@@ -75,6 +75,60 @@ public struct AgentContinuitySnapshot: Sendable, Equatable {
     }
 }
 
+struct RuntimeJobContinuationReference: Codable, Sendable, Equatable {
+    let submissionID: UUID
+    let jobID: UUID
+    let tool: String
+
+    static let tools: Set<String> = ["process.run", "shell.run", "bash.run", "python.run", "powershell.run"]
+
+    enum CodingKeys: String, CodingKey {
+        case submissionID = "submission_id"
+        case jobID = "job_id"
+        case tool
+    }
+
+    func asDictionary() -> [String: Any] {
+        ["submission_id": submissionID.uuidString.lowercased(),
+         "job_id": jobID.uuidString.lowercased(), "tool": tool]
+    }
+}
+
+struct RuntimeJobContinuationSnapshot: Codable, Sendable, Equatable {
+    static let maximumReferences = 32
+    static let maximumBytes = 16_384
+
+    let schemaVersion: Int
+    let scopeKey: String
+    let originEpoch: UUID
+    let submissions: [RuntimeJobContinuationReference]
+
+    enum CodingKeys: String, CodingKey {
+        case schemaVersion = "schema_version"
+        case scopeKey = "scope_key"
+        case originEpoch = "origin_epoch"
+        case submissions
+    }
+
+    func validated() throws -> Self {
+        guard schemaVersion == 1, scopeKey.utf8.count == 64,
+              scopeKey.utf8.allSatisfy({ (48...57).contains($0) || (97...102).contains($0) }),
+              !submissions.isEmpty, submissions.count <= Self.maximumReferences,
+              Set(submissions.map(\.submissionID)).count == submissions.count,
+              submissions.allSatisfy({ RuntimeJobContinuationReference.tools.contains($0.tool) }),
+              try JSONSupport.data(from: asDictionary()).count <= Self.maximumBytes else {
+            throw StoreError.execFailed("runtime job continuation is invalid or exceeds its bound")
+        }
+        return self
+    }
+
+    func asDictionary() -> [String: Any] {
+        ["schema_version": schemaVersion, "scope_key": scopeKey,
+         "origin_epoch": originEpoch.uuidString.lowercased(),
+         "submissions": submissions.map { $0.asDictionary() }]
+    }
+}
+
 /// Durable handoff packet (schema_version 1).
 public struct HandoffPacket: Sendable, Equatable {
     public static let schemaVersion = 1
@@ -108,6 +162,8 @@ public struct HandoffPacket: Sendable, Equatable {
     public var narrative: String
     public var resumeSeed: String
     public var resumeSeedIsCustom: Bool
+    // Only native continuity persistence grants authority to this optional field.
+    var runtimeJobContinuation: RuntimeJobContinuationSnapshot?
 
     public init(
         id: String = UUID().uuidString.lowercased(),
@@ -151,6 +207,7 @@ public struct HandoffPacket: Sendable, Equatable {
         self.narrative = String(narrative.prefix(Self.maxNarrativeChars))
         self.resumeSeed = resumeSeed
         self.resumeSeedIsCustom = resumeSeedIsCustom
+        runtimeJobContinuation = nil
     }
 
     public func asDictionary() -> [String: Any] {
@@ -174,7 +231,16 @@ public struct HandoffPacket: Sendable, Equatable {
         if let projectSlug { task["project_slug"] = projectSlug }
         if let cwd { task["cwd"] = cwd }
 
-        return [
+        var instructions = [
+            "Call get_forge_status with resume=true to reload the handoff",
+            "Pass this handoff id to session_checkpoint/session_handoff when continuing it",
+            "Reattach open agents with agent_run_status(session_id) or complete and restart",
+            "Update memory/current-task.md via session_checkpoint as you progress",
+        ]
+        if runtimeJobContinuation != nil {
+            instructions.append("Read each runtime_continuation submission with job.status, then job.read_output for stdout and stderr. Never resubmit a recorded command; a missing job is unresolved, not proof it did not run.")
+        }
+        var result: [String: Any] = [
             "schema_version": schemaVersion,
             "meta": meta,
             "task": task,
@@ -187,14 +253,13 @@ public struct HandoffPacket: Sendable, Equatable {
             "resume": [
                 "seed": resumeSeed.isEmpty ? defaultResumeSeed() : resumeSeed,
                 "custom": resumeSeedIsCustom,
-                "instructions": [
-                    "Call get_forge_status with resume=true to reload the handoff",
-                    "Pass this handoff id to session_checkpoint/session_handoff when continuing it",
-                    "Reattach open agents with agent_run_status(session_id) or complete and restart",
-                    "Update memory/current-task.md via session_checkpoint as you progress",
-                ],
+                "instructions": instructions,
             ] as [String: Any],
         ]
+        if let runtimeJobContinuation {
+            result["runtime_continuation"] = runtimeJobContinuation.asDictionary()
+        }
+        return result
     }
 
     public func defaultResumeSeed() -> String {
@@ -221,12 +286,24 @@ public struct HandoffPacket: Sendable, Equatable {
         if !narrative.isEmpty {
             lines.append("Summary: \(narrative.prefix(500))")
         }
+        if let runtimeJobContinuation {
+            lines.append("Recorded runtime submissions (completion is not assumed):")
+            for reference in runtimeJobContinuation.submissions {
+                lines.append("- \(reference.tool) job_id=\(reference.jobID.uuidString.lowercased())")
+            }
+            lines.append("Read job.status and both job.read_output streams; do not rerun these commands. Missing retained jobs require attention.")
+        }
         lines.append("Continue this packet with handoff_id: \(id) on later checkpoints or handoffs.")
         lines.append("Call get_forge_status with resume=true, then continue the task.")
         return lines.joined(separator: "\n")
     }
 
     public static func fromDictionary(_ root: [String: Any]) -> HandoffPacket? {
+        if let runtime = root["runtime_continuation"], !(runtime is NSNull) {
+            guard let object = runtime as? [String: Any],
+                  let bytes = try? JSONSupport.data(from: object),
+                  bytes.count <= RuntimeJobContinuationSnapshot.maximumBytes else { return nil }
+        }
         let wire: HandoffPacketWire
         do {
             let data = try JSONSupport.data(from: root)
@@ -294,6 +371,10 @@ public struct HandoffPacket: Sendable, Equatable {
         if customMarker == nil {
             let generatedPrefix = "Forge Continuity resume (handoff \(id))."
             packet.resumeSeedIsCustom = !resumeSeed.isEmpty && !resumeSeed.hasPrefix(generatedPrefix)
+        }
+        if let runtime = wire.runtimeJobContinuation {
+            guard let validated = try? runtime.validated() else { return nil }
+            packet.runtimeJobContinuation = validated
         }
         return packet
     }
@@ -388,10 +469,12 @@ private struct HandoffPacketWire: Decodable {
     let agents: [Agent]?
     let narrative: String?
     let resume: Resume?
+    let runtimeJobContinuation: RuntimeJobContinuationSnapshot?
 
     enum CodingKeys: String, CodingKey {
         case id, meta, task, agents, narrative, resume
         case schemaVersion = "schema_version"
         case workingSet = "working_set"
+        case runtimeJobContinuation = "runtime_continuation"
     }
 }

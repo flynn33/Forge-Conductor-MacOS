@@ -15082,7 +15082,7 @@ public actor ProjectControlPlaneRepository {
         return String(decoding: try encoder.encode(stored), as: UTF8.self)
     }
 
-    private static func scope(from json: String) throws -> ToolAuthorizationScope {
+    static func scope(from json: String) throws -> ToolAuthorizationScope {
         let stored: StoredAuthorizationScope
         do {
             stored = try JSONDecoder().decode(StoredAuthorizationScope.self, from: Data(json.utf8))

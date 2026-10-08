@@ -1,8 +1,53 @@
 # Forge Conductor architecture
 
-Version: `0.25.0`; build: `35`.
+Version: `0.26.0`; build: `36`.
 
-The PDF repair keeps the existing document tools and atomic destination write,
+Ordinary MCP runtime submissions now persist the selected job UUID through a
+separate Source callback inside the CP submission transaction, before COMMIT.
+Same-connection full binding validation and a one-use Source epoch fence apply
+on both new-job and idempotency paths; callbacks are absent from reconstructed
+pending execution. Native references are limited to 32 attempts/16 KiB per epoch
+and merged into packet saves under the existing Source lock. No schema or journal
+migration is added. Resume derives current-authorized status from the exact native
+packet before epoch reset; unavailable rows remain unresolved without replay.
+Same-ID sealed authored edits preserve their native origin/reference extension.
+[Contract and original failure](ORDINARY-RUNTIME-CONTINUATION.md) separate source
+implementation, first compile/regression passes and 24 later focused source
+passes from the retained first owning-area NONPASS and later three-method
+budget/unavailable-reader repair pass. Earlier source 309 distinct methods,
+including actual separate Manager/version checks, and ordinary native Debug
+build passed. Native 309 also passed with three QoS diagnostics; only two test
+dispatch priorities changed, followed by warning-free source 4/native 4 and an
+ordinary Debug confirmation. Full 309 retains its earlier fixture map; the
+existing DiagnosticLog warning remains a profiling target. Strict Debug artifact
+binding, two isolated native MCP scenarios and a fresh Qwen API case passed.
+The first fenced-JSON Qwen NONPASS remains. A later isolated two-helper E0
+baseline shows fallback status entering startup recovery while the primary owns
+live work: its `/bin/sleep 30` child was gone and the row failed runtime_owner_restarted
+after 0.713 s while the exact primary parent stayed alive. Collection succeeded;
+the feature contract failed; that original receipt remains NONPASS.
+The repair owns a private kernel runtime lifetime lease before artifact reservation/spool creation/CP
+queued COMMIT. Startup recovery, artifact sweeps and cleanup debt take the
+same lease and skip verified foreign owners. Authorized warm status/output/cancel
+and selected list-page reads reserve one recovery operation, claim ownership,
+requery current scope and use the existing persisted-identity reaper without
+replaying requests. List filters/cursor are rerun after recovery. Native cleanup
+awaits one bounded utility probe callback per iteration, including after caller
+cancellation; it adds no recurring producer or retention history.
+The runtime owner repair is now applied. The final source selection passed
+**321 methods** without failures, skips or compiler warnings on its unchanged
+450-input map. The separate ordinary canonical Debug build passed in 24.992
+seconds. The same **321 native methods** passed without failures/skips, retaining
+one existing DiagnosticLog:64 runtime QoS warning. Strict Debug verification of seven binaries
+and build binding, plus repeated signed live-owner, warm-crash and two
+continuation cases passed on the final map. Fresh Qwen consumption passed three
+actual Low/API rounds and four verified calls with exact job/output/task recovery
+and no replay. Earlier passes retain their earlier maps. Exact direct publication and synchronization revisions are retained separately
+in `runtime-continuation-publication-and-synchronization-026.json` after the update.
+Budget reuse requires an unsealed eligible origin; otherwise a fresh ID clones
+authored content while prior same-ID native origins remain preserved. Installed .18 and the 54 capability/full-web/PDFKit/all-feature gates remain separate.
+
+The preceding 0.25 PDF repair keeps the existing document tools and atomic destination write,
 using CoreText glyph/metric layout and a per-call CoreGraphics output consumer
 with a new 64 MiB retained-output cap. The shared `NativePDFTextReader` owns its
 native parser/scanner resources per invocation, admits a complete flat tagged-text
@@ -23,7 +68,9 @@ published and synchronized. A later test-only immutable fixture capture correcti
 passed the freshly compiled UTF-8 regression and all 19 writer methods without the
 original warning. It changes no production ownership, resource boundary, graph or
 product identity; original candidate receipts retain their original test hash. This
-test/documentation publication is pending. The scope, unresolved optional
+test/documentation closeout was delivered and synchronized with clean 0/0
+source/wiki divergence; [exact preceding refs](ORDINARY-RUNTIME-CONTINUATION.md#preceding-pdf-delivery)
+retain that receipt. The scope, unresolved optional
 root-field ambiguity and retained PDFKit order failure are in [native PDF writing](NATIVE-PDF-WRITING.md).
 
 ## Preceding 0.24.0 listing boundary

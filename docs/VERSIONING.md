@@ -11,7 +11,36 @@ readbacks and ordinary observations retain their explicit limits; no
 installation, notarization, App Store upload or distribution was performed.
 Exact owner publication/readback/synchronization refs are retained externally.
 
-Current identity is **0.25.0 (35)**. The native PDF text/layout correction and shared
+Current identity is **0.26.0 (36)**. Ordinary runtime job continuation advances
+the feature-release component: native admission references and exact-packet resume
+status are additive, with no schema/journal migration. Existing names, grants,
+output semantics and public managed/provider paths remain required. Earlier
+source checks passed 309 distinct methods, including actual Manager/G3 selection;
+incremental CLI/app and ordinary native Debug build passed. Native 309 passed
+with three QoS diagnostics; only two test priority lines changed, then source 4
+and native 4 passed without warnings and ordinary Debug was confirmed on the
+later map. Strict Debug artifact binding, two isolated native MCP cases and a
+fresh Qwen API case passed. The first fenced-JSON Qwen NONPASS is retained;
+a later isolated two-helper E0 baseline failed the live-owner contract. Its
+collection success is not a feature pass; that original failure remains NONPASS.
+The runtime owner repair is now applied. The final source selection passed
+**321 methods** without failures, skips or compiler warnings on its unchanged
+450-input map. The separate ordinary canonical Debug build passed in 24.992
+seconds. The same **321 native methods** passed without failures/skips, retaining
+one existing DiagnosticLog:64 runtime QoS warning. Strict Debug verification of seven binaries
+and build binding, plus repeated signed live-owner, warm-crash and two
+continuation cases passed on the final map. Fresh Qwen consumption passed three
+actual Low/API rounds and four verified calls with exact job/output/task recovery
+and no replay. Earlier passes retain their earlier maps. Exact direct publication and synchronization revisions are retained separately
+in `runtime-continuation-publication-and-synchronization-026.json` after the update. The first owning-area source NONPASS
+is retained; later budget/unavailable-reader repairs passed three methods.
+First CLI/app compiles and
+the original repaired regression passed on their first integration snapshots.
+The later focused 24 new source tests passed without warnings/errors.
+[The continuation contract](ORDINARY-RUNTIME-CONTINUATION.md) retains exact receipts; installed .18,
+54 capability themes, full-web, PDFKit and all-feature/shipment acceptance stay open.
+
+The preceding identity is **0.25.0 (35)**. The native PDF text/layout correction and shared
 complete tagged-text reader advance the feature-release component. Tool names,
 schemas, defaults and durable formats remain; generated PDF bytes/layout and
 new converter provenance can change. The corrected owning-area source selection
@@ -26,7 +55,8 @@ review covered ten Release and two Qwen PNG pages. The PDFKit whole mixed-script
 order and Qwen wrapped-sentinel gates remain open. The PDF source/wiki checkpoint
 was published and synchronized. A later test-only immutable fixture capture
 correction passed the freshly compiled UTF-8 regression and all 19 writer methods
-without the original warning; this test/documentation publication is pending in
+without the original warning; its test/documentation closeout was delivered and
+synchronized with clean 0/0 source/wiki divergence ([exact refs](ORDINARY-RUNTIME-CONTINUATION.md#preceding-pdf-delivery)), as recorded in
 [native PDF writing](NATIVE-PDF-WRITING.md).
 
 The preceding identity is **0.24.0 (34)**. Additive `fs_list`
@@ -88,9 +118,38 @@ focused version test, and CI reject drift between them.
 
 ## Current identity
 
-The current product version is `0.25.0`, build `35`. `VERSION`, `BUILD_NUMBER`,
+The current product version is `0.26.0`, build `36`. `VERSION`, `BUILD_NUMBER`,
 compiled protocol constants, all twelve Xcode marketing-version settings,
 all sixteen build-number settings and current document markers must agree.
+The actual .26 source version regression passed; ordinary native Debug build
+passed. Native 309 passed with three QoS diagnostics; focused source 4/native 4
+and ordinary Debug confirmation passed after two test priority lines changed.
+Strict Debug signature/build binding passed for seven binary files on that earlier map. First
+CLI/app compiles and the original repaired regression passed on their first maps;
+the later 24 new cases passed without warnings/errors on their final map. The
+first owning-area source NONPASS remains: 307 tests executed with 41 assertion
+failures in two pending-output fixtures. Later budget/unavailable-reader repairs
+passed three source methods. The following owning-area 307 + separate exact
+Manager/G3 two-method checks passed 309 distinct source methods, zero skips or
+failures. Final product commands passed as incremental confirmations; canonical
+ordinary native Debug build passed. Native 309 and later focused native 4 passed
+on their separate fixture maps; three full-run QoS diagnostics remain retained.
+The Debug candidate’s seven binaries are bound to that earlier map; isolated native MCP
+and fresh Qwen consumption passed within their recorded scopes. The first Qwen
+final-parser NONPASS and earlier maps remain retained. Release/install/GUI
+qualification stays separate. The later isolated two-helper owner baseline is
+an E0 feature failure; that original receipt remains NONPASS. Owner repair is
+applied and source 321/ordinary Debug compilation passed on the current 450 map.
+The same native 321 selection passed with one existing DiagnosticLog64 warning;
+strict Debug verification of seven binaries, signed owner/continuation repetitions and fresh Qwen passed.
+Exact direct publication/synchronization revisions use the external delivery receipt after the update. A private runtime kernel lifetime lease is an
+implementation change within the additive .26 feature; it adds no Source/CP
+schema migration, admission lease or journal.
+The ordinary-runtime extension retains handoff schema 1 and existing Source/CP
+storage schemas; product identity does not imply a database format migration.
+
+### Preceding 0.25 PDF version agreement
+
 At the PDF product checkpoint, the current-version source/document regression
 passed one method and the compiled native selection passed 102 tests, including
 that same marker check. Strict Debug/Release verification bound seven/five
@@ -102,7 +161,11 @@ and graph remain unchanged. Its focused native regression and all 19 writer
 methods passed without the original warning. No distributed candidate or product
 contract changed, so identity remains 0.25.0 (35); this does not alter the general
 version policy or the build-number requirement for distributed candidates. This
-test/documentation publication remains pending. Independent r6 semantic artifact
+test/documentation closeout was delivered and synchronized at source
+`5ff5559ad02192a90a4887154f48e38c81fa54fe` and wiki
+`3dc576814d2bafdaa2ff303e5011072026e0a378`, both clean with 0/0 divergence;
+`native-pdf-capture-publication-and-synchronization-025.json` retains the exact receipt.
+Independent r6 semantic artifact
 validation and Release/Qwen render review retain their original scopes; both
 PDFKit compatibility failures remain open.
 The corrected PDF owning-area

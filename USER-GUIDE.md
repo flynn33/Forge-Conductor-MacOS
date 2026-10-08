@@ -1,5 +1,34 @@
 # Forge Conductor user guide
 
+Current source targets 0.26.0 (36). First CLI/app compiles and one repaired
+regression passed on their first snapshots; 24 later new source tests passed.
+The first broader NONPASS remains historical. The later checkpoint guard
+correction and two genuine unavailable-reader fixtures passed three source
+methods; available live empty snapshots remain supported. Earlier source
+checks passed 309 distinct methods, including separate Manager/version checks;
+incremental CLI/app and ordinary native Debug build passed. Native 309 passed
+with three QoS diagnostics; two test priority corrections passed four source
+and four native methods without warnings, and ordinary Debug was confirmed.
+Strict Debug artifact binding, two isolated native MCP cases and a fresh Qwen
+API case passed exact job/output recovery without replay. The first Qwen
+fenced-JSON NONPASS remains recorded. An isolated two-helper E0 baseline then
+interrupted a still-live primary job; collection succeeded, but the feature
+contract failed; that historical receipt remains NONPASS.
+The runtime owner repair is now applied. The final source selection passed
+**321 methods** without failures, skips or compiler warnings on its unchanged
+450-input map. The separate ordinary canonical Debug build passed in 24.992
+seconds. The same **321 native methods** passed without failures/skips, retaining
+one existing DiagnosticLog:64 runtime QoS warning. Strict Debug verification of seven binaries
+and build binding, plus repeated signed live-owner, warm-crash and two
+continuation cases passed on the final map. Fresh Qwen consumption passed three
+actual Low/API rounds and four verified calls with exact job/output/task recovery
+and no replay. Earlier passes retain their earlier maps. Exact direct publication and synchronization revisions are retained separately
+in `runtime-continuation-publication-and-synchronization-026.json` after the update.
+The installed .18 deployment stays separate.
+[Ordinary runtime continuation](docs/ORDINARY-RUNTIME-CONTINUATION.md) records the
+original missing-job-reference failure and manual recovery; it does not close
+the 54 capability themes, full-web, PDFKit or installed/all-feature gates.
+
 The current native hosted rollover-control test passed numeric edits and public
 accessibility stepper actions, including the 1 and 10,000 boundaries and default
 200. This verifies the rendered control and staged settings binding; ordinary
@@ -189,7 +218,7 @@ observations retain their recorded scope. Exact owner publication, remote
 readback and synchronization references are retained externally. See the
 [phase record](docs/GRAPHITE-WORKBENCH.md) for evidence and capture limits.
 
-Version **0.25.0**, build **35** (current source; candidate qualification is separate from installation).
+Version **0.26.0**, build **36** (current source; qualification is pending and separate from installation).
 
 This guide describes the current LM Studio-driven workflow. The user works in a
 normal LM Studio chat; Forge Conductor supplies project context, tools, policy
@@ -465,7 +494,9 @@ and two Qwen artifacts with the original scalar markers. Its 82 controls retain
 the original 80 expectations and add exact 32,768/32,769 operand boundaries. Native PNG
 review covered ten Release and two Qwen PNG pages. PDFKit compatibility remains
 open. A later test-only fixture capture correction passed the focused native
-regression and all 19 writer methods; the PDF tool contract is unchanged. These
+regression and all 19 writer methods; the PDF tool contract is unchanged. Its
+0.25 test/documentation closeout was delivered and synchronized with clean 0/0
+source/wiki divergence ([exact refs](docs/ORDINARY-RUNTIME-CONTINUATION.md#preceding-pdf-delivery)). These
 results do not qualify the installed active chat, full Markdown or Office export.
 
 Web tools accept integer `timeout_sec` from 1–30 (default 20), and
@@ -539,6 +570,26 @@ mode. Current cursors avoid skipping later live rows when earlier rows expire.
 
 ## 7. Automatic continuity
 
+The 0.26 source adds native runtime job references to an ordinary project's
+handoff, alongside the authored goal and custom resume seed. Resume with
+`get_forge_status(resume=true)` and the exact handoff ID. When currently authorized,
+`runtime_continuation_status` reports those jobs before the epoch is cleared.
+Cooperating helpers preserve a live job owned by another helper. If its owner
+has exited, an authorized status/output read attempts bounded recovery using the
+stored process identity; it does not rerun the command. Read the returned job
+state and both output streams before treating the work as complete.
+Use each returned UUID with `job.status`, then `job.read_output` for stdout and
+stderr. A queued acknowledgement may already refer to a completed job. If the
+row is unavailable or unauthorized, it is unresolved and must not be replayed.
+The bound is 32 native submission attempts per logical epoch and a 16 KiB
+extension; this does not capture the latest GUI instruction. A budget handoff
+uses a fresh ID when the predecessor is sealed or its native origin belongs to
+an earlier epoch, while preserving authored content. Automatic finalized packets
+use the existing default `handoff_ready` status; the original authored checkpoint
+can remain completed. Signed candidate continuation and scoped Qwen API
+consumption passed; installed GUI continuation remains separate in
+[the contract](docs/ORDINARY-RUNTIME-CONTINUATION.md).
+
 The model can save compact checkpoints while it works. At context pressure it
 saves a resume-ready handoff. Continuity then proceeds without an operator
 action in the Continuity view:
@@ -566,8 +617,10 @@ fixtures also verify that concurrent bootstrap cannot replace an active intent,
 a late acknowledgement cannot revive explicit cancellation, and an interrupted
 intent can retry after restart.
 
-Current ordinary LM Studio GUI rollover/threshold acceptance and debugger
-execution remain unverified; actual live GUI overlap remains unqualified.
+The installed .18 observed case created and acknowledged a successor but omitted
+the newly submitted job UUID; manual delivery recovered its completed output.
+Current .26 GUI continuation/threshold acceptance and debugger execution remain
+unverified; broad live GUI overlap remains unqualified.
 The separately tested managed API handoff and automatic continuation do not
 qualify the GUI trigger, successor consumption, or predecessor sealing; see the
 [current repair record](docs/LMSTUDIO-RUNTIME-REPAIR.md).

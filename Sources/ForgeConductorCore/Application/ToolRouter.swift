@@ -1683,8 +1683,8 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
                 committedResultWins: false
             ) {
                 // Native validation owns the job/project/generation match.
-                // Output streams are published only at terminal completion,
-                // so output reads never qualify as successful waiting polls.
+                // Only status reads receive the waiting exemption. Output
+                // reads, including live snapshots, keep the ordinary loop guard.
                 let owner = try await service.status(jobID: jobID, context: context)
                 return !owner.state.isTerminal
             }

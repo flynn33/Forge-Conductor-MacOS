@@ -10,6 +10,71 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### `0.26.0 (36)` ordinary runtime job continuation and owner recovery
+
+- Add native submission references for ordinary project-bound `process.run`,
+  `shell.run`, `bash.run`, `python.run` and `powershell.run` handoffs. The bound
+  is 32 native submission attempts per logical epoch and 16 KiB of encoded
+  extension; keyed retries may reference one job more than once.
+- Persist the actual chosen new/reused job UUID in Source before CP COMMIT,
+  behind same-connection client/project/generation/full-scope validation and a
+  one-use Source epoch fence. Both early and transactional idempotency paths
+  use the seam; public managed/provider submission compatibility remains.
+  Budget handoffs reuse only unsealed eligible origins; a fresh ID otherwise
+  clones authored fields while retaining the predecessor reference origin.
+- Add current-authorized exact-packet `runtime_continuation_status` to resume
+  before scoped epoch reset. Unavailable rows remain unresolved with replay
+  forbidden; no command replay, job scan, database migration or journal is added.
+- Preserve authored goals/custom seeds and same-ID sealed authored edits while
+  retaining the native origin/reference set. The installed .18 lost-reference
+  case and manual output recovery, plus the original one-test/one-failure
+  baseline, remain recorded. First CLI/app compiles and the repaired original
+  regression passed on their first snapshots. The later focused 24 new source
+  tests passed without warnings/errors. The first owning-area NONPASS remains:
+  307 tests, 41 assertion failures in two pending-output fixtures. A later
+  budget reuse baseline failed 14 assertions; the corrected guard and genuine
+  non-owning unavailable-reader fixtures then passed all three selected methods
+  without skips/warnings, preserving original assertions and available empty
+  snapshots. The earlier owning-area selection passed 307 methods (154
+  Continuity + 153 Runtime); a separate exact Manager + version selection passed
+  two methods, giving 309 distinct source passes, zero skips/warnings/failures.
+  Both incremental SwiftPM products and ordinary canonical native Debug build
+  passed. The full native selection passed 309 methods with three QoS
+  diagnostics. Two test-only dispatch priorities were corrected, then four
+  source and four native methods passed without warnings; the ordinary Debug
+  build was confirmed on the later map. The existing DiagnosticLog warning
+  remains a profiling target. Strict Debug artifact/build binding passed for
+  seven binary files on that earlier 450-input map. Two isolated native MCP cases passed
+  with 33 accepted jobs and 56 complete LF responses; the largest measured
+  status response was 42,833 bytes within the configured 65,536-byte budget.
+  No additive notice was exercised. The first Qwen run remains NONPASS because
+  fenced final JSON failed the strict parser. A fresh run with only two external
+  prompt strings made explicit passed three rounds/four consumed tool calls,
+  exact job/output/authored-task checks and normal stop, without replay.
+  A subsequent isolated shared-home/deployment baseline supplies E0: fallback
+  job.status interrupted the primary's still-live `/bin/sleep 30` job after 0.713 s,
+  producing runtime_owner_restarted and unavailable output while the exact
+  primary parent remained alive. Evidence collection succeeded; the feature
+  contract failed; that receipt remains NONPASS.
+- Protect queued admission and active work with a private kernel runtime lifetime
+  lease shared by cooperating native helpers. Startup recovery and artifact/debt
+  cleanup skip verified live owners. Durable cancellation reaches the owner
+  through its existing monitor; unavailable ownership fails closed.
+- Recover abandoned work on authorized warm status/output/cancel reads and the
+  bounded selected list page, with claimed ownership and a current scoped requery.
+  Exact persisted process identity, termination/debt policy and no-replay behavior
+  remain. Cancelled cleanup now awaits its native probe delay instead of spinning;
+  the saturated 4,096-probe baseline remains NONPASS and the same four cases passed.
+  The final source selection passed 321 methods, zero failures/skips/compiler
+  warnings; separate ordinary Debug compilation passed in 24.992 seconds.
+  The same 321 native methods passed with one existing DiagnosticLog:64 runtime
+  QoS warning. Strict Debug verification of seven binaries, signed live-owner/warm-crash and two continuation
+  cases passed on the final map. Fresh Qwen also passed three actual Low/API
+  rounds and four verified calls, normal stop/full native EOF without replay.
+  Exact direct publication/synchronization revisions are retained in the external
+  delivery receipt named in [the contract](docs/ORDINARY-RUNTIME-CONTINUATION.md).
+  The 54 capability themes, PDFKit, full-web, installed and shipment gates remain open.
+
 ### `0.25.0 (35)` native PDF text and layout
 
 - Native CoreText glyph layout and metric wrapping replace the manual Helvetica
@@ -42,7 +107,10 @@ Product versions do not by themselves claim shipment.
   All 96 existing assertion lines remain, with one new fixture unwrap. The other
   449 source/configuration/graph inputs and product 0.25.0 (35) remain unchanged;
   the earlier candidate receipts keep their original test hash. This test/document
-  update awaits its own publication.
+  update was delivered and synchronized at source
+  `5ff5559ad02192a90a4887154f48e38c81fa54fe` and wiki
+  `3dc576814d2bafdaa2ff303e5011072026e0a378`, both clean with 0/0 divergence;
+  `native-pdf-capture-publication-and-synchronization-025.json` retains the exact receipt.
 
 ### `0.24.0 (34)` bounded directory continuation
 

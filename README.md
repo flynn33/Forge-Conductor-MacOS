@@ -1,6 +1,44 @@
 # Forge Conductor for macOS
 
-Current source is **0.25.0 (35)**. The native PDF repair uses CoreText glyph layout
+Current source is **0.26.0 (36)**. Ordinary project-bound MCP submissions now
+carry native job references into the handoff, with Source admission before CP
+COMMIT and current-authorized resume status before epoch reset. The installed
+0.18 Qwen failure and its manual exact-ID recovery are retained; the original
+regression failed its UUID assertion and passed on the first repaired snapshot.
+First CLI/app compiles and the initial 24 new source tests passed. The first
+owning-area **NONPASS** (307 tests, 41 assertion failures) remains retained.
+The later budget-checkpoint regression and two genuine unavailable-reader
+fixtures passed all three selected source methods without skips or warnings.
+Earlier source checks passed **309 distinct tests** across two commands,
+including the exact Manager parity and version method. Both incremental SwiftPM
+products and the ordinary canonical native Debug build passed. Native tests
+passed all 309 methods with three retained QoS diagnostics. Two test dispatch
+priority changes then passed four related source and four native methods without
+warnings; the ordinary Debug build was confirmed on that later map. Strict
+Debug artifact/build binding and two isolated native MCP scenarios passed.
+The first Qwen run remains NONPASS at fenced final JSON; the fresh raw-JSON
+run passed three rounds/four consumed tool calls with exact job/output recovery.
+An isolated two-helper E0 baseline then failed the feature contract: fallback
+status interrupted the primary's still-live sleep job. Collection succeeded; that original feature failure remains NONPASS.
+
+The runtime owner repair is now applied. The final source selection passed
+**321 methods** without failures, skips or compiler warnings on its unchanged
+450-input map. The separate ordinary canonical Debug build passed in 24.992
+seconds. The same **321 native methods** passed without failures/skips, retaining
+one existing DiagnosticLog:64 runtime QoS warning. Strict Debug verification of seven binaries
+and build binding, plus repeated signed live-owner, warm-crash and two
+continuation cases passed on the final map. Fresh Qwen consumption passed three
+actual Low/API rounds and four verified calls with exact job/output/task recovery
+and no replay. Earlier passes retain their earlier maps. Exact direct publication and synchronization revisions are retained separately
+in `runtime-continuation-publication-and-synchronization-026.json` after the update.
+The private kernel runtime lifetime lease protects cooperating helpers' live and
+queued work; authorized warm reads recover abandoned work without replay. The
+32-attempt / 16 KiB extension, one-use epoch/full-grant fence, unresolved/no-replay behavior
+and preserved authored-task/sealed-edit contract are in
+[ordinary runtime continuation](docs/ORDINARY-RUNTIME-CONTINUATION.md).
+The 54 capability themes, PDFKit, full-web and installed/all-feature gates remain open.
+
+The preceding **0.25.0 (35)** native PDF repair uses CoreText glyph layout
 and measured wrapping through the existing `pdf_write` and `pdf_from_file` tools.
 A bounded CoreGraphics reader preserves logical text for the supported complete
 tagged subset in instruction imports and policy-source indexing. The corrected
@@ -18,7 +56,10 @@ source/wiki checkpoint was published and synchronized. A later test-only correct
 captures an immutable fixture URL; its freshly compiled UTF-8 regression and all
 19 writer methods passed without the original capture warning. All 96 existing
 assertion lines remain. Product/configuration/graph and version 0.25.0 (35) are
-unchanged; the new test/documentation publication is pending.
+unchanged at that checkpoint. Its test/documentation closeout was delivered and
+synchronized, source `5ff5559ad02192a90a4887154f48e38c81fa54fe` and wiki
+`3dc576814d2bafdaa2ff303e5011072026e0a378`, both clean with 0/0 divergence.
+The exact external record is `native-pdf-capture-publication-and-synchronization-025.json`.
 [PDF contract, evidence and limits](docs/NATIVE-PDF-WRITING.md).
 
 The preceding **0.24.0 (34)** checkpoint: Opt-in `fs_list` pagination passed 173 affected
@@ -566,8 +607,8 @@ continuity. The user does not start project work through a Forge Managed Run.
 
 | | |
 |---|---|
-| **Version** | **0.25.0** |
-| **Build** | **35** |
+| **Version** | **0.26.0** |
+| **Build** | **36** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |
@@ -685,9 +726,9 @@ receipt does not qualify that path. The full scope and remaining
 distribution limits are in the [qualification record](docs/QUALIFICATION-STATUS.md).
 
 The current root version authorities, compiled protocol constants and Xcode
-build settings use `0.25.0 (35)`; the current document markers are checked by
-the version-alignment regression. Historical qualification receipts retain
-their tested identities.
+build settings use `0.26.0 (36)`; the current document markers must pass
+the version-alignment regression, which passed its actual source selection. Historical
+qualification receipts retain their tested identities.
 The [GitHub wiki](https://github.com/flynn33/Forge-Conductor-MacOS/wiki)
 publication/readback/synchronization refs are retained externally. Installed-app
 references are dated qualification snapshots; the later publication readback

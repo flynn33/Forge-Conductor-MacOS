@@ -52,6 +52,9 @@ public struct RuntimeJobSubsystem: Sendable {
 public struct RuntimeJobSynchronousToolPack: ToolPackHandling, Sendable {
     public static let controlTimeoutSeconds: TimeInterval = 15
     public static let legacyCompletionSlackSeconds: TimeInterval = 10
+    private static let continuationSubmissionTools: Set<String> = [
+        "process.run", "shell.run", "bash.run", "python.run", "powershell.run",
+    ]
 
     private let subsystem: RuntimeJobSubsystem
 
@@ -122,12 +125,18 @@ public struct RuntimeJobSynchronousToolPack: ToolPackHandling, Sendable {
                 cancellation: cancellation
             )
         }
+        let preCommitAdmission = Self.continuationSubmissionTools.contains(name)
+            ? try app.continuityAutomation.prepareOrdinaryRuntimeJobAdmission(
+                tool: name, context: context, cancellation: cancellation
+            )
+            : nil
         let committedReceipt = Self.mutatingControlTools.contains(name)
             ? RuntimeBlockingResult<ToolResult>()
             : nil
         let toolPack = committedReceipt.map { receipt in
             RuntimeJobToolPack(
                 service: subsystem.service,
+                preCommitAdmission: preCommitAdmission,
                 durableResultObserver: { value in
                     receipt.store(.success(value))
                 }

@@ -1,6 +1,51 @@
 # Telemetry architecture (real-time native)
 
-Current source documentation is `0.25.0`, build `35`. The PDF writer and shared
+Current source documentation is `0.26.0`, build `36`. The ordinary runtime
+continuation extension is bounded to 32 native attempts and 16 KiB per logical
+epoch. The callback owns a bounded Source mutation while the CP writer is held;
+status uses only the selected native packet's references, with no history scan,
+new recurring producer or Source/CP admission journal/lease. Cancellation/rollback can leave an
+unresolved Source reference and never grant replay. These are source boundaries,
+not measured latency, heap, leak or GUI claims. First CLI/app compiles and one
+repaired regression passed on their first snapshots; the later 24 new source
+cases passed without warnings/errors. The first owning-area NONPASS stays
+retained. The later budget guard and genuine unavailable-reader repairs passed
+three source methods, with original assertions and live empty snapshots
+preserved. Earlier 309 distinct source methods, incremental CLI/app and ordinary
+native Debug build passed. Native 309 passed with three QoS diagnostics: two
+new fixture Utility waits and existing DiagnosticLog:64. Only two test dispatch
+priorities changed; source 4/native 4 passed without warnings, with ordinary
+Debug confirmed on the later map. The third diagnostic remains E3 profiling
+scope, with no ordinary GUI inversion or production repair claim. Neither these
+passes nor seven deliberate SQLite negative-fixture logs supply heap/leak proof.
+Strict Debug artifact binding and the isolated native MCP/Qwen cases passed,
+with normal native exit/full EOF and no replay. The first Qwen fenced-JSON
+NONPASS remains. No actual additive notice was exercised. A later isolated
+two-helper E0 baseline interrupted the primary's still-live `/bin/sleep 30` job after
+0.713 s on fallback status, leaving runtime_owner_restarted and unavailable
+output while the exact primary parent remained alive. Collection succeeded;
+the feature contract failed; that receipt remains NONPASS. The runtime repair
+now owns a private kernel lifetime lease with bounded inventory and cleanup;
+the reference admission path adds no Source/CP lease. The cancelled-probe
+baseline saturated 4,096 observations; the same four cases passed after replacing
+only the two cancelled sleeps with an awaited native utility callback. Each loop
+awaits its callback before another iteration; no repeating timer or producer is
+added. This is bounded retained work/cadence evidence, not a hard scheduler/native
+call completion bound or whole-app heap/leak proof.
+The runtime owner repair is now applied. The final source selection passed
+**321 methods** without failures, skips or compiler warnings on its unchanged
+450-input map. The separate ordinary canonical Debug build passed in 24.992
+seconds. The same **321 native methods** passed without failures/skips, retaining
+one existing DiagnosticLog:64 runtime QoS warning. Strict Debug verification of seven binaries
+and build binding, plus repeated signed live-owner, warm-crash and two
+continuation cases passed on the final map. Fresh Qwen consumption passed three
+actual Low/API rounds and four verified calls with exact job/output/task recovery
+and no replay. Earlier passes retain their earlier maps. Exact direct publication and synchronization revisions are retained separately
+in `runtime-continuation-publication-and-synchronization-026.json` after the update.
+[The continuation record](ORDINARY-RUNTIME-CONTINUATION.md) keeps exact scopes. Full-web, PDFKit,
+54 capability themes and installed/all-feature gates remain open.
+
+At the preceding 0.25 checkpoint, the PDF writer and shared
 semantic reader own per-call native resources without adding a recurring
 producer, timer or cache. The corrected owning-area source selection passed
 101 methods and the compiled native selection passed 102 tests on the original
@@ -16,8 +61,9 @@ validator passed 82 controls and the Debug/Release/Qwen artifacts with normal
 exits and full EOF; its revised operand quota is separate from framework latency/heap bounds.
 Native PNG review covered ten Release and two Qwen PNG pages. PDFKit compatibility
 remains open. The PDF source/wiki checkpoint was published and synchronized; this
-later test/documentation publication is pending in
-[native PDF writing](NATIVE-PDF-WRITING.md).
+later test/documentation closeout was also delivered and synchronized, with
+clean 0/0 source/wiki divergence ([exact refs](ORDINARY-RUNTIME-CONTINUATION.md#preceding-pdf-delivery)).
+[Native PDF writing](NATIVE-PDF-WRITING.md) retains the original qualification scopes.
 
 ## Preceding 0.24.0 listing resource evidence
 
@@ -263,6 +309,6 @@ representative physical-hardware qualification remain open.
 
 ## Version
 
-`0.25.0`
+`0.26.0`
 
-Build: `35`
+Build: `36`

@@ -5514,8 +5514,15 @@ final class ContinuityTests: XCTestCase {
         try bindProjectContext(app, clientID: client)
         try configureAllowedProjectRoot(app)
         _ = try app.config.update(["shell": ["enabled": true]], save: false)
+        // Start the non-owning reader before the publisher creates a live job;
+        // startup recovery must never reclaim the publisher's process.
+        try await app.runtimeJobs.start()
+        let publisher = try ForgeApp.bootstrap(home: tempHome)
+        defer { publisher.shutdown() }
+        try configureAllowedProjectRoot(publisher)
+        _ = try publisher.config.update(["shell": ["enabled": true]], save: false)
         let context = try app.projectContexts.invocationContext(for: client)
-        let submission = try app.tools.call(name: "process.run", arguments: [
+        let submission = try publisher.tools.call(name: "process.run", arguments: [
             "executable": "/bin/sleep", "arguments": ["20"], "cwd": tempHome.path,
             "timeout_sec": 30, "replay_class": RuntimeReplayClass.readOnly.rawValue,
         ], clientID: client)
@@ -5523,10 +5530,10 @@ final class ContinuityTests: XCTestCase {
         let jobText = try XCTUnwrap(submission.payload["job_id"] as? String)
         let jobID = try XCTUnwrap(UUID(uuidString: jobText))
         let runningDeadline = ContinuousClock.now.advanced(by: .seconds(3))
-        var owner = try await app.runtimeJobs.service.status(jobID: jobID, context: context)
+        var owner = try await publisher.runtimeJobs.service.status(jobID: jobID, context: context)
         while owner.state != .running, ContinuousClock.now < runningDeadline {
             try await Task.sleep(for: .milliseconds(25))
-            owner = try await app.runtimeJobs.service.status(jobID: jobID, context: context)
+            owner = try await publisher.runtimeJobs.service.status(jobID: jobID, context: context)
         }
         XCTAssertEqual(owner.state, .running)
         XCTAssertNotNil(owner.processIdentifier)
@@ -5555,10 +5562,10 @@ final class ContinuityTests: XCTestCase {
         XCTAssertEqual(app.continuityAutomation.snapshot(for: client)["tool_call_count"] as? Int, 9)
         XCTAssertTrue(app.continuityAutomation.isBlocked(client))
         XCTAssertEqual(try sqliteFixtureInt(at: app.paths.storeSQLite, sql: "SELECT COUNT(*) FROM context_handoffs;"), 1)
-        let stillRunning = try await app.runtimeJobs.service.status(jobID: jobID, context: context)
+        let stillRunning = try await publisher.runtimeJobs.service.status(jobID: jobID, context: context)
         XCTAssertEqual(stillRunning.state, .running)
-        try await app.runtimeJobs.service.cancel(jobID: jobID, context: context)
-        let cancelled = try await app.runtimeJobs.service.waitForTerminal(jobID: jobID, context: context, maximumWait: .seconds(5))
+        try await publisher.runtimeJobs.service.cancel(jobID: jobID, context: context)
+        let cancelled = try await publisher.runtimeJobs.service.waitForTerminal(jobID: jobID, context: context, maximumWait: .seconds(5))
         XCTAssertEqual(cancelled.state, .cancelled)
     }
 
@@ -5607,7 +5614,12 @@ final class ContinuityTests: XCTestCase {
         _ = try app.config.update(["shell": ["enabled": true]], save: false)
         _ = try app.config.update(ManagerSettingsPatch(continuityRolloverToolCalls: 3), save: false)
         let client = ClientID("pending-unavailable-output-budget")
-        let (jobID, jobText, context) = try await startContinuitySleepingOwner(app, clientID: client, root: tempHome)
+        try await app.runtimeJobs.start()
+        let publisher = try ForgeApp.bootstrap(home: tempHome)
+        defer { publisher.shutdown() }
+        try configureAllowedProjectRoot(publisher)
+        _ = try publisher.config.update(["shell": ["enabled": true]], save: false)
+        let (jobID, jobText, context) = try await startContinuitySleepingOwner(publisher, clientID: client, root: tempHome)
         for count in 1...2 {
             let output = try app.tools.call(name: "job.read_output", arguments: ["job_id": jobText, "stream": "stdout", "offset": 0], clientID: client)
             XCTAssertFalse(output.ok)
@@ -5624,10 +5636,10 @@ final class ContinuityTests: XCTestCase {
         XCTAssertEqual(app.continuityAutomation.snapshot(for: client)["failed_tool_count"] as? Int, 2)
         XCTAssertEqual(app.continuityAutomation.snapshot(for: client)["tool_call_count"] as? Int, 3)
         XCTAssertTrue(app.continuityAutomation.isBlocked(client))
-        let owner = try await app.runtimeJobs.service.status(jobID: jobID, context: context)
+        let owner = try await publisher.runtimeJobs.service.status(jobID: jobID, context: context)
         XCTAssertEqual(owner.state, .running)
-        try await app.runtimeJobs.service.cancel(jobID: jobID, context: context)
-        let cancelled = try await app.runtimeJobs.service.waitForTerminal(jobID: jobID, context: context, maximumWait: .seconds(5))
+        try await publisher.runtimeJobs.service.cancel(jobID: jobID, context: context)
+        let cancelled = try await publisher.runtimeJobs.service.waitForTerminal(jobID: jobID, context: context, maximumWait: .seconds(5))
         XCTAssertEqual(cancelled.state, .cancelled)
     }
 
@@ -6243,6 +6255,644 @@ final class ContinuityTests: XCTestCase {
             clientID: ClientID("configured-read")
         )
         XCTAssertTrue(allowed.ok, "\(allowed.payload)")
+    }
+}
+
+private func ordinaryRuntimeProgressBytes(_ value: RuntimeContinuityProgress) throws -> Data {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys]
+    return try encoder.encode(value)
+}
+
+private func ordinaryRuntimeReferenceRecord(
+    context: ToolInvocationContext,
+    jobID: UUID = UUID(),
+    projectID: ProjectID? = nil,
+    generation: ProjectGeneration? = nil
+) -> RuntimeJobRecord {
+    RuntimeJobRecord(jobID: jobID, runID: context.runID,
+        projectID: projectID ?? context.projectID,
+        projectGeneration: generation ?? context.projectGeneration,
+        runtimeKind: .process, executionProfile: .directProcess,
+        replayClass: .readOnly, idempotencyKey: nil, state: .queued,
+        canonicalWorkingDirectory: context.authorizationScope.canonicalRoots[0],
+        commandSummary: "FORGE-ORDINARY-REF-PRIVATE-COMMAND", timeoutSeconds: 5,
+        exitCode: nil, outputArtifactID: nil, outputBytes: 0,
+        processIdentifier: nil, processGroupIdentifier: nil,
+        errorCode: nil, errorSummary: nil, createdAt: "2027-01-15T08:00:00Z",
+        startedAt: nil, completedAt: nil, updatedAt: "2027-01-15T08:00:00Z")
+}
+
+private final class OrdinaryRuntimePacketResultBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var result: Result<[String: Any], Error>?
+    func set(_ result: Result<[String: Any], Error>) {
+        lock.lock(); self.result = result; lock.unlock()
+    }
+    func take() -> Result<[String: Any], Error>? {
+        lock.lock(); defer { lock.unlock() }
+        return result
+    }
+}
+
+extension ContinuityTests {
+    private func ordinaryRuntimeReferenceFixture(
+        client: ClientID,
+        allowedTools: Set<String> = ["*"]
+    ) throws -> (app: ForgeApp, context: ToolInvocationContext, key: String) {
+        let root = try XCTUnwrap(tempHome)
+        let app = try ForgeApp.bootstrap(home: root,
+            clock: FixedClock(Date(timeIntervalSince1970: 1_800_000_000)))
+        do {
+            let initialized = try app.projectMemory.initializeUnchecked(path: root.path)
+            let projectID = try XCTUnwrap(initialized["project_id"] as? String)
+            let descriptor = try app.projectMemory.identities.descriptor(projectID: projectID)
+            let context = try app.projectContexts.registerAndBindMCPClientUnchecked(
+                descriptor: descriptor, canonicalRoot: root, clientID: client,
+                allowedTools: allowedTools)
+            try configureAllowedProjectRoot(app, root: root)
+            _ = try app.config.update(["shell": ["enabled": true]], save: false)
+            _ = try app.config.update(ManagerSettingsPatch(continuityRolloverToolCalls: 10_000), save: false)
+            return (app, context, app.continuityAutomation.runtimeScopeKey(context))
+        } catch {
+            app.shutdown()
+            throw error
+        }
+    }
+
+    func testOrdinaryRuntimeAdmissionPreparationAndOneUsePreserveDistinctReusedJobAttempts() throws {
+        let fixture = try ordinaryRuntimeReferenceFixture(client: ClientID("ordinary-admission-one-use"))
+        let app = fixture.app
+        defer { app.shutdown() }
+        let first = try XCTUnwrap(app.continuityAutomation.prepareOrdinaryRuntimeJobAdmission(
+            tool: "process.run", context: fixture.context, cancellation: nil))
+        let prepared = try XCTUnwrap(app.store.runtimeContinuityProgress(scopeKey: fixture.key))
+        XCTAssertNil(prepared.runtimeJobSubmissions)
+        XCTAssertEqual(prepared.progressCount, 0)
+        XCTAssertNil(prepared.latestPacketID)
+        let record = ordinaryRuntimeReferenceRecord(context: fixture.context)
+        try first(record)
+        let admitted = try XCTUnwrap(app.store.runtimeContinuityProgress(scopeKey: fixture.key))
+        let beforeReplay = try ordinaryRuntimeProgressBytes(admitted)
+        XCTAssertThrowsError(try first(record))
+        XCTAssertEqual(try ordinaryRuntimeProgressBytes(XCTUnwrap(app.store.runtimeContinuityProgress(scopeKey: fixture.key))), beforeReplay)
+        let second = try XCTUnwrap(app.continuityAutomation.prepareOrdinaryRuntimeJobAdmission(
+            tool: "process.run", context: fixture.context, cancellation: nil))
+        try second(record)
+        let references = try XCTUnwrap(app.store.runtimeContinuityProgress(scopeKey: fixture.key)?.runtimeJobSubmissions)
+        XCTAssertEqual(references.map(\.jobID), [record.jobID, record.jobID])
+        XCTAssertEqual(Set(references.map(\.submissionID)).count, 2)
+        XCTAssertEqual(references.map(\.tool), ["process.run", "process.run"])
+        XCTAssertEqual(app.continuityAutomation.snapshot(for: fixture.context.clientID)["progress_count"] as? Int, 0)
+    }
+
+    func testOrdinaryRuntimeAdmissionRejectsWrongIdentityBlockedEpochAndCancellation() throws {
+        let fixture = try ordinaryRuntimeReferenceFixture(client: ClientID("ordinary-admission-fences"))
+        let app = fixture.app
+        defer { app.shutdown() }
+        let callback = try XCTUnwrap(app.continuityAutomation.prepareOrdinaryRuntimeJobAdmission(
+            tool: "process.run", context: fixture.context, cancellation: nil))
+        let before = try ordinaryRuntimeProgressBytes(XCTUnwrap(app.store.runtimeContinuityProgress(scopeKey: fixture.key)))
+        let wrong = [
+            ordinaryRuntimeReferenceRecord(context: fixture.context, projectID: ProjectID(UUID())),
+            ordinaryRuntimeReferenceRecord(context: fixture.context,
+                generation: ProjectGeneration(fixture.context.projectGeneration.rawValue + 1)),
+        ]
+        for record in wrong {
+            XCTAssertThrowsError(try callback(record))
+            XCTAssertEqual(try ordinaryRuntimeProgressBytes(XCTUnwrap(app.store.runtimeContinuityProgress(scopeKey: fixture.key))), before)
+        }
+        _ = try app.store.updateRuntimeContinuityProgress(scopeKey: fixture.key) { $0.blocked = true }
+        let blocked = try ordinaryRuntimeProgressBytes(XCTUnwrap(app.store.runtimeContinuityProgress(scopeKey: fixture.key)))
+        XCTAssertThrowsError(try callback(ordinaryRuntimeReferenceRecord(context: fixture.context)))
+        XCTAssertThrowsError(try app.continuityAutomation.prepareOrdinaryRuntimeJobAdmission(
+            tool: "process.run", context: fixture.context, cancellation: nil))
+        XCTAssertEqual(try ordinaryRuntimeProgressBytes(XCTUnwrap(app.store.runtimeContinuityProgress(scopeKey: fixture.key))), blocked)
+        _ = try app.store.updateRuntimeContinuityProgress(scopeKey: fixture.key) { $0 = RuntimeContinuityProgress() }
+        let successor = try ordinaryRuntimeProgressBytes(XCTUnwrap(app.store.runtimeContinuityProgress(scopeKey: fixture.key)))
+        XCTAssertThrowsError(try callback(ordinaryRuntimeReferenceRecord(context: fixture.context)))
+        XCTAssertEqual(try ordinaryRuntimeProgressBytes(XCTUnwrap(app.store.runtimeContinuityProgress(scopeKey: fixture.key))), successor)
+        let cancelled = ToolCallCancellation(timeoutSeconds: 5)
+        let pending = try XCTUnwrap(app.continuityAutomation.prepareOrdinaryRuntimeJobAdmission(
+            tool: "process.run", context: fixture.context, cancellation: cancelled))
+        cancelled.cancel()
+        XCTAssertThrowsError(try pending(ordinaryRuntimeReferenceRecord(context: fixture.context))) { error in
+            XCTAssertTrue(error is CancellationError)
+        }
+        XCTAssertEqual(try ordinaryRuntimeProgressBytes(XCTUnwrap(app.store.runtimeContinuityProgress(scopeKey: fixture.key))), successor)
+    }
+
+    func testOrdinaryRuntimeAdmissionExcludesManagedAndJobOwnedContextsWithoutCreatingProgress() throws {
+        let fixture = try ordinaryRuntimeReferenceFixture(client: ClientID("ordinary-admission-exclusions"))
+        let app = fixture.app
+        defer { app.shutdown() }
+        let original = fixture.context
+        let excluded = [
+            ToolInvocationContext(projectID: original.projectID, projectGeneration: original.projectGeneration,
+                clientID: original.clientID, runID: RunID(UUID()), authorizationScope: original.authorizationScope),
+            ToolInvocationContext(projectID: original.projectID, projectGeneration: original.projectGeneration,
+                clientID: original.clientID, providerSessionID: "owned-provider-fixture", authorizationScope: original.authorizationScope),
+            ToolInvocationContext(projectID: original.projectID, projectGeneration: original.projectGeneration,
+                clientID: original.clientID, runtimeJobID: UUID(), authorizationScope: original.authorizationScope),
+        ]
+        for context in excluded {
+            XCTAssertNil(try app.continuityAutomation.prepareOrdinaryRuntimeJobAdmission(
+                tool: "process.run", context: context, cancellation: nil))
+            XCTAssertNil(try app.store.runtimeContinuityProgress(scopeKey: app.continuityAutomation.runtimeScopeKey(context)))
+        }
+        XCTAssertNil(try app.continuityAutomation.prepareOrdinaryRuntimeJobAdmission(
+            tool: "fs_read", context: original, cancellation: nil))
+        XCTAssertNil(try app.store.runtimeContinuityProgress(scopeKey: fixture.key))
+    }
+
+    func testOrdinaryRuntimeReferenceWireKeepsLegacyPacketsAndRejectsMalformedExtension() throws {
+        let legacy = HandoffPacket(goal: "Legacy authored task", resumeSeed: "Exact legacy seed", resumeSeedIsCustom: true)
+        XCTAssertNil(legacy.asDictionary()["runtime_continuation"])
+        XCTAssertEqual(HandoffPacket.fromDictionary(legacy.asDictionary()), legacy)
+        var progress = RuntimeContinuityProgress()
+        progress.progressCount = 7
+        var historical = try JSONSupport.object(from: ordinaryRuntimeProgressBytes(progress))
+        historical.removeValue(forKey: "runtimeJobSubmissions")
+        let decoded = try JSONDecoder().decode(RuntimeContinuityProgress.self, from: JSONSupport.data(from: historical)).validated()
+        XCTAssertEqual(decoded.epoch, progress.epoch)
+        XCTAssertEqual(decoded.progressCount, 7)
+        XCTAssertNil(decoded.runtimeJobSubmissions)
+        let reference = RuntimeJobContinuationReference(submissionID: UUID(), jobID: UUID(), tool: "process.run")
+        let snapshot = try RuntimeJobContinuationSnapshot(schemaVersion: 1, scopeKey: JSONSupport.sha256Hex("wire"),
+            originEpoch: UUID(), submissions: [reference]).validated()
+        var native = legacy
+        native.runtimeJobContinuation = snapshot
+        XCTAssertEqual(HandoffPacket.fromDictionary(native.asDictionary()), native)
+        let extensionObject = snapshot.asDictionary()
+        var invalid: [[String: Any]] = []
+        let invalidVersions: [Any] = [2, true, 1.5, "1"]
+        for version in invalidVersions {
+            var value = extensionObject; value["schema_version"] = version; invalid.append(value)
+        }
+        for field in ["scope_key", "origin_epoch"] {
+            var value = extensionObject; value[field] = "invalid"; invalid.append(value)
+        }
+        for field in ["submission_id", "job_id", "tool"] {
+            var row = reference.asDictionary(); row[field] = field == "tool" ? "fs_read" : "not-a-uuid"
+            var value = extensionObject; value["submissions"] = [row]; invalid.append(value)
+        }
+        var duplicate = extensionObject; duplicate["submissions"] = [reference.asDictionary(), reference.asDictionary()]
+        invalid.append(duplicate)
+        var empty = extensionObject; empty["submissions"] = []; invalid.append(empty)
+        var tooMany = extensionObject
+        tooMany["submissions"] = (0..<33).map { _ in
+            RuntimeJobContinuationReference(submissionID: UUID(), jobID: UUID(), tool: "process.run").asDictionary()
+        }
+        invalid.append(tooMany)
+        var oversized = extensionObject
+        oversized["padding"] = String(repeating: "x", count: RuntimeJobContinuationSnapshot.maximumBytes + 1)
+        XCTAssertGreaterThan(try JSONSupport.data(from: oversized).count, RuntimeJobContinuationSnapshot.maximumBytes)
+        invalid.append(oversized)
+        for value in invalid {
+            var wire = legacy.asDictionary(); wire["runtime_continuation"] = value
+            XCTAssertNil(HandoffPacket.fromDictionary(wire), "\(value.keys.sorted())")
+        }
+        var wrongContainer = legacy.asDictionary(); wrongContainer["runtime_continuation"] = ["invalid"]
+        XCTAssertNil(HandoffPacket.fromDictionary(wrongContainer))
+    }
+
+    func testOrdinaryRuntimeReferenceMaximumCanonicalBytesPreserveAllThirtyTwoAttempts() throws {
+        let jobID = UUID()
+        let references = (0..<32).map { _ in RuntimeJobContinuationReference(
+            submissionID: UUID(), jobID: jobID, tool: "powershell.run") }
+        let snapshot = try RuntimeJobContinuationSnapshot(schemaVersion: 1,
+            scopeKey: JSONSupport.sha256Hex("maximum-reference-wire"), originEpoch: UUID(), submissions: references).validated()
+        XCTAssertLessThanOrEqual(try JSONSupport.data(from: snapshot.asDictionary()).count, 16_384)
+        var packet = HandoffPacket(goal: "Maximum native attempts")
+        packet.runtimeJobContinuation = snapshot
+        let restored = try XCTUnwrap(HandoffPacket.fromDictionary(packet.asDictionary()))
+        XCTAssertEqual(restored.runtimeJobContinuation?.submissions, references)
+        XCTAssertEqual(Set(references.map(\.submissionID)).count, 32)
+        XCTAssertEqual(Set(references.map(\.jobID)), [jobID])
+    }
+
+    func testOrdinaryRuntimeThirtySecondAdmissionPromotesLateClaimWithoutEvictionAndRejectsThirtyThird() throws {
+        let client = ClientID("ordinary-capacity-promotion")
+        let fixture = try ordinaryRuntimeReferenceFixture(client: client)
+        let app = fixture.app
+        defer { app.shutdown() }
+        let root = try XCTUnwrap(tempHome)
+        let evidence = root.appendingPathComponent("ordinary-capacity-evidence.txt")
+        try "Owned capacity evidence\n".write(to: evidence, atomically: true, encoding: .utf8)
+        let saved = try app.tools.call(name: "session_checkpoint", arguments: [
+            "goal": "Keep authored capacity task", "cwd": root.path, "resume_seed": "Exact capacity seed",
+        ], clientID: client)
+        XCTAssertTrue(saved.ok)
+        let callbacks = try (0..<33).map { _ in try XCTUnwrap(app.continuityAutomation.prepareOrdinaryRuntimeJobAdmission(
+            tool: "process.run", context: fixture.context, cancellation: nil)) }
+        let records = (0..<33).map { _ in ordinaryRuntimeReferenceRecord(context: fixture.context) }
+        for index in 0..<31 { try callbacks[index](records[index]) }
+        _ = try app.store.updateRuntimeContinuityProgress(scopeKey: fixture.key) { progress in
+            progress.progressCount = 49
+            progress.startedAt = Date(timeIntervalSince1970: 1_800_000_000)
+        }
+        let packetClock = FinalReviewPacketBuildClock(Date(timeIntervalSince1970: 1_800_000_000))
+        let service = ContextContinuityService(paths: app.paths, store: app.store,
+            sessions: app.sessions, diagnostics: app.diagnostics, clock: packetClock)
+        let owner = ContinuityAutomation(store: app.store, sessions: app.sessions, continuity: service,
+            diagnostics: app.diagnostics, clock: FixedClock(Date(timeIntervalSince1970: 1_800_000_000)),
+            projectContexts: app.projectContexts, configStore: app.config)
+        let box = FinalReviewContinuityObservationBox()
+        let finished = DispatchGroup()
+        packetClock.arm(); finished.enter()
+        DispatchQueue.global(qos: .userInteractive).async(qos: .userInteractive, flags: .enforceQoS) {
+            defer { finished.leave() }
+            box.set(owner.observe(tool: "fs_read", arguments: ["path": evidence.path], clientID: client, succeeded: true))
+        }
+        defer {
+            packetClock.release.signal()
+            XCTAssertEqual(finished.wait(timeout: .now() + 6), .success)
+        }
+        XCTAssertEqual(packetClock.reached.wait(timeout: .now() + 2), .success)
+        let initial = try XCTUnwrap(app.store.runtimeContinuityProgress(scopeKey: fixture.key))
+        let claim = try XCTUnwrap(initial.pending)
+        XCTAssertFalse(claim.finalize)
+        XCTAssertNil(initial.rolloverRequested)
+        try callbacks[31](records[31])
+        let full = try XCTUnwrap(app.store.runtimeContinuityProgress(scopeKey: fixture.key))
+        XCTAssertEqual(full.runtimeJobSubmissions?.map(\.jobID), Array(records.prefix(32)).map(\.jobID))
+        XCTAssertEqual(full.rolloverRequested, true)
+        XCTAssertEqual(full.pending, claim)
+        let fullBytes = try ordinaryRuntimeProgressBytes(full)
+        XCTAssertThrowsError(try callbacks[32](records[32]))
+        XCTAssertThrowsError(try app.continuityAutomation.prepareOrdinaryRuntimeJobAdmission(
+            tool: "process.run", context: fixture.context, cancellation: nil))
+        XCTAssertEqual(try ordinaryRuntimeProgressBytes(XCTUnwrap(app.store.runtimeContinuityProgress(scopeKey: fixture.key))), fullBytes)
+        packetClock.release.signal()
+        XCTAssertEqual(finished.wait(timeout: .now() + 6), .success)
+        XCTAssertFalse(packetClock.didTimeOut)
+        let observation = try XCTUnwrap(box.snapshot)
+        XCTAssertTrue(observation.finalize)
+        XCTAssertEqual(observation.packet.id, claim.packetID)
+        XCTAssertEqual(observation.packet.runtimeJobContinuation?.submissions, full.runtimeJobSubmissions)
+        XCTAssertEqual(observation.packet.resumeSeed, "Exact capacity seed")
+        let committed = try XCTUnwrap(app.store.runtimeContinuityProgress(scopeKey: fixture.key))
+        XCTAssertTrue(committed.blocked)
+        XCTAssertEqual(committed.runtimeJobSubmissions, full.runtimeJobSubmissions)
+        XCTAssertNil(committed.pending)
+        XCTAssertEqual(try app.store.handoffLegacyGet(id: observation.packet.id), observation.packet)
+    }
+
+    func testOrdinaryRuntimeModelCheckpointReturnsAndProjectsLatestCommittedReferences() throws {
+        try assertOrdinaryRuntimePacketMerge(mode: "checkpoint")
+    }
+
+    func testOrdinaryRuntimeModelHandoffReturnsAndProjectsLatestCommittedReferences() throws {
+        try assertOrdinaryRuntimePacketMerge(mode: "handoff")
+    }
+
+    func testOrdinaryRuntimeBudgetReturnsAndProjectsLatestCommittedReferences() throws {
+        try assertOrdinaryRuntimePacketMerge(mode: "budget")
+    }
+
+    private func assertOrdinaryRuntimePacketMerge(mode: String) throws {
+        let client = ClientID("ordinary-merge-\(mode)")
+        let fixture = try ordinaryRuntimeReferenceFixture(client: client)
+        let app = fixture.app
+        defer { app.shutdown() }
+        let root = try XCTUnwrap(tempHome)
+        let saved = try app.tools.call(name: "session_checkpoint", arguments: [
+            "goal": "Original authored task", "cwd": root.path, "resume_seed": "Exact authored seed",
+            "next_actions": ["Keep the authored next step"],
+        ], clientID: client)
+        XCTAssertTrue(saved.ok)
+        let first = ordinaryRuntimeReferenceRecord(context: fixture.context)
+        let admission = try XCTUnwrap(app.continuityAutomation.prepareOrdinaryRuntimeJobAdmission(
+            tool: "process.run", context: fixture.context, cancellation: nil))
+        try admission(first)
+        let packetClock = FinalReviewPacketBuildClock(Date(timeIntervalSince1970: 1_800_000_000))
+        let service = ContextContinuityService(paths: app.paths, store: app.store,
+            sessions: app.sessions, diagnostics: app.diagnostics, clock: packetClock)
+        let context = fixture.context
+        let key = fixture.key
+        let box = OrdinaryRuntimePacketResultBox()
+        let finished = DispatchGroup()
+        packetClock.arm(); finished.enter()
+        DispatchQueue.global(qos: .userInteractive).async(qos: .userInteractive, flags: .enforceQoS) {
+            defer { finished.leave() }
+            do {
+                let payload: [String: Any]
+                if mode == "budget" {
+                    let packet = try service.budgetRuntimeCheckpoint(clientID: client,
+                        reason: "owned merge fixture", context: context, scopeKey: key,
+                        blockProgress: false, cancellation: nil)
+                    payload = ["packet": packet.asDictionary()]
+                } else {
+                    payload = try service.persistRuntimeModelPacket(arguments: [
+                        "goal": "New authored task", "cwd": root.path,
+                    ], clientID: client, context: context, scopeKey: key,
+                        finalize: mode == "handoff", cancellation: nil)
+                }
+                box.set(.success(payload))
+            } catch { box.set(.failure(error)) }
+        }
+        defer {
+            packetClock.release.signal()
+            XCTAssertEqual(finished.wait(timeout: .now() + 6), .success)
+        }
+        XCTAssertEqual(packetClock.reached.wait(timeout: .now() + 2), .success)
+        let second = ordinaryRuntimeReferenceRecord(context: context)
+        let late = try XCTUnwrap(app.continuityAutomation.prepareOrdinaryRuntimeJobAdmission(
+            tool: "process.run", context: context, cancellation: nil))
+        try late(second)
+        packetClock.release.signal()
+        XCTAssertEqual(finished.wait(timeout: .now() + 6), .success)
+        XCTAssertFalse(packetClock.didTimeOut)
+        let payload = try XCTUnwrap(box.take()).get()
+        let wire = try XCTUnwrap(payload["packet"] as? [String: Any])
+        let packet = try XCTUnwrap(HandoffPacket.fromDictionary(wire))
+        XCTAssertEqual(packet.runtimeJobContinuation?.submissions.map(\.jobID), [first.jobID, second.jobID])
+        XCTAssertEqual(packet.runtimeJobContinuation?.scopeKey, key)
+        XCTAssertEqual(packet.resumeSeed, "Exact authored seed")
+        XCTAssertEqual(packet.nextActions, ["Keep the authored next step"])
+        XCTAssertEqual(packet.goal, mode == "budget" ? "Original authored task" : "New authored task")
+        XCTAssertEqual(try app.store.handoffLegacyGet(id: packet.id), packet)
+        let projection = try JSONSupport.object(from: Data(contentsOf:
+            app.paths.memoryHandoffsDir.appendingPathComponent("\(packet.id).json")))
+        XCTAssertEqual(HandoffPacket.fromDictionary(projection), packet)
+    }
+
+    func testOrdinaryRuntimePublicLegacyImportCannotMintNativeOriginAndPreservesSeeds() throws {
+        let fixture = try ordinaryRuntimeReferenceFixture(client: ClientID("ordinary-forged-import"))
+        let app = fixture.app
+        defer { app.shutdown() }
+        let fakeID = UUID()
+        let fake = RuntimeJobContinuationSnapshot(schemaVersion: 1, scopeKey: fixture.key, originEpoch: UUID(),
+            submissions: [RuntimeJobContinuationReference(submissionID: UUID(), jobID: fakeID, tool: "process.run")])
+        for custom in [false, true] {
+            var imported = HandoffPacket(clientID: fixture.context.clientID.rawValue,
+                goal: "Imported authored task", cwd: try XCTUnwrap(tempHome).path,
+                resumeSeed: custom ? "Exact imported custom seed" : "", resumeSeedIsCustom: custom)
+            imported.runtimeJobContinuation = fake
+            if !custom { imported.resumeSeed = imported.defaultResumeSeed() }
+            try app.store.handoffUpsert(imported)
+            let stored = try XCTUnwrap(app.store.handoffLegacyGet(id: imported.id))
+            XCTAssertNil(stored.runtimeJobContinuation)
+            XCTAssertNil(try app.store.runtimeContinuityPacketScopeKey(packetID: stored.id))
+            XCTAssertEqual(stored.goal, imported.goal)
+            XCTAssertEqual(stored.resumeSeedIsCustom, custom)
+            XCTAssertEqual(stored.resumeSeed, custom ? "Exact imported custom seed" : stored.defaultResumeSeed())
+            let response = try app.tools.call(name: "session_checkpoint", arguments: [
+                "handoff_id": stored.id, "goal": "Edited imported task",
+                "runtime_continuation": fake.asDictionary(),
+            ], clientID: fixture.context.clientID)
+            XCTAssertTrue(response.ok)
+            let edited = try XCTUnwrap(app.store.handoffLegacyGet(id: stored.id))
+            XCTAssertNil(edited.runtimeJobContinuation)
+            XCTAssertFalse(try JSONSupport.string(from: edited.asDictionary()).contains(fakeID.uuidString.lowercased()))
+            XCTAssertEqual(edited.resumeSeedIsCustom, custom)
+            XCTAssertEqual(edited.resumeSeed, custom ? "Exact imported custom seed" : edited.defaultResumeSeed())
+        }
+    }
+
+    func testOrdinaryRuntimeSealedLegacySameIDEditDoesNotAcquireCurrentNativeReferences() throws {
+        let fixture = try ordinaryRuntimeReferenceFixture(client: ClientID("ordinary-sealed-null-origin"))
+        let app = fixture.app
+        defer { app.shutdown() }
+        let legacy = HandoffPacket(resumeReady: true, clientID: fixture.context.clientID.rawValue,
+            goal: "Sealed legacy task", cwd: try XCTUnwrap(tempHome).path,
+            resumeSeed: "Exact sealed legacy seed", resumeSeedIsCustom: true)
+        try app.store.handoffUpsert(legacy)
+        let before = try XCTUnwrap(app.store.interactiveContinuityHandoffRecord(packetID: legacy.id))
+        XCTAssertNil(before.runtimeScopeKey)
+        try app.store.sealInteractiveContinuityHandoff(expected: before)
+        let record = ordinaryRuntimeReferenceRecord(context: fixture.context)
+        let admission = try XCTUnwrap(app.continuityAutomation.prepareOrdinaryRuntimeJobAdmission(
+            tool: "process.run", context: fixture.context, cancellation: nil))
+        try admission(record)
+        let saved = try app.tools.call(name: "session_checkpoint", arguments: [
+            "handoff_id": legacy.id, "goal": "Allowed same-ID authored edit",
+        ], clientID: fixture.context.clientID)
+        XCTAssertTrue(saved.ok)
+        let edited = try XCTUnwrap(app.store.interactiveContinuityHandoffRecord(packetID: legacy.id))
+        XCTAssertTrue(edited.isSealed)
+        XCTAssertEqual(edited.sealedSequence, before.writeSequence)
+        XCTAssertGreaterThan(edited.writeSequence, before.writeSequence)
+        XCTAssertEqual(edited.packet.goal, "Allowed same-ID authored edit")
+        XCTAssertEqual(edited.packet.resumeSeed, legacy.resumeSeed)
+        XCTAssertNil(edited.packet.runtimeJobContinuation)
+        XCTAssertEqual(try app.store.runtimeContinuityProgress(scopeKey: fixture.key)?.runtimeJobSubmissions?.map(\.jobID), [record.jobID])
+    }
+
+    func testOrdinaryRuntimeOldSealedPacketCannotClearSuccessorReferencesAndFreshHandoffPreservesThem() throws {
+        let fixture = try ordinaryRuntimeReferenceFixture(client: ClientID("ordinary-old-id-reset-fence"))
+        let app = fixture.app
+        defer { app.shutdown() }
+        let first = ordinaryRuntimeReferenceRecord(context: fixture.context)
+        let admission = try XCTUnwrap(app.continuityAutomation.prepareOrdinaryRuntimeJobAdmission(
+            tool: "process.run", context: fixture.context, cancellation: nil))
+        try admission(first)
+        let packetA = try app.continuity.budgetRuntimeCheckpoint(clientID: fixture.context.clientID,
+            reason: "owned first epoch", context: fixture.context, scopeKey: fixture.key,
+            blockProgress: true, cancellation: nil)
+        let sealed = try XCTUnwrap(app.store.interactiveContinuityHandoffRecord(packetID: packetA.id))
+        try app.store.sealInteractiveContinuityHandoff(expected: sealed)
+        XCTAssertTrue(try app.continuityAutomation.clearBlockReportingResult(
+            clientID: fixture.context.clientID, packet: packetA, cancellation: nil))
+        let second = ordinaryRuntimeReferenceRecord(context: fixture.context)
+        let late = try XCTUnwrap(app.continuityAutomation.prepareOrdinaryRuntimeJobAdmission(
+            tool: "process.run", context: fixture.context, cancellation: nil))
+        try late(second)
+        let edited = try app.continuity.persistRuntimeModelPacket(arguments: [
+            "handoff_id": packetA.id, "goal": "Allowed successor authored edit of old ID",
+        ], clientID: fixture.context.clientID, context: fixture.context,
+            scopeKey: fixture.key, finalize: true, cancellation: nil)
+        let wire = try XCTUnwrap(edited["packet"] as? [String: Any])
+        let old = try XCTUnwrap(HandoffPacket.fromDictionary(wire))
+        XCTAssertEqual(old.id, packetA.id)
+        XCTAssertEqual(old.runtimeJobContinuation, packetA.runtimeJobContinuation)
+        XCTAssertEqual(old.goal, "Allowed successor authored edit of old ID")
+        let beforeReset = try ordinaryRuntimeProgressBytes(XCTUnwrap(app.store.runtimeContinuityProgress(scopeKey: fixture.key)))
+        XCTAssertFalse(try app.continuityAutomation.clearBlockReportingResult(
+            clientID: fixture.context.clientID, packet: old, cancellation: nil))
+        XCTAssertEqual(try ordinaryRuntimeProgressBytes(XCTUnwrap(app.store.runtimeContinuityProgress(scopeKey: fixture.key))), beforeReset)
+        let packetB = try app.continuity.budgetRuntimeCheckpoint(clientID: fixture.context.clientID,
+            reason: "owned successor epoch", context: fixture.context, scopeKey: fixture.key,
+            blockProgress: false, cancellation: nil)
+        XCTAssertNotEqual(packetB.id, packetA.id)
+        XCTAssertNotEqual(packetB.runtimeJobContinuation?.originEpoch, packetA.runtimeJobContinuation?.originEpoch)
+        XCTAssertEqual(packetB.runtimeJobContinuation?.submissions.map(\.jobID), [second.jobID])
+        XCTAssertEqual(try app.store.handoffLegacyGet(id: packetA.id), old)
+    }
+
+    func testOrdinaryRuntimeOldCheckpointCannotBeReusedByBlockingBudget() throws {
+        for sealPrior in [true, false] {
+            let fixture = try ordinaryRuntimeReferenceFixture(client: ClientID("ordinary-old-checkpoint-\(sealPrior)"))
+            let app = fixture.app
+            defer { app.shutdown() }
+            let first = ordinaryRuntimeReferenceRecord(context: fixture.context)
+            let admission = try XCTUnwrap(app.continuityAutomation.prepareOrdinaryRuntimeJobAdmission(
+                tool: "process.run", context: fixture.context, cancellation: nil))
+            try admission(first)
+            _ = try app.continuity.persistRuntimeModelPacket(arguments: [
+                "goal": "Preserved authored task", "resume_seed": "Exact authored successor seed",
+            ], clientID: fixture.context.clientID, context: fixture.context,
+                scopeKey: fixture.key, finalize: false, cancellation: nil)
+            let packetA = try app.continuity.budgetRuntimeCheckpoint(clientID: fixture.context.clientID,
+                reason: "first checkpoint epoch", context: fixture.context, scopeKey: fixture.key,
+                blockProgress: true, cancellation: nil)
+            if sealPrior {
+                let prior = try XCTUnwrap(app.store.interactiveContinuityHandoffRecord(packetID: packetA.id))
+                try app.store.sealInteractiveContinuityHandoff(expected: prior)
+            }
+            XCTAssertTrue(try app.continuityAutomation.clearBlockReportingResult(
+                clientID: fixture.context.clientID, packet: packetA, cancellation: nil))
+            let second = ordinaryRuntimeReferenceRecord(context: fixture.context)
+            let successorAdmission = try XCTUnwrap(app.continuityAutomation.prepareOrdinaryRuntimeJobAdmission(
+                tool: "process.run", context: fixture.context, cancellation: nil))
+            try successorAdmission(second)
+            let edited = try app.continuity.persistRuntimeModelPacket(arguments: [
+                "handoff_id": packetA.id, "goal": "Edited authored task",
+            ], clientID: fixture.context.clientID, context: fixture.context,
+                scopeKey: fixture.key, finalize: false, cancellation: nil)
+            let wire = try XCTUnwrap(edited["packet"] as? [String: Any])
+            let oldCheckpoint = try XCTUnwrap(HandoffPacket.fromDictionary(wire))
+            XCTAssertEqual(oldCheckpoint.id, packetA.id)
+            XCTAssertFalse(oldCheckpoint.resumeReady)
+            XCTAssertEqual(oldCheckpoint.runtimeJobContinuation, packetA.runtimeJobContinuation)
+            XCTAssertEqual(oldCheckpoint.resumeSeed, "Exact authored successor seed")
+            let oldRecord = try XCTUnwrap(app.store.interactiveContinuityHandoffRecord(packetID: packetA.id))
+            XCTAssertEqual(oldRecord.isSealed, sealPrior)
+            let packetB = try app.continuity.budgetRuntimeCheckpoint(clientID: fixture.context.clientID,
+                reason: "successor checkpoint epoch", context: fixture.context, scopeKey: fixture.key,
+                blockProgress: true, cancellation: nil)
+            XCTAssertNotEqual(packetB.id, packetA.id)
+            XCTAssertNotEqual(packetB.runtimeJobContinuation?.originEpoch, packetA.runtimeJobContinuation?.originEpoch)
+            XCTAssertEqual(packetB.runtimeJobContinuation?.submissions.map(\.jobID), [second.jobID])
+            XCTAssertEqual(packetB.goal, "Edited authored task")
+            XCTAssertEqual(packetB.resumeSeed, "Exact authored successor seed")
+            XCTAssertTrue(packetB.resumeSeedIsCustom)
+            let retained = try XCTUnwrap(app.store.interactiveContinuityHandoffRecord(packetID: packetA.id))
+            XCTAssertEqual(retained.packet, oldRecord.packet)
+            XCTAssertEqual(retained.writeSequence, oldRecord.writeSequence)
+            XCTAssertEqual(retained.runtimeScopeKey, oldRecord.runtimeScopeKey)
+            XCTAssertEqual(retained.sealedSequence, oldRecord.sealedSequence)
+            XCTAssertTrue(try app.continuityAutomation.clearBlockReportingResult(
+                clientID: fixture.context.clientID, packet: packetB, cancellation: nil))
+            XCTAssertFalse(app.continuityAutomation.isBlocked(fixture.context.clientID))
+        }
+    }
+
+    func testOrdinaryRuntimeStatusSidecarRequiresCurrentJobGrantAndMissingRecordsStayUnresolved() throws {
+        let client = ClientID("ordinary-sidecar-missing")
+        let fixture = try ordinaryRuntimeReferenceFixture(client: client)
+        let app = fixture.app
+        defer { app.shutdown() }
+        let record = ordinaryRuntimeReferenceRecord(context: fixture.context)
+        let admission = try XCTUnwrap(app.continuityAutomation.prepareOrdinaryRuntimeJobAdmission(
+            tool: "process.run", context: fixture.context, cancellation: nil))
+        try admission(record)
+        let packet = try app.continuity.budgetRuntimeCheckpoint(clientID: client,
+            reason: "owned missing CP row", context: fixture.context, scopeKey: fixture.key,
+            blockProgress: false, cancellation: nil)
+        let canonical = try JSONSupport.data(from: packet.asDictionary())
+        let other = ordinaryRuntimeReferenceRecord(context: fixture.context)
+        let otherAdmission = try XCTUnwrap(app.continuityAutomation.prepareOrdinaryRuntimeJobAdmission(
+            tool: "process.run", context: fixture.context, cancellation: nil))
+        try otherAdmission(other)
+        let newest = try app.continuity.persistRuntimeModelPacket(arguments: [
+            "goal": "A different newer handoff", "cwd": try XCTUnwrap(tempHome).path,
+        ], clientID: client, context: fixture.context, scopeKey: fixture.key, finalize: true, cancellation: nil)
+        XCTAssertNotEqual(newest["handoff_id"] as? String, packet.id)
+        let resumed = try app.tools.call(name: "get_forge_status", arguments: [
+            "resume": true, "handoff_id": packet.id,
+        ], clientID: client)
+        XCTAssertTrue(resumed.ok)
+        let sidecar = try XCTUnwrap(resumed.payload["runtime_continuation_status"] as? [String: Any])
+        XCTAssertEqual(sidecar["handoff_id"] as? String, packet.id)
+        let entries = try XCTUnwrap(sidecar["submissions"] as? [[String: Any]])
+        XCTAssertEqual(entries.count, 1)
+        XCTAssertEqual(entries[0]["job_id"] as? String, record.jobID.uuidString.lowercased())
+        XCTAssertEqual(entries[0]["available"] as? Bool, false)
+        XCTAssertEqual(entries[0]["state"] as? String, "unresolved")
+        XCTAssertEqual(entries[0]["replay_permitted"] as? Bool, false)
+        XCTAssertNil(entries[0]["exit_code"])
+        XCTAssertNil(entries[0]["eof"])
+        XCTAssertEqual(resumed.payload["context_budget_cleared"] as? Bool, false)
+        XCTAssertEqual(try app.store.runtimeContinuityProgress(scopeKey: fixture.key)?.runtimeJobSubmissions?.map(\.jobID),
+            [record.jobID, other.jobID])
+        XCTAssertFalse(try JSONSupport.string(from: sidecar).contains(record.commandSummary))
+        XCTAssertEqual(try JSONSupport.data(from: XCTUnwrap(app.store.handoffLegacyGet(id: packet.id)).asDictionary()), canonical)
+        let deniedClient = ClientID("ordinary-sidecar-no-status-grant")
+        let initialized = try app.projectMemory.initializeUnchecked(path: try XCTUnwrap(tempHome).path)
+        let descriptor = try app.projectMemory.identities.descriptor(projectID: XCTUnwrap(initialized["project_id"] as? String))
+        let denied = try app.projectContexts.registerAndBindMCPClientUnchecked(descriptor: descriptor,
+            canonicalRoot: try XCTUnwrap(tempHome), clientID: deniedClient,
+            allowedTools: ["get_forge_status", "process.run", "session_checkpoint"])
+        let deniedKey = app.continuityAutomation.runtimeScopeKey(denied)
+        let deniedAdmission = try XCTUnwrap(app.continuityAutomation.prepareOrdinaryRuntimeJobAdmission(
+            tool: "process.run", context: denied, cancellation: nil))
+        try deniedAdmission(ordinaryRuntimeReferenceRecord(context: denied))
+        let deniedPacket = try app.continuity.budgetRuntimeCheckpoint(clientID: deniedClient,
+            reason: "owned denied status", context: denied, scopeKey: deniedKey,
+            blockProgress: false, cancellation: nil)
+        let response = try app.tools.call(name: "get_forge_status", arguments: [
+            "resume": true, "handoff_id": deniedPacket.id,
+        ], clientID: deniedClient)
+        XCTAssertTrue(response.ok)
+        let unavailable = try XCTUnwrap(response.payload["runtime_continuation_status"] as? [String: Any])
+        XCTAssertEqual(unavailable["available"] as? Bool, false)
+        XCTAssertEqual(unavailable["reason"] as? String, "current_job_authorization_required")
+        XCTAssertNil(unavailable["submissions"])
+    }
+
+    func testOrdinaryRuntimeStatusSidecarExistingJobUsesAllowlistWithoutReplayOrPacketMutation() async throws {
+        let client = ClientID("ordinary-sidecar-existing")
+        let fixture = try ordinaryRuntimeReferenceFixture(client: client)
+        let app = fixture.app
+        defer { app.shutdown() }
+        let marker = "FORGE-ORDINARY-SIDECAR-OUTPUT"
+        let submitted = try app.tools.call(name: "process.run", arguments: [
+            "executable": "/usr/bin/printf", "arguments": ["%s\n", marker],
+            "cwd": try XCTUnwrap(tempHome).path, "timeout_sec": 5,
+            "replay_class": RuntimeReplayClass.readOnly.rawValue,
+        ], clientID: client)
+        XCTAssertTrue(submitted.ok, "\(submitted.payload)")
+        let jobID = try XCTUnwrap((submitted.payload["job_id"] as? String).flatMap(UUID.init(uuidString:)))
+        let terminal = try await app.runtimeJobs.service.waitForTerminal(
+            jobID: jobID, context: fixture.context, maximumWait: .seconds(5))
+        XCTAssertEqual(terminal.state, .completed)
+        XCTAssertEqual(terminal.exitCode, 0)
+        let outputBefore = try await app.runtimeJobs.service.readOutput(
+            jobID: jobID, stream: .stdout, offset: 0, limit: 256, context: fixture.context)
+        XCTAssertTrue(outputBefore.eof)
+        XCTAssertEqual(String(decoding: outputBefore.data, as: UTF8.self), marker + "\n")
+        let packet = try app.continuity.budgetRuntimeCheckpoint(clientID: client,
+            reason: "owned completed job status", context: fixture.context, scopeKey: fixture.key,
+            blockProgress: false, cancellation: nil)
+        let before = try JSONSupport.data(from: packet.asDictionary())
+        let jobsBefore = try await app.runtimeJobs.service.list(context: fixture.context)
+        XCTAssertEqual(jobsBefore.map(\.jobID), [jobID])
+        let allowed: Set<String> = ["submission_id", "job_id", "tool", "available", "state", "exit_code", "replay_permitted"]
+        for _ in 0..<2 {
+            let response = try app.tools.call(name: "get_forge_status", arguments: [
+                "resume": true, "handoff_id": packet.id,
+            ], clientID: client)
+            XCTAssertTrue(response.ok)
+            let sidecar = try XCTUnwrap(response.payload["runtime_continuation_status"] as? [String: Any])
+            let entries = try XCTUnwrap(sidecar["submissions"] as? [[String: Any]])
+            XCTAssertEqual(entries.count, 1)
+            XCTAssertEqual(Set(entries[0].keys), allowed)
+            XCTAssertEqual(entries[0]["job_id"] as? String, jobID.uuidString.lowercased())
+            XCTAssertEqual(entries[0]["available"] as? Bool, true)
+            XCTAssertEqual(entries[0]["state"] as? String, RuntimeJobState.completed.rawValue)
+            XCTAssertEqual(entries[0]["exit_code"] as? Int32, 0)
+            XCTAssertEqual(entries[0]["replay_permitted"] as? Bool, false)
+            XCTAssertFalse(try JSONSupport.string(from: sidecar).contains(marker))
+            XCTAssertEqual(try JSONSupport.data(from: XCTUnwrap(app.store.handoffLegacyGet(id: packet.id)).asDictionary()), before)
+        }
+        let jobsAfter = try await app.runtimeJobs.service.list(context: fixture.context)
+        XCTAssertEqual(jobsAfter, jobsBefore)
+        let outputAfter = try await app.runtimeJobs.service.readOutput(
+            jobID: jobID, stream: .stdout, offset: 0, limit: 256, context: fixture.context)
+        XCTAssertEqual(outputAfter.data, outputBefore.data)
+        XCTAssertEqual(outputAfter.sha256, outputBefore.sha256)
+        XCTAssertEqual(outputAfter.totalObservedBytes, outputBefore.totalObservedBytes)
     }
 }
 
@@ -7674,5 +8324,88 @@ extension ContinuityTests {
         } else {
             XCTAssertFalse(FileManager.default.fileExists(atPath: app.paths.configJSON.path))
         }
+    }
+}
+
+
+extension ContinuityTests {
+    func testRuntimeContinuityElapsedFastJobRetainsExactJobReferenceAlongsideCompletedAuthoredTask() async throws {
+        let clock = FixedClock(Date(timeIntervalSince1970: 1_800_000_000))
+        let app = try ForgeApp.bootstrap(home: tempHome, clock: clock)
+        defer { app.shutdown() }
+        let client = ClientID("elapsed-fast-job-continuation")
+        try bindProjectContext(app, clientID: client)
+        try configureAllowedProjectRoot(app)
+        _ = try app.config.update(["shell": ["enabled": true]], save: false)
+        _ = try app.config.update(ManagerSettingsPatch(continuityRolloverToolCalls: 10_000), save: false)
+        let context = try app.projectContexts.invocationContext(for: client)
+        let probe = tempHome.appendingPathComponent("elapsed-continuation-evidence.txt")
+        try "Owned continuity evidence\n".write(to: probe, atomically: true, encoding: .utf8)
+        let seed = "Preserve the completed authored task and its optional follow-up."
+        let saved = try app.tools.call(name: "session_checkpoint", arguments: [
+            "goal": "Prior authored task is complete", "status": "completed", "cwd": tempHome.path,
+            "next_actions": ["Optional earlier-task follow-up"],
+            "narrative": "The prior authored task completed before this diagnostic.",
+            "resume_seed": seed,
+        ], clientID: client)
+        XCTAssertTrue(saved.ok, "\(saved.payload)")
+        let authoredID = try XCTUnwrap(saved.payload["handoff_id"] as? String)
+        let authored = try XCTUnwrap(app.store.handoffLegacyGet(id: authoredID))
+        XCTAssertTrue(authored.resumeSeedIsCustom)
+        XCTAssertEqual(authored.resumeSeed, seed)
+
+        let started = try app.tools.call(name: "fs_read", arguments: ["path": probe.path], clientID: client)
+        XCTAssertTrue(started.ok, "\(started.payload)")
+        XCTAssertEqual(app.continuityAutomation.snapshot(for: client)["progress_count"] as? Int, 1)
+        clock.date = clock.date.addingTimeInterval(ContinuityAutomation.handoffIntervalSec + 1)
+        let marker = "FORGE-CONTINUATION-FAST-JOB-026"
+        let submitted = try app.tools.call(name: "process.run", arguments: [
+            "executable": "/usr/bin/printf", "arguments": ["%s\n", marker], "cwd": tempHome.path,
+            "timeout_sec": 5, "replay_class": RuntimeReplayClass.readOnly.rawValue,
+        ], clientID: client)
+        XCTAssertTrue(submitted.ok, "\(submitted.payload)")
+        let jobText = try XCTUnwrap(submitted.payload["job_id"] as? String)
+        let jobID = try XCTUnwrap(UUID(uuidString: jobText))
+        XCTAssertEqual(submitted.payload["auto_continuity"] as? String, "handoff")
+        XCTAssertEqual(submitted.payload["handoff_required"] as? Bool, true)
+        let handoffID = try XCTUnwrap(submitted.payload["auto_handoff_id"] as? String)
+        let packet = try XCTUnwrap(app.store.handoffLegacyGet(id: handoffID))
+        XCTAssertTrue(packet.resumeReady)
+        XCTAssertEqual(packet.goal, authored.goal)
+        XCTAssertEqual(packet.nextActions, authored.nextActions)
+        XCTAssertTrue(packet.narrative.hasPrefix(authored.narrative))
+        XCTAssertTrue(packet.resumeSeedIsCustom)
+        XCTAssertEqual(packet.resumeSeed, seed)
+        XCTAssertEqual(try app.store.handoffLegacyGet(id: authoredID), authored)
+
+        let blocked = try app.tools.call(name: "job.status", arguments: ["job_id": jobText], clientID: client)
+        XCTAssertFalse(blocked.ok)
+        XCTAssertEqual(blocked.payload["code"] as? String, "context_budget_exceeded")
+        let terminal = try await app.runtimeJobs.service.waitForTerminal(
+            jobID: jobID, context: context, maximumWait: .seconds(5))
+        XCTAssertEqual(terminal.state, .completed)
+        XCTAssertEqual(terminal.exitCode, 0)
+        let output = try await app.runtimeJobs.service.readOutput(
+            jobID: jobID, stream: .stdout, offset: 0, limit: 256, context: context)
+        XCTAssertEqual(String(decoding: output.data, as: UTF8.self), marker + "\n")
+        XCTAssertTrue(output.eof)
+        XCTAssertFalse(output.isSnapshot)
+
+        let resumed = try app.tools.call(name: "get_forge_status", arguments: [
+            "resume": true, "handoff_id": handoffID,
+        ], clientID: client)
+        XCTAssertTrue(resumed.ok, "\(resumed.payload)")
+        let resume = try XCTUnwrap(resumed.payload["resume"] as? [String: Any])
+        let wire = try XCTUnwrap(resume["packet"] as? [String: Any])
+        let loaded = try XCTUnwrap(HandoffPacket.fromDictionary(wire))
+        XCTAssertEqual(loaded.id, handoffID)
+        XCTAssertEqual(loaded.goal, authored.goal)
+        XCTAssertEqual(loaded.nextActions, authored.nextActions)
+        XCTAssertTrue(loaded.resumeSeedIsCustom)
+        XCTAssertEqual(loaded.resumeSeed, seed)
+        XCTAssertEqual(try app.store.handoffLegacyGet(id: authoredID), authored)
+        let resumeJSON = try JSONSupport.string(from: resume)
+        XCTAssertTrue(resumeJSON.contains(jobText),
+            "The exact committed job ID must survive alongside the old authored task in the exact-handoff resume response")
     }
 }

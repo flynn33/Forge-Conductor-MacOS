@@ -1,8 +1,60 @@
 # Forge Conductor — Xcode
 
-Current source version **0.25.0**, build **35**.
+Current source version **0.26.0**, build **36**.
 
-The PDF repair adds `NativePDFTextReader.swift` to the existing Core target and
+The ordinary runtime continuation slice edits existing source/test inputs and
+adds no source, resource, test-file or workspace membership. Canonical identity
+settings advance with VERSION, BUILD_NUMBER and compiled constants; twelve
+MARKETING_VERSION and sixteen CURRENT_PROJECT_VERSION settings must agree.
+The original isolated regression executed one test with one missing-UUID failure;
+first CLI/app integration compiles and the repaired original regression passed.
+Those 450-input maps predate later test changes and the production budget guard
+correction; they do not qualify the current map. Later actual version/Manager
+source checks, native tests and ordinary native Debug build later passed on
+the maps recorded below. The first full
+runtime/Continuity/selected-Manager run returned terminal1: 307 tests executed
+with 41 assertion failures in two existing pending-output Continuity methods.
+Runtime tests passed 153/0 and the selected Manager method passed 1/0; the
+first NONPASS remains historical. The separate
+focused selection passed 24 new source cases
+(14 Continuity + 10 Runtime), zero skips/failures, with newly compiled fixtures
+and no warning/error lines. The ten appended runtime admission tests belong to
+ForgeConductorTests and preserve every existing method/assertion. The later
+budget-checkpoint and two genuine unavailable-reader repairs passed all three
+selected source methods without skips/warnings; the following ToolRouter change
+is comment-only. The later owning-area selection passed 307 methods,
+Continuity 154+Runtime 153; its unmatched Manager selector adds no Manager result.
+The separate exact Manager+G3 selection passed 2, totaling 309 distinct source
+passes, zero skips/warnings/failures. Both final SwiftPM product commands passed
+as incremental confirmations (0.900/0.894 s, 53 bytes each). Ordinary canonical
+native Debug build passed in 25.285 s with 456,413 output bytes on 450 unchanged
+inputs. The canonical native selection then passed all 309 methods, zero
+skips/failures, with three runtime QoS diagnostics and seven deliberate SQLite
+rename-negative logs. Two test dispatch priorities changed afterward; focused
+source 4 and native 4 passed without warnings, while the third existing
+DiagnosticLog warning remains a profiling target. The final ordinary Debug
+confirmation passed 1.870 s / 21,596 B with the later 450 map unchanged. Earlier
+full 309/build receipts retain their original test hash. Strict Debug signature/
+build binding passed for seven binary files on that earlier 450 map. Two isolated native
+MCP cases and a fresh Qwen API case passed; the first fenced-JSON Qwen NONPASS
+remains retained. A later isolated two-helper E0 baseline failed the live-owner
+contract: fallback status interrupted the primary's still-live sleep job. Its
+collection terminal0 is not a feature pass. The owner repair is now applied;
+the final combined source selection passed 321 methods without failures/skips/
+compiler warnings on the 450-input map. A separate ordinary canonical Debug
+build in `native-debug-runtime-warm-owner-026` passed in 24.992 seconds with
+480,011 captured bytes (log `82d8a479…`). This is compilation, not strict signing
+or native test completion. The separate native 321 run passed with one existing
+DiagnosticLog:64 runtime QoS warning. Strict Debug verification of seven binaries and signed owner/continuation
+repetitions and fresh Qwen also passed on the final map. Exact direct publication/synchronization revisions use the external delivery
+receipt after the update. The canonical graph receipt verifies sixteen changed Swift inputs
+in their existing targets; membership/workspace stay unchanged and only the
+twelve marketing/sixteen build settings change.
+The ForgeConductor scheme selects that native target; ForgeConductorAppTests
+selects its separate AppTests target. [Contract, baseline and required gates](docs/ORDINARY-RUNTIME-CONTINUATION.md).
+The installed .18 app, prior .25 candidates and their receipts remain separate.
+
+The preceding 0.25 PDF repair adds `NativePDFTextReader.swift` to the existing Core target and
 `PDFWriterTests.swift` / `NativePDFTextReaderTests.swift` to the existing test
 target: twelve additive PBX entries, three new Swift files and 450 source inputs.
 The workspace is unchanged. On the original PDF product snapshot, the corrected
@@ -37,7 +89,10 @@ Only this test hash changes among 450 inputs; the other 449 inputs, existing fou
 PDFWriterTests membership entries, workspace, product/configuration and 0.25.0 (35)
 identity are unchanged. Original 102-test and signed-candidate receipts keep their
 old map; no runtime race or new product-candidate qualification is claimed.
-Concurrency checking was not relaxed. This test/documentation publication is pending.
+Concurrency checking was not relaxed. That test/documentation closeout was
+delivered and synchronized at source `5ff5559ad02192a90a4887154f48e38c81fa54fe`
+and wiki `3dc576814d2bafdaa2ff303e5011072026e0a378`, both clean with 0/0 divergence;
+`native-pdf-capture-publication-and-synchronization-025.json` retains the exact receipt.
 [PDF contract and gate status](docs/NATIVE-PDF-WRITING.md).
 
 ## Preceding 0.24.0 listing graph and qualification
@@ -672,7 +727,7 @@ remains `22e7443d13496b3cc08b6e98366bb6d2332e3fd4`; later documentation commits
 do not change the binary identity. The set is ready for owner notarization and
 Apple upload, but is not notarized, stapled, installed, shipped, or released.
 That retained archive used Xcode `MARKETING_VERSION = 0.16.2` and
-`CURRENT_PROJECT_VERSION = 23`. Current source uses `0.25.0 (35)`; the historical build-24 app/archive use
+`CURRENT_PROJECT_VERSION = 23`. Current source uses `0.26.0 (36)`; the historical build-24 app/archive use
 `0.16.3 (24)`; notarization and shipment remain separate.
 
 Implementation revision `91ad90ee7a1e51b7289f4c531ddae4dbbc6812ec`

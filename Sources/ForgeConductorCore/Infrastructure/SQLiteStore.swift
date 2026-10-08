@@ -865,7 +865,7 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
                 let failureCount = finalize ? progress.failureCount : claim.failureCount
                 // Preparation is a bounded, synchronous value transformation. It
                 // must not reenter storage, touch files or suspend under this fence.
-                let committedPacket: HandoffPacket
+                var committedPacket: HandoffPacket
                 if let preparePacket {
                     committedPacket = try preparePacket(packet, finalize, progressCount, failureCount)
                 } else {
@@ -874,6 +874,8 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
                     }
                     committedPacket = packet
                 }
+                committedPacket = try packetRecordingRuntimeSubmissionsUnlocked(committedPacket,
+                    progress: progress, scopeKey: claim.scopeKey, cancellation: cancellation)
                 guard committedPacket.id == packet.id,
                       committedPacket.clientID == packet.clientID,
                       committedPacket.cwd == packet.cwd,
@@ -882,7 +884,8 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
                 }
                 let json = try JSONSupport.string(from: committedPacket.asDictionary())
                 try requireRuntimeContinuityPacketCapacityUnlocked(packetID: committedPacket.id)
-                try handoffUpsertUnlocked(committedPacket, json: json, timestamp: timestamp, cancellation: cancellation)
+                try handoffUpsertUnlocked(committedPacket, json: json, timestamp: timestamp,
+                    cancellation: cancellation, nativeRuntimeScopeKey: claim.scopeKey)
                 try recordRuntimeContinuityPacketScopeKeyUnlocked(packetID: committedPacket.id, scopeKey: claim.scopeKey)
                 progress.lastCheckpointCount = progressCount
                 progress.lastCheckpointFailureCount = failureCount
@@ -906,18 +909,18 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
         }
     }
 
+    @discardableResult
     func handoffUpsertRecordingRuntimeProgress(
         _ packet: HandoffPacket,
         scopeKey: String,
         blockProgress: Bool = false,
         expectedEpoch: String? = nil,
         cancellation: ToolCallCancellation? = nil
-    ) throws {
+    ) throws -> HandoffPacket {
         guard scopeKey.utf8.count == 64 else { throw StoreError.execFailed("invalid continuity scope") }
         guard !blockProgress || packet.resumeReady else { throw StoreError.conflict("runtime continuity block requires a resume-ready packet") }
-        let json = try JSONSupport.string(from: packet.asDictionary())
         let timestamp = ISO8601.string(from: clock.now())
-        try withLockedSQLiteOperation(cancellation: cancellation) {
+        return try withLockedSQLiteOperation(cancellation: cancellation) {
             try transactionUnlocked(cancellation: cancellation, mutationKind: .handoff) {
                 let prior = try runtimeContinuityProgressUnlocked(scopeKey: scopeKey)
                 if prior == nil {
@@ -932,37 +935,88 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
                         throw StoreError.conflict("runtime continuity budget changed before packet commit")
                     }
                 }
-                try requireRuntimeContinuityPacketCapacityUnlocked(packetID: packet.id)
-                try handoffUpsertUnlocked(packet, json: json, timestamp: timestamp, cancellation: cancellation)
-                try recordRuntimeContinuityPacketScopeKeyUnlocked(packetID: packet.id, scopeKey: scopeKey)
-                progress.latestPacketID = packet.id
+                let committedPacket = try packetRecordingRuntimeSubmissionsUnlocked(packet,
+                    progress: progress, scopeKey: scopeKey, cancellation: cancellation)
+                let json = try JSONSupport.string(from: committedPacket.asDictionary())
+                try requireRuntimeContinuityPacketCapacityUnlocked(packetID: committedPacket.id)
+                try handoffUpsertUnlocked(committedPacket, json: json, timestamp: timestamp,
+                    cancellation: cancellation, nativeRuntimeScopeKey: scopeKey)
+                try recordRuntimeContinuityPacketScopeKeyUnlocked(packetID: committedPacket.id, scopeKey: scopeKey)
+                progress.latestPacketID = committedPacket.id
                 progress.latestRuntimeCheckpointID = nil
                 progress.capacityFailure = nil
                 // A newer model save supersedes an unfinished inferred save.
                 // Its exact task is committed with the pointer, without resetting budgets.
                 progress.pending = nil
-                if packet.resumeReady {
-                    progress.lastHandoffID = packet.id
-                    progress.lastResumeSeed = RuntimeContinuityProgress.resumeSeed(for: packet)
+                if committedPacket.resumeReady {
+                    progress.lastHandoffID = committedPacket.id
+                    progress.lastResumeSeed = RuntimeContinuityProgress.resumeSeed(for: committedPacket)
                 }
                 if blockProgress { progress.blocked = true }
                 try writeRuntimeContinuityProgressUnlocked(progress, scopeKey: scopeKey)
+                return committedPacket
             }
         }
+    }
+
+    private func packetRecordingRuntimeSubmissionsUnlocked(
+        _ candidate: HandoffPacket,
+        progress: RuntimeContinuityProgress,
+        scopeKey: String,
+        cancellation: ToolCallCancellation?
+    ) throws -> HandoffPacket {
+        var packet = candidate
+        let prior = try interactiveContinuityHandoffRecordUnlocked(packetID: packet.id,
+            cancellation: cancellation)
+        if let priorScope = prior?.runtimeScopeKey, priorScope != scopeKey {
+            throw StoreError.conflict("runtime continuity packet belongs to another scope")
+        }
+        // Same-ID authored edits remain available. Their native origin must not
+        // be rebound to successor work or rewrite an acknowledged runtime set.
+        let changesOrigin = prior?.packet.runtimeJobContinuation.map {
+            $0.originEpoch != UUID(uuidString: progress.epoch)
+        } ?? false
+        if let prior, prior.isSealed
+            || (prior.runtimeScopeKey == scopeKey && changesOrigin) {
+            packet.runtimeJobContinuation = prior.packet.runtimeJobContinuation
+        } else {
+            packet.runtimeJobContinuation = try progress.runtimeJobSnapshot(scopeKey: scopeKey)
+        }
+        if !packet.resumeSeedIsCustom { packet.resumeSeed = packet.defaultResumeSeed() }
+        return packet
     }
 
     public func handoffUpsert(
         _ packet: HandoffPacket,
         cancellation: ToolCallCancellation? = nil
     ) throws {
+        _ = try handoffUpsertReturningCommittedPacket(packet, cancellation: cancellation)
+    }
+
+    func handoffUpsertReturningCommittedPacket(
+        _ packet: HandoffPacket,
+        cancellation: ToolCallCancellation? = nil
+    ) throws -> HandoffPacket {
         try cancellation?.checkCancellation()
-        let json = try JSONSupport.string(from: packet.asDictionary())
         let noteTimestamp = ISO8601.string(from: clock.now())
-        try withLockedSQLiteOperation(cancellation: cancellation) {
+        return try withLockedSQLiteOperation(cancellation: cancellation) {
             try transactionUnlocked(cancellation: cancellation, mutationKind: .handoff) {
+                // Imported/model JSON is not admission authority. Preserve only
+                // an existing native-associated extension under the Source fence.
+                let prior = try interactiveContinuityHandoffRecordUnlocked(packetID: packet.id,
+                    cancellation: cancellation)
+                var committedPacket = packet
+                committedPacket.runtimeJobContinuation = prior?.runtimeScopeKey == nil
+                    ? nil : prior?.packet.runtimeJobContinuation
+                if committedPacket.runtimeJobContinuation != packet.runtimeJobContinuation,
+                   !committedPacket.resumeSeedIsCustom {
+                    committedPacket.resumeSeed = committedPacket.defaultResumeSeed()
+                }
+                let json = try JSONSupport.string(from: committedPacket.asDictionary())
                 try handoffUpsertUnlocked(
-                    packet, json: json, timestamp: noteTimestamp, cancellation: cancellation
+                    committedPacket, json: json, timestamp: noteTimestamp, cancellation: cancellation
                 )
+                return committedPacket
             }
         }
     }
@@ -971,9 +1025,16 @@ public final class SQLiteStore: PresenceStore, SessionStore, AuditReading, @unch
         _ packet: HandoffPacket,
         json: String,
         timestamp: String,
-        cancellation: ToolCallCancellation?
+        cancellation: ToolCallCancellation?,
+        nativeRuntimeScopeKey: String? = nil
     ) throws {
         try cancellation?.checkCancellation()
+        if let nativeRuntimeScopeKey {
+            guard packet.runtimeJobContinuation?.scopeKey == nil
+                    || packet.runtimeJobContinuation?.scopeKey == nativeRuntimeScopeKey else {
+                throw StoreError.conflict("runtime submission origin differs from native packet scope")
+            }
+        }
         try withStatementUnlocked(
             """
             INSERT INTO context_handoffs(

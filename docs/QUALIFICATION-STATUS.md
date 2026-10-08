@@ -1,6 +1,74 @@
 # Version and qualification status
 
-Current source **0.25.0, build 35** repairs native PDF text/layout and adds a bounded
+Current source **0.26.0, build 36** implements ordinary runtime job reference
+continuation. Earlier affected source checks passed **309 distinct methods**:
+154 Continuity + 153 Runtime in the owning-area command, then the exact Manager
+parity and version method in a separate command. Both incremental SwiftPM
+products and the ordinary canonical native Debug build passed on unchanged
+450-input maps. Native 309 passed, zero skips/failures, with three QoS
+diagnostics. Only two test dispatch priority lines changed afterward; source 4
+and native 4 passed without warnings and ordinary Debug was confirmed on the
+later map. Strict Debug signing/build binding passed for seven binary files on that
+earlier 450 map. Two isolated native MCP scenarios passed, with 33 accepted jobs
+and 56 complete LF responses. The first Qwen fenced-JSON NONPASS is retained;
+a fresh Qwen API case passed three rounds/four consumed tool calls, exact
+job/output/authored-task checks and normal stop. These scopes do not qualify
+installed GUI successor creation, ACK or seal. A later isolated two-helper E0
+baseline failed the live-owner contract: fallback status interrupted the
+primary's still-live `/bin/sleep 30` job after 0.713 s, with runtime_owner_restarted,
+the exact primary parent alive and both streams unavailable. Collection
+succeeded; that receipt remains NONPASS and supplies no installed-topology failure claim.
+The runtime owner repair is now applied. The final source selection passed
+**321 methods** without failures, skips or compiler warnings on its unchanged
+450-input map. The separate ordinary canonical Debug build passed in 24.992
+seconds. The same **321 native methods** passed without failures/skips, retaining
+one existing DiagnosticLog:64 runtime QoS warning. Strict Debug verification of seven binaries
+and build binding, plus repeated signed live-owner, warm-crash and two
+continuation cases passed on the final map. Fresh Qwen consumption passed three
+actual Low/API rounds and four verified calls with exact job/output/task recovery
+and no replay. Earlier passes retain their earlier maps. Exact direct publication and synchronization revisions are retained separately
+in `runtime-continuation-publication-and-synchronization-026.json` after the update.
+The final source 321 count is Continuity 154 + Runtime 165 + actual Manager 1 + G3
+one; focused invocations are included rather than added to it.
+
+The installed .18 case created/acknowledged a successor but omitted the submitted
+UUID. Manual ID delivery recovered completed/exit0 and full retained stdout/stderr
+EOF without replay. The original isolated regression executed one test/one failure
+at its UUID assertion; the first repair passed one method. Its two new fixture
+warnings were corrected; the later focused 24 methods passed without warnings.
+The first owning-area NONPASS remains **307 tests/41 assertion failures** in two
+pending-output fixtures, including historical Manager 1 and Runtime 153 passes.
+A new old-checkpoint fixture then failed compilation at a non-Equatable assertion;
+after four field comparisons, its old-reuse baseline executed one test with
+14 assertion failures. These failed receipts keep their original maps.
+
+The budget guard correction and two genuine unavailable-reader fixtures passed
+all three selected source methods, no skips/warnings. A separate reader starts
+before any publisher job; one shared durable binding and a real publisher process
+exercise output unavailability without the reader owning the spool. All original
+error/counter/loop/handoff/block/running/cancel assertions remain, while available
+live empty snapshots stay supported. The following comment-only ToolRouter edit
+is included in the later current source map. The repaired owning-area command's
+unmatched Manager selector selected no Manager tests; the separate actual
+Manager+G3 command passed both, completing the **309 distinct source passes**.
+Exact counts, commands and hashes are in [the continuation record](ORDINARY-RUNTIME-CONTINUATION.md).
+
+Source references are bounded to 32 native attempts/16 KiB per logical epoch,
+with actual chosen UUID admission before CP COMMIT, one-use epoch/full-grant
+fencing and exact-packet authorized status before reset. Missing rows remain
+unresolved without replay. Fresh/current unsealed saves merge current references;
+sealed or earlier-origin same-ID edits retain prior references. Budget reuse
+requires an unsealed eligible origin; otherwise a fresh ID clones authored fields.
+Automatic finalized status uses the existing `handoff_ready` default; the original
+completed authored checkpoint remains unchanged. No schema/journal/job scan or
+GUI-instruction inference is added. The graph receipt verifies sixteen changed
+Swift inputs in existing targets, retaining membership/workspace with only the
+canonical twelve marketing/sixteen build settings changed.
+
+Existing .25 receipts retain their identities. Installed .18, all 54 capability
+themes, PDFKit, full-web, all-feature resource acceptance and shipment remain open.
+
+The preceding **0.25.0, build 35** repairs native PDF text/layout and adds a bounded
 complete tagged-text path to instruction imports and policy-source indexing.
 On the original PDF product snapshot, the corrected owning-area selection passed
 101 source methods with no failures or skips on 450 unchanged inputs. This
@@ -50,7 +118,11 @@ and product 0.25.0 (35) remain unchanged. Twelve prior Debug/Release binary
 identities and three protected inputs remain unchanged; original 101/102 and
 artifact receipts keep their original test hash. No runtime race, production/UI
 reachability or new product-candidate qualification is claimed. This later
-test/documentation publication is pending. API candidate evidence is separate
+test/documentation closeout was delivered and synchronized at source
+`5ff5559ad02192a90a4887154f48e38c81fa54fe` and wiki
+`3dc576814d2bafdaa2ff303e5011072026e0a378`, both clean with 0/0 divergence.
+`native-pdf-capture-publication-and-synchronization-025.json` retains the exact receipt.
+API candidate evidence is separate
 from the active GUI and installed deployment.
 Accepted ActualText is not glyph proof, standards-complete tagging or arbitrary
 metadata truth; the native root's unresolved optional-field ambiguity is explicit.
@@ -1491,7 +1563,7 @@ Dashboard geometry, minimum/normal containment of every primary view, and
 populated policy evaluation rows. Live completion of the reported owner run,
 universal policy enforcement, and distribution qualification remain open.
 
-Current source identity: **0.25.0, build 35**, supporting **macOS 26+**. The earlier
+Current source identity: **0.26.0, build 36**, supporting **macOS 26+**. The earlier
 0.16.3 Developer ID app and archive are recorded in the historical build-24 section;
 that workflow staged the CLI under `~/.forge-conductor` and manually copied the
 app to `/Applications`. It did not exercise a `.pkg` installation, notarization,
@@ -1504,12 +1576,28 @@ the detailed, source-bound receipts are in the
 ## Version and build agreement
 
 The Swift runtime, CLI, Xcode Debug and Release configurations, and current
-documentation target version **0.25.0, build 35**. The root [`VERSION`](../VERSION)
+documentation target version **0.26.0, build 36**. The root [`VERSION`](../VERSION)
 and [`BUILD_NUMBER`](../BUILD_NUMBER) files are canonical; compiled constants
-and Xcode build settings must match them. The current marker regression passed
-one source method and was included in the 102-test compiled native pass. Strict
-Debug/Release verification bound their successful builds to the same 450 inputs.
-This documentation refresh still requires final review/publication. The
+and Xcode build settings must match them. The actual .26 source version method
+and exact Manager parity passed separately after the earlier owning-area 307
+methods passed. Both incremental products and ordinary native Debug build passed;
+native 309 and focused native 4 passed on their distinct fixture maps, with
+three full-run QoS diagnostics retained. Strict Debug artifact binding and
+isolated native MCP/Qwen cases passed; the first Qwen final-parser NONPASS
+remains. Owner repair is applied; final source 321 and separate ordinary Debug
+compilation passed on the later map. Final native 321 passed with the existing
+DiagnosticLog64 warning; strict Debug verification of seven binaries and signed owner/continuation repetitions
+passed. Fresh Qwen passed on the final candidate; exact direct publication/synchronization revisions use the external delivery
+receipt after the update. First NONPASS and
+later three-method repair receipts retain their distinct maps. The graph receipt
+verifies sixteen changed Swift inputs with retained membership/workspace and
+only twelve marketing/sixteen build settings changed. First CLI/app
+integration compiles passed on their recorded 450-input snapshots. At the preceding .25 PDF
+checkpoint, its marker regression passed one source method and was included in
+the 102-test compiled native pass; strict Debug/Release verification bound those
+historical builds to their 450 inputs. Its later test-only closeout was delivered
+and synchronized at the exact source/wiki refs above. The final scoped .26 native/API gates above passed; exact direct publication/synchronization revisions use the external delivery
+receipt after the update. The
 consistency check runs locally and in CI. Filesystem protocol, provider-plugin,
 and database schema versions are
 separate compatibility contracts.

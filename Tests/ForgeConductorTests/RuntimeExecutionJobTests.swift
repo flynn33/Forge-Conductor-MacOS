@@ -161,12 +161,34 @@ final class RuntimeExecutionJobTests: XCTestCase {
 
     func testRunningOutputAbsentOwnerIsRetryableOnlyBeforeTerminalPersistence() async throws {
         let fixture = try await Fixture.make()
-        addTeardownBlock { await fixture.close(); try? FileManager.default.removeItem(at: fixture.root) }
-        let jobID = UUID()
-        _ = try await fixture.runtimeRepository.createJob(
-            jobID: jobID, request: fixture.request(kind: .bash, profile: .bashNoProfile, script: "exit 0", timeout: 5),
-            commandSummary: "queued before owner wiring", timeoutSeconds: 5, requestArtifactRelativePath: nil
+        let gate = SharedOwnerPreparationGate()
+        let publisher = try ExecutionJobService(
+            repository: fixture.runtimeRepository,
+            contextValidator: SharedOwnerPreparationValidator(
+                base: ProjectControlPlaneRuntimeJobContextValidator(repository: fixture.controlRepository),
+                gate: gate),
+            artifactRoot: fixture.root.appendingPathComponent("artifacts", isDirectory: true),
+            limits: fixture.limits
         )
+        try await publisher.start()
+        let submission = Task {
+            try await publisher.submit(fixture.request(
+                kind: .bash, profile: .bashNoProfile, script: "exit 0", timeout: 5))
+        }
+        addTeardownBlock {
+            await gate.release()
+            submission.cancel()
+            _ = await submission.result
+            _ = await publisher.shutdown()
+            await fixture.close()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+        // A real publisher retains the queued intent while wiring its owner;
+        // the separate reader has neither that spool nor terminal output.
+        let paused = await Self.waitUntil { await gate.observedJobID() != nil }
+        XCTAssertTrue(paused)
+        let pausedID = await gate.observedJobID()
+        let jobID = try XCTUnwrap(pausedID)
         let pack = RuntimeJobToolPack(service: fixture.service)
         let pending = try await pack.handle(name: "job.read_output", arguments: [
             "job_id": jobID.uuidString, "stream": "stdout", "offset": 0, "limit": 100
@@ -176,8 +198,7 @@ final class RuntimeExecutionJobTests: XCTestCase {
         XCTAssertEqual(pending?.payload["retryable"] as? Bool, true)
         XCTAssertNil(pending?.payload["data"])
         XCTAssertNil(pending?.payload["sha256"])
-        _ = try await fixture.runtimeRepository.complete(jobID: jobID, terminalState: .cancelled,
-            exitCode: nil, outputs: [], artifactID: nil, expectedContext: fixture.context)
+        try await publisher.cancel(jobID: jobID, context: fixture.context)
         let terminal = try await pack.handle(name: "job.read_output", arguments: [
             "job_id": jobID.uuidString, "stream": "stdout", "offset": 0, "limit": 100
         ], context: fixture.context)
@@ -8106,5 +8127,1531 @@ final class RuntimeExecutionJobTests: XCTestCase {
         func allowPersistence() {
             persistenceAllowed = true
         }
+    }
+}
+
+extension RuntimeExecutionJobTests {
+    private enum PreCommitAdmissionFixtureError: Error, Equatable, Sendable {
+        case rejected
+        case alreadyConsumed
+        case barrierTimedOut
+    }
+
+    func testPreCommitAdmissionPersistsSeparateSourceReceiptBeforeControlPlaneCommit() async throws {
+        let fixture = try await Fixture.make()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let databaseURL = await fixture.runtimeRepository.databaseURL
+        let source = try SQLiteStore(path: fixture.root.appendingPathComponent("admission-source.sqlite"))
+        defer { source.close() }
+        let jobID = UUID()
+        let entered = DispatchSemaphore(value: 0)
+        let release = DispatchSemaphore(value: 0)
+        defer { release.signal() }
+        let admitted = RuntimeBlockingResult<RuntimeJobRecord>()
+        let committed = RuntimeBlockingResult<RuntimeJobRecord>()
+        let callback: RuntimeJobPreCommitAdmission = { record in
+            guard admitted.take() == nil else { throw PreCommitAdmissionFixtureError.alreadyConsumed }
+            try source.memorySet(key: "native-admission", body: record.jobID.uuidString.lowercased())
+            admitted.store(.success(record))
+            entered.signal()
+            guard release.wait(timeout: .now() + 3) == .success else {
+                throw PreCommitAdmissionFixtureError.barrierTimedOut
+            }
+        }
+        let request = Self.preCommitRequest(fixture: fixture, admission: callback)
+        let create = Task.detached(priority: .utility) {
+            try await fixture.runtimeRepository.createJob(
+                jobID: jobID, request: request, commandSummary: "pre-commit ordering fixture",
+                timeoutSeconds: 5, requestArtifactRelativePath: nil,
+                preCommitAdmission: callback,
+                commitObserver: { record in committed.store(.success(record)) }
+            )
+        }
+        do {
+            let didEnter = await withCheckedContinuation { continuation in
+                DispatchQueue.global(qos: .utility).async {
+                    continuation.resume(returning: entered.wait(timeout: .now() + 2) == .success)
+                }
+            }
+            XCTAssertTrue(didEnter, "The bounded barrier must pause inside admission")
+            let observed = try XCTUnwrap(admitted.take()).get()
+            XCTAssertEqual(observed.jobID, jobID)
+            XCTAssertEqual(observed.projectID, fixture.projectID)
+            XCTAssertEqual(observed.projectGeneration, fixture.context.projectGeneration)
+            XCTAssertEqual(observed.state, .queued)
+            let beforeCommit = try await Task.detached(priority: .utility) {
+                (
+                    try Self.sqliteCount(databaseURL: databaseURL,
+                        sql: "SELECT COUNT(*) FROM execution_jobs WHERE job_id=?",
+                        textBinding: jobID.uuidString.lowercased()),
+                    try source.memoryGet(key: "native-admission")
+                )
+            }.value
+            XCTAssertEqual(beforeCommit.0, 0, "A separate CP reader must not see the uncommitted job")
+            XCTAssertEqual(beforeCommit.1, jobID.uuidString.lowercased())
+            XCTAssertNil(committed.take(), "The existing persistence observer must remain after COMMIT")
+            release.signal()
+            let stored = try await create.value
+            XCTAssertEqual(stored, observed)
+            XCTAssertEqual(try XCTUnwrap(committed.take()).get(), stored)
+            let visible = try await Task.detached(priority: .utility) {
+                try Self.sqliteCount(databaseURL: databaseURL,
+                    sql: "SELECT COUNT(*) FROM execution_jobs WHERE job_id=?",
+                    textBinding: jobID.uuidString.lowercased())
+            }.value
+            XCTAssertEqual(visible, 1)
+        } catch {
+            release.signal()
+            create.cancel()
+            _ = await create.result
+            await fixture.close()
+            throw error
+        }
+        await fixture.close()
+    }
+
+    func testPreCommitAdmissionThrowRollsBackJobWithoutErasingSeparateSourceReceipt() async throws {
+        let fixture = try await Fixture.make()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let databaseURL = await fixture.runtimeRepository.databaseURL
+        let sourceURL = fixture.root.appendingPathComponent("admission-source.sqlite")
+        let source = try SQLiteStore(path: sourceURL)
+        defer { source.close() }
+        let jobID = UUID()
+        let committed = RuntimeBlockingResult<RuntimeJobRecord>()
+        let callback: RuntimeJobPreCommitAdmission = { record in
+            guard try source.memoryGet(key: "consumed-native-admission") == nil else {
+                throw PreCommitAdmissionFixtureError.alreadyConsumed
+            }
+            try source.memorySet(key: "consumed-native-admission", body: record.jobID.uuidString.lowercased())
+            throw PreCommitAdmissionFixtureError.rejected
+        }
+        let request = Self.preCommitRequest(fixture: fixture, admission: callback,
+            idempotencyKey: "rolled-back-native-admission")
+        do {
+            for expectedError in [PreCommitAdmissionFixtureError.rejected, .alreadyConsumed] {
+                do {
+                    _ = try await fixture.runtimeRepository.createJob(
+                        jobID: jobID, request: request, commandSummary: "rollback fixture",
+                        timeoutSeconds: 5, requestArtifactRelativePath: nil,
+                        preCommitAdmission: callback,
+                        commitObserver: { record in committed.store(.success(record)) }
+                    )
+                    XCTFail("A throwing Source admission must not commit a CP job")
+                } catch let error as PreCommitAdmissionFixtureError {
+                    XCTAssertEqual(error, expectedError)
+                }
+            }
+            XCTAssertNil(committed.take())
+            let rows = try await Task.detached(priority: .utility) {
+                try Self.sqliteCount(databaseURL: databaseURL, sql: "SELECT COUNT(*) FROM execution_jobs")
+            }.value
+            XCTAssertEqual(rows, 0)
+            let existing = try await fixture.runtimeRepository.existingJob(
+                projectID: fixture.projectID, generation: fixture.context.projectGeneration,
+                idempotencyKey: "rolled-back-native-admission"
+            )
+            XCTAssertNil(existing)
+            source.close()
+            let reopenedReceipt = try await Task.detached(priority: .utility) {
+                let reopened = try SQLiteStore(path: sourceURL)
+                defer { reopened.close() }
+                return try reopened.memoryGet(key: "consumed-native-admission")
+            }.value
+            XCTAssertEqual(reopenedReceipt, jobID.uuidString.lowercased())
+        } catch {
+            await fixture.close()
+            throw error
+        }
+        await fixture.close()
+    }
+
+    func testPreCommitAdmissionCancellationAfterSourceCommitRollsBackOnlyControlPlaneJob() async throws {
+        let fixture = try await Fixture.make()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let databaseURL = await fixture.runtimeRepository.databaseURL
+        let source = try SQLiteStore(path: fixture.root.appendingPathComponent("admission-source.sqlite"))
+        defer { source.close() }
+        let jobID = UUID()
+        let entered = DispatchSemaphore(value: 0)
+        let release = DispatchSemaphore(value: 0)
+        defer { release.signal() }
+        let committed = RuntimeBlockingResult<RuntimeJobRecord>()
+        let callback: RuntimeJobPreCommitAdmission = { record in
+            try source.memorySet(key: "cancelled-native-admission", body: record.jobID.uuidString.lowercased())
+            entered.signal()
+            guard release.wait(timeout: .now() + 3) == .success else {
+                throw PreCommitAdmissionFixtureError.barrierTimedOut
+            }
+        }
+        let request = Self.preCommitRequest(fixture: fixture, admission: callback)
+        let create = Task.detached(priority: .utility) {
+            try await fixture.runtimeRepository.createJob(
+                jobID: jobID, request: request, commandSummary: "cancelled admission fixture",
+                timeoutSeconds: 5, requestArtifactRelativePath: nil,
+                preCommitAdmission: callback,
+                commitObserver: { record in committed.store(.success(record)) }
+            )
+        }
+        do {
+            let didEnter = await withCheckedContinuation { continuation in
+                DispatchQueue.global(qos: .utility).async {
+                    continuation.resume(returning: entered.wait(timeout: .now() + 2) == .success)
+                }
+            }
+            XCTAssertTrue(didEnter)
+            create.cancel()
+            release.signal()
+            do {
+                _ = try await create.value
+                XCTFail("Cancellation after Source admission must still prevent CP COMMIT")
+            } catch is CancellationError {
+                // The repository checks cancellation after admission and before COMMIT.
+            }
+            XCTAssertNil(committed.take())
+            let observed = try await Task.detached(priority: .utility) {
+                (
+                    try Self.sqliteCount(databaseURL: databaseURL, sql: "SELECT COUNT(*) FROM execution_jobs"),
+                    try source.memoryGet(key: "cancelled-native-admission")
+                )
+            }.value
+            XCTAssertEqual(observed.0, 0)
+            XCTAssertEqual(observed.1, jobID.uuidString.lowercased())
+        } catch {
+            release.signal()
+            create.cancel()
+            _ = await create.result
+            await fixture.close()
+            throw error
+        }
+        await fixture.close()
+    }
+
+    func testPreCommitAdmissionNewAndEarlyReusedJobReceivesActualNativeRecordWithoutReplay() async throws {
+        let fixture = try await Fixture.make()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let marker = fixture.projectRoot.appendingPathComponent("admitted-once")
+        let key = "ordinary-precommit-once"
+        let firstAdmission = RuntimeBlockingResult<RuntimeJobRecord>()
+        let firstCommit = RuntimeBlockingResult<RuntimeJobRecord>()
+        let firstCallback: RuntimeJobPreCommitAdmission = { record in
+            guard firstAdmission.take() == nil else { throw PreCommitAdmissionFixtureError.alreadyConsumed }
+            firstAdmission.store(.success(record))
+        }
+        do {
+            let original = try await fixture.service.submitWithOutcome(Self.preCommitRequest(
+                fixture: fixture, executable: "/usr/bin/touch", arguments: [marker.path],
+                admission: firstCallback, idempotencyKey: key,
+                persistenceObserver: { record in firstCommit.store(.success(record)) }
+            ))
+            XCTAssertFalse(original.reused)
+            let admitted = try XCTUnwrap(firstAdmission.take()).get()
+            XCTAssertEqual(admitted.jobID, original.jobID)
+            XCTAssertEqual(admitted.state, .queued)
+            XCTAssertEqual(try XCTUnwrap(firstCommit.take()).get(), admitted)
+            let terminal = try await fixture.service.waitForTerminal(
+                jobID: original.jobID, context: fixture.context, maximumWait: .seconds(8)
+            )
+            XCTAssertEqual(terminal.state, .completed)
+            XCTAssertEqual(terminal.exitCode, 0)
+            XCTAssertTrue(FileManager.default.fileExists(atPath: marker.path))
+
+            let reusedAdmission = RuntimeBlockingResult<RuntimeJobRecord>()
+            let reusedCommit = RuntimeBlockingResult<RuntimeJobRecord>()
+            let replacement = try await fixture.service.submitWithOutcome(Self.preCommitRequest(
+                fixture: fixture, executable: "/bin/rm", arguments: [marker.path],
+                admission: { record in
+                    guard reusedAdmission.take() == nil else { throw PreCommitAdmissionFixtureError.alreadyConsumed }
+                    reusedAdmission.store(.success(record))
+                }, idempotencyKey: key,
+                persistenceObserver: { record in reusedCommit.store(.success(record)) }
+            ))
+            XCTAssertTrue(replacement.reused)
+            XCTAssertEqual(replacement.jobID, original.jobID)
+            XCTAssertEqual(try XCTUnwrap(reusedAdmission.take()).get(), terminal)
+            XCTAssertEqual(try XCTUnwrap(reusedCommit.take()).get(), terminal)
+            XCTAssertTrue(FileManager.default.fileExists(atPath: marker.path), "Early reuse must not execute the replacement command")
+            let rows = try await fixture.runtimeRepository.list(context: fixture.context)
+            XCTAssertEqual(rows.map(\.jobID), [original.jobID])
+        } catch {
+            await fixture.close()
+            throw error
+        }
+        await fixture.close()
+    }
+
+    func testPreCommitAdmissionCompactedReceiptIsAdmittedByEarlyAndTransactionalReuseWithoutReplay() async throws {
+        let fixture = try await Fixture.make()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let databaseURL = await fixture.runtimeRepository.databaseURL
+        let marker = fixture.projectRoot.appendingPathComponent("compacted-admitted-once")
+        let key = "ordinary-precommit-compacted"
+        do {
+            let original = try await fixture.service.submit(Self.preCommitRequest(
+                fixture: fixture, executable: "/usr/bin/touch", arguments: [marker.path],
+                admission: nil, idempotencyKey: key
+            ))
+            let terminal = try await fixture.service.waitForTerminal(
+                jobID: original, context: fixture.context, maximumWait: .seconds(8)
+            )
+            XCTAssertEqual(terminal.state, .completed)
+            XCTAssertEqual(terminal.exitCode, 0)
+            let newer = try await fixture.service.submit(Self.preCommitRequest(fixture: fixture, admission: nil))
+            let newerTerminal = try await fixture.service.waitForTerminal(
+                jobID: newer, context: fixture.context, maximumWait: .seconds(8)
+            )
+            XCTAssertEqual(newerTerminal.state, .completed)
+            let compacted = try await fixture.runtimeRepository.compactTerminalJobs(
+                maximumPerProject: 100, maximumGlobal: 1,
+                maximumIdempotencyReceiptsPerProject: 2, maximumIdempotencyReceiptsGlobal: 2
+            )
+            XCTAssertEqual(compacted, 1)
+            let receipt = try await fixture.runtimeRepository.existingJob(
+                projectID: fixture.projectID, generation: fixture.context.projectGeneration,
+                idempotencyKey: key
+            )
+            let expected = try XCTUnwrap(receipt)
+            XCTAssertEqual(expected.jobID, original)
+            XCTAssertEqual(expected.state, .completed)
+            XCTAssertNil(expected.processIdentifier)
+            let earlyAdmission = RuntimeBlockingResult<RuntimeJobRecord>()
+            let earlyCommit = RuntimeBlockingResult<RuntimeJobRecord>()
+            let reused = try await fixture.service.submitWithOutcome(Self.preCommitRequest(
+                fixture: fixture, executable: "/bin/rm", arguments: [marker.path],
+                admission: { record in earlyAdmission.store(.success(record)) }, idempotencyKey: key,
+                persistenceObserver: { record in earlyCommit.store(.success(record)) }
+            ))
+            XCTAssertTrue(reused.reused)
+            XCTAssertEqual(reused.jobID, original)
+            XCTAssertEqual(try XCTUnwrap(earlyAdmission.take()).get(), expected)
+            XCTAssertEqual(try XCTUnwrap(earlyCommit.take()).get(), expected)
+
+            let candidateID = UUID()
+            let transactionalAdmission = RuntimeBlockingResult<RuntimeJobRecord>()
+            let transactionalCommit = RuntimeBlockingResult<RuntimeJobRecord>()
+            let callback: RuntimeJobPreCommitAdmission = { record in
+                transactionalAdmission.store(.success(record))
+            }
+            let transactionallyReused = try await fixture.runtimeRepository.createJob(
+                jobID: candidateID, request: Self.preCommitRequest(fixture: fixture,
+                    executable: "/bin/rm", arguments: [marker.path], admission: callback, idempotencyKey: key),
+                commandSummary: "must reuse compacted receipt", timeoutSeconds: 5,
+                requestArtifactRelativePath: nil, preCommitAdmission: callback,
+                commitObserver: { record in transactionalCommit.store(.success(record)) }
+            )
+            XCTAssertEqual(transactionallyReused, expected)
+            XCTAssertEqual(try XCTUnwrap(transactionalAdmission.take()).get(), expected)
+            XCTAssertEqual(try XCTUnwrap(transactionalCommit.take()).get(), expected)
+            XCTAssertTrue(FileManager.default.fileExists(atPath: marker.path))
+            let counts = try await Task.detached(priority: .utility) {
+                (
+                    try Self.sqliteCount(databaseURL: databaseURL,
+                        sql: "SELECT COUNT(*) FROM execution_jobs WHERE job_id IN (?,?)",
+                        textBindings: [original.uuidString.lowercased(), candidateID.uuidString.lowercased()]),
+                    try Self.sqliteCount(databaseURL: databaseURL,
+                        sql: "SELECT COUNT(*) FROM runtime_job_idempotency_receipts WHERE job_id=?",
+                        textBinding: original.uuidString.lowercased())
+                )
+            }.value
+            XCTAssertEqual(counts.0, 0)
+            XCTAssertEqual(counts.1, 1)
+        } catch {
+            await fixture.close()
+            throw error
+        }
+        await fixture.close()
+    }
+
+    func testPreCommitAdmissionRaceAdmitsCommittedWinnerAndDiscardsReplacementCommand() async throws {
+        let fixture = try await Fixture.make()
+        let admissionClock = RawRuntimeAdmissionClock()
+        defer {
+            admissionClock.release()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+        let databaseURL = await fixture.runtimeRepository.databaseURL
+        let raceRepository = try RuntimeJobRepository(databaseURL: databaseURL, clock: admissionClock)
+        let raceService = try ExecutionJobService(
+            repository: raceRepository,
+            contextValidator: ProjectControlPlaneRuntimeJobContextValidator(repository: fixture.controlRepository),
+            artifactRoot: fixture.root.appendingPathComponent("precommit-race-artifacts"), limits: fixture.limits
+        )
+        let marker = fixture.projectRoot.appendingPathComponent("race-winner")
+        let key = "ordinary-precommit-raced-key"
+        let admitted = RuntimeBlockingResult<RuntimeJobRecord>()
+        let committed = RuntimeBlockingResult<RuntimeJobRecord>()
+        let request = Self.preCommitRequest(fixture: fixture, executable: "/bin/rm",
+            arguments: [marker.path], admission: { record in admitted.store(.success(record)) },
+            idempotencyKey: key, persistenceObserver: { record in committed.store(.success(record)) })
+        var submission: Task<(jobID: UUID, reused: Bool), Error>?
+        do {
+            try await raceService.start()
+            admissionClock.arm()
+            let losing = Task.detached(priority: .utility) { try await raceService.submitWithOutcome(request) }
+            submission = losing
+            for _ in 0..<200 {
+                if admissionClock.didPause() { break }
+                try await Task.sleep(for: .milliseconds(10))
+            }
+            XCTAssertTrue(admissionClock.didPause(), "The race must pause after the empty early lookup")
+            XCTAssertNil(admitted.take(), "An empty early lookup must not consume admission")
+            let winner = try await fixture.service.submit(Self.preCommitRequest(
+                fixture: fixture, executable: "/usr/bin/touch", arguments: [marker.path],
+                admission: nil, idempotencyKey: key
+            ))
+            let terminal = try await fixture.service.waitForTerminal(
+                jobID: winner, context: fixture.context, maximumWait: .seconds(5)
+            )
+            XCTAssertEqual(terminal.state, .completed)
+            XCTAssertEqual(terminal.exitCode, 0)
+            admissionClock.release()
+            let reused = try await losing.value
+            XCTAssertTrue(reused.reused)
+            XCTAssertEqual(reused.jobID, winner)
+            XCTAssertEqual(try XCTUnwrap(admitted.take()).get(), terminal)
+            XCTAssertEqual(try XCTUnwrap(committed.take()).get(), terminal)
+            XCTAssertFalse(admissionClock.didTimeOut())
+            XCTAssertTrue(FileManager.default.fileExists(atPath: marker.path))
+            let rows = try await fixture.runtimeRepository.list(context: fixture.context)
+            XCTAssertEqual(rows.map(\.jobID), [winner])
+        } catch {
+            admissionClock.release()
+            submission?.cancel()
+            if let submission { _ = await submission.result }
+            await raceService.shutdown()
+            await raceRepository.close()
+            await fixture.close()
+            throw error
+        }
+        await raceService.shutdown()
+        await raceRepository.close()
+        await fixture.close()
+    }
+
+    func testPreCommitAdmissionRechecksRevokedSwitchedAndResetContextsInsideRepositoryTransaction() async throws {
+        for change in 0..<4 {
+            let fixture = try await Fixture.make()
+            defer { try? FileManager.default.removeItem(at: fixture.root) }
+            let databaseURL = await fixture.runtimeRepository.databaseURL
+            let admitted = RuntimeBlockingResult<RuntimeJobRecord>()
+            let committed = RuntimeBlockingResult<RuntimeJobRecord>()
+            let callback: RuntimeJobPreCommitAdmission = { record in admitted.store(.success(record)) }
+            let request = Self.preCommitRequest(fixture: fixture, admission: callback,
+                idempotencyKey: "binding-fence-existing-job")
+            do {
+                let owner = ProjectBindingOwner(kind: .mcpClient, id: fixture.context.clientID.rawValue)
+                try await fixture.controlRepository.validate(fixture.context, for: owner)
+                let original = try await fixture.runtimeRepository.createJob(
+                    jobID: UUID(), request: request, commandSummary: "existing public nil-path fixture",
+                    timeoutSeconds: 5, requestArtifactRelativePath: nil
+                )
+                XCTAssertNil(admitted.take(), "The public createJob overload must keep its nil-admission contract")
+                let expectedError: ProjectContextError
+                switch change {
+                case 0:
+                    let changed = try await Task.detached(priority: .utility) {
+                        try Self.updatePreCommitFixture(databaseURL: databaseURL,
+                            sql: "UPDATE project_bindings SET active=0 WHERE owner_kind=? AND owner_id=? AND active=1",
+                            textBindings: [owner.kind.rawValue, owner.id])
+                    }.value
+                    XCTAssertEqual(changed, 1)
+                    expectedError = .projectContextRequired(owner)
+                case 1:
+                    let otherRoot = fixture.root.appendingPathComponent("other-project", isDirectory: true)
+                    try FileManager.default.createDirectory(at: otherRoot, withIntermediateDirectories: true)
+                    let otherID = ProjectID()
+                    _ = try await fixture.controlRepository.registerProjectUnchecked(
+                        projectID: otherID, displayName: "Switched Admission Fixture", canonicalRoot: otherRoot
+                    )
+                    let changed = try await Task.detached(priority: .utility) {
+                        try Self.updatePreCommitFixture(databaseURL: databaseURL,
+                            sql: "UPDATE project_bindings SET project_id=? WHERE owner_kind=? AND owner_id=? AND active=1",
+                            textBindings: [otherID.description, owner.kind.rawValue, owner.id])
+                    }.value
+                    XCTAssertEqual(changed, 1)
+                    expectedError = .projectScopeMismatch
+                case 2:
+                    _ = try await fixture.controlRepository.beginReset(
+                        projectID: fixture.projectID, expectedGeneration: fixture.context.projectGeneration
+                    )
+                    expectedError = .projectNotActive(.resetting)
+                default:
+                    _ = try await fixture.controlRepository.beginReset(
+                        projectID: fixture.projectID, expectedGeneration: fixture.context.projectGeneration
+                    )
+                    let reset = try await fixture.controlRepository.completeReset(
+                        projectID: fixture.projectID, expectedGeneration: fixture.context.projectGeneration
+                    )
+                    expectedError = .staleProjectGeneration(expected: fixture.context.projectGeneration,
+                        actual: reset.newGeneration)
+                }
+                do {
+                    _ = try await fixture.runtimeRepository.createJob(
+                        jobID: UUID(), request: request, commandSummary: "stale native admission",
+                        timeoutSeconds: 5, requestArtifactRelativePath: nil, preCommitAdmission: callback,
+                        commitObserver: { record in committed.store(.success(record)) }
+                    )
+                    XCTFail("Earlier caller validation must not authorize a changed CP binding")
+                } catch let error as ProjectContextError {
+                    XCTAssertEqual(error, expectedError)
+                }
+                do {
+                    _ = try await fixture.runtimeRepository.admitExistingJob(
+                        request: request, preCommitAdmission: callback,
+                        commitObserver: { record in committed.store(.success(record)) }
+                    )
+                    XCTFail("The early reuse transaction must recheck the same changed CP binding")
+                } catch let error as ProjectContextError {
+                    XCTAssertEqual(error, expectedError)
+                }
+                XCTAssertNil(admitted.take())
+                XCTAssertNil(committed.take())
+                let count = try await Task.detached(priority: .utility) {
+                    try Self.sqliteCount(databaseURL: databaseURL, sql: "SELECT COUNT(*) FROM execution_jobs")
+                }.value
+                XCTAssertEqual(count, 1)
+                let unchanged = try await fixture.runtimeRepository.job(original.jobID)
+                XCTAssertEqual(unchanged, original)
+            } catch {
+                await fixture.close()
+                throw error
+            }
+            await fixture.close()
+        }
+    }
+
+    func testPreCommitAdmissionRequiresAllScopeFieldsAndDecodesLegacyStoredWritableRoots() async throws {
+        let fixture = try await Fixture.make()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let databaseURL = await fixture.runtimeRepository.databaseURL
+        let scope = fixture.context.authorizationScope
+        let owner = ProjectBindingOwner(kind: .mcpClient, id: fixture.context.clientID.rawValue)
+        let admitted = RuntimeBlockingResult<RuntimeJobRecord>()
+        let callback: RuntimeJobPreCommitAdmission = { record in admitted.store(.success(record)) }
+        do {
+            let legacyScope = String(decoding: try JSONSerialization.data(withJSONObject: [
+                "canonicalRoots": scope.canonicalRoots.map(\.path),
+                "allowedTools": scope.allowedTools.sorted(),
+                "networkAllowed": scope.networkAllowed,
+                "maximumInlineOutputBytes": scope.maximumInlineOutputBytes,
+            ], options: [.sortedKeys]), as: UTF8.self)
+            let changed = try await Task.detached(priority: .utility) {
+                try Self.updatePreCommitFixture(databaseURL: databaseURL,
+                    sql: "UPDATE project_bindings SET authorization_scope_json=? WHERE owner_kind=? AND owner_id=? AND active=1",
+                    textBindings: [legacyScope, owner.kind.rawValue, owner.id])
+            }.value
+            XCTAssertEqual(changed, 1)
+            let original = try await fixture.runtimeRepository.createJob(
+                jobID: UUID(), request: Self.preCommitRequest(fixture: fixture, admission: callback),
+                commandSummary: "legacy scope admission", timeoutSeconds: 5,
+                requestArtifactRelativePath: nil, preCommitAdmission: callback
+            )
+            XCTAssertEqual(try XCTUnwrap(admitted.take()).get(), original)
+            let mismatchedScopes = [
+                ToolAuthorizationScope(canonicalRoots: [fixture.root], writableRoots: scope.writableRoots,
+                    allowedTools: scope.allowedTools, networkAllowed: scope.networkAllowed,
+                    maximumInlineOutputBytes: scope.maximumInlineOutputBytes),
+                ToolAuthorizationScope(canonicalRoots: scope.canonicalRoots, writableRoots: [],
+                    allowedTools: scope.allowedTools, networkAllowed: scope.networkAllowed,
+                    maximumInlineOutputBytes: scope.maximumInlineOutputBytes),
+                ToolAuthorizationScope(canonicalRoots: scope.canonicalRoots, writableRoots: scope.writableRoots,
+                    allowedTools: ["job.status"], networkAllowed: scope.networkAllowed,
+                    maximumInlineOutputBytes: scope.maximumInlineOutputBytes),
+                ToolAuthorizationScope(canonicalRoots: scope.canonicalRoots, writableRoots: scope.writableRoots,
+                    allowedTools: scope.allowedTools, networkAllowed: !scope.networkAllowed,
+                    maximumInlineOutputBytes: scope.maximumInlineOutputBytes),
+                ToolAuthorizationScope(canonicalRoots: scope.canonicalRoots, writableRoots: scope.writableRoots,
+                    allowedTools: scope.allowedTools, networkAllowed: scope.networkAllowed,
+                    maximumInlineOutputBytes: scope.maximumInlineOutputBytes + 1),
+            ]
+            for mismatched in mismatchedScopes {
+                let context = ToolInvocationContext(projectID: fixture.projectID,
+                    projectGeneration: fixture.context.projectGeneration, clientID: fixture.context.clientID,
+                    authorizationScope: mismatched)
+                let rejectedAdmission = RuntimeBlockingResult<RuntimeJobRecord>()
+                let rejectedCommit = RuntimeBlockingResult<RuntimeJobRecord>()
+                let rejectCallback: RuntimeJobPreCommitAdmission = { record in rejectedAdmission.store(.success(record)) }
+                do {
+                    _ = try await fixture.runtimeRepository.createJob(
+                        jobID: UUID(), request: Self.preCommitRequest(fixture: fixture,
+                            context: context, admission: rejectCallback),
+                        commandSummary: "mismatched scope fixture", timeoutSeconds: 5,
+                        requestArtifactRelativePath: nil, preCommitAdmission: rejectCallback,
+                        commitObserver: { record in rejectedCommit.store(.success(record)) }
+                    )
+                    XCTFail("Every stored scope field must match before admission")
+                } catch let error as ProjectContextError {
+                    XCTAssertEqual(error, .projectScopeMismatch)
+                }
+                XCTAssertNil(rejectedAdmission.take())
+                XCTAssertNil(rejectedCommit.take())
+            }
+            let narrowedStoredScope = String(decoding: try JSONSerialization.data(withJSONObject: [
+                "canonicalRoots": scope.canonicalRoots.map(\.path),
+                "writableRoots": scope.writableRoots.map(\.path),
+                "allowedTools": ["job.status"],
+                "networkAllowed": scope.networkAllowed,
+                "maximumInlineOutputBytes": scope.maximumInlineOutputBytes,
+            ], options: [.sortedKeys]), as: UTF8.self)
+            _ = try await Task.detached(priority: .utility) {
+                try Self.updatePreCommitFixture(databaseURL: databaseURL,
+                    sql: "UPDATE project_bindings SET authorization_scope_json=? WHERE owner_kind=? AND owner_id=? AND active=1",
+                    textBindings: [narrowedStoredScope, owner.kind.rawValue, owner.id])
+            }.value
+            let narrowedAdmission = RuntimeBlockingResult<RuntimeJobRecord>()
+            let narrowedCallback: RuntimeJobPreCommitAdmission = { record in narrowedAdmission.store(.success(record)) }
+            do {
+                _ = try await fixture.runtimeRepository.createJob(
+                    jobID: UUID(), request: Self.preCommitRequest(fixture: fixture, admission: narrowedCallback),
+                    commandSummary: "changed stored tools fixture", timeoutSeconds: 5,
+                    requestArtifactRelativePath: nil, preCommitAdmission: narrowedCallback
+                )
+                XCTFail("A previously broader context must not pass the current stored allowed tools")
+            } catch let error as ProjectContextError {
+                XCTAssertEqual(error, .projectScopeMismatch)
+            }
+            XCTAssertNil(narrowedAdmission.take())
+            let rows = try await Task.detached(priority: .utility) {
+                try Self.sqliteCount(databaseURL: databaseURL, sql: "SELECT COUNT(*) FROM execution_jobs")
+            }.value
+            XCTAssertEqual(rows, 1)
+        } catch {
+            await fixture.close()
+            throw error
+        }
+        await fixture.close()
+    }
+
+    func testPreCommitAdmissionRejectsManagedProviderAndRuntimeIdentityWhilePublicRequestKeepsNilPath() async throws {
+        let fixture = try await Fixture.make()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        do {
+            let run = try await fixture.autonomousRunContext(mission: "Preserve non-admitted managed runtime jobs")
+            let publicRequest = RuntimeJobRequest(kind: .process, profile: .directProcess,
+                context: run.context, executable: URL(fileURLWithPath: "/usr/bin/true"),
+                canonicalWorkingDirectory: fixture.projectRoot, timeout: .seconds(5),
+                maximumInlineOutputBytes: fixture.limits.maximumInlineOutputBytes, replayClass: .readOnly)
+            XCTAssertNil(publicRequest.preCommitAdmission)
+            let jobID = try await fixture.service.submit(publicRequest)
+            let terminal = try await fixture.service.waitForTerminal(
+                jobID: jobID, context: run.context, maximumWait: .seconds(8)
+            )
+            XCTAssertEqual(terminal.state, .completed)
+            XCTAssertEqual(terminal.exitCode, 0)
+            XCTAssertEqual(terminal.runID, run.runID)
+            let nonOrdinary = [
+                run.context,
+                ToolInvocationContext(projectID: fixture.projectID,
+                    projectGeneration: fixture.context.projectGeneration, clientID: fixture.context.clientID,
+                    providerSessionID: "native-provider-test", authorizationScope: fixture.context.authorizationScope),
+                ToolInvocationContext(projectID: fixture.projectID,
+                    projectGeneration: fixture.context.projectGeneration, clientID: fixture.context.clientID,
+                    runtimeJobID: jobID, authorizationScope: fixture.context.authorizationScope),
+            ]
+            for context in nonOrdinary {
+                let admitted = RuntimeBlockingResult<RuntimeJobRecord>()
+                let committed = RuntimeBlockingResult<RuntimeJobRecord>()
+                let callback: RuntimeJobPreCommitAdmission = { record in admitted.store(.success(record)) }
+                do {
+                    _ = try await fixture.runtimeRepository.createJob(
+                        jobID: UUID(), request: Self.preCommitRequest(fixture: fixture,
+                            context: context, admission: callback),
+                        commandSummary: "nonordinary admission fixture", timeoutSeconds: 5,
+                        requestArtifactRelativePath: nil, preCommitAdmission: callback,
+                        commitObserver: { record in committed.store(.success(record)) }
+                    )
+                    XCTFail("A nonnil ordinary continuity admission must reject another native identity")
+                } catch let error as ProjectContextError {
+                    XCTAssertEqual(error, .projectScopeMismatch)
+                }
+                XCTAssertNil(admitted.take())
+                XCTAssertNil(committed.take())
+            }
+            let rows = try await fixture.runtimeRepository.list(context: fixture.context)
+            XCTAssertEqual(rows.map(\.jobID), [jobID])
+        } catch {
+            await fixture.close()
+            throw error
+        }
+        await fixture.close()
+    }
+
+    func testPreCommitAdmissionFailureDuringBothReusePathsPreservesCommittedJobAndSourceReceipt() async throws {
+        let fixture = try await Fixture.make()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let source = try SQLiteStore(path: fixture.root.appendingPathComponent("admission-source.sqlite"))
+        defer { source.close() }
+        let marker = fixture.projectRoot.appendingPathComponent("reuse-admission-failed")
+        let key = "ordinary-precommit-reuse-failure"
+        let committed = RuntimeBlockingResult<RuntimeJobRecord>()
+        let callback: RuntimeJobPreCommitAdmission = { record in
+            guard try source.memoryGet(key: "failed-reuse-admission") == nil else {
+                throw PreCommitAdmissionFixtureError.alreadyConsumed
+            }
+            try source.memorySet(key: "failed-reuse-admission", body: record.jobID.uuidString.lowercased())
+            throw PreCommitAdmissionFixtureError.rejected
+        }
+        do {
+            let original = try await fixture.service.submit(Self.preCommitRequest(
+                fixture: fixture, executable: "/usr/bin/touch", arguments: [marker.path],
+                admission: nil, idempotencyKey: key
+            ))
+            let terminal = try await fixture.service.waitForTerminal(
+                jobID: original, context: fixture.context, maximumWait: .seconds(8)
+            )
+            XCTAssertEqual(terminal.state, .completed)
+            XCTAssertEqual(terminal.exitCode, 0)
+            let replacement = Self.preCommitRequest(fixture: fixture, executable: "/bin/rm",
+                arguments: [marker.path], admission: callback, idempotencyKey: key,
+                persistenceObserver: { record in committed.store(.success(record)) })
+            do {
+                _ = try await fixture.service.submitWithOutcome(replacement)
+                XCTFail("Throwing early reuse admission must propagate its failure")
+            } catch let error as PreCommitAdmissionFixtureError {
+                XCTAssertEqual(error, .rejected)
+            }
+            do {
+                _ = try await fixture.runtimeRepository.createJob(
+                    jobID: UUID(), request: replacement, commandSummary: "rejected transactional reuse",
+                    timeoutSeconds: 5, requestArtifactRelativePath: nil, preCommitAdmission: callback,
+                    commitObserver: { record in committed.store(.success(record)) }
+                )
+                XCTFail("Transactional reuse must not undo a separately consumed admission")
+            } catch let error as PreCommitAdmissionFixtureError {
+                XCTAssertEqual(error, .alreadyConsumed)
+            }
+            XCTAssertNil(committed.take())
+            let unchanged = try await fixture.runtimeRepository.job(original)
+            XCTAssertEqual(unchanged, terminal)
+            let rows = try await fixture.runtimeRepository.list(context: fixture.context)
+            XCTAssertEqual(rows.map(\.jobID), [original])
+            let receipt = try await Task.detached(priority: .utility) {
+                try source.memoryGet(key: "failed-reuse-admission")
+            }.value
+            XCTAssertEqual(receipt, original.uuidString.lowercased())
+            XCTAssertTrue(FileManager.default.fileExists(atPath: marker.path))
+        } catch {
+            await fixture.close()
+            throw error
+        }
+        await fixture.close()
+    }
+
+    private static func preCommitRequest(
+        fixture: Fixture,
+        context: ToolInvocationContext? = nil,
+        executable: String = "/usr/bin/true",
+        arguments: [String] = [],
+        admission: RuntimeJobPreCommitAdmission?,
+        idempotencyKey: String? = nil,
+        persistenceObserver: (@Sendable (RuntimeJobRecord) -> Void)? = nil
+    ) -> RuntimeJobRequest {
+        RuntimeJobRequest(kind: .process, profile: .directProcess, context: context ?? fixture.context,
+            executable: URL(fileURLWithPath: executable), arguments: arguments,
+            canonicalWorkingDirectory: fixture.projectRoot, timeout: .seconds(5),
+            maximumInlineOutputBytes: fixture.limits.maximumInlineOutputBytes, replayClass: .idempotent,
+            idempotencyKey: idempotencyKey, fileSizeProfile: .standard,
+            preCommitAdmission: admission, persistenceObserver: persistenceObserver)
+    }
+
+    private static func updatePreCommitFixture(
+        databaseURL: URL,
+        sql: String,
+        textBindings: [String]
+    ) throws -> Int {
+        var database: OpaquePointer?
+        let opened = sqlite3_open_v2(databaseURL.path, &database,
+            SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX, nil)
+        guard opened == SQLITE_OK, let database else {
+            if let database { sqlite3_close(database) }
+            throw RuntimeJobError.storageFailure("could not open pre-commit SQLite fixture")
+        }
+        defer { sqlite3_close(database) }
+        guard sqlite3_busy_timeout(database, 1_000) == SQLITE_OK else {
+            throw RuntimeJobError.storageFailure("could not bound pre-commit fixture update")
+        }
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK, let statement else {
+            throw RuntimeJobError.storageFailure("could not prepare pre-commit fixture update")
+        }
+        defer { sqlite3_finalize(statement) }
+        let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+        for (offset, value) in textBindings.enumerated() {
+            guard sqlite3_bind_text(statement, Int32(offset + 1), value, -1, transient) == SQLITE_OK else {
+                throw RuntimeJobError.storageFailure("could not bind pre-commit fixture update")
+            }
+        }
+        guard sqlite3_step(statement) == SQLITE_DONE else {
+            throw RuntimeJobError.storageFailure("could not apply pre-commit fixture update")
+        }
+        return Int(sqlite3_changes(database))
+    }
+}
+
+extension RuntimeExecutionJobTests {
+    private struct SharedOwnerObserver: Sendable {
+        let control: ProjectControlPlaneRepository
+        let repository: RuntimeJobRepository
+        let service: ExecutionJobService
+
+        static func make(fixture: Fixture) async throws -> Self {
+            let database = await fixture.runtimeRepository.databaseURL
+            let control = try ProjectControlPlaneRepository(databaseURL: database)
+            let repository = try RuntimeJobRepository(databaseURL: database)
+            let service = try ExecutionJobService(
+                repository: repository,
+                contextValidator: ProjectControlPlaneRuntimeJobContextValidator(repository: control),
+                artifactRoot: fixture.root.appendingPathComponent("artifacts", isDirectory: true),
+                limits: fixture.limits
+            )
+            return Self(control: control, repository: repository, service: service)
+        }
+
+        func close() async {
+            _ = await service.shutdown()
+            await repository.close()
+            await control.close()
+        }
+    }
+
+    func testShutdownCannotReportCompletionWhenDurableOwnershipInspectionFails() async throws {
+        let fixture = try await Fixture.make()
+        addTeardownBlock {
+            await fixture.close()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+        await fixture.runtimeRepository.close()
+        let report = await fixture.service.shutdown()
+        XCTAssertFalse(report.completed, "An unreadable ledger is not proof that no jobs remain")
+        XCTAssertTrue(report.unresolvedJobIDs.isEmpty, "An inspection error must not invent a job UUID")
+        XCTAssertTrue(report.persistencePendingJobIDs.isEmpty)
+    }
+
+    private enum SharedOwnerPreparationError: Error, Sendable {
+        case alreadyEntered
+        case timedOut
+    }
+
+    private actor SharedOwnerPreparationGate {
+        private var pausedJobID: UUID?
+        private var released = false
+        private var waiter: CheckedContinuation<Void, Error>?
+        private var timeout: Task<Void, Never>?
+
+        func pause(jobID: UUID) async throws {
+            guard pausedJobID == nil else { throw SharedOwnerPreparationError.alreadyEntered }
+            pausedJobID = jobID
+            if released { return }
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                waiter = continuation
+                timeout = Task { [weak self] in
+                    do { try await Task.sleep(for: .seconds(8)) } catch { return }
+                    await self?.expire()
+                }
+            }
+        }
+
+        func observedJobID() -> UUID? { pausedJobID }
+
+        func release() {
+            released = true
+            timeout?.cancel()
+            timeout = nil
+            let waiting = waiter
+            waiter = nil
+            waiting?.resume()
+        }
+
+        private func expire() {
+            timeout = nil
+            let waiting = waiter
+            waiter = nil
+            waiting?.resume(throwing: SharedOwnerPreparationError.timedOut)
+        }
+    }
+
+    private struct SharedOwnerPreparationValidator: RuntimeJobContextValidating {
+        let base: ProjectControlPlaneRuntimeJobContextValidator
+        let gate: SharedOwnerPreparationGate
+
+        func validateCaller(_ context: ToolInvocationContext) async throws {
+            try await base.validateCaller(context)
+        }
+
+        func prepareJob(jobID: UUID, context: ToolInvocationContext) async throws -> ToolInvocationContext {
+            try await base.validateCaller(context)
+            try await gate.pause(jobID: jobID)
+            return try await base.prepareJob(jobID: jobID, context: context)
+        }
+
+        func contextForStoredJob(jobID: UUID) async throws -> ToolInvocationContext {
+            try await base.contextForStoredJob(jobID: jobID)
+        }
+
+        func validateJob(jobID: UUID, context: ToolInvocationContext) async throws {
+            try await base.validateJob(jobID: jobID, context: context)
+        }
+
+        func commitJobResult(jobID: UUID, context: ToolInvocationContext, resultSHA256: String) async throws {
+            try await base.commitJobResult(jobID: jobID, context: context, resultSHA256: resultSHA256)
+        }
+    }
+
+    private static func sharedOwnerSleepRequest(fixture: Fixture) -> RuntimeJobRequest {
+        RuntimeJobRequest(
+            kind: .process, profile: .directProcess, context: fixture.context,
+            executable: URL(fileURLWithPath: "/bin/sh"),
+            arguments: ["-c", "printf 'owned-live-stdout\\n'; printf 'owned-live-stderr\\n' >&2; exec /bin/sleep 30"],
+            canonicalWorkingDirectory: fixture.projectRoot, timeout: .seconds(40),
+            maximumInlineOutputBytes: fixture.limits.maximumInlineOutputBytes,
+            replayClass: .readOnly
+        )
+    }
+
+    func testSecondRuntimeServicePreservesLiveOwnerIdentityOutputAndIndependentShutdown() async throws {
+        let fixture = try await Fixture.make()
+        let observer = try await SharedOwnerObserver.make(fixture: fixture)
+        addTeardownBlock {
+            await fixture.close()
+            await observer.close()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+        let jobID = try await fixture.service.submit(Self.sharedOwnerSleepRequest(fixture: fixture))
+        let ready = await Self.waitUntil {
+            let stdout = try? await fixture.service.readOutput(
+                jobID: jobID, stream: .stdout, offset: 0, limit: 1024, context: fixture.context)
+            let stderr = try? await fixture.service.readOutput(
+                jobID: jobID, stream: .stderr, offset: 0, limit: 1024, context: fixture.context)
+            return stdout?.data == Data("owned-live-stdout\n".utf8)
+                && stderr?.data == Data("owned-live-stderr\n".utf8)
+                && stdout?.jobState == .running && stderr?.jobState == .running
+        }
+        XCTAssertTrue(ready)
+        let before = try await fixture.service.status(jobID: jobID, context: fixture.context)
+        let beforeIdentityValue = try await fixture.runtimeRepository.recoveryProcessIdentity(jobID: jobID)
+        let beforeIdentity = try XCTUnwrap(beforeIdentityValue)
+        let beforeObserved = RuntimeProcessIdentityReader.observedIdentity(
+            processIdentifier: beforeIdentity.processIdentifier)
+        XCTAssertEqual(before.state, .running)
+        XCTAssertNil(before.errorCode)
+        XCTAssertEqual(beforeObserved?.startIdentity, beforeIdentity.startIdentity)
+        XCTAssertEqual(beforeObserved?.parentProcessIdentifier, Darwin.getpid())
+        let stdoutBefore = try await fixture.service.readOutput(
+            jobID: jobID, stream: .stdout, offset: 0, limit: 1024, context: fixture.context)
+        let stderrBefore = try await fixture.service.readOutput(
+            jobID: jobID, stream: .stderr, offset: 0, limit: 1024, context: fixture.context)
+        XCTAssertTrue(stdoutBefore.isSnapshot)
+        XCTAssertTrue(stderrBefore.isSnapshot)
+        XCTAssertNil(stdoutBefore.producerEndReason)
+        XCTAssertNil(stderrBefore.producerEndReason)
+
+        try await observer.service.start()
+        let after = try await observer.service.status(jobID: jobID, context: fixture.context)
+        let afterIdentity = try await observer.repository.recoveryProcessIdentity(jobID: jobID)
+        let afterObserved = RuntimeProcessIdentityReader.observedIdentity(
+            processIdentifier: beforeIdentity.processIdentifier)
+        XCTAssertEqual(after.state, .running, "Another service must not recover a live owner's row")
+        XCTAssertNil(after.errorCode)
+        XCTAssertEqual(after.processIdentifier, before.processIdentifier)
+        XCTAssertEqual(after.processGroupIdentifier, before.processGroupIdentifier)
+        XCTAssertEqual(afterIdentity, beforeIdentity)
+        XCTAssertEqual(afterObserved?.startIdentity, beforeIdentity.startIdentity)
+        XCTAssertEqual(afterObserved?.parentProcessIdentifier, Darwin.getpid())
+        for (stream, expected) in [(RuntimeOutputStream.stdout, stdoutBefore), (.stderr, stderrBefore)] {
+            do {
+                let output = try await fixture.service.readOutput(
+                    jobID: jobID, stream: stream, offset: 0, limit: 1024, context: fixture.context)
+                XCTAssertEqual(output, expected, "A second service must preserve the full owner-spool snapshot")
+            } catch {
+                XCTFail("Live owner output became unavailable after another service started: \(error)")
+            }
+        }
+        let observerShutdown = await observer.service.shutdown()
+        XCTAssertTrue(observerShutdown.completed, "A nonowning service must close independently of a live owner")
+        XCTAssertTrue(observerShutdown.unresolvedJobIDs.isEmpty)
+        XCTAssertTrue(observerShutdown.persistencePendingJobIDs.isEmpty)
+        let stillRunning = try await fixture.service.status(jobID: jobID, context: fixture.context)
+        XCTAssertEqual(stillRunning.state, .running)
+        try await fixture.service.cancel(jobID: jobID, context: fixture.context)
+        let cancelled = try await fixture.service.waitForTerminal(
+            jobID: jobID, context: fixture.context, maximumWait: .seconds(8))
+        XCTAssertEqual(cancelled.state, .cancelled)
+        let ownerShutdown = await fixture.service.shutdown()
+        XCTAssertTrue(ownerShutdown.completed)
+    }
+
+    func testSecondRuntimeServicePreservesCommittedQueuedIntentBeforeJobPreparation() async throws {
+        let fixture = try await Fixture.make()
+        let initialShutdown = await fixture.service.shutdown()
+        XCTAssertTrue(initialShutdown.completed)
+        let gate = SharedOwnerPreparationGate()
+        let owner = try ExecutionJobService(
+            repository: fixture.runtimeRepository,
+            contextValidator: SharedOwnerPreparationValidator(
+                base: ProjectControlPlaneRuntimeJobContextValidator(repository: fixture.controlRepository),
+                gate: gate),
+            artifactRoot: fixture.root.appendingPathComponent("artifacts", isDirectory: true),
+            limits: fixture.limits
+        )
+        try await owner.start()
+        let observer = try await SharedOwnerObserver.make(fixture: fixture)
+        let marker = fixture.projectRoot.appendingPathComponent("queued-live-owner-marker")
+        let request = fixture.request(
+            kind: .bash, profile: .bashNoProfile,
+            script: "printf 'QUEUED-OWNER-ONCE\\n' >> queued-live-owner-marker; printf 'queued-owner-output\\n'",
+            timeout: 5, replayClass: .nonReplayable)
+        let submission = Task { try await owner.submit(request) }
+        addTeardownBlock {
+            await gate.release()
+            submission.cancel()
+            _ = await submission.result
+            _ = await owner.shutdown()
+            await observer.close()
+            await fixture.close()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+        let paused = await Self.waitUntil { await gate.observedJobID() != nil }
+        XCTAssertTrue(paused)
+        let pausedID = await gate.observedJobID()
+        let jobID = try XCTUnwrap(pausedID)
+        let beforeValue = try await fixture.runtimeRepository.job(jobID)
+        let before = try XCTUnwrap(beforeValue)
+        XCTAssertEqual(before.state, .queued)
+        XCTAssertNil(before.processIdentifier)
+        let requestPathValue = try await fixture.runtimeRepository.requestArtifactRelativePath(jobID: jobID)
+        let requestPath = try XCTUnwrap(requestPathValue)
+        let requestURL = fixture.root.appendingPathComponent("artifacts", isDirectory: true)
+            .appendingPathComponent(requestPath)
+        let stagedBytes = try Data(contentsOf: requestURL)
+        XCTAssertFalse(stagedBytes.isEmpty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: marker.path))
+
+        try await observer.service.start()
+        let afterValue = try await observer.repository.job(jobID)
+        let afterPath = try await observer.repository.requestArtifactRelativePath(jobID: jobID)
+        XCTAssertEqual(afterValue, before, "A live queued intent must not be terminalized as an owner restart")
+        XCTAssertEqual(afterPath, requestPath)
+        XCTAssertEqual(try? Data(contentsOf: requestURL), stagedBytes)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: marker.path))
+        let observerShutdown = await observer.service.shutdown()
+        XCTAssertTrue(observerShutdown.completed)
+        XCTAssertTrue(observerShutdown.unresolvedJobIDs.isEmpty)
+
+        await gate.release()
+        let acceptedID = try await submission.value
+        XCTAssertEqual(acceptedID, jobID)
+        let completed = try await owner.waitForTerminal(
+            jobID: jobID, context: fixture.context, maximumWait: .seconds(8))
+        XCTAssertEqual(completed.state, .completed)
+        XCTAssertEqual(completed.exitCode, 0)
+        XCTAssertNil(completed.errorCode)
+        XCTAssertEqual(try? String(contentsOf: marker, encoding: .utf8), "QUEUED-OWNER-ONCE\n")
+        do {
+            let output = try await owner.readOutput(
+                jobID: jobID, stream: .stdout, offset: 0, limit: 1024, context: fixture.context)
+            XCTAssertEqual(output.data, Data("queued-owner-output\n".utf8))
+            XCTAssertFalse(output.isSnapshot)
+            XCTAssertEqual(output.producerEndReason, .eof)
+            XCTAssertNil(output.producerReadErrno)
+            XCTAssertFalse(output.artifactTruncated)
+        } catch {
+            XCTFail("The preserved queued intent must produce its one completed output: \(error)")
+        }
+        let ownerShutdown = await owner.shutdown()
+        XCTAssertTrue(ownerShutdown.completed)
+    }
+
+    func testAnotherAuthorizedRuntimeServiceCancellationReachesLiveOwnerAndFinalOutput() async throws {
+        let fixture = try await Fixture.make()
+        let observer = try await SharedOwnerObserver.make(fixture: fixture)
+        addTeardownBlock {
+            await fixture.close()
+            await observer.close()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+        // Start the nonowner before submission so startup recovery cannot cause
+        // the cancellation outcome this independent case measures.
+        try await observer.service.start()
+        let jobID = try await fixture.service.submit(Self.sharedOwnerSleepRequest(fixture: fixture))
+        let ready = await Self.waitUntil {
+            let stdout = try? await fixture.service.readOutput(
+                jobID: jobID, stream: .stdout, offset: 0, limit: 1024, context: fixture.context)
+            let stderr = try? await fixture.service.readOutput(
+                jobID: jobID, stream: .stderr, offset: 0, limit: 1024, context: fixture.context)
+            return stdout?.data == Data("owned-live-stdout\n".utf8)
+                && stderr?.data == Data("owned-live-stderr\n".utf8)
+                && stdout?.jobState == .running && stderr?.jobState == .running
+        }
+        XCTAssertTrue(ready)
+        let before = try await fixture.service.status(jobID: jobID, context: fixture.context)
+        XCTAssertEqual(before.state, .running)
+        try await observer.service.cancel(jobID: jobID, context: fixture.context)
+        let fromOtherService = try await fixture.service.waitForTerminal(
+            jobID: jobID, context: fixture.context, maximumWait: .seconds(2))
+        XCTAssertEqual(fromOtherService.state, .cancelled,
+            "A persisted cancellation must reach the actual owner without a second caller cancellation")
+        XCTAssertNotEqual(fromOtherService.errorCode, "runtime_owner_restarted")
+        for (stream, expected) in [(RuntimeOutputStream.stdout, Data("owned-live-stdout\n".utf8)),
+                                   (.stderr, Data("owned-live-stderr\n".utf8))] {
+            let output = try await fixture.service.readOutput(
+                jobID: jobID, stream: stream, offset: 0, limit: 1024, context: fixture.context)
+            XCTAssertEqual(output.data, expected)
+            XCTAssertEqual(output.sha256, JSONSupport.sha256Hex(expected))
+            XCTAssertFalse(output.isSnapshot)
+            XCTAssertEqual(output.jobState, .cancelled)
+            XCTAssertTrue(output.eof)
+            XCTAssertEqual(output.producerEndReason, .eof)
+            XCTAssertNil(output.producerReadErrno)
+            XCTAssertFalse(output.artifactTruncated)
+        }
+        // This cleanup remains owner-local even when the foreign cancellation
+        // assertion fails, so the real sleep never escapes the owned fixture.
+        try await fixture.service.cancel(jobID: jobID, context: fixture.context)
+        let cleanup = try await fixture.service.waitForTerminal(
+            jobID: jobID, context: fixture.context, maximumWait: .seconds(8))
+        XCTAssertEqual(cleanup.state, .cancelled)
+        let ownerShutdown = await fixture.service.shutdown()
+        let observerShutdown = await observer.service.shutdown()
+        XCTAssertTrue(ownerShutdown.completed)
+        XCTAssertTrue(observerShutdown.completed)
+    }
+
+    private struct WarmOrphanIntent: Sendable {
+        let record: RuntimeJobRecord
+        let outputDirectory: URL
+        let requestDirectory: URL
+        let marker: URL
+    }
+
+    private actor WarmRecoveredIdentityProbe: RuntimeRecoveredProcessControlling {
+        struct Event: Equatable, Sendable {
+            let signal: Int32
+            let identity: RuntimePersistedProcessIdentity
+        }
+        private var events: [Event] = []
+
+        func signalProcessGroup(
+            _ signal: Int32, expectedIdentity: RuntimePersistedProcessIdentity
+        ) async -> RuntimeRecoveredProcessSignalResult {
+            guard events.count < 64 else { return .identityUnavailable }
+            events.append(Event(signal: signal, identity: expectedIdentity))
+            return .processMissing
+        }
+
+        func observed() -> [Event] { events }
+    }
+
+    private static func insertWarmOrphanIntent(
+        fixture: Fixture,
+        context: ToolInvocationContext? = nil,
+        state: RuntimeJobState = .queued,
+        startIdentity: RuntimeProcessStartIdentity? = nil
+    ) async throws -> WarmOrphanIntent {
+        let scope = context ?? fixture.context
+        let workingDirectory = try XCTUnwrap(scope.authorizationScope.canonicalRoots.first)
+        let jobID = UUID()
+        let marker = workingDirectory.appendingPathComponent("warm-must-not-replay-" + jobID.uuidString)
+        let script = "printf 'must-not-replay' > " + marker.lastPathComponent
+        let relative = [scope.projectID.description, String(scope.projectGeneration.rawValue),
+                        jobID.uuidString.lowercased()].joined(separator: "/")
+        let artifacts = fixture.root.appendingPathComponent("artifacts", isDirectory: true)
+        let outputDirectory = artifacts.appendingPathComponent(relative, isDirectory: true)
+        let requestRelative = ".runtime-scratch/" + relative + "/request.bash"
+        let requestURL = artifacts.appendingPathComponent(requestRelative)
+        try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: requestURL.deletingLastPathComponent(),
+                                                withIntermediateDirectories: true)
+        try Data("uncommitted-partial-output".utf8).write(to: outputDirectory.appendingPathComponent("stdout.log"))
+        try Data(script.utf8).write(to: requestURL)
+        let request = RuntimeJobRequest(kind: .bash, profile: .bashNoProfile, context: scope,
+            script: script, canonicalWorkingDirectory: workingDirectory, timeout: .seconds(5),
+            maximumInlineOutputBytes: fixture.limits.maximumInlineOutputBytes, replayClass: .nonReplayable)
+        _ = try await fixture.runtimeRepository.createJob(jobID: jobID, request: request,
+            commandSummary: "owned warm recovery fixture", timeoutSeconds: 5,
+            requestArtifactRelativePath: requestRelative)
+        if state == .running {
+            try await fixture.runtimeRepository.markRunning(jobID: jobID,
+                processIdentifier: 424_242, processGroupIdentifier: 424_242,
+                processStartIdentity: startIdentity)
+        } else if state != .queued {
+            throw RuntimeJobError.invalidRequest("warm orphan fixture supports queued or running intent")
+        }
+        let stored = try await fixture.runtimeRepository.job(jobID)
+        return WarmOrphanIntent(record: try XCTUnwrap(stored), outputDirectory: outputDirectory,
+            requestDirectory: requestURL.deletingLastPathComponent(), marker: marker)
+    }
+
+    func testWarmRuntimeStatusRecoversAbandonedRunningIdentityWithoutReplayingItsRequest() async throws {
+        let probe = WarmRecoveredIdentityProbe()
+        let fixture = try await Fixture.make(recoveredProcessController: probe)
+        addTeardownBlock {
+            await fixture.close()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+        // Fixture.make starts the service while the ledger is empty; this intent
+        // appears after that one-time startup recovery has completed.
+        let start = try XCTUnwrap(RuntimeProcessStartIdentity(seconds: 100, microseconds: 7))
+        let orphan = try await Self.insertWarmOrphanIntent(fixture: fixture, state: .running,
+                                                         startIdentity: start)
+        let recovered = try await fixture.service.status(jobID: orphan.record.jobID, context: fixture.context)
+        XCTAssertEqual(recovered.state, .failed)
+        XCTAssertEqual(recovered.errorCode, "runtime_owner_restarted")
+        XCTAssertEqual(recovered.replayClass, .nonReplayable)
+        XCTAssertNotNil(recovered.completedAt)
+        let events = await probe.observed()
+        XCTAssertEqual(events, [.init(signal: SIGTERM, identity: RuntimePersistedProcessIdentity(
+            processIdentifier: 424_242, processGroupIdentifier: 424_242, startIdentity: start))])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: orphan.outputDirectory.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: orphan.requestDirectory.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: orphan.marker.path))
+        let retainedPath = try await fixture.runtimeRepository.requestArtifactRelativePath(jobID: orphan.record.jobID)
+        XCTAssertNil(retainedPath)
+    }
+
+    func testWarmRuntimeOutputAndCancellationRecoverQueuedIntentsWithoutReplay() async throws {
+        let probe = WarmRecoveredIdentityProbe()
+        let fixture = try await Fixture.make(recoveredProcessController: probe)
+        addTeardownBlock {
+            await fixture.close()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+        let outputIntent = try await Self.insertWarmOrphanIntent(fixture: fixture)
+        do {
+            _ = try await fixture.service.readOutput(jobID: outputIntent.record.jobID,
+                stream: .stdout, offset: 0, limit: 100, context: fixture.context)
+            XCTFail("Abandoned partial bytes must not become a successful output page")
+        } catch let error as RuntimeJobError {
+            if case .outputUnavailable(let jobID, let stream) = error {
+                XCTAssertEqual(jobID, outputIntent.record.jobID)
+                XCTAssertEqual(stream, .stdout)
+            } else {
+                XCTFail("Recovered terminal output must be unavailable, not a pending live snapshot: \(error)")
+            }
+        }
+        let outputRow = try await fixture.runtimeRepository.job(outputIntent.record.jobID)
+        XCTAssertEqual(outputRow?.state, .failed)
+        XCTAssertEqual(outputRow?.errorCode, "runtime_owner_restarted")
+        let cancelledIntent = try await Self.insertWarmOrphanIntent(fixture: fixture)
+        let cancelledRow = try await fixture.service.cancelAndReturnRecord(
+            jobID: cancelledIntent.record.jobID, context: fixture.context)
+        // Startup-before-cancel already classifies abandoned queued intent as a
+        // failed owner restart. A warm reader must preserve that same contract.
+        XCTAssertEqual(cancelledRow.state, .failed)
+        XCTAssertEqual(cancelledRow.errorCode, "runtime_owner_restarted")
+        for intent in [outputIntent, cancelledIntent] {
+            XCTAssertFalse(FileManager.default.fileExists(atPath: intent.outputDirectory.path))
+            XCTAssertFalse(FileManager.default.fileExists(atPath: intent.requestDirectory.path))
+            XCTAssertFalse(FileManager.default.fileExists(atPath: intent.marker.path))
+            let retainedPath = try await fixture.runtimeRepository.requestArtifactRelativePath(jobID: intent.record.jobID)
+            XCTAssertNil(retainedPath)
+        }
+        let events = await probe.observed()
+        XCTAssertTrue(events.isEmpty, "Queued recovery must not invent a process-start identity")
+    }
+
+    func testWarmRuntimeListRequeriesRunningFilterAndPreservesForeignProjectIntent() async throws {
+        let probe = WarmRecoveredIdentityProbe()
+        let fixture = try await Fixture.make(recoveredProcessController: probe)
+        addTeardownBlock {
+            await fixture.close()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+        let foreignRoot = fixture.root.appendingPathComponent("warm-foreign-project", isDirectory: true)
+        try FileManager.default.createDirectory(at: foreignRoot, withIntermediateDirectories: true)
+        let foreignID = ProjectID()
+        _ = try await fixture.controlRepository.registerProjectUnchecked(projectID: foreignID,
+            displayName: "Warm foreign intent", canonicalRoot: foreignRoot)
+        let foreignOwner = ProjectBindingOwner(kind: .mcpClient, id: "warm-foreign-" + UUID().uuidString)
+        _ = try await fixture.controlRepository.bind(owner: foreignOwner, projectID: foreignID,
+            generation: .initial, authorizationScope: ToolAuthorizationScope(canonicalRoots: [foreignRoot],
+                writableRoots: [foreignRoot], allowedTools: Set(RuntimeJobToolPack.names),
+                networkAllowed: false, maximumInlineOutputBytes: fixture.limits.maximumInlineOutputBytes))
+        let foreignContext = try await fixture.controlRepository.invocationContext(for: foreignOwner)
+        let foreign = try await Self.insertWarmOrphanIntent(fixture: fixture, context: foreignContext)
+        let start = try XCTUnwrap(RuntimeProcessStartIdentity(seconds: 101, microseconds: 8))
+        let local = try await Self.insertWarmOrphanIntent(fixture: fixture, state: .running, startIdentity: start)
+        do {
+            _ = try await fixture.service.status(jobID: foreign.record.jobID, context: fixture.context)
+            XCTFail("An ordinary caller must not trigger recovery for another project's job")
+        } catch let error as RuntimeJobError {
+            XCTAssertEqual(error.code, "runtime_job_scope_mismatch")
+        }
+        let beforeListEvents = await probe.observed()
+        XCTAssertTrue(beforeListEvents.isEmpty)
+        let runningRows = try await fixture.service.list(context: fixture.context, states: [.running], limit: 10)
+        XCTAssertTrue(runningRows.isEmpty, "A recovered failed row must not leak into the original running filter")
+        let allRows = try await fixture.service.list(context: fixture.context, limit: 10)
+        XCTAssertEqual(allRows.map(\.jobID), [local.record.jobID])
+        XCTAssertEqual(allRows.first?.state, .failed)
+        XCTAssertEqual(allRows.first?.errorCode, "runtime_owner_restarted")
+        let foreignAfter = try await fixture.runtimeRepository.job(foreign.record.jobID)
+        XCTAssertEqual(foreignAfter, foreign.record)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: foreign.outputDirectory.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: foreign.requestDirectory.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: foreign.marker.path))
+        let events = await probe.observed()
+        XCTAssertEqual(events, [.init(signal: SIGTERM, identity: RuntimePersistedProcessIdentity(
+            processIdentifier: 424_242, processGroupIdentifier: 424_242, startIdentity: start))])
+    }
+
+    func testWarmRuntimeRecoveryWithoutExactIdentityFailsClosedAndRetainsIntent() async throws {
+        let probe = WarmRecoveredIdentityProbe()
+        let fixture = try await Fixture.make(recoveredProcessController: probe)
+        addTeardownBlock {
+            await fixture.close()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+        let orphan = try await Self.insertWarmOrphanIntent(fixture: fixture, state: .running)
+        do {
+            _ = try await fixture.service.status(jobID: orphan.record.jobID, context: fixture.context)
+            XCTFail("Missing exact identity must block warm recovery instead of claiming cleanup")
+        } catch let error as RuntimeJobError {
+            XCTAssertEqual(error.code, "runtime_storage_failure")
+        }
+        let unchanged = try await fixture.runtimeRepository.job(orphan.record.jobID)
+        XCTAssertEqual(unchanged, orphan.record)
+        XCTAssertNil(unchanged?.completedAt)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: orphan.outputDirectory.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: orphan.requestDirectory.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: orphan.marker.path))
+        let retainedPath = try await fixture.runtimeRepository.requestArtifactRelativePath(jobID: orphan.record.jobID)
+        XCTAssertNotNil(retainedPath)
+        let events = await probe.observed()
+        XCTAssertTrue(events.isEmpty, "Recovery must never guess a process identity")
+    }
+}
+
+extension RuntimeExecutionJobTests {
+    // Append within the existing RuntimeExecutionJobTests shared-owner extension.
+    // Requires its immutable Fixture and warm/shared-owner helpers; no new graph input.
+
+    func testRuntimeOwnershipUnsafeDirectoryAndCoordinatorRefuseBeforeQueuedCommit() async throws {
+        for unsafeDirectory in [true, false] {
+            let commit = RuntimeBlockingResult<Bool>()
+            let fixture = try await Fixture.make(afterMutationCommitObserver: { kind in
+                if kind == .submission { commit.store(.success(true)) }
+            })
+            addTeardownBlock {
+                await fixture.close()
+                try? FileManager.default.removeItem(at: fixture.root)
+            }
+            let owners = fixture.root.appendingPathComponent("artifacts/.runtime-owners", isDirectory: true)
+            let changed = unsafeDirectory ? owners : owners.appendingPathComponent("coordinator.lock")
+            XCTAssertEqual(Darwin.chmod(changed.path, unsafeDirectory ? 0o755 : 0o644), 0)
+            let marker = fixture.projectRoot.appendingPathComponent("unsafe-owner-must-not-launch")
+            do {
+                _ = try await fixture.service.submit(fixture.request(kind: .bash, profile: .bashNoProfile,
+                    script: "printf unexpected > " + marker.lastPathComponent, timeout: 5,
+                    replayClass: .nonReplayable))
+                XCTFail("Unsafe ownership metadata must reject before a queued commit")
+            } catch let error as RuntimeJobError {
+                XCTAssertEqual(error.code, "runtime_storage_failure")
+            }
+            XCTAssertNil(commit.take(), "Rejected ownership must not publish a CP submission commit")
+            let rows = try await fixture.runtimeRepository.list(context: fixture.context)
+            XCTAssertTrue(rows.isEmpty)
+            XCTAssertFalse(FileManager.default.fileExists(atPath: marker.path))
+        }
+    }
+
+    func testRuntimeOwnershipInventoryAt4096RefusesAndOneRemovalRestoresAdmission() async throws {
+        let commit = RuntimeBlockingResult<Bool>()
+        let fixture = try await Fixture.make(afterMutationCommitObserver: { kind in
+            if kind == .submission { commit.store(.success(true)) }
+        })
+        addTeardownBlock {
+            await fixture.close()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+        let owners = fixture.root.appendingPathComponent("artifacts/.runtime-owners", isDirectory: true)
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: owners.path), ["coordinator.lock"])
+        let removable = owners.appendingPathComponent(UUID().uuidString.lowercased() + ".lock")
+        try Data().write(to: removable)
+        XCTAssertEqual(Darwin.chmod(removable.path, 0o600), 0)
+        for _ in 0..<4094 {
+            let file = owners.appendingPathComponent(UUID().uuidString.lowercased() + ".lock")
+            try Data().write(to: file)
+            XCTAssertEqual(Darwin.chmod(file.path, 0o600), 0)
+        }
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: owners.path).count, 4096)
+        let marker = fixture.projectRoot.appendingPathComponent("restored-owner-capacity")
+        let request = fixture.request(kind: .bash, profile: .bashNoProfile,
+            script: "printf 'ADMITTED-ONCE\\n' > " + marker.lastPathComponent + "; printf 'capacity-output'",
+            timeout: 5, replayClass: .nonReplayable)
+        do {
+            _ = try await fixture.service.submit(request)
+            XCTFail("Exactly 4096 total inventory entries must refuse another owner file")
+        } catch let error as RuntimeJobError {
+            XCTAssertEqual(error.code, "runtime_storage_failure")
+        }
+        XCTAssertNil(commit.take())
+        let refusedRows = try await fixture.runtimeRepository.list(context: fixture.context)
+        XCTAssertTrue(refusedRows.isEmpty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: marker.path))
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: owners.path).count, 4096)
+        try FileManager.default.removeItem(at: removable)
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: owners.path).count, 4095)
+        let accepted = try await fixture.service.submit(request)
+        let terminal = try await fixture.service.waitForTerminal(jobID: accepted, context: fixture.context,
+                                                               maximumWait: .seconds(8))
+        XCTAssertEqual(terminal.state, .completed)
+        XCTAssertEqual(terminal.exitCode, 0)
+        XCTAssertNotNil(commit.take())
+        XCTAssertEqual(try String(contentsOf: marker, encoding: .utf8), "ADMITTED-ONCE\n")
+        let rows = try await fixture.runtimeRepository.list(context: fixture.context)
+        XCTAssertEqual(rows.map(\.jobID), [accepted])
+        let output = try await fixture.service.readOutput(jobID: accepted, stream: .stdout,
+            offset: 0, limit: 100, context: fixture.context)
+        XCTAssertEqual(output.data, Data("capacity-output".utf8))
+        XCTAssertEqual(output.sha256, JSONSupport.sha256Hex(output.data))
+        XCTAssertFalse(output.isSnapshot)
+        XCTAssertEqual(output.producerEndReason, .eof)
+        XCTAssertNil(output.producerReadErrno)
+        XCTAssertFalse(output.artifactTruncated)
+    }
+
+    func testRuntimeStartupSymlinkOwnerLockFailsClosedWithoutTouchingIntentOrSignaling() async throws {
+        let fixture = try await Fixture.make()
+        let observer = try await SharedOwnerObserver.make(fixture: fixture)
+        let probe = WarmRecoveredIdentityProbe()
+        try await observer.service.setRecoveredProcessController(probe)
+        addTeardownBlock {
+            await observer.close()
+            await fixture.close()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+        let start = try XCTUnwrap(RuntimeProcessStartIdentity(seconds: 102, microseconds: 9))
+        let orphan = try await Self.insertWarmOrphanIntent(fixture: fixture, state: .running,
+                                                         startIdentity: start)
+        let target = fixture.root.appendingPathComponent("owned-harmless-lock-target")
+        try Data().write(to: target)
+        XCTAssertEqual(Darwin.chmod(target.path, 0o600), 0)
+        let ownerFile = fixture.root.appendingPathComponent("artifacts/.runtime-owners/"
+            + orphan.record.jobID.uuidString.lowercased() + ".lock")
+        try FileManager.default.createSymbolicLink(atPath: ownerFile.path, withDestinationPath: target.path)
+        do {
+            try await observer.service.start()
+            XCTFail("A symlink owner file is not an admissible recovery lease")
+        } catch let error as RuntimeJobError {
+            XCTAssertEqual(error.code, "runtime_storage_failure")
+        }
+        let unchanged = try await fixture.runtimeRepository.job(orphan.record.jobID)
+        XCTAssertEqual(unchanged, orphan.record)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: orphan.outputDirectory.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: orphan.requestDirectory.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: orphan.marker.path))
+        XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: ownerFile.path), target.path)
+        XCTAssertEqual(try Data(contentsOf: target), Data())
+        let events = await probe.observed()
+        XCTAssertTrue(events.isEmpty)
+        let shutdown = await observer.service.shutdown()
+        XCTAssertFalse(shutdown.completed)
+        XCTAssertTrue(shutdown.unresolvedJobIDs.contains(orphan.record.jobID))
+    }
+
+    private actor CancelledWarmIdentityProbe: RuntimeRecoveredProcessControlling {
+        let gate: SharedOwnerPreparationGate
+        let gateTag: UUID
+        private var count = 0
+        private var identity: RuntimePersistedProcessIdentity?
+        private var differentIdentity = false
+
+        init(gate: SharedOwnerPreparationGate, gateTag: UUID) {
+            self.gate = gate
+            self.gateTag = gateTag
+        }
+
+        func signalProcessGroup(_ signal: Int32, expectedIdentity: RuntimePersistedProcessIdentity)
+            async -> RuntimeRecoveredProcessSignalResult {
+            count = min(4096, count + 1)
+            if let identity, identity != expectedIdentity { differentIdentity = true }
+            identity = expectedIdentity
+            if count == 1 { try? await gate.pause(jobID: gateTag) }
+            return .identityUnavailable
+        }
+
+        func observed() -> (count: Int, identity: RuntimePersistedProcessIdentity?, differentIdentity: Bool) {
+            (count, identity, differentIdentity)
+        }
+    }
+
+    func testCancelledWarmRecoveryRetainsProbeCadenceAndReleasesLeaseWithHonestDebt() async throws {
+        let gate = SharedOwnerPreparationGate()
+        let tag = UUID()
+        let probe = CancelledWarmIdentityProbe(gate: gate, gateTag: tag)
+        let limits = RuntimeJobLimits(maximumConcurrentJobs: 1, maximumCPUHeavyJobs: 1,
+            maximumQueuedJobs: 2, maximumInlineOutputBytes: 256, maximumArtifactBytesPerJob: 4096,
+            maximumScriptBytes: 8192, maximumArguments: 32, maximumArgumentBytes: 4096,
+            maximumTimeoutSeconds: 30, terminationGraceMilliseconds: 60,
+            forcedTerminationGraceMilliseconds: 60)
+        let fixture = try await Fixture.make(limits: limits, recoveredProcessController: probe)
+        let observer = try await SharedOwnerObserver.make(fixture: fixture)
+        let cleanupProbe = WarmRecoveredIdentityProbe()
+        try await observer.service.setRecoveredProcessController(cleanupProbe)
+        let start = try XCTUnwrap(RuntimeProcessStartIdentity(seconds: 103, microseconds: 10))
+        let orphan = try await Self.insertWarmOrphanIntent(fixture: fixture, state: .running,
+                                                         startIdentity: start)
+        let operation = Task { try await fixture.service.status(jobID: orphan.record.jobID, context: fixture.context) }
+        addTeardownBlock {
+            operation.cancel()
+            await gate.release()
+            _ = await operation.result
+            await observer.close()
+            await fixture.close()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+        let entered = await Self.waitUntil { await gate.observedJobID() == tag }
+        XCTAssertTrue(entered)
+        let owners = fixture.root.appendingPathComponent("artifacts/.runtime-owners", isDirectory: true)
+        // Keep one reader of the original inode, even if normal cleanup unlinks
+        // its pathname. A replacement owner file cannot satisfy this lock proof.
+        let ownerURL = owners.appendingPathComponent(orphan.record.jobID.uuidString.lowercased() + ".lock")
+        let reader = Darwin.open(ownerURL.path, O_RDWR | O_NOFOLLOW | O_CLOEXEC)
+        guard reader >= 0 else { throw RuntimeJobError.storageFailure("cadence owner reader is unavailable") }
+        defer { _ = flock(reader, LOCK_UN); _ = Darwin.close(reader) }
+        var before = stat()
+        XCTAssertEqual(Darwin.fstat(reader, &before), 0)
+        XCTAssertEqual(before.st_mode & S_IFMT, S_IFREG)
+        XCTAssertEqual(before.st_mode & 0o777, 0o600)
+        XCTAssertEqual(before.st_size, 0)
+        XCTAssertEqual(before.st_uid, geteuid())
+        let initialLock = flock(reader, LOCK_EX | LOCK_NB)
+        let initialError = errno
+        XCTAssertEqual(initialLock, -1, "The original owner must hold this inode while its probe is paused")
+        XCTAssertTrue(initialError == EWOULDBLOCK || initialError == EAGAIN)
+        operation.cancel()
+        await gate.release()
+        do {
+            _ = try await operation.value
+            XCTFail("The cancelled caller must not receive an ordinary successful status")
+        } catch is CancellationError {}
+        let evidence = await probe.observed()
+        XCTAssertGreaterThanOrEqual(evidence.count, 1)
+        XCTAssertLessThanOrEqual(evidence.count, 12,
+            "A cancelled sleep must not turn the 20ms recovery cadence into continuous probes")
+        XCTAssertFalse(evidence.differentIdentity)
+        let expected = RuntimePersistedProcessIdentity(processIdentifier: 424_242,
+            processGroupIdentifier: 424_242, startIdentity: start)
+        XCTAssertEqual(evidence.identity, expected)
+        let debt = try await fixture.runtimeRepository.job(orphan.record.jobID)
+        XCTAssertEqual(debt?.state, .failed)
+        XCTAssertEqual(debt?.errorCode, "runtime_termination_unconfirmed")
+        XCTAssertTrue(debt?.errorSummary?.contains("cleanup_debt_resolved=false") == true)
+        XCTAssertTrue(debt?.errorSummary?.contains("restart_attempts=1;") == true)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: orphan.marker.path))
+        var after = stat()
+        XCTAssertEqual(Darwin.fstat(reader, &after), 0)
+        XCTAssertEqual(after.st_dev, before.st_dev)
+        XCTAssertEqual(after.st_ino, before.st_ino)
+        XCTAssertEqual(flock(reader, LOCK_EX | LOCK_NB), 0,
+            "Another reader must acquire the released original owner inode")
+        XCTAssertEqual(flock(reader, LOCK_UN), 0)
+        // Startup-style cleanup already consumed its one restart retry. A later
+        // reader must preserve honest terminal debt instead of signaling again.
+        try await observer.service.start()
+        let cleanupEvents = await cleanupProbe.observed()
+        XCTAssertTrue(cleanupEvents.isEmpty)
+        let afterReader = try await fixture.runtimeRepository.job(orphan.record.jobID)
+        XCTAssertEqual(afterReader, debt)
     }
 }

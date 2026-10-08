@@ -556,6 +556,183 @@ public struct RuntimeCapabilityDiscoverer: Sendable {
     }
 }
 
+// A kernel lease distinguishes abandoned intent from a different live helper.
+private final class RuntimeJobOwnershipLease: @unchecked Sendable {
+    static let maximumFiles = 4_096
+    private let root: URL
+    private let url: URL
+    private let descriptor: Int32
+    private let identity: stat
+    private let lock = NSLock()
+    private var closed = false
+
+    private init(root: URL, url: URL, descriptor: Int32, identity: stat) {
+        self.root = root
+        self.url = url
+        self.descriptor = descriptor
+        self.identity = identity
+    }
+
+    deinit { release(removeFile: false) }
+
+    static func claim(jobID: UUID, artifactRoot: URL, before requestedDeadline: ContinuousClock.Instant? = nil) async throws -> RuntimeJobOwnershipLease? {
+        let root = artifactRoot.appendingPathComponent(".runtime-owners", isDirectory: true)
+        let coordinator = try openCoordinator(root: root)
+        defer { _ = Darwin.close(coordinator) }
+        let proposed = ContinuousClock.now + .seconds(1)
+        let deadline = requestedDeadline.map { min($0, proposed) } ?? proposed
+        while flock(coordinator, LOCK_EX | LOCK_NB) != 0 {
+            let code = errno
+            guard code == EWOULDBLOCK || code == EAGAIN || code == EINTR,
+                  ContinuousClock.now < deadline else {
+                throw RuntimeJobError.storageFailure("runtime ownership coordinator is unavailable")
+            }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        defer { _ = flock(coordinator, LOCK_UN) }
+        try validateLinked(coordinator, url: root.appendingPathComponent("coordinator.lock"))
+        let url = root.appendingPathComponent(jobID.uuidString.lowercased() + ".lock")
+        var descriptor = Darwin.open(url.path, O_RDWR | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK)
+        if descriptor < 0, errno == ENOENT {
+            var count = 0, failed = false
+            guard let entries = FileManager.default.enumerator(at: root,
+                includingPropertiesForKeys: nil, options: [], errorHandler: { _, _ in failed = true; return false }) else {
+                throw RuntimeJobError.storageFailure("runtime ownership inventory is unavailable")
+            }
+            while let _ = entries.nextObject() {
+                try Task.checkCancellation()
+                guard ContinuousClock.now < deadline else {
+                    throw RuntimeJobError.storageFailure("runtime ownership admission deadline elapsed")
+                }
+                entries.skipDescendants()
+                count += 1
+                guard count <= maximumFiles else {
+                    throw RuntimeJobError.storageFailure("runtime ownership file capacity is exhausted")
+                }
+            }
+            guard !failed, count < maximumFiles else {
+                throw RuntimeJobError.storageFailure("runtime ownership file capacity is exhausted")
+            }
+            descriptor = Darwin.open(url.path,
+                O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK,
+                mode_t(S_IRUSR | S_IWUSR))
+        }
+        guard descriptor >= 0 else {
+            throw RuntimeJobError.storageFailure("runtime ownership file is unavailable")
+        }
+        var keep = false
+        defer { if !keep { _ = Darwin.close(descriptor) } }
+        try validateLinked(descriptor, url: url)
+        guard flock(descriptor, LOCK_EX | LOCK_NB) == 0 else {
+            let code = errno
+            guard code == EWOULDBLOCK || code == EAGAIN else {
+                throw RuntimeJobError.storageFailure("runtime ownership lock is invalid")
+            }
+            try validateLinked(descriptor, url: url)
+            return nil
+        }
+        try validateLinked(descriptor, url: url)
+        var identity = stat()
+        guard Darwin.fstat(descriptor, &identity) == 0 else {
+            throw RuntimeJobError.storageFailure("runtime ownership identity is unavailable")
+        }
+        keep = true
+        return RuntimeJobOwnershipLease(root: root, url: url, descriptor: descriptor, identity: identity)
+    }
+
+    static func candidateJobIDs(artifactRoot: URL, before deadline: ContinuousClock.Instant) throws -> [UUID] {
+        let root = artifactRoot.appendingPathComponent(".runtime-owners", isDirectory: true)
+        let coordinator = try openCoordinator(root: root)
+        defer { _ = Darwin.close(coordinator) }
+        var failed = false, count = 0
+        guard let entries = FileManager.default.enumerator(at: root,
+            includingPropertiesForKeys: nil, options: [],
+            errorHandler: { _, _ in failed = true; return false }) else {
+            throw RuntimeJobError.storageFailure("runtime ownership inventory is unavailable")
+        }
+        var result: [UUID] = []
+        while let url = entries.nextObject() as? URL {
+            try Task.checkCancellation()
+            guard ContinuousClock.now < deadline else { break }
+            entries.skipDescendants()
+            count += 1
+            guard count <= maximumFiles else {
+                throw RuntimeJobError.storageFailure("runtime ownership inventory exceeds its bound")
+            }
+            if url.lastPathComponent == "coordinator.lock" { continue }
+            guard url.pathExtension == "lock",
+                  let jobID = UUID(uuidString: url.deletingPathExtension().lastPathComponent) else {
+                throw RuntimeJobError.storageFailure("runtime ownership inventory contains an invalid name")
+            }
+            result.append(jobID)
+            if result.count == 256 { break }
+        }
+        guard !failed else {
+            throw RuntimeJobError.storageFailure("runtime ownership inventory is incomplete")
+        }
+        return result
+    }
+
+    func release(removeFile: Bool = true) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !closed else { return }
+        closed = true
+        // If the short coordinator window is occupied, retain this bounded stale
+        // file for startup pruning. Never unlink another claimant's open inode.
+        var descriptorClosed = false
+        if removeFile, let coordinator = try? Self.openCoordinator(root: root) {
+            if flock(coordinator, LOCK_EX | LOCK_NB) == 0 {
+                var linked = stat()
+                if (try? Self.validateLinked(coordinator,
+                    url: root.appendingPathComponent("coordinator.lock"))) != nil,
+                   Darwin.lstat(url.path, &linked) == 0,
+                   linked.st_dev == identity.st_dev, linked.st_ino == identity.st_ino {
+                    _ = Darwin.unlink(url.path)
+                }
+                _ = Darwin.close(descriptor)
+                descriptorClosed = true
+                _ = flock(coordinator, LOCK_UN)
+            }
+            _ = Darwin.close(coordinator)
+        }
+        if !descriptorClosed { _ = Darwin.close(descriptor) }
+    }
+
+    private static func openCoordinator(root: URL) throws -> Int32 {
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700])
+        var directory = stat()
+        guard Darwin.lstat(root.path, &directory) == 0,
+              directory.st_mode & S_IFMT == S_IFDIR,
+              directory.st_uid == geteuid(), directory.st_mode & 0o777 == 0o700,
+              RuntimePathCanonicalizer.canonicalExistingURL(root).path == root.path else {
+            throw RuntimeJobError.storageFailure("runtime ownership directory is unsafe")
+        }
+        let url = root.appendingPathComponent("coordinator.lock")
+        let descriptor = Darwin.open(url.path,
+            O_RDWR | O_CREAT | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK, mode_t(S_IRUSR | S_IWUSR))
+        guard descriptor >= 0 else {
+            throw RuntimeJobError.storageFailure("runtime ownership coordinator is unavailable")
+        }
+        do { try validateLinked(descriptor, url: url) }
+        catch { _ = Darwin.close(descriptor); throw error }
+        return descriptor
+    }
+
+    private static func validateLinked(_ descriptor: Int32, url: URL) throws {
+        var opened = stat(), linked = stat()
+        guard Darwin.fstat(descriptor, &opened) == 0,
+              Darwin.lstat(url.path, &linked) == 0,
+              opened.st_mode & S_IFMT == S_IFREG,
+              opened.st_uid == geteuid(), opened.st_nlink == 1,
+              opened.st_mode & 0o777 == 0o600, opened.st_size == 0,
+              linked.st_dev == opened.st_dev, linked.st_ino == opened.st_ino else {
+            throw RuntimeJobError.storageFailure("runtime ownership file identity is unsafe")
+        }
+    }
+}
+
 public actor ExecutionJobService: ExecutionJobServicing {
     private static let maximumStartupCleanupDebtRetries = 1
     private static let maximumStartupCleanupDebtsPerLaunch = 8
@@ -683,6 +860,10 @@ public actor ExecutionJobService: ExecutionJobServicing {
     private var terminationRecoveryJobs: Set<UUID> = []
     private var terminationRecoveryTasks: [UUID: Task<Void, Never>] = [:]
     private var terminationRecoveryPolicy = RuntimeTerminationRecoveryPolicy.production
+    private var ownershipLeases: [UUID: RuntimeJobOwnershipLease] = [:]
+    private var admittingJobIDs: Set<UUID> = []
+    private var startupTask: Task<Void, Error>?
+    private var recoveringJobID: UUID?
     private var started = false
     private var shuttingDown = false
 
@@ -745,47 +926,91 @@ public actor ExecutionJobService: ExecutionJobServicing {
 
     public func start() async throws {
         guard !started else { return }
+        if let startupTask { return try await startupTask.value }
+        let task = Task { try await self.recoverStartup() }
+        startupTask = task
+        do {
+            try await task.value
+            startupTask = nil
+        } catch {
+            startupTask = nil
+            throw error
+        }
+    }
+
+    private func recoverStartup() async throws {
+        try await pruneReleasedOwnershipFiles()
         try await sweepOrphanedJobDirectories()
         try await retryEligibleTerminalCleanupDebts()
         let interrupted = try await repository.nonterminalJobs()
-        for job in interrupted {
-            var recoverySummary =
-                "Execution owner restarted before a terminal job result was committed"
-            if let identity = try await repository.recoveryProcessIdentity(jobID: job.jobID) {
-                do {
-                    recoverySummary += try await terminateRecoveredProcessGroup(
-                        jobID: job.jobID,
-                        identity: identity
-                    )
-                } catch let error as RuntimeJobError
-                where error.code == "runtime_termination_unconfirmed" {
-                    try await persistStartupCleanupDebt(
-                        job: job,
-                        identity: identity,
-                        error: error
-                    )
-                    continue
-                }
-            } else if job.state == .queued {
-                recoverySummary +=
-                    "; queued intent had no committed process owner, so its gated launcher could not execute the target"
-            } else {
-                // The launch gate prevents target execution until the exact identity is
-                // committed. A running record without that identity is still corrupt
-                // durable state and must fail closed rather than be guessed dead.
-                throw RuntimeJobError.storageFailure(
-                    "runtime recovery is blocked because job \(job.jobID.uuidString.lowercased()) has no exact process-start identity"
-                )
-            }
-            try deleteInterruptedArtifacts(job)
-            try await repository.markInterrupted(
-                jobID: job.jobID,
-                summary: recoverySummary
-            )
+        for candidate in interrupted {
+            try await recoverAbandonedJob(jobID: candidate.jobID)
         }
         await compactArtifacts(projectID: nil)
         await compactTerminalLedger()
         started = true
+    }
+
+    private func recoverAbandonedJob(
+        jobID: UUID,
+        context: ToolInvocationContext? = nil,
+        before deadline: ContinuousClock.Instant? = nil
+    ) async throws {
+        guard recoveringJobID == nil,
+              ownershipLeases[jobID] == nil,
+              pending[jobID] == nil, active[jobID] == nil,
+              !admittingJobIDs.contains(jobID),
+              context == nil || !shuttingDown,
+              deadline.map({ ContinuousClock.now < $0 }) ?? true else { return }
+        // One recovery reservation also covers the await before a lease is claimed.
+        recoveringJobID = jobID
+        defer { recoveringJobID = nil }
+        guard let lease = try await RuntimeJobOwnershipLease.claim(
+            jobID: jobID, artifactRoot: artifactRoot, before: deadline) else { return }
+        var removeOwnershipFile = false
+        ownershipLeases[jobID] = lease
+        defer {
+            if ownershipLeases[jobID] === lease { ownershipLeases.removeValue(forKey: jobID) }
+            lease.release(removeFile: removeOwnershipFile)
+        }
+        guard context == nil || !shuttingDown else { return }
+        let record: RuntimeJobRecord?
+        if let context {
+            try await contextValidator.validateCaller(context)
+            record = try await repository.job(jobID, context: context)
+        } else {
+            record = try await repository.job(jobID)
+        }
+        guard let job = record, !job.state.isTerminal else {
+            removeOwnershipFile = record?.errorCode != "runtime_termination_unconfirmed"
+            return
+        }
+        try Task.checkCancellation()
+        guard deadline.map({ ContinuousClock.now < $0 }) ?? true else { return }
+        var recoverySummary =
+            "Execution owner restarted before a terminal job result was committed"
+        if let identity = try await repository.recoveryProcessIdentity(jobID: jobID) {
+            guard deadline.map({ ContinuousClock.now < $0 }) ?? true else { return }
+            do {
+                recoverySummary += try await terminateRecoveredProcessGroup(
+                    jobID: jobID, identity: identity, before: deadline)
+            } catch let error as RuntimeJobError
+            where error.code == "runtime_termination_unconfirmed" {
+                try await persistStartupCleanupDebt(job: job, identity: identity, error: error)
+                removeOwnershipFile = true
+                return
+            }
+        } else if job.state == .queued {
+            recoverySummary +=
+                "; queued intent had no committed process owner, so its gated launcher could not execute the target"
+        } else {
+            throw RuntimeJobError.storageFailure(
+                "runtime recovery is blocked because job \(jobID.uuidString.lowercased()) has no exact process-start identity"
+            )
+        }
+        try deleteInterruptedArtifacts(job)
+        try await repository.markInterrupted(jobID: jobID, summary: recoverySummary)
+        removeOwnershipFile = true
     }
 
     private func persistStartupCleanupDebt(
@@ -832,7 +1057,18 @@ public actor ExecutionJobService: ExecutionJobServicing {
         let clock = ContinuousClock()
         let sweepDeadline = clock.now
             + .milliseconds(Self.maximumStartupCleanupDebtSweepMilliseconds)
-        for debt in debts {
+        for candidate in debts {
+            guard clock.now < sweepDeadline else { break }
+            guard let lease = try await RuntimeJobOwnershipLease.claim(
+                jobID: candidate.jobID, artifactRoot: artifactRoot, before: sweepDeadline) else { continue }
+            defer { lease.release(removeFile: false) }
+            guard let debt = try await repository.eligibleTerminalCleanupDebts(
+                before: ISO8601.string(from: Date()),
+                limit: Self.maximumStartupCleanupDebtsPerLaunch
+            ).first(where: { $0.jobID == candidate.jobID }) else {
+                lease.release()
+                continue
+            }
             let sweepRemaining = Self.remainingMilliseconds(
                 before: sweepDeadline,
                 clock: clock
@@ -905,14 +1141,17 @@ public actor ExecutionJobService: ExecutionJobServicing {
                 resolved: resolved,
                 errorSummary: summary
             )
+            lease.release()
         }
     }
 
     private func terminateRecoveredProcessGroup(
         jobID: UUID,
-        identity: RuntimePersistedProcessIdentity
+        identity: RuntimePersistedProcessIdentity,
+        before deadline: ContinuousClock.Instant? = nil
     ) async throws -> String {
-        let result = try await reapPersistedProcessGroup(jobID: jobID, identity: identity)
+        let result = try await reapPersistedProcessGroup(
+            jobID: jobID, identity: identity, before: deadline)
         return Self.recoverySignalSummary(
             termination: result.termination,
             forced: result.forced
@@ -1076,7 +1315,7 @@ public actor ExecutionJobService: ExecutionJobServicing {
             guard result == .identityUnavailable, clock.now < deadline else {
                 return result
             }
-            try? await Task.sleep(for: .milliseconds(20))
+            await Self.waitForRecoveryProbe(before: deadline)
         } while true
     }
 
@@ -1093,8 +1332,19 @@ public actor ExecutionJobService: ExecutionJobServicing {
             if probe == .processMissing { return true }
             if probe != .signaled, probe != .identityUnavailable { return false }
             if clock.now >= deadline { return false }
-            try? await Task.sleep(for: .milliseconds(20))
+            await Self.waitForRecoveryProbe(before: deadline)
         } while true
+    }
+
+    private static func waitForRecoveryProbe(before deadline: ContinuousClock.Instant) async {
+        let milliseconds = min(20, remainingMilliseconds(before: deadline, clock: ContinuousClock()))
+        guard milliseconds > 0 else { return }
+        // Already-admitted process cleanup must keep its cadence after caller cancellation.
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + .milliseconds(milliseconds)) {
+                continuation.resume()
+            }
+        }
     }
 
     func setRecoveredProcessController(
@@ -1149,31 +1399,54 @@ public actor ExecutionJobService: ExecutionJobServicing {
         try await contextValidator.validateCaller(request.context)
         try Task.checkCancellation()
         let validated = try validate(request)
-        if let key = request.idempotencyKey,
-           let existing = try await repository.existingJob(
-            projectID: request.context.projectID,
-            generation: request.context.projectGeneration,
-            idempotencyKey: key
-           ) {
-            guard existing.projectID == request.context.projectID,
-                  existing.projectGeneration == request.context.projectGeneration,
-                  existing.runID == request.context.runID || request.context.runID == nil else {
-                throw RuntimeJobError.jobScopeMismatch(existing.jobID)
+        if let key = request.idempotencyKey {
+            let existing: RuntimeJobRecord?
+            if let preCommitAdmission = request.preCommitAdmission {
+                existing = try await repository.admitExistingJob(
+                    request: request,
+                    preCommitAdmission: preCommitAdmission,
+                    commitObserver: request.didPersist
+                )
+            } else {
+                existing = try await repository.existingJob(
+                    projectID: request.context.projectID,
+                    generation: request.context.projectGeneration,
+                    idempotencyKey: key
+                )
             }
-            return (existing.jobID, true)
+            if let existing {
+                guard existing.projectID == request.context.projectID,
+                      existing.projectGeneration == request.context.projectGeneration,
+                      existing.runID == request.context.runID || request.context.runID == nil else {
+                    throw RuntimeJobError.jobScopeMismatch(existing.jobID)
+                }
+                return (existing.jobID, true)
+            }
         }
-        guard pending.count + active.count < limits.maximumQueuedJobs + limits.maximumConcurrentJobs else {
+        let owned = Set(pending.keys).union(active.keys).union(ownershipLeases.keys).union(admittingJobIDs)
+        guard owned.count < limits.maximumQueuedJobs + limits.maximumConcurrentJobs else {
             throw RuntimeJobError.queueFull
         }
         try Task.checkCancellation()
 
         let jobID = UUID()
-        let outputArtifactBudget = try await reserveArtifactCapacity(
-            jobID: jobID,
-            request: request
-        )
+        admittingJobIDs.insert(jobID)
+        defer { admittingJobIDs.remove(jobID) }
         let spool: RuntimeOutputSpool
         do {
+            guard let lease = try await RuntimeJobOwnershipLease.claim(
+                jobID: jobID, artifactRoot: artifactRoot) else {
+                throw RuntimeJobError.storageFailure("new runtime job already has a live owner")
+            }
+            ownershipLeases[jobID] = lease
+            guard !shuttingDown else {
+                throw RuntimeJobError.invalidRequest("runtime job service is shutting down")
+            }
+            let outputArtifactBudget = try await reserveArtifactCapacity(jobID: jobID, request: request)
+            try Task.checkCancellation()
+            guard !shuttingDown else {
+                throw RuntimeJobError.invalidRequest("runtime job service is shutting down")
+            }
             spool = try RuntimeOutputSpool(
                 jobID: jobID,
                 projectID: request.context.projectID,
@@ -1184,6 +1457,7 @@ public actor ExecutionJobService: ExecutionJobServicing {
             )
         } catch {
             releaseArtifactReservation(jobID: jobID)
+            releaseOwnership(jobID: jobID)
             throw error
         }
         var preserveReservationForRecovery = false
@@ -1219,11 +1493,13 @@ public actor ExecutionJobService: ExecutionJobServicing {
                 commandSummary: planned.summary,
                 timeoutSeconds: validated.timeoutSeconds,
                 requestArtifactRelativePath: planned.requestArtifactRelativePath,
+                preCommitAdmission: request.preCommitAdmission,
                 commitObserver: request.didPersist
             )
             guard persisted.jobID == jobID else {
                 spool.discard()
                 releaseArtifactReservation(jobID: jobID)
+                releaseOwnership(jobID: jobID)
                 return (persisted.jobID, true)
             }
             let jobContext: ToolInvocationContext
@@ -1247,6 +1523,14 @@ public actor ExecutionJobService: ExecutionJobServicing {
                 preserveReservationForRecovery = !terminalPersisted
                 throw error
             }
+            if shuttingDown {
+                spool.discard()
+                _ = await persistTerminal(
+                    jobID: jobID, state: .cancelled, exitCode: nil, outputs: [], artifactID: nil,
+                    errorCode: "runtime_shutdown", errorSummary: "Runtime job service shut down before launch",
+                    expectedContext: jobContext)
+                return (jobID, false)
+            }
             pending[jobID] = PendingExecution(
                 request: persistedRequest,
                 jobContext: jobContext,
@@ -1262,6 +1546,7 @@ public actor ExecutionJobService: ExecutionJobServicing {
             spool.discard()
             if !preserveReservationForRecovery {
                 releaseArtifactReservation(jobID: jobID)
+                releaseOwnership(jobID: jobID)
             }
             throw error
         }
@@ -1353,8 +1638,12 @@ public actor ExecutionJobService: ExecutionJobServicing {
         try await ensureStarted()
         try await contextValidator.validateCaller(context)
         let record = try await repository.job(jobID, context: context)
+        if !record.state.isTerminal {
+            try await recoverAbandonedJob(jobID: jobID, context: context,
+                                          before: ContinuousClock.now + .seconds(10))
+        }
         try Task.checkCancellation()
-        return record
+        return try await repository.job(jobID, context: context)
     }
 
     public func list(
@@ -1374,8 +1663,15 @@ public actor ExecutionJobService: ExecutionJobServicing {
             beforeCreatedAt: beforeCreatedAt,
             beforeJobID: beforeJobID
         )
+        let recoveryDeadline = ContinuousClock.now + .seconds(10)
+        for record in records where !record.state.isTerminal {
+            guard ContinuousClock.now < recoveryDeadline else { break }
+            try await recoverAbandonedJob(jobID: record.jobID, context: context,
+                                          before: recoveryDeadline)
+        }
         try Task.checkCancellation()
-        return records
+        return try await repository.list(context: context, states: states, limit: limit,
+                                         beforeCreatedAt: beforeCreatedAt, beforeJobID: beforeJobID)
     }
 
     public func readOutput(
@@ -1392,6 +1688,11 @@ public actor ExecutionJobService: ExecutionJobServicing {
             throw RuntimeJobError.invalidRequest("output read limit must be between 1 and 65536 bytes")
         }
         var record = try await repository.job(jobID, context: context)
+        if !record.state.isTerminal {
+            try await recoverAbandonedJob(jobID: jobID, context: context,
+                                          before: ContinuousClock.now + .seconds(10))
+            record = try await repository.job(jobID, context: context)
+        }
         if !record.state.isTerminal,
            let item = active[jobID]?.item ?? pending[jobID] {
             guard item.spool.jobID == jobID,
@@ -1566,6 +1867,11 @@ public actor ExecutionJobService: ExecutionJobServicing {
         context: ToolInvocationContext,
         commitObserver: (@Sendable (RuntimeJobRecord) -> Void)? = nil
     ) async throws -> (changed: Bool, record: RuntimeJobRecord) {
+        let current = try await repository.job(jobID, context: context)
+        if !current.state.isTerminal {
+            try await recoverAbandonedJob(jobID: jobID, context: context,
+                                          before: ContinuousClock.now + .seconds(10))
+        }
         let record = try await repository.requestCancellation(
             jobID: jobID,
             context: context,
@@ -1576,6 +1882,7 @@ public actor ExecutionJobService: ExecutionJobServicing {
             pendingExecution.spool.discard()
             deleteRequestArtifact(pendingExecution.requestArtifactRelativePath)
             releaseArtifactReservation(jobID: jobID)
+            releaseOwnership(jobID: jobID)
             pumpQueue()
             return (true, record)
         }
@@ -1613,6 +1920,7 @@ public actor ExecutionJobService: ExecutionJobServicing {
     @discardableResult
     public func shutdown() async -> RuntimeJobShutdownReport {
         shuttingDown = true
+        if let startupTask { _ = try? await startupTask.value }
         let pendingIDs = pendingOrder
         for jobID in pendingIDs {
             guard let item = pending[jobID] else { continue }
@@ -1677,20 +1985,49 @@ public actor ExecutionJobService: ExecutionJobServicing {
             if pending.isEmpty,
                active.isEmpty,
                persistenceRecoveryJobs.isEmpty,
-               terminationRecoveryJobs.isEmpty {
+               terminationRecoveryJobs.isEmpty,
+               recoveringJobID == nil {
                 break
             }
             try? await Task.sleep(for: .milliseconds(20))
         }
 
-        let durableNonterminal = (try? await repository.nonterminalJobs()) ?? []
+        let durableNonterminal: [RuntimeJobRecord]
+        let durableInspectionSucceeded: Bool
+        do {
+            durableNonterminal = try await repository.nonterminalJobs()
+            durableInspectionSucceeded = true
+        } catch {
+            durableNonterminal = []
+            durableInspectionSucceeded = false
+        }
+        var unownedUnresolved: Set<UUID> = []
+        for job in durableNonterminal where ownershipLeases[job.jobID] == nil {
+            guard clock.now < deadline else { unownedUnresolved.insert(job.jobID); continue }
+            do {
+                // A busy verified cooperative lease belongs to another helper.
+                // Missing/invalid ownership remains this shutdown's unresolved debt.
+                if let lease = try await RuntimeJobOwnershipLease.claim(
+                    jobID: job.jobID, artifactRoot: artifactRoot, before: deadline) {
+                    defer { lease.release(removeFile: false) }
+                    if let current = try await repository.job(job.jobID), !current.state.isTerminal {
+                        unownedUnresolved.insert(job.jobID)
+                    } else {
+                        lease.release()
+                    }
+                }
+            } catch { unownedUnresolved.insert(job.jobID) }
+        }
         let unresolved = Set(pending.keys)
             .union(active.keys)
-            .union(durableNonterminal.map(\.jobID))
+            .union(ownershipLeases.keys)
+            .union(admittingJobIDs)
+            .union(recoveringJobID.map { [$0] } ?? [])
+            .union(unownedUnresolved)
             .union(terminationRecoveryJobs)
         let persistencePending = Set(persistenceRecoveryJobs)
         return RuntimeJobShutdownReport(
-            completed: unresolved.isEmpty && persistencePending.isEmpty,
+            completed: durableInspectionSucceeded && unresolved.isEmpty && persistencePending.isEmpty,
             unresolvedJobIDs: unresolved.sorted { $0.uuidString < $1.uuidString },
             persistencePendingJobIDs: persistencePending.sorted { $0.uuidString < $1.uuidString }
         )
@@ -1831,6 +2168,7 @@ public actor ExecutionJobService: ExecutionJobServicing {
                 item.spool.discard()
                 deleteRequestArtifact(item.requestArtifactRelativePath)
                 releaseArtifactReservation(jobID: jobID)
+                releaseOwnership(jobID: jobID)
                 persisted = true
             } else if active[jobID]?.cancellationRequested == true {
                 item.spool.discard()
@@ -1878,6 +2216,7 @@ public actor ExecutionJobService: ExecutionJobServicing {
         var cancellationObserved = false
         var descendantEvidence = RuntimeDescendantLimitEvidence()
         var terminationFailure: Error?
+        var nextCancellationPoll = clock.now
         while exit == nil {
             if active[jobID]?.pendingTerminationCompletion != nil {
                 return
@@ -1906,6 +2245,14 @@ public actor ExecutionJobService: ExecutionJobServicing {
             if let current = process.currentExit() {
                 exit = current
                 break
+            }
+            if clock.now >= nextCancellationPoll {
+                nextCancellationPoll = clock.now + .milliseconds(250)
+                if let current = try? await repository.job(jobID), current.state == .cancelling,
+                   var execution = active[jobID] {
+                    execution.cancellationRequested = true
+                    active[jobID] = execution
+                }
             }
             if active[jobID]?.cancellationRequested == true {
                 cancellationObserved = true
@@ -2611,7 +2958,12 @@ public actor ExecutionJobService: ExecutionJobServicing {
         artifactReservations.removeValue(forKey: jobID)
     }
 
+    private func releaseOwnership(jobID: UUID) {
+        ownershipLeases.removeValue(forKey: jobID)?.release()
+    }
+
     private func settleArtifactReservation(jobID: UUID) async {
+        releaseOwnership(jobID: jobID)
         let projectID = artifactReservations.removeValue(forKey: jobID)?.projectID
         persistenceRecoveryJobs.remove(jobID)
         persistenceRecoveryPayloads.removeValue(forKey: jobID)
@@ -3064,6 +3416,21 @@ public actor ExecutionJobService: ExecutionJobServicing {
         }
     }
 
+    private func pruneReleasedOwnershipFiles() async throws {
+        let deadline = ContinuousClock.now + .seconds(10)
+        for jobID in try RuntimeJobOwnershipLease.candidateJobIDs(artifactRoot: artifactRoot, before: deadline) {
+            guard ContinuousClock.now < deadline else { break }
+            guard let lease = try await RuntimeJobOwnershipLease.claim(
+                jobID: jobID, artifactRoot: artifactRoot, before: deadline) else { continue }
+            defer { lease.release(removeFile: false) }
+            let record = try await repository.job(jobID)
+            if record == nil || (record?.state.isTerminal == true
+                && record?.errorCode != "runtime_termination_unconfirmed") {
+                lease.release()
+            }
+        }
+    }
+
     private func sweepOrphanedJobDirectories() async throws {
         var remainingEntries = Self.maximumStartupDirectoryEntries
         var candidates: [JobDirectoryCandidate] = []
@@ -3083,11 +3450,20 @@ public actor ExecutionJobService: ExecutionJobServicing {
             )
         }
 
+        let deadline = ContinuousClock.now + .seconds(10)
         for candidate in candidates.prefix(Self.maximumStartupOrphanDirectories) {
+            guard ContinuousClock.now < deadline else { break }
+            guard let lease = try await RuntimeJobOwnershipLease.claim(
+                jobID: candidate.jobID, artifactRoot: artifactRoot, before: deadline) else { continue }
+            defer { lease.release(removeFile: false) }
             let record = try await repository.job(candidate.jobID)
             let isDurableIntent = record?.projectID == candidate.projectID
                 && record?.projectGeneration == candidate.generation
-            guard !isDurableIntent else { continue }
+            guard !isDurableIntent else {
+                if record?.state.isTerminal == true,
+                   record?.errorCode != "runtime_termination_unconfirmed" { lease.release() }
+                continue
+            }
             let resolved = RuntimePathCanonicalizer.canonicalExistingURL(candidate.url)
             guard resolved.path == candidate.url.path,
                   Self.contains(resolved, root: candidate.root) else {
@@ -3095,6 +3471,7 @@ public actor ExecutionJobService: ExecutionJobServicing {
             }
             do {
                 try FileManager.default.removeItem(at: resolved)
+                lease.release()
             } catch {
                 throw RuntimeJobError.storageFailure(
                     "could not remove orphaned runtime job directory: \(error.localizedDescription)"

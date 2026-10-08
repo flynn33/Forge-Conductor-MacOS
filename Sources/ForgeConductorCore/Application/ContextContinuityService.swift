@@ -850,9 +850,12 @@ public final class ContextContinuityService: @unchecked Sendable {
                 throw StoreError.conflict("runtime continuity budget changed before packet build")
             }
             let priorID = current?.latestPacketID
-            let prior = try priorID.flatMap { try store.handoffLegacyGet(id: $0, cancellation: cancellation) }
+            let priorRecord = try priorID.flatMap {
+                try store.interactiveContinuityHandoffRecord(packetID: $0, cancellation: cancellation)
+            }
+            let prior = priorRecord?.packet
             if let prior {
-                guard try store.runtimeContinuityPacketScopeKey(packetID: prior.id, cancellation: cancellation) == scopeKey,
+                guard priorRecord?.runtimeScopeKey == scopeKey,
                       let cwd = prior.cwd,
                       context.authorizationScope.canonicalRoots.contains(where: { root in
                           let path = ToolArgHelpers.resolvePath(cwd).resolvingSymlinksInPath().standardizedFileURL.path
@@ -860,9 +863,15 @@ public final class ContextContinuityService: @unchecked Sendable {
                           return path == canonical || path.hasPrefix(canonical + "/")
                       }) else { throw StoreError.conflict("budget handoff is outside the selected runtime scope") }
             }
-            let reusesPendingBudget = prior?.source == .budget && prior?.resumeReady == true
+            // Authored same-ID edits do not reopen a sealed or earlier-origin
+            // packet for successor work. A fresh ID still clones authored fields.
+            let canReusePrior = priorRecord?.isSealed == false
+                && (prior?.runtimeJobContinuation.map {
+                    $0.scopeKey == scopeKey && $0.originEpoch == UUID(uuidString: startingProgress.epoch)
+                } ?? true)
+            let reusesPendingBudget = canReusePrior && prior?.source == .budget && prior?.resumeReady == true
                 && current?.lastHandoffID == prior?.id
-            let reusesOpenCheckpoint = prior?.resumeReady == false
+            let reusesOpenCheckpoint = canReusePrior && prior?.resumeReady == false
             let packetID = (reusesPendingBudget || reusesOpenCheckpoint) ? prior?.id : nil
             var args: [String: Any] = ["status": "budget_pressure"]
             if let root = context.authorizationScope.canonicalRoots.first { args["cwd"] = root.path }
@@ -1217,13 +1226,13 @@ public final class ContextContinuityService: @unchecked Sendable {
                 ingress = nil
             } else if let runtimeScopeKey {
                 stageObserver?("runtime_model_handoff_commit")
-                try store.handoffUpsertRecordingRuntimeProgress(packet, scopeKey: runtimeScopeKey,
+                packet = try store.handoffUpsertRecordingRuntimeProgress(packet, scopeKey: runtimeScopeKey,
                     blockProgress: runtimeBlockProgress, expectedEpoch: runtimeExpectedEpoch,
                     cancellation: cancellation)
                 ingress = nil
             } else {
                 stageObserver?("handoff_upsert")
-                try store.handoffUpsert(packet, cancellation: cancellation)
+                packet = try store.handoffUpsertReturningCommittedPacket(packet, cancellation: cancellation)
                 ingress = nil
             }
             // SQLite is authoritative. A cancellation observed after this point

@@ -15,8 +15,12 @@ external validator's revised limit. Native PNG review covered ten Release and tw
 PNG pages. PDFKit compatibility remains open. The PDF source/wiki checkpoint was
 published and synchronized. A later test-only fixture capture correction passed
 the freshly compiled UTF-8 regression and all 19 writer methods without the
-original warning; product identity remains 0.25.0 (35). This later test/documentation
-publication is pending.
+original warning; product identity remains 0.25.0 (35) for that test-only checkpoint.
+Its later test/documentation closeout was delivered and synchronized at source
+`5ff5559ad02192a90a4887154f48e38c81fa54fe` and wiki
+`3dc576814d2bafdaa2ff303e5011072026e0a378`, both clean with 0/0 divergence.
+`native-pdf-capture-publication-and-synchronization-025.json` retains the exact receipt;
+this does not qualify .26 or alter the PDF candidate evidence.
 
 The signed 0.24 baseline and every unsuccessful repair attempt retain their own
 inputs. Generation metadata, logical text, PDFKit extraction, geometry and visible
@@ -184,7 +188,7 @@ Receipts are retained externally under
 | R6 Qwen semantic artifacts | `native-pdf-qwen-semantic-r6-025`: both passed with original scalar markers/page targets, normal zero exits/full EOF and no forced cleanup. Outer zero, 0.341 seconds; log `0b989029494ae09790d75edf5e16dbd75f007f64eb733fe5d68b17e0f8fb85d8`. This separate logical-text proof does not reclassify the unchanged Qwen PDFKit NONPASS. |
 | Original native test warning | Historical E2 source evidence: the original native compiler warned at `PDFWriterTests.swift:85` that detached work captured XCTest `self`, including mutable fixture state. The method awaited `.value`; no runtime race or production/UI reachability was observed. The original 102-test receipt and warning log remain immutable; the later test-only correction has separate receipts below. |
 | PDF product publication | `native-pdf-publication-and-synchronization-025.json` records owner source `812f4ead367fc95f39b666fd1a814606b837b853` and wiki `07a4fb8f0a12b68c22650cc4121fa84fae1dce50`, clean and zero divergence. The 26 published source paths and all 450 tested inputs match; 45 remote wiki files match, with 34 pages and 284 checked local links/zero errors. Product candidate receipts retain this original test snapshot. |
-| Later test/documentation publication, installation and shipment | The test-only immutable capture change and this documentation closeout await their own owner publication/readback/synchronization. Installation and shipment remain separate. |
+| Later test/documentation publication, installation and shipment | `native-pdf-capture-publication-and-synchronization-025.json` records delivered source main `5ff5559ad02192a90a4887154f48e38c81fa54fe` and wiki `3dc576814d2bafdaa2ff303e5011072026e0a378`, both clean with 0/0 divergence. The 13 published source files/450 inputs and 45 remote wiki files match; 34 pages and 286 local links/zero errors are retained. Original product and failed receipts keep their identities. Installation, .26 qualification and shipment remain separate. |
 
 R6 is a fresh independent validator revision, not a product-source change. Its
 cumulative generic-operand/TJ-member ceiling increased from 4,096 to 32,768 after
@@ -236,7 +240,9 @@ not rerun all 102 tests or supply new candidate signing/build-binding qualificat
 No runtime race or general concurrency acceptance is claimed. Both unchanged
 PDFKit compatibility gates remain OPEN; this test-only change does not alter
 generation, glyph, logical-text, layout or installed behavior. Its source/document
-publication is pending separately from the completed PDF product checkpoint.
+publication/readback/synchronization is complete at the exact refs above, separately
+from the earlier PDF product checkpoint. This supplies no new .26 PDF, installed
+or shipment qualification.
 
 The PDF record closes neither the attachment's other rich-format requests nor the
 broader completion target. Earlier PNG/WAV/minimal-DOCX examples were Qwen-authored

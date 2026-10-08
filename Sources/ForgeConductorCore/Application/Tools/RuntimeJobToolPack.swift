@@ -29,11 +29,13 @@ public struct RuntimeJobToolPack: AsyncContextualToolPackHandling, Sendable {
     private let service: ExecutionJobService
     private let postCancellationCommit: (@Sendable () async -> Void)?
     private let durableResultObserver: (@Sendable (ToolResult) -> Void)?
+    private let preCommitAdmission: RuntimeJobPreCommitAdmission?
 
     public init(service: ExecutionJobService) {
         self.service = service
         postCancellationCommit = nil
         durableResultObserver = nil
+        preCommitAdmission = nil
     }
 
     init(
@@ -43,15 +45,18 @@ public struct RuntimeJobToolPack: AsyncContextualToolPackHandling, Sendable {
         self.service = service
         self.postCancellationCommit = postCancellationCommit
         durableResultObserver = nil
+        preCommitAdmission = nil
     }
 
     init(
         service: ExecutionJobService,
+        preCommitAdmission: RuntimeJobPreCommitAdmission? = nil,
         durableResultObserver: @escaping @Sendable (ToolResult) -> Void
     ) {
         self.service = service
         postCancellationCommit = nil
         self.durableResultObserver = durableResultObserver
+        self.preCommitAdmission = preCommitAdmission
     }
 
     public var toolNames: [String] { Self.names }
@@ -151,6 +156,7 @@ public struct RuntimeJobToolPack: AsyncContextualToolPackHandling, Sendable {
                     name: name,
                     arguments: arguments,
                     context: context,
+                    preCommitAdmission: preCommitAdmission,
                     didPersist: { record in
                         durableResultObserver?(.success(Self.submissionPayload(record)))
                     }
@@ -353,6 +359,7 @@ public struct RuntimeJobToolPack: AsyncContextualToolPackHandling, Sendable {
         name: String,
         arguments: [String: Any],
         context: ToolInvocationContext,
+        preCommitAdmission: RuntimeJobPreCommitAdmission? = nil,
         didPersist: (@Sendable (RuntimeJobRecord) -> Void)? = nil
     ) throws -> RuntimeJobRequest {
         let replayText = ToolArgHelpers.string(arguments, "replay_class")
@@ -432,6 +439,7 @@ public struct RuntimeJobToolPack: AsyncContextualToolPackHandling, Sendable {
             maximumInlineOutputBytes: inline,
             replayClass: replayClass,
             idempotencyKey: idempotency,
+            preCommitAdmission: preCommitAdmission,
             persistenceObserver: didPersist ?? { _ in }
         )
     }

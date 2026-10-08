@@ -327,6 +327,23 @@ public actor RuntimeJobRepository {
         requestArtifactRelativePath: String?,
         commitObserver: (@Sendable (RuntimeJobRecord) -> Void)? = nil
     ) throws -> RuntimeJobRecord {
+        try createJob(
+            jobID: jobID, request: request, commandSummary: commandSummary,
+            timeoutSeconds: timeoutSeconds, requestArtifactRelativePath: requestArtifactRelativePath,
+            preCommitAdmission: nil, commitObserver: commitObserver
+        )
+    }
+
+    @discardableResult
+    func createJob(
+        jobID: UUID,
+        request: RuntimeJobRequest,
+        commandSummary: String,
+        timeoutSeconds: Int,
+        requestArtifactRelativePath: String?,
+        preCommitAdmission: RuntimeJobPreCommitAdmission?,
+        commitObserver: (@Sendable (RuntimeJobRecord) -> Void)? = nil
+    ) throws -> RuntimeJobRecord {
         try Task.checkCancellation()
         let summary = try Self.bounded(commandSummary, maximumBytes: 2_048, field: "command summary")
         let idempotency = try request.idempotencyKey.map(Self.boundedIdempotencyKey)
@@ -344,6 +361,9 @@ public actor RuntimeJobRepository {
             commitObserver: commitObserver
         ) {
             try validateCurrentProject(request.context)
+            if preCommitAdmission != nil {
+                try validateOrdinaryContinuationCaller(request.context)
+            }
             if let idempotency,
                let existing = try existingJobUnlocked(
                 projectID: request.context.projectID,
@@ -355,6 +375,7 @@ public actor RuntimeJobRepository {
                       existing.runID == request.context.runID || request.context.runID == nil else {
                     throw RuntimeJobError.jobScopeMismatch(existing.jobID)
                 }
+                try preCommitAdmission?(existing)
                 return existing
             }
             try execute(
@@ -385,7 +406,40 @@ public actor RuntimeJobRepository {
             guard let inserted = try jobUnlocked(jobID) else {
                 throw RuntimeJobError.storageFailure("created job could not be read back")
             }
+            try preCommitAdmission?(inserted)
             return inserted
+        }
+    }
+
+    func admitExistingJob(
+        request: RuntimeJobRequest,
+        preCommitAdmission: RuntimeJobPreCommitAdmission,
+        commitObserver: (@Sendable (RuntimeJobRecord) -> Void)? = nil
+    ) throws -> RuntimeJobRecord? {
+        try Task.checkCancellation()
+        guard let suppliedKey = request.idempotencyKey else { return nil }
+        let key = try Self.boundedIdempotencyKey(suppliedKey)
+        return try transaction(
+            checkTaskCancellation: true,
+            commitKind: .submission,
+            commitObserver: { (record: RuntimeJobRecord?) in
+                if let record { commitObserver?(record) }
+            }
+        ) {
+            try validateCurrentProject(request.context)
+            try validateOrdinaryContinuationCaller(request.context)
+            guard let existing = try existingJobUnlocked(
+                projectID: request.context.projectID,
+                generation: request.context.projectGeneration,
+                idempotencyKey: key
+            ) else { return nil }
+            guard existing.projectID == request.context.projectID,
+                  existing.projectGeneration == request.context.projectGeneration,
+                  existing.runID == request.context.runID || request.context.runID == nil else {
+                throw RuntimeJobError.jobScopeMismatch(existing.jobID)
+            }
+            try preCommitAdmission(existing)
+            return existing
         }
     }
 
@@ -1318,6 +1372,77 @@ public actor RuntimeJobRepository {
         }
         guard row.1 == ProjectLifecycleState.active.rawValue else {
             throw ProjectContextError.projectNotActive(ProjectLifecycleState(rawValue: row.1) ?? .quarantined)
+        }
+    }
+
+    /// This connection already owns BEGIN IMMEDIATE. Do not enter the separate
+    /// control-plane actor/connection while holding this submission fence.
+    private func validateOrdinaryContinuationCaller(_ context: ToolInvocationContext) throws {
+        guard context.runID == nil, context.providerSessionID == nil,
+              context.runtimeJobID == nil else {
+            throw ProjectContextError.projectScopeMismatch
+        }
+        let owner = ProjectBindingOwner(kind: .mcpClient, id: context.clientID.rawValue)
+        let normalizedOwner = owner.id.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedOwner.isEmpty, normalizedOwner == owner.id,
+              owner.id.utf8.count <= 1_024 else {
+            throw ProjectContextError.invalidIdentifier("binding owner")
+        }
+        _ = try Self.sqliteGeneration(context.projectGeneration)
+        let binding: ProjectContextBinding? = try queryOne(
+            """
+            SELECT binding_id,owner_kind,owner_id,project_id,project_generation,run_id,
+                   authorization_scope_json,lease_owner,lease_expires_at,active,created_at,updated_at
+            FROM project_bindings WHERE owner_kind=? AND owner_id=? AND active=1 LIMIT 1
+            """,
+            bindings: [.text(owner.kind.rawValue), .text(owner.id)]
+        ) { statement in
+            guard let bindingText = Self.requiredText(statement, column: 0),
+                  let bindingID = UUID(uuidString: bindingText),
+                  let kindText = Self.requiredText(statement, column: 1),
+                  let kind = ProjectBindingOwnerKind(rawValue: kindText),
+                  let ownerID = Self.requiredText(statement, column: 2),
+                  let projectText = Self.requiredText(statement, column: 3),
+                  let projectUUID = UUID(uuidString: projectText),
+                  let scopeText = Self.requiredText(statement, column: 6),
+                  let createdAt = Self.requiredText(statement, column: 10),
+                  let updatedAt = Self.requiredText(statement, column: 11) else {
+                throw ProjectContextError.integrityFailure("invalid project binding row")
+            }
+            let generation = sqlite3_column_int64(statement, 4)
+            guard generation > 0 else {
+                throw ProjectContextError.integrityFailure("invalid stored binding generation")
+            }
+            let runID: RunID?
+            if let runText = Self.optionalText(statement, column: 5) {
+                guard let runUUID = UUID(uuidString: runText) else {
+                    throw ProjectContextError.integrityFailure("invalid stored run identifier")
+                }
+                runID = RunID(runUUID)
+            } else {
+                runID = nil
+            }
+            return ProjectContextBinding(
+                bindingID: bindingID,
+                owner: ProjectBindingOwner(kind: kind, id: ownerID),
+                projectID: ProjectID(projectUUID),
+                projectGeneration: ProjectGeneration(UInt64(generation)),
+                runID: runID,
+                authorizationScope: try ProjectControlPlaneRepository.scope(from: scopeText),
+                leaseOwner: Self.optionalText(statement, column: 7),
+                leaseExpiresAt: Self.optionalText(statement, column: 8),
+                active: sqlite3_column_int64(statement, 9) == 1,
+                createdAt: createdAt,
+                updatedAt: updatedAt
+            )
+        }
+        guard let binding else { throw ProjectContextError.projectContextRequired(owner) }
+        guard binding.owner == owner,
+              binding.projectID == context.projectID,
+              binding.projectGeneration == context.projectGeneration,
+              binding.runID == context.runID,
+              binding.authorizationScope == context.authorizationScope else {
+            throw ProjectContextError.projectScopeMismatch
         }
     }
 

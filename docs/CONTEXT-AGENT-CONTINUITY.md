@@ -1,4 +1,6 @@
-# Context and agent continuity (v0.25.0)
+# Context and agent continuity (v0.26.0)
+
+<a id="context-and-agent-continuity-v0250"></a>
 
 <a id="context-and-agent-continuity-v0240"></a>
 
@@ -8,7 +10,53 @@
 
 <a id="context-and-agent-continuity-v0180"></a>
 
-Current source documentation targets 0.25.0 (35). Existing PDF tools retain their
+Current source documentation targets 0.26.0 (36). Ordinary MCP job submissions
+carry native references alongside authored task content, with a 32-attempt / 16 KiB
+extension admitted to Source before CP COMMIT. Both keyed paths revalidate the
+full native binding and consume a one-use epoch admission. Resume status is a
+current-authorized sidecar of the exact returned packet before reset; missing rows
+remain unresolved and cannot authorize replay. Same-ID sealed authored edits stay
+available while their native reference origin is preserved. No migration/journal
+or GUI-text inference is added. The installed .18 original failure, manual exact-ID
+recovery and failing isolated baseline remain recorded. First CLI/app compiles
+and the original repaired regression passed on their first snapshots; the later
+24 new source tests passed without warnings/errors. The full owning-area run
+has a retained first NONPASS (41 assertion failures in two pending-output
+fixtures). The later budget guard and genuine unavailable-reader fixtures
+passed three source methods, preserving assertions and available empty snapshots.
+Earlier source checks passed 309 distinct methods, with separate actual
+Manager/version coverage; incremental CLI/app and ordinary native Debug build
+passed. Native 309 passed with three QoS diagnostics; later changes to two
+test priorities passed focused source 4/native 4 without warnings, with ordinary
+Debug confirmed on the later map. Earlier full 309 retains its original test
+hash and existing DiagnosticLog profiling target. Strict Debug artifact
+binding, two isolated native MCP cases and a fresh Qwen API case passed; the
+first Qwen fenced-JSON NONPASS remains. A later isolated shared-home/deployment
+E0 baseline interrupted the primary's live `/bin/sleep 30` job on fallback status; the
+row failed runtime_owner_restarted after 0.713 s with the exact primary parent
+still alive and both streams unavailable. Collection succeeded; the feature
+contract failed; that receipt remains NONPASS.
+The runtime owner repair is now applied. The final source selection passed
+**321 methods** without failures, skips or compiler warnings on its unchanged
+450-input map. The separate ordinary canonical Debug build passed in 24.992
+seconds. The same **321 native methods** passed without failures/skips, retaining
+one existing DiagnosticLog:64 runtime QoS warning. Strict Debug verification of seven binaries
+and build binding, plus repeated signed live-owner, warm-crash and two
+continuation cases passed on the final map. Fresh Qwen consumption passed three
+actual Low/API rounds and four verified calls with exact job/output/task recovery
+and no replay. Earlier passes retain their earlier maps. Exact direct publication and synchronization revisions are retained separately
+in `runtime-continuation-publication-and-synchronization-026.json` after the update.
+Runtime lifetime ownership uses a private kernel lease; Source/CP reference
+admission adds no lease or journal. Warm recovery preserves scope, exact process
+identity and no replay. [Ordinary runtime continuation](ORDINARY-RUNTIME-CONTINUATION.md)
+records each baseline, current repair and pending gate.
+Budget reuse requires an unsealed eligible origin; otherwise Forge creates a
+fresh ID with cloned authored fields. Same-ID old-origin edits preserve their
+reference set. Automatic finalized status uses the existing `handoff_ready`
+default; the original completed authored checkpoint remains unchanged.
+The 54 capability themes, full-web, PDFKit and installed/all-feature gates remain open.
+
+At the preceding 0.25.0 (35) checkpoint, existing PDF tools retain their
 grant/deadline boundary. Complete supported tagged PDFs can now contribute logical
 text to instruction imports and policy-source indexing, with explicit converter
 provenance and unchanged durable ownership. Unsupported, incomplete, over-budget
@@ -23,7 +71,8 @@ and two Qwen PNG pages. PDFKit compatibility remains open. The PDF source/wiki
 checkpoint was published and synchronized. A later test-only fixture capture
 correction passed the freshly compiled UTF-8 regression and all 19 writer methods
 without the original warning; it changes neither product nor continuity behavior.
-This test/documentation publication is pending in
+This test/documentation closeout was delivered and synchronized with clean 0/0
+source/wiki divergence ([exact refs](ORDINARY-RUNTIME-CONTINUATION.md#preceding-pdf-delivery)), as recorded in
 [native PDF writing](NATIVE-PDF-WRITING.md).
 
 The preceding 0.24.0 (34) checkpoint: Paged `fs_list` retains the

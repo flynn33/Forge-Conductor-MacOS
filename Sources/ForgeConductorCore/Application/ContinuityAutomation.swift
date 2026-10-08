@@ -56,6 +56,16 @@ struct RuntimeContinuityProgress: Codable, Sendable {
     var capacityFailure: String?
     var pending: RuntimeContinuityProgressClaim?
     var rolloverRequested: Bool?
+    var runtimeJobSubmissions: [RuntimeJobContinuationReference]?
+
+    func runtimeJobSnapshot(scopeKey: String) throws -> RuntimeJobContinuationSnapshot? {
+        guard let submissions = runtimeJobSubmissions, !submissions.isEmpty else { return nil }
+        guard let origin = UUID(uuidString: epoch) else {
+            throw StoreError.execFailed("runtime continuity epoch is invalid")
+        }
+        return try RuntimeJobContinuationSnapshot(schemaVersion: 1, scopeKey: scopeKey,
+            originEpoch: origin, submissions: submissions).validated()
+    }
 
     static func utf8Prefix(_ value: String, maximumBytes: Int) -> String {
         var output = ""
@@ -97,6 +107,13 @@ struct RuntimeContinuityProgress: Codable, Sendable {
                   pending.claimedAt.timeIntervalSinceReferenceDate.isFinite,
                   pending.expiresAt.timeIntervalSinceReferenceDate.isFinite else {
                 throw StoreError.execFailed("runtime continuity claim is invalid")
+            }
+        }
+        if let runtimeJobSubmissions {
+            guard runtimeJobSubmissions.count <= RuntimeJobContinuationSnapshot.maximumReferences,
+                  Set(runtimeJobSubmissions.map(\.submissionID)).count == runtimeJobSubmissions.count,
+                  runtimeJobSubmissions.allSatisfy({ RuntimeJobContinuationReference.tools.contains($0.tool) }) else {
+                throw StoreError.execFailed("runtime continuity submissions are invalid")
             }
         }
         return self
@@ -611,10 +628,17 @@ public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Send
     ) throws -> Bool {
         if let context = try runtimeContext(for: clientID, cancellation: cancellation) {
             var cleared = false
-            _ = try store.updateRuntimeContinuityProgress(scopeKey: runtimeScopeKey(context), cancellation: cancellation) { progress in
+            let key = runtimeScopeKey(context)
+            _ = try store.updateRuntimeContinuityProgress(scopeKey: key, cancellation: cancellation) { progress in
                 if let packet {
                     guard packetMatchesProject(packet, context: context),
                           packet.resumeReady, progress.lastHandoffID == packet.id else { return }
+                }
+                if progress.runtimeJobSubmissions?.isEmpty == false {
+                    guard let packet,
+                          packet.runtimeJobContinuation == (try progress.runtimeJobSnapshot(scopeKey: key)) else {
+                        return
+                    }
                 }
                 // This is Forge's logical continuity epoch. Shared stdio exposes no
                 // authenticated identity for the external host's individual chat.
@@ -718,6 +742,52 @@ public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Send
         JSONSupport.sha256Hex("runtime-continuity-v1:\(context.projectID.description):\(context.projectGeneration.rawValue):\(JSONSupport.sha256Hex(context.clientID.rawValue)):\(JSONSupport.sha256Hex(context.providerSessionID ?? "forge-logical-epoch"))")
     }
 
+    /// The runtime CP transaction validates the caller before invoking this
+    /// separate precommit seam. Its closure owns only a bounded Source mutation.
+    func prepareOrdinaryRuntimeJobAdmission(
+        tool: String,
+        context: ToolInvocationContext,
+        cancellation: ToolCallCancellation?
+    ) throws -> RuntimeJobPreCommitAdmission? {
+        guard context.runID == nil, context.providerSessionID == nil, context.runtimeJobID == nil,
+              RuntimeJobContinuationReference.tools.contains(tool) else { return nil }
+        let key = runtimeScopeKey(context)
+        let progress = try store.updateRuntimeContinuityProgress(scopeKey: key, cancellation: cancellation) { current in
+            guard !current.blocked else {
+                throw StoreError.conflict("runtime continuity is already handed off")
+            }
+            guard (current.runtimeJobSubmissions?.count ?? 0) < RuntimeJobContinuationSnapshot.maximumReferences else {
+                throw StoreError.conflict("runtime continuity submission capacity reached before job commit")
+            }
+        }
+        let epoch = progress.epoch
+        let submissionID = UUID()
+        let source = store
+        return { record in
+            guard record.projectID == context.projectID,
+                  record.projectGeneration == context.projectGeneration else {
+                throw ProjectContextError.projectScopeMismatch
+            }
+            _ = try source.updateRuntimeContinuityProgress(scopeKey: key, cancellation: cancellation) { current in
+                guard current.epoch == epoch, !current.blocked else {
+                    throw StoreError.conflict("runtime continuity epoch changed before job commit")
+                }
+                var submissions = current.runtimeJobSubmissions ?? []
+                guard submissions.count < RuntimeJobContinuationSnapshot.maximumReferences,
+                      !submissions.contains(where: { $0.submissionID == submissionID }) else {
+                    throw StoreError.conflict("runtime continuity admission was consumed or reached capacity")
+                }
+                submissions.append(RuntimeJobContinuationReference(submissionID: submissionID,
+                    jobID: record.jobID, tool: tool))
+                current.runtimeJobSubmissions = submissions
+                _ = try current.runtimeJobSnapshot(scopeKey: key)
+                if submissions.count == RuntimeJobContinuationSnapshot.maximumReferences {
+                    current.rolloverRequested = true
+                }
+            }
+        }
+    }
+
     func packetReadScope(
         context: ToolInvocationContext?,
         cancellation: ToolCallCancellation?
@@ -809,6 +879,7 @@ public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Send
             let sinceHandoff = current.progressCount - current.lastHandoffCount
                 + current.failureCount - current.lastHandoffFailureCount
             let handoffDue = current.rolloverRequested == true || sinceHandoff >= handoffThreshold
+                || (current.runtimeJobSubmissions?.count ?? 0) >= RuntimeJobContinuationSnapshot.maximumReferences
                 || now.timeIntervalSince(current.lastHandoffAt ?? current.startedAt ?? now) >= Self.handoffIntervalSec
             if handoffDue { current.rolloverRequested = true }
             if var pending = current.pending {

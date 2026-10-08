@@ -99,6 +99,8 @@ enum RuntimeFileSizeProfile: String, Sendable {
     case nativeXcodebuildSparseCAS = "native_xcodebuild_sparse_cas_v1"
 }
 
+typealias RuntimeJobPreCommitAdmission = @Sendable (RuntimeJobRecord) throws -> Void
+
 public struct RuntimeJobRequest: Sendable {
     public let kind: RuntimeKind
     public let profile: RuntimeExecutionProfile
@@ -112,6 +114,7 @@ public struct RuntimeJobRequest: Sendable {
     public let replayClass: RuntimeReplayClass
     public let idempotencyKey: String?
     let fileSizeProfile: RuntimeFileSizeProfile
+    let preCommitAdmission: RuntimeJobPreCommitAdmission?
     let didPersist: (@Sendable (RuntimeJobRecord) -> Void)?
 
     public init(
@@ -131,7 +134,8 @@ public struct RuntimeJobRequest: Sendable {
             kind: kind, profile: profile, context: context, executable: executable,
             arguments: arguments, script: script, canonicalWorkingDirectory: canonicalWorkingDirectory,
             timeout: timeout, maximumInlineOutputBytes: maximumInlineOutputBytes,
-            replayClass: replayClass, idempotencyKey: idempotencyKey, fileSizeProfile: .standard
+            replayClass: replayClass, idempotencyKey: idempotencyKey, fileSizeProfile: .standard,
+            preCommitAdmission: nil
         )
     }
 
@@ -148,6 +152,7 @@ public struct RuntimeJobRequest: Sendable {
         replayClass: RuntimeReplayClass,
         idempotencyKey: String? = nil,
         fileSizeProfile: RuntimeFileSizeProfile,
+        preCommitAdmission: RuntimeJobPreCommitAdmission? = nil,
         persistenceObserver: (@Sendable (RuntimeJobRecord) -> Void)? = nil
     ) {
         self.kind = kind
@@ -162,6 +167,7 @@ public struct RuntimeJobRequest: Sendable {
         self.replayClass = replayClass
         self.idempotencyKey = idempotencyKey
         self.fileSizeProfile = fileSizeProfile
+        self.preCommitAdmission = preCommitAdmission
         didPersist = persistenceObserver
     }
 
@@ -177,6 +183,7 @@ public struct RuntimeJobRequest: Sendable {
         maximumInlineOutputBytes: Int = 64 * 1_024,
         replayClass: RuntimeReplayClass,
         idempotencyKey: String? = nil,
+        preCommitAdmission: RuntimeJobPreCommitAdmission? = nil,
         persistenceObserver: @escaping @Sendable (RuntimeJobRecord) -> Void
     ) {
         self.init(
@@ -184,6 +191,7 @@ public struct RuntimeJobRequest: Sendable {
             arguments: arguments, script: script, canonicalWorkingDirectory: canonicalWorkingDirectory,
             timeout: timeout, maximumInlineOutputBytes: maximumInlineOutputBytes,
             replayClass: replayClass, idempotencyKey: idempotencyKey, fileSizeProfile: .standard,
+            preCommitAdmission: preCommitAdmission,
             persistenceObserver: persistenceObserver
         )
     }

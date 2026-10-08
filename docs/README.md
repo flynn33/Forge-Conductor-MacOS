@@ -1,6 +1,36 @@
 # Documentation guide
 
-Current source is **0.25.0 (35)**. Native PDF writing, measured wrapping and the
+Current source is **0.26.0 (36)**. [Ordinary runtime continuation](ORDINARY-RUNTIME-CONTINUATION.md)
+records native job UUID admission before CP COMMIT, exact-packet resume status,
+one-use epoch/full-grant fences and unresolved/no-replay handling. The installed
+.18 failure/manual recovery and original one-test/one-failure baseline remain
+retained. First CLI/app compiles and the original repaired regression passed on
+their first snapshots; 24 later new source tests passed without warnings/errors.
+The first owning-area **NONPASS** remains retained. The later budget guard
+correction and genuine unavailable-reader fixtures passed three source methods,
+without skips/warnings. Earlier owning-area 307 and separate Manager/version 2
+passed 309 distinct source methods; incremental CLI/app and ordinary native Debug
+build passed. Native 309 passed with three retained QoS diagnostics; two test
+priority corrections passed focused source 4/native 4 without warnings and the
+ordinary Debug build was confirmed on the later map. Strict Debug artifact
+binding, two isolated native MCP cases and a fresh Qwen API case passed.
+The first fenced-JSON Qwen NONPASS is retained. A later isolated two-helper E0
+baseline interrupted a still-live primary job; collection succeeded but the
+feature contract failed; that receipt remains NONPASS.
+The runtime owner repair is now applied. The final source selection passed
+**321 methods** without failures, skips or compiler warnings on its unchanged
+450-input map. The separate ordinary canonical Debug build passed in 24.992
+seconds. The same **321 native methods** passed without failures/skips, retaining
+one existing DiagnosticLog:64 runtime QoS warning. Strict Debug verification of seven binaries
+and build binding, plus repeated signed live-owner, warm-crash and two
+continuation cases passed on the final map. Fresh Qwen consumption passed three
+actual Low/API rounds and four verified calls with exact job/output/task recovery
+and no replay. Earlier passes retain their earlier maps. Exact direct publication and synchronization revisions are retained separately
+in `runtime-continuation-publication-and-synchronization-026.json` after the update.
+Private runtime owner fencing and bounded warm recovery are now source-tested;
+54 capability themes, PDFKit, full-web and installed/all-feature gates remain open.
+
+The preceding **0.25.0 (35)** native PDF writing, measured wrapping and the
 shared complete tagged-text reader are recorded in
 [native PDF writing](NATIVE-PDF-WRITING.md). The corrected owning-area selection
 passed 101 source methods and the compiled native selection passed 102 tests on
@@ -16,7 +46,9 @@ pages. PDFKit compatibility remains open; the PDF source/wiki checkpoint was
 published and synchronized. A later test-only immutable fixture capture correction
 passed the freshly compiled UTF-8 regression and all 19 writer methods without the
 original warning. Product/configuration/graph and 0.25.0 (35) remain unchanged;
-this test/documentation publication is pending.
+its test/documentation closeout was delivered and synchronized, with clean 0/0
+source/wiki divergence. [Exact preceding refs](ORDINARY-RUNTIME-CONTINUATION.md#preceding-pdf-delivery)
+retain the external publication record and historical PDF scopes.
 
 The preceding **0.24.0 (34)** checkpoint: Opt-in directory continuation,
 metadata fences, final stdio budgets and qualification limits are recorded in
@@ -95,6 +127,7 @@ qualification is not promoted by this UI phase.
 | Document | Purpose |
 | --- | --- |
 | [Architecture](ARCHITECTURE.md) | Product boundaries, ownership, persistence, and trust |
+| [Ordinary runtime continuation](ORDINARY-RUNTIME-CONTINUATION.md) | Native job references, before-COMMIT Source admission, exact resume status, retained failures, scoped native/Qwen proof and observed shared-owner recovery failure |
 | [Dashboard parity and layout](RIG-PARITY.md) | Current Dashboard monitoring, compact Managed Activity, and responsive layout contract |
 | [Rune Forge and Stjornarvald](STJORNARVALD.md) | Pinned policy binding, durable log, all-format catalog, Raven rules, manager lifecycle/API, managed/MCP notice delivery, non-interference boundary, realization map, and delivered state |
 | [Rune Forge acceptance](RUNE-FORGE-STJORNARVALD-ACCEPTANCE.md) | Every issued acceptance row, integrated evidence, and the remaining physical VoiceOver limit |

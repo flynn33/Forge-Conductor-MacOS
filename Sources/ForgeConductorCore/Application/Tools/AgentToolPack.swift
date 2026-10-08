@@ -386,6 +386,15 @@ public struct AgentToolPack: ToolPackHandling {
                 cancellation: cancellation
             )
             payload["resume"] = resumed
+            if resumed["found"] as? Bool == true,
+               let object = resumed["packet"] as? [String: Any],
+               let packet = HandoffPacket.fromDictionary(object),
+               packet.runtimeJobContinuation != nil {
+                payload["runtime_continuation_status"] = try runtimeContinuationStatus(
+                    packet: packet, context: effectiveContext, app: app,
+                    cancellation: cancellation
+                )
+            }
             if let rolloverNonce = ToolArgHelpers.string(arguments, "rollover_nonce") {
                 guard resumed["found"] as? Bool == true,
                       resumed["resume_ready"] as? Bool == true,
@@ -425,5 +434,60 @@ public struct AgentToolPack: ToolPackHandling {
         let result = ToolResult.success(payload)
         try cancellation?.checkCancellation()
         return result
+    }
+
+    private func runtimeContinuationStatus(
+        packet: HandoffPacket,
+        context: ToolInvocationContext?,
+        app: ForgeApp,
+        cancellation: ToolCallCancellation?
+    ) throws -> [String: Any] {
+        guard let snapshot = packet.runtimeJobContinuation else { return [:] }
+        let unresolved: [String: Any] = [
+            "handoff_id": packet.id, "available": false,
+            "attention_required": true, "reason": "current_job_authorization_required",
+            "replay_permitted": false,
+        ]
+        guard let context, context.runID == nil, context.providerSessionID == nil,
+              context.runtimeJobID == nil,
+              context.authorizationScope.allowedTools.contains("job.status")
+                || context.authorizationScope.allowedTools.contains("*"),
+              snapshot.scopeKey == app.continuityAutomation.runtimeScopeKey(context),
+              let source = try app.store.interactiveContinuityHandoffRecord(
+                packetID: packet.id, cancellation: cancellation),
+              source.runtimeScopeKey == snapshot.scopeKey,
+              source.packet == packet else { return unresolved }
+        let service = app.runtimeJobs.service
+        let status = try RuntimeJobSynchronousToolPack.wait(
+            timeoutSeconds: RuntimeJobSynchronousToolPack.controlTimeoutSeconds,
+            cancellation: cancellation, committedResultWins: false
+        ) {
+            var results: [[String: Any]] = []
+            for reference in snapshot.submissions {
+                try Task.checkCancellation()
+                var result = reference.asDictionary()
+                do {
+                    let job = try await service.status(jobID: reference.jobID, context: context)
+                    result["available"] = true
+                    result["state"] = job.state.rawValue
+                    if let exitCode = job.exitCode { result["exit_code"] = exitCode }
+                } catch is CancellationError {
+                    throw CancellationError()
+                } catch {
+                    // Source admission can survive a CP rollback or retention.
+                    // Absence never establishes that a command may be replayed.
+                    result["available"] = false
+                    result["state"] = "unresolved"
+                    result["attention_required"] = true
+                    result["reason"] = "job_record_unavailable_or_unauthorized"
+                }
+                result["replay_permitted"] = false
+                results.append(result)
+            }
+            return ToolResult.success(["submissions": results])
+        }
+        return ["handoff_id": packet.id, "schema_version": snapshot.schemaVersion,
+                "available": true, "submissions": status.payload["submissions"] as Any,
+                "replay_permitted": false]
     }
 }
