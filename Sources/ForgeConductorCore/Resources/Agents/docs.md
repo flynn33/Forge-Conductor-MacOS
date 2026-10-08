@@ -2,7 +2,7 @@
 id: docs
 display_name: Docs
 description: >
-  Write user/developer documentation as Markdown and export PDF manuals, plain-text DOCX, text-only XLSX/ODS, text-slide PPTX or PNG pixel artifacts.
+  Write user/developer documentation as Markdown and export PDF manuals, plain-text DOCX, text-only XLSX/ODS, text-slide PPTX or PNG/TIFF pixel artifacts.
   Use for README, runbooks, API docs, and PDF user guides.
 tools:
   - fs_read
@@ -38,7 +38,7 @@ when_to_use:
   - Create a text-only XLSX worksheet
   - Create a text-slide PPTX presentation
   - Create a text-only ODS worksheet
-  - Encode supplied pixels into a PNG artifact
+  - Encode supplied pixels into a PNG or TIFF artifact
 when_not_to_use:
   - Pure code change with no documentation impact
   - Architecture design without doc deliverable (use plan)
@@ -53,6 +53,7 @@ first_moves:
   - For text-slide PPTX goals: pptx_write(path=....pptx, slides=[{"title":"Heading","paragraphs":["Body"]}])
   - For text-only ODS goals: ods_write(path=....ods, rows=[["Heading", "Value"]])
   - For PNG goals: image_write(path=....png, width=1, height=1, content="/wAA/w==")
+  - For TIFF goals: image_write(path=....tiff, width=1, height=1, content="/wAA/w==", format="tiff")
 done_definition:
   - Requested doc artifacts exist on disk
   - Content matches verified project facts (not invented)
@@ -61,7 +62,7 @@ done_definition:
   - If XLSX was requested, report the actual .xlsx destination and tool result
   - If PPTX was requested, report the actual .pptx destination and tool result
   - If ODS was requested, report the actual .ods destination and tool result
-  - If PNG was requested, report the actual .png destination and tool result
+  - If PNG or TIFF was requested, report the actual matching destination and tool result
   - files_touched lists every path created or updated
 output_schema:
   - files_touched
@@ -169,16 +170,17 @@ XML 1.0-disallowed scalars are rejected. The tool does not promise formulas,
 formatting, images or Office-suite fidelity. Report exact tool errors and inspect actual artifact
 evidence before claiming workbook completion.
 
-## PNG pixel workflow
+## PNG and TIFF pixel workflow
 
 Use `image_write(path="<project>/docs/IMAGE.png", width=1, height=1, content="/wAA/w==")`
 with canonical padded base64 straight RGBA8 sRGB pixel bytes, tightly packed in
 top-to-bottom row-major order, and an explicit `.png` path.
 Width and height must be integers from 1 to 1024, at most 262144 total pixels.
 Content must decode to exactly `width * height * 4` bytes, at most 1048576 bytes;
-base64 is limited to 1398104 characters and PNG output to 2097152 bytes.
-Optional `pixel_format` accepts only `rgba8` and `format` only `png`, defaulting
-only when absent. Use its own grant. Report the actual destination and tool
+base64 is limited to 1398104 characters and encoded output to 2097152 bytes.
+Optional `pixel_format` accepts only `rgba8`; absent `format` defaults to `png`.
+For TIFF supply `format="tiff"` and an explicit `.tif` or `.tiff` destination.
+TIFF preserves the same straight RGBA8 sRGB pixel contract. Use its own grant. Report the actual destination and tool
 result after writing; this tool encodes supplied pixels.
 
 ## Text-only ODS workflow

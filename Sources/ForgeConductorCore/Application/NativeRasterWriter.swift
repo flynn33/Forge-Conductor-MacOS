@@ -25,14 +25,14 @@ enum NativeRasterError: Error, Equatable, LocalizedError {
         case .invalidDimensions: "width and height must be integers from 1 through 1024, with at most 262144 pixels"
         case .invalidContent: "content must be canonical padded base64 containing exactly width × height × 4 RGBA8 bytes, at most 1048576 bytes"
         case .invalidPixelFormat: "pixel_format must be rgba8"
-        case .invalidFormat: "format must be png"
-        case .outputTooLarge: "Encoded PNG is limited to 2097152 bytes"
-        case .encoderUnavailable: "The native PNG encoder could not complete the image"
+        case .invalidFormat: "format must be png or tiff"
+        case .outputTooLarge: "Encoded image is limited to 2097152 bytes"
+        case .encoderUnavailable: "The native image encoder could not complete the image"
         }
     }
 }
 
-/// Call-local ImageIO encoding of straight-alpha sRGB RGBA8 pixels.
+/// Call-local PNG/TIFF encoding of straight-alpha sRGB RGBA8 pixels.
 enum NativeRasterWriter {
     static let maximumDimension = 1024
     static let maximumPixels = 262_144
@@ -54,7 +54,7 @@ enum NativeRasterWriter {
                        outputByteLimit: Int = maximumOutputBytes) throws -> Data {
         guard !Thread.isMainThread else { throw NativeRasterError.workerRequired }
         try cancellation?.checkCancellation()
-        guard format == "png" else { throw NativeRasterError.invalidFormat }
+        guard format == "png" || format == "tiff" else { throw NativeRasterError.invalidFormat }
         guard pixelFormat == "rgba8" else { throw NativeRasterError.invalidPixelFormat }
         guard (1...maximumDimension).contains(width), (1...maximumDimension).contains(height) else {
             throw NativeRasterError.invalidDimensions
@@ -69,6 +69,9 @@ enum NativeRasterWriter {
         try cancellation?.checkCancellation()
         guard outputByteLimit > 0, outputByteLimit <= maximumOutputBytes else {
             throw NativeRasterError.outputTooLarge
+        }
+        if format == "tiff" {
+            return try encodeTIFF(raw, width: width, height: height, cancellation: cancellation, outputByteLimit: outputByteLimit)
         }
         guard let space = CGColorSpace(name: CGColorSpace.sRGB),
               let provider = CGDataProvider(data: raw as CFData),
@@ -102,6 +105,63 @@ enum NativeRasterWriter {
         let encoded = try withExtendedLifetime((raw, provider, image, consumer, destination)) { try output.snapshot() }
         guard finalized, !encoded.isEmpty else { throw NativeRasterError.encoderUnavailable }
         return encoded
+    }
+
+    private static func encodeTIFF(_ raw: Data, width: Int, height: Int,
+                                   cancellation: ToolCallCancellation?, outputByteLimit: Int) throws -> Data {
+        try cancellation?.checkCancellation()
+        guard let space = CGColorSpace(name: CGColorSpace.sRGB),
+              let profileData = space.copyICCData() else { throw NativeRasterError.encoderUnavailable }
+        let profile = profileData as Data
+        guard profile.count >= 128, profile.count <= 65_536 else { throw NativeRasterError.encoderUnavailable }
+        let rowBytes = width * 4
+        let rowsPerStrip = min(height, 65_536 / rowBytes)
+        let stripCount = (height + rowsPerStrip - 1) / rowsPerStrip
+        let bitsOffset = 8 + 2 + 16 * 12 + 4
+        let xResolutionOffset = bitsOffset + 8
+        let yResolutionOffset = xResolutionOffset + 8
+        let offsetsOffset = yResolutionOffset + 8
+        let countsOffset = offsetsOffset + (stripCount > 1 ? stripCount * 4 : 0)
+        let profileOffset = countsOffset + (stripCount > 1 ? stripCount * 4 : 0)
+        let pixelsOffset = profileOffset + profile.count + profile.count % 2
+        guard pixelsOffset + raw.count <= outputByteLimit else { throw NativeRasterError.outputTooLarge }
+        let output = Output(maximumBytes: outputByteLimit, cancellation: cancellation)
+        func short(_ value: UInt16) throws {
+            try output.append(Data([UInt8(truncatingIfNeeded: value), UInt8(truncatingIfNeeded: value >> 8)]))
+        }
+        func word(_ value: UInt32) throws {
+            try output.append(Data((0..<4).map { UInt8(truncatingIfNeeded: value >> ($0 * 8)) }))
+        }
+        func field(_ tag: UInt16, _ type: UInt16, _ count: Int, _ value: Int) throws {
+            try short(tag); try short(type); try word(UInt32(count)); try word(UInt32(value))
+        }
+        func stripBytes(_ index: Int) -> Int { rowBytes * min(rowsPerStrip, height - index * rowsPerStrip) }
+        // TIFF 6.0 sorted IFD; ICC embedding uses tag 34675, type UNDEFINED.
+        try output.append(Data([73, 73])); try short(42); try word(8); try short(16)
+        try field(256, 4, 1, width); try field(257, 4, 1, height)
+        try field(258, 3, 4, bitsOffset); try field(259, 3, 1, 1); try field(262, 3, 1, 2)
+        try field(273, 4, stripCount, stripCount == 1 ? pixelsOffset : offsetsOffset)
+        try field(274, 3, 1, 1); try field(277, 3, 1, 4); try field(278, 4, 1, rowsPerStrip)
+        try field(279, 4, stripCount, stripCount == 1 ? raw.count : countsOffset)
+        try field(282, 5, 1, xResolutionOffset); try field(283, 5, 1, yResolutionOffset)
+        try field(284, 3, 1, 1); try field(296, 3, 1, 2); try field(338, 3, 1, 2)
+        try field(34675, 7, profile.count, profileOffset); try word(0)
+        for _ in 0..<4 { try short(8) }
+        for _ in 0..<2 { try word(72); try word(1) }
+        if stripCount > 1 {
+            for index in 0..<stripCount { try word(UInt32(pixelsOffset + index * rowsPerStrip * rowBytes)) }
+            for index in 0..<stripCount { try word(UInt32(stripBytes(index))) }
+        }
+        try output.append(profile)
+        if profile.count % 2 == 1 { try output.append(Data([0])) }
+        try raw.withUnsafeBytes { bytes in
+            guard let base = bytes.baseAddress else { throw NativeRasterError.invalidContent }
+            for offset in stride(from: 0, to: raw.count, by: 8192) {
+                _ = output.append(base.advanced(by: offset), count: min(8192, raw.count - offset))
+                try output.check()
+            }
+        }
+        return try output.snapshot()
     }
 
     private final class Output {
@@ -138,6 +198,13 @@ enum NativeRasterWriter {
                 if error == nil { error = caught }
                 return 0
             }
+        }
+
+        func append(_ bytes: Data) throws {
+            bytes.withUnsafeBytes { buffer in
+                if let base = buffer.baseAddress { _ = append(base, count: buffer.count) }
+            }
+            try check()
         }
 
         func snapshot() throws -> Data {

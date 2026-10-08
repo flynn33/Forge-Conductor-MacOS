@@ -1,6 +1,17 @@
 # Telemetry architecture (real-time native)
 
-Current source documentation targets `0.31.0`, build `44`. `image_write` joins
+Current source documentation targets `0.32.0`, build `45`. TIFF extends
+`image_write` under existing docs/tool-card classification. Source/native
+catalog parity passed within matching 203-method selections; signed App/CLI
+tool checks passed. No producer, timer, delivery queue, performance or lifetime
+repair is claimed. Final document G3 passed source/native. Exact source/wiki
+publication/readback/synchronization identities will be retained in external
+closeout receipts.
+[Contract](NATIVE-IMAGE-WRITING.md).
+
+## Preceding 0.31.0 (44) PNG qualification
+
+The preceding source documentation targets `0.31.0`, build `44`. `image_write` joins
 existing tool-card/docs classification. Source/native catalog parity passed
 within matching 198-method selections; signed App/CLI tool checks passed;
 no producer, timer or performance repair is claimed. [Contract](NATIVE-IMAGE-WRITING.md).

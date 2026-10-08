@@ -11,7 +11,14 @@ readbacks and ordinary observations retain their explicit limits; no
 installation, notarization, App Store upload or distribution was performed.
 Exact owner publication/readback/synchronization refs are retained externally.
 
-Current target identity is **0.31.0 (44)**. Additive `image_write` advances the
+Current target identity is **0.32.0 (45)**. Additive TIFF support advances the
+feature component and build while preserving PNG defaults and prior receipts.
+Authority/G3 agreement passed within matching 203-method source/native selections;
+direct builds, strict candidate and scoped runtime/model checks passed. Final
+document G3 passed source/native. Exact source/wiki publication/readback/
+synchronization identities will be retained in external closeout receipts. [Contract and gates](NATIVE-IMAGE-WRITING.md).
+
+The preceding target identity is **0.31.0 (44)**. Additive `image_write` advances the
 feature component and build. G3 passed within matching 198-method source/native
 selections; CLI/app compilation, ordinary Debug/strict candidate and scoped
 runtime/model checks passed. Final document G3 passed in source and native; publication/synchronization receipts will be retained externally. [Contract and gates](NATIVE-IMAGE-WRITING.md).
@@ -174,10 +181,17 @@ focused version test, and CI reject drift between them.
 
 ## Current identity
 
-Current source target is `0.31.0`, build `44`. G3 passed within matching
-198-method source/native selections; CLI/app compilation and ordinary Debug build
-and strict candidate/scoped PNG runtime-model checks passed. Final document G3
-passed in source and native; publication/synchronization receipts will be retained externally. [Scope](NATIVE-IMAGE-WRITING.md).
+Current source target is `0.32.0`, build `45`. Authority agreement/G3 passed
+within matching 203-method source/native selections; direct builds, strict
+candidate and scoped runtime/model checks passed. Final document G3 passed
+source/native. Exact source/wiki publication/readback/synchronization identities
+will be retained in external closeout receipts. Repeated G3 does not increase
+the 203 distinct method count.
+[Scope](NATIVE-IMAGE-WRITING.md).
+
+The preceding .31 G3, matching 198-method source/native selections, direct builds,
+candidate and scoped PNG runtime/model checks passed on their original inputs.
+The repeated final document G3 did not increase that distinct method count.
 
 ### Preceding 0.30.0 version agreement
 

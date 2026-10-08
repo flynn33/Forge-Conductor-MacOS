@@ -1,6 +1,18 @@
-# Context and agent continuity (v0.31.0)
+# Context and agent continuity (v0.32.0)
 
-Current source documentation targets 0.31.0 (44). `image_write` joins existing
+Current source documentation targets 0.32.0 (45). TIFF extends existing
+`image_write`; handoff, job-reference, ACK, seal, successor and replay formats
+retain their contracts. Matching source/native selections passed 203 methods
+each, including queue/catalog parity; scoped App/CLI and Qwen API checks passed.
+Final document G3 passed source/native. Exact source/wiki publication/readback/
+synchronization identities will be retained in external closeout receipts.
+These checks do not qualify automatic rollover. [Contract](NATIVE-IMAGE-WRITING.md).
+
+<a id="context-and-agent-continuity-v0310"></a>
+
+## Preceding 0.31.0 (44) PNG qualification
+
+The preceding source documentation targets 0.31.0 (44). `image_write` joins existing
 progress classification without changing handoff, job-reference, ACK, seal or
 successor formats. Owning source/native selections each passed 198 methods,
 including queue/catalog parity; scoped App/CLI and Qwen API checks passed.

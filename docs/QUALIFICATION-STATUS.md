@@ -1,6 +1,18 @@
 # Version and qualification status
 
-Current source target **0.31.0, build 44** adds bounded PNG writing from supplied
+Current source target **0.32.0, build 45** adds bounded TIFF to `image_write`
+while preserving PNG defaults. Matching owning source/canonical native selections
+passed 203 distinct methods each, zero failures/skips; direct builds and strict
+candidate checks passed. Scoped App/CLI controls, independent TIFF artifact
+inspection and Qwen API consumption passed. The missing-feature baseline stays
+NONPASS; earlier fourteen- and 21-method checkpoints retain their tested maps.
+Final document G3 passed in source and native. Exact source/wiki publication/
+readback/synchronization identities will be retained in external closeout receipts. Installed/GUI, production managed-adapter, full web, all models, other
+formats, Release and shipment stay open. [Contract](NATIVE-IMAGE-WRITING.md).
+
+## Preceding 0.31.0 (44) PNG qualification
+
+The preceding source target **0.31.0, build 44** adds bounded PNG writing from supplied
 pixels. External opaque/partial-alpha 2×2 probes and independent PNG byte checks
 passed. Matching source/canonical native selections passed 198 distinct methods
 each, including G3; CLI/app compilation, ordinary Debug and strict candidate
@@ -1670,7 +1682,7 @@ Dashboard geometry, minimum/normal containment of every primary view, and
 populated policy evaluation rows. Live completion of the reported owner run,
 universal policy enforcement, and distribution qualification remain open.
 
-Current source target: **0.31.0, build 44**, supporting **macOS 26+**. The earlier
+Current source target: **0.32.0, build 45**, supporting **macOS 26+**. The earlier
 0.16.3 Developer ID app and archive are recorded in the historical build-24 section;
 that workflow staged the CLI under `~/.forge-conductor` and manually copied the
 app to `/Applications`. It did not exercise a `.pkg` installation, notarization,
@@ -1682,11 +1694,16 @@ the detailed, source-bound receipts are in the
 
 ## Version and build agreement
 
-The current Swift, CLI, Xcode and documentation target is **0.31.0, build 44**.
-G3 passed within matching 198-method source/native selections; CLI/app
-compilation, ordinary Debug/strict candidate and scoped PNG runtime/model checks
-passed. Final document G3 passed in source and native; publication/synchronization receipts will be retained externally.
-[Current PNG scope](NATIVE-IMAGE-WRITING.md).
+The current target is **0.32.0, build 45**. Authority agreement and G3 passed
+within matching 203-method source/native selections. Direct builds, strict
+candidate and scoped TIFF runtime/model checks passed. Final document G3
+passed source/native. Exact source/wiki publication/readback/synchronization
+identities will be retained in external closeout receipts.
+[Current image scope](NATIVE-IMAGE-WRITING.md).
+
+The preceding .31 source/native selections passed 198 distinct methods each;
+build/signing, scoped PNG runtime/model and final document G3 passed on the
+original .31 inputs. That evidence is retained without qualifying TIFF.
 
 The preceding .30 source/native G3 passed within matching 199-method selections;
 canonical build/signing and scoped ODS runtime checks passed. [Scope](NATIVE-ODS-WRITING.md).

@@ -1385,9 +1385,10 @@ final class ToolDefinitionCatalogTests: XCTestCase {
             for (key, value) in [("pixel_format", "rgba8"), ("format", "png")] {
                 let format = try XCTUnwrap(properties[key] as? [String: Any])
                 XCTAssertEqual(format["type"] as? String, "string")
-                XCTAssertEqual(format["enum"] as? [String], [value])
+                XCTAssertEqual(format["enum"] as? [String], key == "format" ? ["png", "tiff"] : [value])
                 XCTAssertEqual(format["default"] as? String, value)
             }
+            XCTAssertTrue(((properties["path"] as? [String: Any])?["description"] as? String)?.contains(".tif/.tiff") == true)
             XCTAssertNil(properties["idempotency_key"])
             XCTAssertFalse(ProductionToolReplayCatalog.acceptsDurableIdempotencyArgument.contains("image_write"))
             XCTAssertEqual(ManagerToolCategory.classify("image_write"), .documents)

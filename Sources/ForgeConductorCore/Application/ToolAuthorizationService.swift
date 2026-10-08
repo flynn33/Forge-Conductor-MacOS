@@ -259,7 +259,7 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
                   !path.utf8.contains(0) else {
                 return .denied(
                     code: "invalid_path",
-                    message: "PNG path must be a nonblank string without NUL bytes"
+                    message: "Image path must be a nonblank string without NUL bytes"
                 )
             }
         }

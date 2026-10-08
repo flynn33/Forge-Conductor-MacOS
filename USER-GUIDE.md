@@ -1,6 +1,18 @@
 # Forge Conductor user guide
 
-Current source targets **0.31.0 (44)** for bounded PNG creation from supplied
+Current source targets **0.32.0 (45)** for bounded TIFF creation from supplied
+pixels. Use `image_write` with its own grant, explicit `format: "tiff"` and a
+`.tif` or `.tiff` destination. An absent format still selects PNG and requires
+`.png`; canonical straight RGBA8/sRGB and existing input/output bounds remain.
+Source/native selections passed 203 methods each; build/signing and scoped
+App/CLI/artifact/Qwen API checks passed. Final document G3 passed source/native.
+Exact source/wiki publication/readback/synchronization identities will be
+retained in external closeout receipts. [Contract and limits](docs/NATIVE-IMAGE-WRITING.md).
+Installed-GUI acceptance remains open.
+
+## Preceding 0.31.0 (44) PNG qualification
+
+The preceding source targets **0.31.0 (44)** for bounded PNG creation from supplied
 pixels. `image_write` requires its own grant, an explicit `.png` destination,
 width/height and canonical base64 RGBA8/sRGB content with straight alpha.
 Source/native selections each passed 198 distinct methods; CLI/app compilation
@@ -286,7 +298,7 @@ observations retain their recorded scope. Exact owner publication, remote
 readback and synchronization references are retained externally. See the
 [phase record](docs/GRAPHITE-WORKBENCH.md) for evidence and capture limits.
 
-Version **0.31.0**, build **44** (current source target; bounded PNG candidate checks passed, with installed-GUI acceptance still open).
+Version **0.32.0**, build **45** (current source target; bounded TIFF candidate checks passed, with installed-GUI acceptance still open).
 
 This guide describes the current LM Studio-driven workflow. The user works in a
 normal LM Studio chat; Forge Conductor supplies project context, tools, policy
@@ -545,7 +557,7 @@ can return errors. [Renderer contract and verified scopes](docs/NATIVE-WEB-RENDE
 | `xlsx_write` | `path`, `rows` arrays of strings; explicit `.xlsx` destination. One text-only worksheet: at most 256 rows, 64 columns per row, 4096 cells, 4096 UTF-8 bytes per cell and 65536 total text bytes; encoded output up to 1048576 bytes. Requires its own XLSX tool grant. |
 | `pptx_write` | `path`, `slides` with string `title` and string-array `paragraphs`; explicit `.pptx` destination. At most 32 slides, 1024 total paragraphs including nonempty titles, 4096 UTF-8 bytes per string, 65536 total input bytes, 32768 XML elements per slide and 1048576 encoded bytes. Requires its own PPTX tool grant. |
 | `ods_write` | `path`, `rows` arrays of strings; explicit `.ods` destination. One ODF 1.3 worksheet: at most 256 rows, 64 columns per row, 4096 input cells, 4096 UTF-8 bytes per cell, 65536 total input bytes, 32768 content XML elements and 1048576 encoded bytes. Requires its own ODS grant. |
-| `image_write` | `path`, integer `width`/`height`, canonical padded base64 `content`; explicit `.png` destination. RGBA8/sRGB pixels, straight alpha, tightly packed top-to-bottom rows. Optional `pixel_format: "rgba8"` and `format: "png"`. Each dimension 1–1024; at most 262144 pixels, exactly width × height × 4 decoded bytes (at most 1048576), 1398104 base64 UTF-8 bytes and 2097152 encoded PNG bytes. Requires its own image grant; source/native, signed App/CLI and Qwen API checks passed for supplied pixels; installed-GUI acceptance remains open. |
+| `image_write` | `path`, integer `width`/`height`, canonical padded base64 `content`. Explicit `.png` for `format: "png"` (the absent-format default); `.tif`/`.tiff` requires explicit `format: "tiff"`. RGBA8/sRGB straight-alpha pixels, tightly packed top-to-bottom rows; optional `pixel_format: "rgba8"`. Each dimension 1–1024; at most 262144 pixels, exactly width × height × 4 decoded bytes (at most 1048576), 1398104 base64 UTF-8 bytes and 2097152 encoded bytes. PNG uses Apple ImageIO; uncompressed TIFF uses the native Swift writer. Requires its own image grant. Current PNG/TIFF source/native parity and scoped signed TIFF App/CLI/Qwen checks passed; installed-GUI acceptance remains open. |
 | `search_text` | `pattern`; optional `path`, integer `context_lines` from 0–20, and `include`/`exclude` filename-glob arrays. Each array accepts at most 32 nonempty globs of 256 UTF-8 bytes each. `.git` and `node_modules` remain excluded. |
 | `git_diff` | Optional `cwd`, `staged` and `file` (repository-relative pathspec). For example, `file: "Sources/App.swift"` limits the diff to that file. Read `stdout_truncated`, `stderr_truncated` and `timed_out` before treating output as complete. |
 

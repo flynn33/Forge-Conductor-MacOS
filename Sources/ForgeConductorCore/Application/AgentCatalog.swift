@@ -160,10 +160,10 @@ public final class AgentCatalog: AgentCatalogProviding, @unchecked Sendable {
             AgentSpec(
                 id: "docs",
                 displayName: "Docs",
-                description: "Write Markdown documentation and export PDF manuals, plain-text DOCX, text-only XLSX/ODS, text-slide PPTX or PNG pixel artifacts via native tools.",
+                description: "Write Markdown documentation and export PDF manuals, plain-text DOCX, text-only XLSX/ODS, text-slide PPTX or PNG/TIFF pixel artifacts via native tools.",
                 tools: ["fs_read", "fs_write", "fs_edit", "fs_list", "fs_glob", "fs_mkdir", "search_text", "shell_exec", "pdf_write", "pdf_from_file", "docx_write", "xlsx_write", "pptx_write", "ods_write", "image_write", "git_status", "git_diff", "git_log", "runtime.capabilities", "python.run", "job.status", "job.read_output", "job.cancel", "job.list"],
                 toolsForbidden: ["git_push", "git_commit"],
-                whenToUse: ["README", "PDF manual", "plain-text DOCX", "text-only XLSX", "text-only ODS", "text-slide PPTX", "PNG pixel artifact", "runbook", "API docs"],
+                whenToUse: ["README", "PDF manual", "plain-text DOCX", "text-only XLSX", "text-only ODS", "text-slide PPTX", "PNG pixel artifact", "TIFF pixel artifact", "runbook", "API docs"],
                 firstMoves: ["fs_glob docs/README", "fs_read sources", "fs_write markdown", "pdf_from_file if needed", "agent_run_complete"],
                 doneDefinition: ["Artifacts on disk", "files_touched filled", "agent_run_complete"],
                 outputSchema: ["files_touched", "summary", "formats", "how_to_open"],
@@ -203,8 +203,10 @@ public final class AgentCatalog: AgentCatalogProviding, @unchecked Sendable {
                 height=1, content="/wAA/w=="). Supply canonical padded base64 straight
                 RGBA8 sRGB bytes, tightly packed in top-to-bottom row-major order:
                 width/height 1 to 1024, at most 262144 pixels and 1048576 decoded bytes.
-                Base64 is limited to 1398104 characters; PNG output to 2097152 bytes.
-                Only pixel_format="rgba8" and format="png" are accepted. Report the
+                Base64 is limited to 1398104 characters; encoded output to 2097152 bytes.
+                pixel_format accepts only "rgba8"; absent format defaults to "png".
+                For TIFF use format="tiff" and an explicit .tif or .tiff path; pixels
+                retain the same straight RGBA8 sRGB contract. Report the
                 actual destination and result; this tool encodes supplied pixels.
                 For PDF use pdf_write / pdf_from_file (no pandoc). Always fill files_touched
                 and call agent_run_complete. Never claim PDF done without a file on disk.

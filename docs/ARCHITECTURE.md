@@ -1,6 +1,18 @@
 # Forge Conductor architecture
 
-Version: `0.31.0`; build: `44`. PNG creation uses a call-local CoreGraphics
+Version: `0.32.0`; build: `45`. TIFF uses a call-local native Swift classic
+writer with uncompressed straight RGBA8, top-left chunky strips, unassociated
+alpha and native CoreGraphics sRGB ICC data. Total output is preflighted; the
+bounded first-error output owner checks cancellable 8,192-byte pixel chunks.
+PNG retains its ImageIO path. Existing worker, project-revalidation and pinned-write
+owners remain; no new service, runtime or dependency is introduced. Source/native
+203 each, direct builds, strict candidate and scoped App/CLI/artifact/Qwen checks
+passed. Final document G3 passed source/native. Exact source/wiki publication/
+readback/synchronization identities will be retained in external closeout receipts. [Contract](NATIVE-IMAGE-WRITING.md).
+
+## Preceding 0.31.0 (44) PNG qualification
+
+Preceding version: `0.31.0`; build: `44`. PNG creation uses a call-local CoreGraphics
 image, ImageIO destination and bounded native data consumer on the existing
 worker path, then the existing project-revalidated pinned writer. No new service,
 application runtime or dependency is introduced. Source/native selections each

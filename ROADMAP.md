@@ -1,8 +1,29 @@
 # Forge Conductor macOS — project roadmap
 
-## Bounded native PNG pixel writing
+## Additive native TIFF pixel writing
 
-Current target **0.31.0 (44)** adds `image_write` for supplied RGBA8 pixels.
+Current target **0.32.0 (45)** extends `image_write` with bounded TIFF while
+preserving PNG defaults. Matching source/native, direct builds, strict candidate
+and scoped App/CLI/artifact/Qwen checks passed. Final document G3 passed in source
+and native. Exact source/wiki publication/readback/synchronization identities
+will be retained in external closeout receipts; broader product and shipment
+gates stay open.
+
+| Milestone | Observed evidence or implementation | Remaining gate |
+| --- | --- | --- |
+| Mechanism | The preceding ImageIO TIFF control failed straight-alpha acceptance; the fixed 2×2 AppKit reference passed that pixel control only. Production uses the bounded native Swift writer. | Mechanism controls remain separate from current Forge proof and establish no other-format acceptance. |
+| Tool and parity | Matching source/canonical native selections passed 203 distinct methods each, including seventeen writer, 44 MCP, 35 catalog, forty queue, retained ODS/PDF/audit and G3. Exact TIFF pixels/native ICC/strip bounds, .tif/.tiff aliases, metadata/readback/mode, strict bounds, grants, failed-write cleanup and preserved PNG cases passed. | Earlier focused 21 is a method subset on its own checkpoint map. Selections are not full-suite, installed-GUI or leak acceptance. |
+| Graph and builds | Ten affected source/resource/test memberships remain in their existing targets; the project changes only twelve marketing and sixteen build settings. Source/native 68.835/69.751 s, CLI/app 0.994/1.002 s and ordinary Debug 24.764 s passed, exit 0/unforced, on the same 464-input map. Strict signature/seven-binary/resource checks passed. | Destination/framework diagnostics are retained; no GUI/performance/lifetime/leak qualification follows. |
+| Native consumers | Signed App/CLI controls, independent TIFF artifact inspection and actual Qwen TIFF write/read consumption passed. Exact wire/consumer identities are retained in the image contract. | Qwen acknowledgement is metadata only; isolated candidate/API proof does not qualify installed GUI, production managed-adapter, synthesis, full web or all models. |
+| Delivery | README, existing Unreleased and affected documents record current bounded TIFF results and preserve .31 PNG/.30 ODS receipts. | Final document G3 passed source/native without increasing the 203 distinct method count. Exact source/wiki publication/readback/synchronization identities will be retained in external closeout receipts. Other formats, installed/GUI, full web, all models, Release and shipment stay open. |
+
+[Image contract and gates](docs/NATIVE-IMAGE-WRITING.md).
+
+<a id="bounded-native-png-pixel-writing"></a>
+
+## Preceding bounded native PNG pixel writing
+
+Preceding target **0.31.0 (44)** adds `image_write` for supplied RGBA8 pixels.
 Owning source/native tests, direct builds, strict candidate checks and scoped
 App/CLI/artifact/Qwen checks passed. Final document G3 passed in source and native; publication/synchronization receipts will be retained externally.
 

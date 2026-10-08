@@ -1,6 +1,18 @@
 # Forge Conductor for macOS
 
-Current source targets **0.31.0 (44)**, adding bounded `image_write` for PNG
+Current source targets **0.32.0 (45)**, adding bounded TIFF support to `image_write`
+while preserving PNG defaults. Matching owning source and canonical native
+selections passed 203 distinct methods each, including G3. CLI/app compilation,
+ordinary Debug and strict candidate checks passed. Scoped App/CLI controls,
+independent TIFF artifact inspection and Qwen API consumption passed.
+Final document G3 passed in source and native. Exact source/wiki publication/
+readback/synchronization identities will be retained in external closeout receipts. [Contract and gates](docs/NATIVE-IMAGE-WRITING.md). Original .31 PNG and
+.30 ODS receipts retain their tested identities. Installed/GUI, full web, all
+models, other formats, Release and shipment remain open.
+
+## Preceding 0.31.0 (44) PNG qualification
+
+The preceding source targets **0.31.0 (44)**, adding bounded `image_write` for PNG
 files from supplied RGBA8 pixels. Opaque and partial-alpha 2×2 mechanism probes
 passed independent PNG CRC/zlib pixel checks; they are separate from product
 qualification. Owning source and canonical native selections passed 198 distinct
@@ -712,8 +724,8 @@ continuity. The user does not start project work through a Forge Managed Run.
 
 | | |
 |---|---|
-| **Version** | **0.31.0** |
-| **Build** | **44** |
+| **Version** | **0.32.0** |
+| **Build** | **45** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |
@@ -830,10 +842,12 @@ was not exercised; its source selects the running app executable, so the CLI
 receipt does not qualify that path. The full scope and remaining
 distribution limits are in the [qualification record](docs/QUALIFICATION-STATUS.md).
 
-The current version authorities target `0.31.0 (44)`; G3 passed within the
-matching 198-method source/native selections. CLI/app compilation and ordinary
-Debug build, strict candidate checks and scoped PNG tool/model checks passed.
-Final document G3 passed in source and native; publication/synchronization receipts will be retained externally. [Current PNG scope](docs/NATIVE-IMAGE-WRITING.md).
+The current target is `0.32.0 (45)` for additive TIFF writing. Matching
+source/native selections passed 203 distinct methods each, including G3; direct
+builds, strict candidate and scoped TIFF runtime/model checks passed. Final
+document G3 passed in source and native. Exact source/wiki publication/readback/
+synchronization identities will be retained in external closeout receipts.
+The .31 PNG qualification retains its original inputs. [Current image scope](docs/NATIVE-IMAGE-WRITING.md).
 The preceding `0.30.0 (43)` source/native G3 agreement passed within matching
 199-method selections. [Preceding ODS scope](docs/NATIVE-ODS-WRITING.md).
 The preceding `0.29.0 (42)` source/native G3 passed within matching 166-method selections.

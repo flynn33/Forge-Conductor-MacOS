@@ -1,6 +1,19 @@
 # Project repository, web access and Qwen verification
 
-Current source targets **0.31.0 (44)**. PNG writing from supplied RGBA8 pixels
+Current source targets **0.32.0 (45)** for additive TIFF support in `image_write`.
+Matching source/native selections passed 203 methods each; direct builds,
+strict candidate and scoped App/CLI/artifact checks passed. Qwen selected TIFF
+`image_write` then `fs_read`, consumed both actual results and acknowledged exact
+artifact metadata through the supported isolated API workflow. This adds no
+image-understanding, photographic, production managed-adapter, installed-GUI,
+full-web or all-model acceptance. Final document G3 passed source/native. Exact
+source/wiki publication/readback/synchronization identities will be retained
+in external closeout receipts.
+[Image contract and gates](NATIVE-IMAGE-WRITING.md).
+
+## Preceding 0.31.0 (44) PNG qualification
+
+The preceding source targets **0.31.0 (44)**. PNG writing from supplied RGBA8 pixels
 passed matching 198-method source/native selections, CLI/app compilation and
 ordinary Debug/strict candidate checks. App/CLI controls and seven exact PNGs
 passed. Qwen selected `image_write` then `fs_read`, consumed both actual results

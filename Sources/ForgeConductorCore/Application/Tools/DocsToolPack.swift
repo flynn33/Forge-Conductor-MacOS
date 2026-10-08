@@ -1,5 +1,5 @@
 // DocsToolPack.swift
-// What: Provides native PDF, plain-text DOCX, text-cell XLSX/ODS, text-slide PPTX, and PNG tools to external MCP clients.
+// What: Provides native PDF, plain-text DOCX, text-cell XLSX/ODS, text-slide PPTX, and PNG/TIFF tools to external MCP clients.
 // How: It translates validated tool arguments into PDFWriter operations and returns
 // bounded, structured success or error payloads.
 // Why: Document capability is an optional module rather than a responsibility of Core routing.
@@ -9,7 +9,7 @@ import Darwin
 import AppKit
 import CryptoKit
 
-/// Documentation tools: PDF write / PDF from file / plain-text DOCX / text-cell XLSX/ODS / text-slide PPTX / PNG.
+/// Documentation tools: PDF write / PDF from file / plain-text DOCX / text-cell XLSX/ODS / text-slide PPTX / PNG/TIFF.
 public struct DocsToolPack: ToolPackHandling {
     private static let maximumSourceBytes = 4 * 1024 * 1024
     private let exporter: NativeDOCXExporter?
@@ -54,11 +54,15 @@ public struct DocsToolPack: ToolPackHandling {
         guard let path = args["path"] as? String,
               !path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               !path.utf8.contains(0) else {
-            return .failure(code: "invalid_path", message: "PNG path must be a nonblank string without NUL bytes")
+            return .failure(code: "invalid_path", message: "Image path must be a nonblank string without NUL bytes")
         }
         let url = ToolArgHelpers.resolvePath(path)
-        guard url.pathExtension.lowercased() == "png" else {
-            return .failure(code: "invalid_path", message: "An explicit .png destination is required")
+        let isTIFF = (args["format"] as? String) == "tiff"
+        let extensions = isTIFF ? ["tif", "tiff"] : ["png"]
+        guard extensions.contains(url.pathExtension.lowercased()) else {
+            return .failure(code: "invalid_path", message: isTIFF
+                ? "An explicit .tif or .tiff destination is required for format=tiff"
+                : "An explicit .png destination is required")
         }
         guard let content = args["content"] as? String else {
             return .failure(code: "invalid_content", message: "content must be a base64 string")
@@ -104,7 +108,7 @@ public struct DocsToolPack: ToolPackHandling {
             return .failure(code: "image_write_failed", message: "Destination write or durability confirmation failed; inspect the destination before retrying")
         }
         return .success([
-            "path": url.path, "format": "png", "engine": "apple-imageio",
+            "path": url.path, "format": format, "engine": format == "tiff" ? "swift-tiff-rgba8" : "apple-imageio",
             "width": width, "height": height, "pixel_format": "rgba8", "color_space": "srgb",
             "bytes_written": encoded.count,
             "sha256": SHA256.hash(data: encoded).map { String(format: "%02x", $0) }.joined(),

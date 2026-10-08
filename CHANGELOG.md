@@ -10,6 +10,21 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### `0.32.0 (45)` additive native TIFF pixel writing
+
+- Extend `image_write` with explicit `format: "tiff"` and `.tif`/`.tiff` paths,
+  preserving absent-format PNG behavior, existing tool/JSON field names and grants.
+- Add a bounded native Swift classic TIFF writer for uncompressed straight RGBA8,
+  top-left chunky strips and native sRGB ICC data. Keep the PNG ImageIO engine,
+  dimension/input/output bounds and existing pinned-write/replay/audit ownership.
+- The missing-feature baseline remains NONPASS. Matching owning source/native
+  selections passed 203 distinct methods each; direct builds, strict candidate,
+  scoped App/CLI, independent TIFF artifacts and Qwen API consumption passed.
+  Final document G3 passed in source and native. Exact source/wiki publication/
+  readback/synchronization identities will be retained in external closeout
+  receipts. Earlier checkpoints and .31 PNG receipts keep their original identities; installed-GUI and broader gates stay open.
+  [Contract and gates](docs/NATIVE-IMAGE-WRITING.md).
+
 ### `0.31.0 (44)` bounded native PNG pixel writing
 
 - Add `image_write(path, width, height, content)` for an explicit `.png` destination
