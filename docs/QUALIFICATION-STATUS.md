@@ -1,5 +1,32 @@
 # Version and qualification status
 
+Current source target **0.36.1, build 50** corrects the instruction-package
+retained-document count at the common owner before publication/queue mutation.
+The original two rejection tests failed normally in **12.245 s**, exit 1/unforced,
+with ten assertions: both imports accepted 4,097 documents and changed the queue,
+durable store and reopened state. That baseline remains **NONPASS**.
+After the guard, the earlier five focused source methods passed in **24.404 s**
+on their own pre-version-advance inputs. They are a subset, not extra coverage.
+Current source/canonical native each passed the same **45 distinct queue methods**
+in **31.726/34.385 s**, normal exit 0/unforced, zero failures/skips, on matching
+**464-input 47479210… maps**. All 40 original methods remain byte-identical.
+The native run retains eight linkd NSCocoa4097 diagnostics and the malformed-PDF
+fixture's CoreGraphics error line; no diagnostic-free claim follows.
+CLI/app compilation passed in **0.990/0.886 s**; ordinary Debug/strict signature
+in **25.736/0.138 s**, normal exit 0/unforced. The .36.1/50 candidate cbb9f95c…
+binds seven binaries and the same 464-input map; its native CLI reported 0.36.1
+in **0.614 s**. Previous .36/.35 seven-binary candidates and protected three
+inputs remained unchanged. Initial-document G3 source/native each passed one
+separate method in **1.587/1.907 s**, normal exit 0/unforced, on that same map.
+The 45 owning methods plus one G3 method yield **46 distinct methods per route**, not one 46-test run;
+the earlier focused five adds no distinct methods. Native G3 retains destination
+and DVTAssertions warnings. Initial hygiene/whitespace passed in **0.654/0.135 s**,
+normal exit 0/unforced. Exact source/wiki delivery remains pending for this phase.
+No generic archive/SQLite writer, installed GUI, public-import latency, model,
+full-web, all-model, native-extractor shutdown or shipment acceptance follows.
+
+## Preceding 0.36.0 (49) BMP qualification
+
 Current source target **0.36.0, build 49** adds bounded BMP, preserving
 PNG/TIFF/JPEG/GIF/WebP. This current section records BMP evidence separately
 from preceding .35 source/candidate/model receipts and their immutable inputs.
@@ -1826,7 +1853,7 @@ Dashboard geometry, minimum/normal containment of every primary view, and
 populated policy evaluation rows. Live completion of the reported owner run,
 universal policy enforcement, and distribution qualification remain open.
 
-Current source target: **0.36.0, build 49**, supporting **macOS 26+**; bounded BMP gates are recorded in the latest phase above.
+Current source target: **0.36.1, build 50**, supporting **macOS 26+**; instruction-count gates are recorded above and BMP retains its preceding scoped results.
 
 Preceding .35 status sentence (retained):
 
@@ -1856,6 +1883,10 @@ the detailed, source-bound receipts are in the
 [roadmap](../ROADMAP.md).
 
 ## Version and build agreement
+
+The current target is **0.36.1, build 50** for the instruction-count correction. Current source/native queue tests and builds passed; initial-document G3 source/native one each and initial hygiene/whitespace passed. Exact source/wiki delivery remains pending.
+
+Preceding .36 agreement and qualification record (retained):
 
 The current target is **0.36.0, build 49** for bounded BMP; product authorities advance, and initial-document G3 passed once in source/native (1.439/1.767 s); later document/delivery results require separate external receipts.
 

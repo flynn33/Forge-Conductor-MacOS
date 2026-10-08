@@ -1,5 +1,12 @@
 # Telemetry architecture (real-time native)
 
+Current source documentation targets `0.36.1`, build `50`. Instruction-package
+count validation changes at its existing owner; no telemetry producer, gauge,
+delivery, audit format, timer or lifetime repair is included. Source/native
+queue tests each passed 45 methods; this is not performance or leak qualification.
+
+## Preceding 0.36.0 (49) BMP qualification
+
 Current source documentation targets `0.36.0`, build `49`. BMP remains in
 the existing `image_write` documents/tool-card surface. Catalog/queue/audit
 parity is included in the owning selections; no producer, timer, delivery queue,
@@ -481,7 +488,7 @@ representative physical-hardware qualification remain open.
 
 ## Version
 
-Current source target: `0.36.0`; build: `49`.
+Current source target: `0.36.1`; build: `50`.
 
 Preceding .35 version record (retained):
 

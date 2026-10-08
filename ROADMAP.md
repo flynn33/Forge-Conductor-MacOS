@@ -1,5 +1,19 @@
 # Forge Conductor macOS — project roadmap
 
+## Instruction-package retained-document count correction
+
+Current target **0.36.1 (50)** enforces the existing 4,096-document catalog bound
+before immutable publication and queue linkage, including container/manifest.
+
+| Milestone | Observed evidence | Remaining gate |
+| --- | --- | --- |
+| Baseline and correction | Two actual rejection methods failed, exit 1/unforced, in 12.245 s with ten assertions; both 4,097-document imports mutated queue/store/reopen. A five-line common-owner guard now rejects them. | Original baseline stays NONPASS; persisted oversized snapshots are not migrated. |
+| Boundary and parity | Earlier focused five passed in 24.404 s on their own map. Current source/native each passed the exact same 45 methods, zero failures/skips, in 31.726/34.385 s on matching 464-input 47479210… maps; all 40 original methods remain unchanged. ZIP4095+container, manifest4095+manifest and directory4096 read/reopen checks passed. | Focused five adds no distinct coverage. CoreGraphics malformed-PDF and eight native linkd diagnostics are retained. No installed/model/HTTP-latency/extractor-shutdown claim. |
+| Graph/build and closeout | Existing membership/workspace/signing remain; version/build/G3 expectations advance under patch policy. CLI/app passed in 0.990/0.886 s; ordinary Debug/strict signature in 25.736/0.138 s, normal exit 0/unforced. Seven-binary .36.1/50 candidate cbb9f95c… binds the same 464 map; native CLI version passed in 0.614 s. Prior .36/.35 seven-binary candidates and protected three inputs remained unchanged. Initial-document G3 source/native passed one each in 1.587/1.907 s; the 45 owning methods plus one G3 method give 46 distinct methods per route. Initial hygiene/whitespace passed in 0.654/0.135 s, normal exit 0/unforced. Native G3 destination/DVTAssertions warnings remain. | Exact source/wiki publication/synchronization remains pending. Generic archive/SQLite and broader completion requirements remain open. |
+
+[Instruction-package budgets](docs/INSTRUCTION-PACKAGES.md#resource-budgets).
+The preceding BMP milestone and complete historical receipts follow.
+
 ## Additive native BMP pixel writing
 
 Current target **0.36.0 (49)** adds bounded BMP to `image_write`, preserving

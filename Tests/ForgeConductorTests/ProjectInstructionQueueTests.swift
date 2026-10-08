@@ -2263,3 +2263,241 @@ extension ProjectInstructionQueueTests {
         return local
     }
 }
+
+
+extension ProjectInstructionQueueTests {
+    func testZIP4095MembersRetainsContainerWithinDocumentLimit() async throws {
+        try await Task.detached(priority: .utility) {
+            try Self.assertCountBoundary(kind: .zip, entries: 4_095, accepted: true)
+        }.value
+    }
+
+    func testZIP4096MembersRejectsBeforePublicationOrQueueMutation() async throws {
+        try await Task.detached(priority: .utility) {
+            try Self.assertCountBoundary(kind: .zip, entries: 4_096, accepted: false)
+        }.value
+    }
+
+    func testManifest4095EntriesRetainsManifestWithinDocumentLimit() async throws {
+        try await Task.detached(priority: .utility) {
+            try Self.assertCountBoundary(kind: .manifest, entries: 4_095, accepted: true)
+        }.value
+    }
+
+    func testManifest4096EntriesRejectsBeforePublicationOrQueueMutation() async throws {
+        try await Task.detached(priority: .utility) {
+            try Self.assertCountBoundary(kind: .manifest, entries: 4_096, accepted: false)
+        }.value
+    }
+
+    func testDirectory4096FilesRemainsReadableAfterReopen() async throws {
+        try await Task.detached(priority: .utility) {
+            try Self.assertCountBoundary(kind: .directory, entries: 4_096, accepted: true)
+        }.value
+    }
+
+    private enum CountBoundarySource: Equatable, Sendable { case zip, manifest, directory }
+
+    private static func assertCountBoundary(
+        kind: CountBoundarySource, entries: Int, accepted: Bool
+    ) throws {
+        XCTAssertFalse(Thread.isMainThread)
+        guard (4_095...4_096).contains(entries) else {
+            throw NSError(domain: "CountBoundaryFixture", code: 1)
+        }
+        let deadline = Date().addingTimeInterval(120)
+        func checkDeadline() throws {
+            guard Date() < deadline else { throw NSError(domain: "CountBoundaryFixture", code: 2) }
+        }
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "forge-document-count-test-\(UUID().uuidString)", isDirectory: true
+        )
+        try FileManager.default.createDirectory(
+            at: root, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700]
+        )
+        let paths = AppPaths(home: root.appendingPathComponent("home", isDirectory: true))
+        defer {
+            // Only this fixture's at-most-two published roots need owner write permission for deletion.
+            if let roots = try? FileManager.default.contentsOfDirectory(
+                at: paths.instructionPackageStoreDir, includingPropertiesForKeys: nil
+            ) {
+                for published in roots.prefix(3) {
+                    try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: published.path)
+                }
+            }
+            try? FileManager.default.removeItem(at: root)
+        }
+        let store = try ProjectInstructionQueueStore(paths: paths), project = ProjectID()
+        let seed = root.appendingPathComponent("seed.txt"), seedBytes = Data("seed instruction\n".utf8)
+        try seedBytes.write(to: seed)
+        let before = try store.importPackage(sourceURL: seed, projectID: project, generation: .initial)
+        let seedPackage = try XCTUnwrap(before.packages.first)
+        let queueBefore = try Data(contentsOf: paths.instructionPackageQueue)
+        let rootsBefore = try FileManager.default.contentsOfDirectory(
+            atPath: paths.instructionPackageStoreDir.path
+        ).sorted()
+        let sourceRoot = root.appendingPathComponent("source", isDirectory: true)
+        try FileManager.default.createDirectory(at: sourceRoot, withIntermediateDirectories: false)
+        let members: [(String, Data)] = (0..<entries).map {
+            (String(format: "document-%04d.txt", $0), Data("instruction \($0)\n".utf8))
+        }
+        XCTAssertEqual(Set(members.map { $0.0 }).count, entries)
+        XCTAssertLessThanOrEqual(members.reduce(0) { $0 + $1.1.count }, 131_072)
+        var expected = Dictionary(uniqueKeysWithValues: members)
+        let source: URL
+        switch kind {
+        case .zip:
+            source = root.appendingPathComponent("instructions.zip")
+            // Existing independent test serializer; no additional fixture child process.
+            let bytes = Self.odsStoredZIP(members)
+            XCTAssertLessThan(bytes.count, 1_048_576)
+            let inspected = try SafeZIPArchive.inspect(bytes)
+            XCTAssertEqual(inspected.map(\.path), members.map { $0.0 })
+            XCTAssertTrue(inspected.allSatisfy { !$0.isDirectory && $0.compressedBytes == $0.uncompressedBytes })
+            expected = Dictionary(uniqueKeysWithValues: members.map { ("archive/" + $0.0, $0.1) })
+            expected[source.lastPathComponent] = bytes
+            try bytes.write(to: source)
+        case .manifest, .directory:
+            for (index, member) in members.enumerated() {
+                if index % 64 == 0 { try checkDeadline() }
+                try member.1.write(to: sourceRoot.appendingPathComponent(member.0))
+            }
+            source = sourceRoot
+            if kind == .manifest {
+                let manifest: [String: Any] = [
+                    "schema_version": 1, "package_id": "count-boundary", "version": "1",
+                    "mission": "Read every bounded entry; do not execute imported content.",
+                    "project_id": project.description, "entry_documents": members.map { $0.0 },
+                    "requested_capabilities": ["fs_read"],
+                    "completion_gates": [ProjectInstructionQueueStore.builtInCompletionGate],
+                    "resource_policy": ["profile": "project-default"],
+                ]
+                let bytes = try JSONSerialization.data(withJSONObject: manifest, options: [.sortedKeys])
+                XCTAssertLessThan(bytes.count, 131_072)
+                try bytes.write(to: sourceRoot.appendingPathComponent("forge-package.json"))
+                expected["forge-package.json"] = bytes
+            }
+        }
+        try checkDeadline()
+        if !accepted {
+            XCTAssertEqual(expected.count, 4_097)
+            XCTAssertThrowsError(try store.importPackage(sourceURL: source, projectID: project, generation: .initial)) {
+                guard case ProjectInstructionQueueError.invalidRequest(let detail) = $0 else {
+                    return XCTFail("Unexpected count-boundary error: \($0)")
+                }
+                XCTAssertEqual(detail, "Instruction package exceeds the 4096-file import resource budget. Split the import without rewriting individual instructions.")
+            }
+            XCTAssertEqual(try store.snapshot(projectID: project, generation: .initial), before)
+            XCTAssertEqual(try Data(contentsOf: paths.instructionPackageQueue), queueBefore)
+            XCTAssertEqual(try FileManager.default.contentsOfDirectory(
+                atPath: paths.instructionPackageStoreDir.path
+            ).sorted(), rootsBefore, "No new accepted snapshot or staging residue")
+            let reopened = try ProjectInstructionQueueStore(paths: paths)
+            XCTAssertEqual(try reopened.snapshot(projectID: project, generation: .initial), before)
+            try Self.assertCountBoundaryCatalog(
+                store: reopened, paths: paths, package: seedPackage, project: project,
+                expected: ["seed.txt": seedBytes], deadline: deadline
+            )
+        } else {
+            XCTAssertEqual(expected.count, 4_096)
+            let after = try store.importPackage(sourceURL: source, projectID: project, generation: .initial)
+            XCTAssertEqual(after.totalPackages, 2)
+            let package = try XCTUnwrap(after.packages.last)
+            XCTAssertEqual(package.documentCount, 4_096)
+            XCTAssertEqual(package.unresolvedDocumentCount, 0)
+            XCTAssertEqual(package.asDictionary()["import_ready"] as? Bool, true)
+            try Self.assertCountBoundaryCatalog(
+                store: store, paths: paths, package: package, project: project,
+                expected: expected, deadline: deadline
+            )
+            let reopened = try ProjectInstructionQueueStore(paths: paths)
+            XCTAssertEqual(try reopened.snapshot(projectID: project, generation: .initial), after)
+            try Self.assertCountBoundaryCatalog(
+                store: reopened, paths: paths, package: package, project: project,
+                expected: expected, deadline: deadline
+            )
+        }
+        // Selected input bytes remain original after import/rejection/reopen.
+        if kind == .zip {
+            XCTAssertEqual(try Data(contentsOf: source), try XCTUnwrap(expected[source.lastPathComponent]))
+        } else {
+            for (name, bytes) in expected {
+                try checkDeadline()
+                XCTAssertEqual(try Data(contentsOf: sourceRoot.appendingPathComponent(name)), bytes)
+            }
+        }
+    }
+
+    private static func assertCountBoundaryCatalog(
+        store: ProjectInstructionQueueStore, paths: AppPaths,
+        package: ProjectInstructionPackage, project: ProjectID,
+        expected: [String: Data], deadline: Date
+    ) throws {
+        guard expected.count <= 4_096 else { throw NSError(domain: "CountBoundaryFixture", code: 3) }
+        var cursor = 0, reachedEnd = false, documents: [[String: String]] = []
+        for _ in 0..<33 {
+            guard Date() < deadline else { throw NSError(domain: "CountBoundaryFixture", code: 2) }
+            let page = try store.catalogPage(
+                contentSHA256: package.contentSHA256, projectID: project, generation: .initial,
+                runID: nil, cursor: cursor, limit: 128
+            )
+            XCTAssertEqual(page.totalDocuments, expected.count)
+            documents.append(contentsOf: page.documents)
+            if let next = page.nextCursor { XCTAssertGreaterThan(next, cursor); cursor = next }
+            else { reachedEnd = true; break }
+        }
+        XCTAssertTrue(reachedEnd)
+        XCTAssertEqual(documents.count, expected.count)
+        XCTAssertEqual(Set(documents.compactMap { $0["source_path"] }), Set(expected.keys))
+        XCTAssertEqual(Set(documents.compactMap { $0["id"] }).count, expected.count)
+        XCTAssertThrowsError(try store.catalogPage(
+            contentSHA256: package.contentSHA256, projectID: ProjectID(), generation: .initial,
+            runID: nil, cursor: 0, limit: 1
+        ))
+        let snapshot = paths.instructionPackageStoreDir.appendingPathComponent(package.contentSHA256)
+        let readIndices = Set([0, 1, 127, 128, documents.count - 2, documents.count - 1])
+        for (index, document) in documents.enumerated() {
+            guard Date() < deadline else { throw NSError(domain: "CountBoundaryFixture", code: 2) }
+            let name = try XCTUnwrap(document["source_path"]), bytes = try XCTUnwrap(expected[name])
+            let id = try XCTUnwrap(document["id"]), hash = JSONSupport.sha256Hex(bytes)
+            XCTAssertEqual(document["original_bytes"], String(bytes.count))
+            XCTAssertEqual(document["original_sha256"], hash)
+            let retained = snapshot.appendingPathComponent("originals").appendingPathComponent(name)
+            XCTAssertEqual(try Data(contentsOf: retained), bytes)
+            XCTAssertEqual((try FileManager.default.attributesOfItem(atPath: retained.path)[.posixPermissions] as? NSNumber)?.intValue, 0o400)
+            if name.hasSuffix(".zip") {
+                XCTAssertEqual(document["status"], "retained_attachment")
+                XCTAssertThrowsError(try store.readDocument(
+                    contentSHA256: package.contentSHA256, documentID: id, projectID: project,
+                    generation: .initial, runID: nil, byteOffset: 0, maximumBytes: 65_536
+                ))
+            } else {
+                XCTAssertEqual(document["status"], "converted_instruction")
+                XCTAssertEqual(document["canonical_sha256"], hash)
+                let canonical = snapshot.appendingPathComponent(".forge/canonical/\(id).txt")
+                XCTAssertEqual(try Data(contentsOf: canonical), bytes)
+                XCTAssertEqual((try FileManager.default.attributesOfItem(atPath: canonical.path)[.posixPermissions] as? NSNumber)?.intValue, 0o400)
+                // Fixed edge/page/manifest representatives avoid thousands of full-catalog decodes.
+                guard readIndices.contains(index) || name == "forge-package.json" else { continue }
+                var text = Data(), offset = 0, eof = false
+                for _ in 0..<3 {
+                    let page = try store.readDocument(
+                        contentSHA256: package.contentSHA256, documentID: id, projectID: project,
+                        generation: .initial, runID: nil, byteOffset: offset, maximumBytes: 65_536
+                    )
+                    XCTAssertEqual(page.sha256, hash)
+                    XCTAssertEqual(page.totalBytes, bytes.count)
+                    text.append(contentsOf: page.content.utf8)
+                    if let next = page.nextByteOffset { XCTAssertGreaterThan(next, offset); offset = next }
+                    else { eof = true; break }
+                }
+                XCTAssertTrue(eof)
+                XCTAssertEqual(text, bytes)
+                XCTAssertThrowsError(try store.readDocument(
+                    contentSHA256: package.contentSHA256, documentID: id, projectID: project,
+                    generation: ProjectGeneration(2), runID: nil, byteOffset: 0, maximumBytes: 1
+                ))
+            }
+        }
+    }
+}

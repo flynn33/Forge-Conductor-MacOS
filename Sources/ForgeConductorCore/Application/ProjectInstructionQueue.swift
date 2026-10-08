@@ -2430,6 +2430,11 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
         completionGates: [String],
         documents: [IngestedDocument]
     ) throws -> IngestedPackage {
+        guard documents.count <= maximumSourceFiles else {
+            throw ProjectInstructionQueueError.invalidRequest(
+                "Instruction package exceeds the \(maximumSourceFiles)-file import resource budget. Split the import without rewriting individual instructions."
+            )
+        }
         let total = documents.reduce(0) { partial, document in
             partial > maximumAggregateBytes - document.original.count
                 ? maximumAggregateBytes + 1 : partial + document.original.count

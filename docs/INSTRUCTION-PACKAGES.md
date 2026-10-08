@@ -185,13 +185,23 @@ Resetting a project generation fences unfinished packages from the old generatio
 ## Resource budgets
 
 - 4,096 queued package records
-- 4,096 source files per import
+- 4,096 retained documents per import, including a ZIP container or package manifest
 - 128 MiB per source file
 - 512 MiB aggregate source bytes per import
 - 32 KiB compact bootstrap summary metadata
 - 64 KiB upper transport bound per scoped delivery window; the effective page
   may be smaller for the current provider context or inline-result envelope
 - 64 MiB queue metadata
+
+The final-document bound counts retained originals as well as converted
+instructions. A ZIP with 4,095 regular members plus its retained container or a
+manifest listing 4,095 documents plus its retained manifest fits 4,096; an
+ordinary folder can contain 4,096 files because it adds no container document.
+ZIP inspection separately limits total entries, including directories, to
+4,096. All existing per-file/aggregate byte and extraction budgets still apply.
+An over-limit import rejects before publishing an accepted snapshot or changing
+the queue. Existing oversized persisted snapshots are not migrated by this
+correction.
 
 These are explicit resource backpressure budgets, not a 32 KiB limit on the
 user's total instructions. Referenced snapshots remain durable; unreferenced

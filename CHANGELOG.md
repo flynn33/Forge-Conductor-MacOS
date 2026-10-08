@@ -10,6 +10,21 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### `0.36.1 (50)` instruction-package count correction
+
+- Count every retained document, including a ZIP container or manifest, within
+  the existing 4,096-document bound. Reject over-limit imports at `makePackage`
+  before content identity, immutable publication or queue mutation.
+- Preserve ZIP 4,095-members-plus-container, manifest 4,095-entries-plus-manifest
+  and ordinary folder 4,096-file acceptance, exact originals, project scope,
+  read/reopen behavior and all 40 prior queue tests.
+- Retain the original two-test/ten-assertion NONPASS. Matching source/native
+  queue selections passed 45 each; the earlier focused five add no distinct
+  coverage. CLI/app, ordinary Debug/strict candidate and native CLI version
+  checks passed. Initial-document G3 source/native each passed one separate
+  method; the 45 owning methods plus one G3 method give 46 distinct methods per route. Initial
+  hygiene/whitespace passed; exact source/wiki delivery remains pending.
+
 ### `0.36.0 (49)` additive native BMP pixel writing
 
 - Add exact lowercase `format: "bmp"` with an explicit case-insensitive `.bmp`

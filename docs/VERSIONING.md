@@ -1,5 +1,16 @@
 # Versioning policy
 
+Current target identity is **0.36.1 (50)**. This enforces the existing final
+4,096-document import/catalog bound, so the correction advances the patch
+component under the policy below; it adds no user-facing format or tool.
+`VERSION`, `BUILD_NUMBER`, compiled constants and 12 marketing/16 build values
+advance together; the two G3 identity expectations change without weakening
+assertions. Source/native queue tests, direct builds and the signed ordinary Debug
+candidate passed. Initial-document G3 source/native one each and initial
+hygiene/whitespace passed; exact source/wiki delivery remains pending.
+
+## Preceding 0.36.0 (49) BMP qualification
+
 Current target identity is **0.36.0 (49)** for additive BMP. `VERSION`,
 `BUILD_NUMBER`, compiled constants and twelve project marketing/sixteen build
 values advance; graph membership/signing remain. G3 preserves every assertion
@@ -294,7 +305,7 @@ focused version test, and CI reject drift between them.
 
 ## Current identity
 
-Current source target is `0.36.0`, build `49`, for bounded BMP; see the latest phase above.
+Current source target is `0.36.1`, build `50`, for the instruction-count correction; preceding BMP identities remain unchanged.
 
 Preceding .35 identity and qualification record (retained):
 

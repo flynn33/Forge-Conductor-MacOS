@@ -1,5 +1,14 @@
 # Forge Conductor user guide
 
+Version **0.36.1**, build **50** corrects the retained-document import limit.
+Each package can retain at most 4,096 documents, including its ZIP container or
+manifest: select up to 4,095 regular ZIP members or listed manifest documents,
+or 4,096 files in an ordinary folder. The existing ZIP-entry and byte budgets
+also apply. Over-limit imports leave the accepted store and queue unchanged.
+See [instruction-package resource budgets](docs/INSTRUCTION-PACKAGES.md#resource-budgets).
+
+## Preceding 0.36.0 (49) BMP qualification
+
 Version **0.36.0**, build **49** is the current source target. For supplied
 pixels, use `image_write(path="<project>/IMAGE.bmp", width=1, height=1,
 content="/wAA/w==", format="bmp")`. The input remains canonical padded base64

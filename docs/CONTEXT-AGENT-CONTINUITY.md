@@ -1,4 +1,11 @@
-# Context and agent continuity (v0.36.0)
+# Context and agent continuity (v0.36.1)
+
+Current source documentation targets 0.36.1 (50). Package admission now counts
+the retained ZIP container or manifest within the existing 4,096-document limit.
+Continuity handoff, coverage, successor, ACK, seal and project-generation
+contracts are unchanged; queue tests do not establish live rollover acceptance.
+
+## Preceding 0.36.0 (49) BMP qualification
 
 Current source documentation targets 0.36.0 (49). BMP extends existing
 `image_write`; handoff/job-reference/ACK/seal/successor/progress/grant/replay

@@ -1,5 +1,16 @@
 # Forge Conductor for macOS
 
+Current source target **0.36.1 (50)** corrects instruction-package admission:
+the final immutable snapshot may contain at most **4,096 retained documents**,
+including a ZIP container or package manifest. ZIPs with 4,095 regular members
+and manifests listing 4,095 documents fit that limit; ordinary folders still
+accept 4,096 files. Over-limit imports reject before publication or queue change.
+Matching source/native `ProjectInstructionQueueTests` each passed 45 methods;
+[qualification and pending gates](docs/QUALIFICATION-STATUS.md) remain separate
+from installed, model and shipment acceptance.
+
+## Preceding 0.36.0 (49) BMP qualification
+
 Current source target **0.36.0 (49)** adds bounded BMP to `image_write`,
 preserving PNG/TIFF/JPEG/GIF/WebP. Exact lowercase `bmp` requires `.bmp`;
 destination extensions are case-insensitive. The one-image V5/BITFIELDS output
@@ -833,8 +844,8 @@ continuity. The user does not start project work through a Forge Managed Run.
 
 | | |
 |---|---|
-| **Version** | **0.36.0** |
-| **Build** | **49** |
+| **Version** | **0.36.1** |
+| **Build** | **50** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |
@@ -950,6 +961,10 @@ attached context; `fs_list`, `git_status`, `instruction_catalog`, and
 was not exercised; its source selects the running app executable, so the CLI
 receipt does not qualify that path. The full scope and remaining
 distribution limits are in the [qualification record](docs/QUALIFICATION-STATUS.md).
+
+The current target is `0.36.1 (50)` for the instruction-count correction; see the latest phase above.
+
+Preceding .36 identity and qualification record (retained):
 
 The current target is `0.36.0 (49)` for bounded BMP; see the latest phase above.
 

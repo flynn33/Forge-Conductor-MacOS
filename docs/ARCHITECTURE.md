@@ -1,5 +1,14 @@
 # Forge Conductor architecture
 
+Version: `0.36.1`; build: `50`. The common instruction-package `makePackage`
+boundary rejects more than 4,096 retained documents before hashing, publication
+or queue linkage. ZIP containers and manifests count toward that existing
+catalog bound. Single-file, folder and composite-run callers retain their
+contracts; queue/catalog schemas, project scope, grants and storage ownership
+are unchanged. Existing oversized persisted snapshots are not migrated.
+
+## Preceding 0.36.0 (49) BMP qualification
+
 Version: `0.36.0`; build: `49`. BMP selects native `UTType.bmp` in the
 existing call-local raster path, reusing sRGB/straight-alpha input, one image,
 retained-consumer rollback/release and the bounded first-error output owner.
