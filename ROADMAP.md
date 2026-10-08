@@ -1,8 +1,28 @@
 # Forge Conductor macOS — project roadmap
 
-## Repeated runtime-subsystem shutdown
+## Native text-cell XLSX writing and import
 
-Current target **0.27.1 (40)** repairs repeated shutdown without adding a tool,
+Current target **0.28.0 (41)** adds bounded `xlsx_write` and repairs XLSX import.
+The bounded source/native, build/signing, wire/artifact, retained Core-consumer
+and Qwen API gates passed; broader product and shipment gates remain separate.
+
+| Milestone | Observed evidence or current implementation | Remaining gate |
+| --- | --- | --- |
+| Import baseline | R5 observed six catalog documents and five raw package-XML instruction documents for each workbook: one-cell 1,746 instruction bytes; blank 1,608. Both original workbooks were preserved. | Baseline collection succeeded, but the feature contract failed. Earlier setup/temporary-directory guard failures remain separate historical collector failures. |
+| Writer | Explicit `.xlsx`, string rows only, one worksheet, finite input/output bounds and literal-text semantics. | Source/native writer controls passed, including grants, stale-context and host-wide OS-authorized write parity. App/CLI each passed eight controls and 15 correlated frames; six artifacts passed binary/text-cell checks. This is not Excel/Numbers/GUI acceptance. |
+| Importer | Bounded native XML cell extraction with sheet labels/references; original retained; blank/unreadable input unresolved without package-XML instructions. Actual declarations are rejected while valid CDATA remains data. | Source/native reader/importer controls passed. The same two retained R5 native Core cases passed: one-cell 65 UTF-8 bytes; blank unresolved 1/zero instructions; rawXML instruction documents 0 for both. UTF-8 parts and cached values only; no formula evaluation or full Office fidelity. |
+| Qwen XLSX workflow | Three normal API responses, actual Low 3/3; `xlsx_write` then `fs_read`, two actual results consumed; final exact SHA/2525 bytes/four literal cells. Native 6/6 correlated frames and worker/observer/collector exits/EOF passed normally, unforced. | Separate API exchange and isolated candidate, not active installed GUI, production managed adapter, all models or full Office. |
+| Provider diagnostics | Earlier H4 stopped normally with six keys, omitting `pages_consumed`; H5 stopped normally with seven keys but changed exact text. Both original final-text gates remain NONPASS. | Provider-only, no native dispatch; cause unknown. The later scoped XLSX pass does not relabel them or qualify full web/all models. |
+| Version/graph/build | Current owning source 124 and matching canonical native 124 passed, zero failures/skips/compiler warnings/QoS blocks; G3 included once. CLI/app, ordinary Debug and strict seven-binary candidate checks passed on 454 inputs. | Focused source 26 is a subset, not added to 124. Initial compile failure and R2 wrong outside-confinement assertion remain NONPASS. Runtime framework diagnostics remain separate. |
+| Delivery | Earlier .27.1 source/native 212 and clean source/wiki delivery remain labeled below. | Exact source/wiki publication and synchronization identities are retained in the external closeout after verification; installed/GUI, all-feature, Release and shipment gates remain open. |
+
+[Writer/import contract and current gates](docs/NATIVE-XLSX-WRITING.md).
+
+<a id="repeated-runtime-subsystem-shutdown"></a>
+
+## Preceding repeated runtime-subsystem shutdown
+
+The preceding target **0.27.1 (40)** repairs repeated shutdown without adding a tool,
 service, task, schema or storage migration. The bounded plain-text DOCX capability
 remains available; its preceding qualification keeps its own inputs below.
 

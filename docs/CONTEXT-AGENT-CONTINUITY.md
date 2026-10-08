@@ -1,6 +1,15 @@
-# Context and agent continuity (v0.27.1)
+# Context and agent continuity (v0.28.0)
 
-Current source documentation targets 0.27.1 (40). The shutdown repair preserves
+Current source documentation targets 0.28.0 (41). The XLSX tool joins existing
+progress classification; it adds no runtime-job reference or handoff format.
+Source/native 124, build/signing and scoped wire/Core/Qwen flows passed; these do
+not qualify successor creation. [Contract and remaining gates](NATIVE-XLSX-WRITING.md).
+
+<a id="context-and-agent-continuity-v0271"></a>
+
+## Preceding 0.27.1 shutdown continuity
+
+The preceding source documentation targets 0.27.1 (40). The shutdown repair preserves
 handoff, ACK, seal and Managed startup contracts; [current evidence](ORDINARY-RUNTIME-CONTINUATION.md#repeated-subsystem-shutdown)
 keeps successor/installed qualification separate.
 

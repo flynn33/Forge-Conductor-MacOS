@@ -1,6 +1,13 @@
 # Telemetry architecture (real-time native)
 
-Current source documentation targets `0.27.1`, build `40`.
+Current source documentation targets `0.28.0`, build `41`.
+The additive XLSX name joins existing tool/catalog classification; no telemetry
+performance result is claimed. Source/native 124, build/signing and scoped wire/Core/
+Qwen flows passed; [contract and remaining gates](NATIVE-XLSX-WRITING.md).
+
+## Preceding 0.27.1 shutdown measurements
+
+The preceding source documentation targets `0.27.1`, build `40`.
 The shutdown repair changes no telemetry producer or production QoS policy.
 [Contract](ORDINARY-RUNTIME-CONTINUATION.md#repeated-subsystem-shutdown) and [measurements](DIAGNOSTIC-CAPTURE-CONTRACT.md#bounded-audit-drain-measurements) retain the open QoS boundary.
 

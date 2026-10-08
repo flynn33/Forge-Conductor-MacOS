@@ -133,7 +133,7 @@ final class ToolDefinitionCatalogTests: XCTestCase {
             }
             let docsTools: Set<String> = [
                 "fs_read", "fs_write", "fs_edit", "fs_list", "fs_glob", "fs_mkdir", "search_text",
-                "shell_exec", "pdf_write", "pdf_from_file", "docx_write", "git_status", "git_diff", "git_log",
+                "shell_exec", "pdf_write", "pdf_from_file", "docx_write", "xlsx_write", "git_status", "git_diff", "git_log",
                 "runtime.capabilities", "python.run",
             ]
             let auditTools: Set<String> = [
@@ -890,6 +890,227 @@ final class ToolDefinitionCatalogTests: XCTestCase {
             }
             XCTAssertEqual(code, "tool_forbidden")
             XCTAssertFalse(FileManager.default.fileExists(atPath: project.appendingPathComponent("report.docx").path))
+        }
+    }
+
+    func testXLSXWriteHasExactTextArraySchemaReplayAndNeighboringDocumentParity() throws {
+        try withProductionApp("xlsx-schema") { app in
+            let catalog = try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames)
+            let definition = try XCTUnwrap(catalog.definition(named: "xlsx_write"))
+            let schema = try definition.inputSchemaObject()
+            let properties = try XCTUnwrap(schema["properties"] as? [String: Any])
+            XCTAssertEqual(Set(properties.keys), ["path", "rows", "deadline_ms"])
+            XCTAssertEqual(schema["required"] as? [String], ["path", "rows"])
+            XCTAssertEqual(schema["additionalProperties"] as? Bool, false)
+            XCTAssertTrue(definition.strict)
+            XCTAssertEqual((properties["path"] as? [String: Any])?["type"] as? String, "string")
+            let rows = try XCTUnwrap(properties["rows"] as? [String: Any])
+            XCTAssertEqual(rows["type"] as? String, "array")
+            XCTAssertEqual(rows["maxItems"] as? Int, 256)
+            XCTAssertNil(rows["minItems"])
+            let row = try XCTUnwrap(rows["items"] as? [String: Any])
+            XCTAssertEqual(row["type"] as? String, "array")
+            XCTAssertEqual(row["maxItems"] as? Int, 64)
+            XCTAssertNil(row["minItems"])
+            let cell = try XCTUnwrap(row["items"] as? [String: Any])
+            XCTAssertEqual(cell["type"] as? String, "string")
+            XCTAssertEqual(cell["maxLength"] as? Int, 4_096)
+            XCTAssertTrue((cell["description"] as? String)?.contains("4096 UTF-8 bytes") == true)
+            let deadline = try XCTUnwrap(properties["deadline_ms"] as? [String: Any])
+            XCTAssertEqual(deadline["type"] as? String, "integer")
+            XCTAssertEqual(deadline["minimum"] as? Int, 1)
+            XCTAssertEqual(deadline["maximum"] as? Int, ToolRouter.maximumRequestedDeadlineMilliseconds)
+            XCTAssertTrue(definition.description.contains("4096 cells"))
+            XCTAssertTrue(definition.description.contains("65536 total cell UTF-8 bytes"))
+            XCTAssertTrue(definition.description.contains("1048576 bytes"))
+            XCTAssertTrue(definition.description.contains("without line normalization"))
+            XCTAssertTrue(definition.description.contains("formula-like strings"))
+            XCTAssertEqual(ManagerToolCategory.classify("xlsx_write"), .documents)
+            XCTAssertTrue(ToolRouter.isMutatingTool("xlsx_write"))
+            let replay = try ProductionToolReplayCatalog.classifier(productionToolNames: app.tools.toolNames)
+            XCTAssertEqual(try replay.replayClass(for: "xlsx_write"), .idempotent)
+
+            let descriptor = try definition.mcpDescriptor()
+            XCTAssertEqual(try JSONSupport.data(from: try XCTUnwrap(descriptor["inputSchema"] as? [String: Any])),
+                           definition.inputSchemaJSON)
+            let providerDefinitions = try catalog.providerToolDefinitions(allowedToolNames: ["xlsx_write"])
+            XCTAssertEqual(providerDefinitions.count, 1)
+            let provider = try XCTUnwrap(JSONSerialization.jsonObject(with: try XCTUnwrap(providerDefinitions.first)) as? [String: Any])
+            XCTAssertEqual(provider["name"] as? String, "xlsx_write")
+            XCTAssertEqual(provider["strict"] as? Bool, true)
+            XCTAssertEqual(try JSONSupport.data(from: try XCTUnwrap(provider["parameters"] as? [String: Any])),
+                           definition.inputSchemaJSON)
+
+            let docx = try XCTUnwrap(catalog.definition(named: "docx_write")).inputSchemaObject()
+            XCTAssertEqual(docx["required"] as? [String], ["path", "content"])
+            XCTAssertEqual(Set(try XCTUnwrap(docx["properties"] as? [String: Any]).keys), ["path", "content", "deadline_ms"])
+            let pdf = try XCTUnwrap(catalog.definition(named: "pdf_write")).inputSchemaObject()
+            XCTAssertEqual(pdf["required"] as? [String], ["path", "content"])
+            XCTAssertEqual(Set(try XCTUnwrap(pdf["properties"] as? [String: Any]).keys), ["path", "content", "title", "deadline_ms"])
+            let missing = try app.tools.call(name: "xlsx_write", arguments: ["path": "unattached.xlsx", "rows": [["text"]]],
+                                             clientID: ClientID("xlsx-unattached"))
+            XCTAssertFalse(missing.ok)
+            XCTAssertEqual(missing.payload["code"] as? String, "project_context_required")
+        }
+    }
+
+    func testXLSXWriteRejectsRawInvalidPathsAndPreservesTextRowsDuringNormalization() throws {
+        try withProductionApp("xlsx-path-admission") { app in
+            let project = app.paths.home.appendingPathComponent("project", isDirectory: true)
+            try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+            let client = ClientID("xlsx-path-admission")
+            let context = ToolInvocationContext(projectID: ProjectID(), projectGeneration: .initial,
+                clientID: client, authorizationScope: ToolAuthorizationScope(canonicalRoots: [project],
+                    allowedTools: ["xlsx_write", "docx_write", "pdf_write"], networkAllowed: false, maximumInlineOutputBytes: 65_536))
+            let authorization = ToolAuthorizationService(paths: app.paths, config: app.config)
+            let rows = [["café 日本語", "=1+1"], ["", " leading and trailing "]]
+            let invalid: [(String, Any?)] = [
+                ("missing", nil), ("number", NSNumber(value: 3)), ("boolean", NSNumber(value: true)),
+                ("null", NSNull()), ("array", ["report.xlsx"]), ("object", ["name": "report.xlsx"]),
+                ("empty", ""), ("blank", " \t\r\n"), ("NUL", "before\u{0000}after.xlsx"),
+            ]
+            for (label, path) in invalid {
+                var arguments: [String: Any] = ["rows": rows]
+                if let path { arguments["path"] = path }
+                let decision = try authorization.authorize(tool: "xlsx_write", arguments: arguments,
+                    context: context, clientID: client, binding: nil, cancellation: ToolCallCancellation(timeoutSeconds: 5))
+                guard case .denied(let code, _) = decision else {
+                    XCTFail("\(label): raw XLSX path must not become an authorized normalized string")
+                    continue
+                }
+                XCTAssertEqual(code, "invalid_path", label)
+            }
+            let arguments: [String: Any] = ["path": "relative.xlsx", "rows": rows]
+            let xlsx = try authorization.authorize(tool: "xlsx_write", arguments: arguments,
+                context: context, clientID: client, binding: nil, cancellation: nil)
+            let docx = try authorization.authorize(tool: "docx_write", arguments: ["path": "relative.xlsx", "content": "plain"],
+                context: context, clientID: client, binding: nil, cancellation: nil)
+            guard case .allowed(let normalizedXLSX) = xlsx, case .allowed(let normalizedDOCX) = docx else {
+                return XCTFail("Valid XLSX paths must use the existing write normalization boundary")
+            }
+            XCTAssertEqual(normalizedXLSX["path"] as? String, normalizedDOCX["path"] as? String)
+            XCTAssertEqual(try JSONSupport.data(from: ["rows": try XCTUnwrap(normalizedXLSX["rows"] as? [[String]])]),
+                           try JSONSupport.data(from: ["rows": rows]))
+            let legacyPDF = try authorization.authorize(tool: "pdf_write", arguments: ["path": NSNumber(value: 3), "content": "plain"],
+                context: context, clientID: client, binding: nil, cancellation: nil)
+            guard case .allowed = legacyPDF else { return XCTFail("XLSX path validation must not alter the PDF path contract") }
+            let strictDOCX = try authorization.authorize(tool: "docx_write", arguments: ["path": NSNumber(value: 3), "content": "plain"],
+                context: context, clientID: client, binding: nil, cancellation: nil)
+            guard case .denied(let docxCode, _) = strictDOCX else { return XCTFail("Existing DOCX raw-path validation must remain strict") }
+            XCTAssertEqual(docxCode, "invalid_path")
+            XCTAssertFalse(FileManager.default.fileExists(atPath: project.appendingPathComponent("relative.xlsx").path))
+            XCTAssertFalse(FileManager.default.fileExists(atPath: project.appendingPathComponent("3").path))
+        }
+    }
+
+    func testXLSXWriteDefaultEnrollmentPreservesCustomDenialsAndNarrowGrants() throws {
+        try withProductionApp("xlsx-default-grants") { app in
+            let catalog = try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames)
+            XCTAssertEqual(ProjectInstructionQueueStore.ordinaryDefaultAllowedTools.filter { $0 == "xlsx_write" }.count, 1)
+            XCTAssertTrue(ContinuityAutomation.progressTools.contains("xlsx_write"))
+            for specs in [app.catalog.all(), AgentCatalog.builtinDefaults()] {
+                let docs = try XCTUnwrap(specs.first { $0.id == "docs" })
+                XCTAssertEqual(docs.tools.filter { $0 == "xlsx_write" }.count, 1)
+                XCTAssertTrue(docs.body.contains("xlsx_write"))
+                for spec in specs where spec.id != "docs" { XCTAssertFalse(spec.tools.contains("xlsx_write"), spec.id) }
+            }
+            XCTAssertEqual(try catalog.definitions(allowedToolNames: ["xlsx_write"]).map(\.name), ["xlsx_write"])
+            for existing in ["fs_write", "docx_write", "pdf_write"] {
+                XCTAssertEqual(try catalog.definitions(allowedToolNames: [existing]).map(\.name), [existing])
+                XCTAssertFalse(ToolGrantSemantics.grants(tool: "xlsx_write", from: [existing]))
+                XCTAssertFalse(ToolGrantSemantics.grants(tool: existing, from: ["xlsx_write"]))
+            }
+            let custom = """
+            ---
+            id: docs
+            display_name: Owner docs
+            tools:
+              - fs_write
+              - docx_write
+            tools_forbidden:
+              - xlsx_write
+            ---
+            Owner-defined documentation grants.
+            """
+            try custom.write(to: app.paths.agentsDir.appendingPathComponent("docs.md"), atomically: true, encoding: .utf8)
+            app.catalog.reload()
+            let spec = try XCTUnwrap(app.catalog.get("docs"))
+            XCTAssertEqual(spec.source, "custom")
+            XCTAssertEqual(spec.tools, ["fs_write", "docx_write"])
+            XCTAssertEqual(spec.toolsForbidden, ["xlsx_write"])
+            let project = app.paths.home.appendingPathComponent("project", isDirectory: true)
+            try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+            let client = ClientID("xlsx-grant-boundary")
+            let authorization = ToolAuthorizationService(paths: app.paths, config: app.config)
+            let projectID = ProjectID()
+            for (granted, requested) in [("fs_write", "xlsx_write"), ("xlsx_write", "fs_write"),
+                                         ("docx_write", "xlsx_write"), ("xlsx_write", "docx_write")] {
+                let context = ToolInvocationContext(projectID: projectID, projectGeneration: .initial,
+                    clientID: client, authorizationScope: ToolAuthorizationScope(canonicalRoots: [project],
+                        allowedTools: [granted], networkAllowed: false, maximumInlineOutputBytes: 65_536))
+                let decision = try authorization.authorize(tool: requested,
+                    arguments: ["path": "report.xlsx", "rows": [["text"]], "content": "plain"],
+                    context: context, clientID: client, binding: nil, cancellation: nil)
+                guard case .denied(let code, _) = decision else {
+                    XCTFail("\(granted) must not grant \(requested)")
+                    continue
+                }
+                XCTAssertEqual(code, "tool_not_granted")
+            }
+            let context = ToolInvocationContext(projectID: projectID, projectGeneration: .initial,
+                clientID: client, authorizationScope: ToolAuthorizationScope(canonicalRoots: [project],
+                    allowedTools: ["*"], networkAllowed: false, maximumInlineOutputBytes: 65_536))
+            let binding = ActiveBinding(sessionID: SessionID("xlsx-custom-binding"), agentID: spec.id,
+                toolsPrimary: spec.tools, toolsForbidden: spec.toolsForbidden, cwd: project.path)
+            let denied = try authorization.authorize(tool: "xlsx_write", arguments: ["path": "report.xlsx", "rows": [["text"]]],
+                context: context, clientID: client, binding: binding, cancellation: nil)
+            guard case .denied(let code, _) = denied else {
+                return XCTFail("A wildcard project grant must not override the custom-agent XLSX denial")
+            }
+            XCTAssertEqual(code, "tool_forbidden")
+            XCTAssertFalse(FileManager.default.fileExists(atPath: project.appendingPathComponent("report.xlsx").path))
+        }
+    }
+
+    func testXLSXWriteDoesNotExpandImportedExplicitCapabilities() throws {
+        try withProductionApp("xlsx-imported-grants") { app in
+            let projectID = ProjectID()
+            let source = app.paths.home.appendingPathComponent("owner-package", isDirectory: true)
+            try FileManager.default.createDirectory(at: source, withIntermediateDirectories: true)
+            try "Follow the owner's existing document grants.".write(
+                to: source.appendingPathComponent("instructions.md"), atomically: true, encoding: .utf8)
+            let requested = ["fs_read", "docx_write"]
+            let expected = Array(Set(requested).union(["instruction_catalog", "instruction_read"])).sorted()
+            let manifest: [String: Any] = [
+                "schema_version": 1, "package_id": "owner-documents", "version": "1",
+                "mission": "Preserve the owner's explicit document capabilities.",
+                "project_id": projectID.description, "entry_documents": ["instructions.md"],
+                "requested_capabilities": requested,
+                "completion_gates": [ProjectInstructionQueueStore.builtInCompletionGate],
+                "resource_policy": ["profile": "project-default"],
+            ]
+            try JSONSupport.data(from: manifest).write(to: source.appendingPathComponent("forge-package.json"))
+            let store = try ProjectInstructionQueueStore(paths: app.paths)
+            let snapshot = try store.importPackage(sourceURL: source, projectID: projectID, generation: .initial)
+            let package = try XCTUnwrap(snapshot.packages.first)
+            XCTAssertEqual(package.allowedTools, expected)
+            XCTAssertFalse(package.allowedTools.contains("xlsx_write"))
+            let reread = try store.snapshot(projectID: projectID, generation: .initial)
+            XCTAssertEqual(try XCTUnwrap(reread.packages.first).allowedTools, expected)
+            let catalog = try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames)
+            XCTAssertEqual(Set(try catalog.definitions(allowedToolNames: Set(package.allowedTools)).map(\.name)), Set(expected))
+            let client = ClientID("xlsx-imported-grants")
+            let context = ToolInvocationContext(projectID: projectID, projectGeneration: .initial,
+                clientID: client, authorizationScope: ToolAuthorizationScope(canonicalRoots: [source],
+                    allowedTools: Set(package.allowedTools), networkAllowed: false, maximumInlineOutputBytes: 65_536))
+            let decision = try ToolAuthorizationService(paths: app.paths, config: app.config).authorize(
+                tool: "xlsx_write", arguments: ["path": "report.xlsx", "rows": [["text"]]],
+                context: context, clientID: client, binding: nil, cancellation: nil)
+            guard case .denied(let code, _) = decision else {
+                return XCTFail("New default XLSX enrollment must not expand an imported explicit grant")
+            }
+            XCTAssertEqual(code, "tool_not_granted")
+            XCTAssertFalse(FileManager.default.fileExists(atPath: source.appendingPathComponent("report.xlsx").path))
         }
     }
 

@@ -2,7 +2,7 @@
 id: docs
 display_name: Docs
 description: >
-  Write user/developer documentation as Markdown and export PDF manuals or plain-text DOCX.
+  Write user/developer documentation as Markdown and export PDF manuals, plain-text DOCX or text-only XLSX.
   Use for README, runbooks, API docs, and PDF user guides.
 tools:
   - fs_read
@@ -25,12 +25,14 @@ tools:
   - pdf_write
   - pdf_from_file
   - docx_write
+  - xlsx_write
 when_to_use:
   - README, API docs, or runbooks need writing or updates
   - User/developer manual (Markdown and/or PDF)
   - PDF guide, handbook, or install documentation
   - Convert existing Markdown docs to PDF
   - Create a plain-text DOCX document
+  - Create a text-only XLSX worksheet
 when_not_to_use:
   - Pure code change with no documentation impact
   - Architecture design without doc deliverable (use plan)
@@ -41,11 +43,13 @@ first_moves:
   - For PDF goals: pdf_from_file(source_path=that_md) or pdf_write(path=....pdf, content=...)
   - Verify with fs_list / shell_exec file on the .pdf
   - For plain-text DOCX goals: docx_write(path=....docx, content=...)
+  - For text-only XLSX goals: xlsx_write(path=....xlsx, rows=[["Heading", "Value"]])
 done_definition:
   - Requested doc artifacts exist on disk
   - Content matches verified project facts (not invented)
   - If PDF was requested, a .pdf file was written and size > 0
   - If DOCX was requested, report the actual .docx destination and tool result
+  - If XLSX was requested, report the actual .xlsx destination and tool result
   - files_touched lists every path created or updated
 output_schema:
   - files_touched
@@ -140,6 +144,18 @@ final LF on import. Do not claim byte-exact UTF-8 round trips. XML 1.0-disallowe
 scalars are rejected. The tool does not interpret Markdown or promise layout,
 images, tables or Office-suite fidelity. If blocked, report the exact tool error.
 Read the actual file/tool evidence before claiming document completion.
+
+## Text-only XLSX workflow
+
+Use `xlsx_write(path="<project>/docs/TABLE.xlsx", rows=[["Heading", "Value"], ["Item", "text"]])`
+for one worksheet at an explicit `.xlsx` destination. No extension is appended.
+Use at most 256 rows, 64 columns per row, 4096 cells, 4096 UTF-8 bytes per cell
+and 65536 total cell UTF-8 bytes; encoded output is limited to 1048576 bytes.
+Empty rows and cells are accepted. Every cell must be a string; literal cell
+text is preserved without line normalization, including formula-like strings.
+XML 1.0-disallowed scalars are rejected. The tool does not promise formulas,
+formatting, images or Office-suite fidelity. Report exact tool errors and inspect actual artifact
+evidence before claiming workbook completion.
 
 ## Quality bar
 

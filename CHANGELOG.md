@@ -10,6 +10,22 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### `0.28.0 (41)` native text-cell XLSX writing and import
+
+- Add `xlsx_write(path, rows)` for one text-only worksheet and an explicit `.xlsx`
+  destination. Bound rows, columns, cells, UTF-8 input and encoded output; preserve
+  literal escape-like text and CR without line normalization.
+- Import bounded worksheet cell values with sheet labels and cell references;
+  retain original workbooks. Blank/unreadable workbooks remain unresolved, without
+  runnable package XML. Actual DTD/entity declarations are rejected; valid CDATA
+  containing declaration-like text is data. Formulas are not evaluated.
+- Preserve existing tools, grants, owner host-wide OS access and durable formats.
+  Owning source/native 124 each, CLI/app, ordinary Debug and strict candidate
+  checks passed, plus App/CLI 16 wire controls, both retained Core cases and
+  three-response Qwen API consumption. Initial compile and wrong-confinement
+  assertion failures remain; GUI/full Office/full web and shipment are separate.
+  [Contract and limits](docs/NATIVE-XLSX-WRITING.md).
+
 ### `0.27.1 (40)` repeated runtime-subsystem shutdown
 
 - Retain the first completed report on the existing repository actor before close.

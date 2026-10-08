@@ -1,6 +1,13 @@
 # Forge Conductor architecture
 
-Version: `0.27.1`; build: `40`.
+Version: `0.28.0`; build: `41`.
+
+XLSX encoding uses a bounded call-local Swift writer on the existing worker path
+and pinned destination writer. Import uses bounded Foundation XMLParser cell
+extraction. Source/native 124, build/signing and scoped wire/Core/Qwen flows passed;
+[contract and remaining gates](NATIVE-XLSX-WRITING.md).
+
+## Preceding 0.27.1 shutdown ownership
 
 Repeated subsystem shutdown retains its completed result on the existing repository
 actor while incomplete shutdown remains retryable.

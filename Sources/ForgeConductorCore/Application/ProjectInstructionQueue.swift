@@ -1110,7 +1110,7 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
         "search_text", "instruction_catalog", "instruction_read", "shell_exec",
         "web.fetch", "web.search", "web.render",
         "git_status", "git_diff", "git_log", "git_add", "git_commit",
-        "pdf_write", "pdf_from_file", "docx_write",
+        "pdf_write", "pdf_from_file", "docx_write", "xlsx_write",
         "runtime.capabilities", "process.run", "shell.run", "bash.run", "python.run",
         "powershell.run", "job.status", "job.read_output", "job.cancel", "job.list",
         "xcode.discover", "xcode.run", "xcode.result", "xcode.debug", "xcode.simulator",
@@ -2247,7 +2247,7 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
         let package: IngestedPackage
         if values.isRegularFile == true {
             let sourceData = try readRegularFile(source)
-            if source.pathExtension.lowercased() != "docx",
+            if !["docx", "xlsx"].contains(source.pathExtension.lowercased()),
                SafeZIPArchive.isZIP(sourceData, path: source.path) {
                 package = try archivePackage(source, data: sourceData)
             } else if source.pathExtension.lowercased() == "forgepackage"
@@ -2743,6 +2743,22 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
         emptyStatus: InstructionDocumentStatus,
         emptyDetail: String
     )? {
+        if path.lowercased().hasSuffix(".xlsx") {
+            do {
+                return (
+                    try NativeXLSXReader.text(in: data), "native-xlsx-cells-v1",
+                    "Extracted sheet-labeled cell values; formulas were not evaluated, cached values are unformatted, and package XML is not instruction text. The original workbook remains source-linked.",
+                    .unrepresentedVisualStructural,
+                    "The workbook contained no non-whitespace cell values. Original bytes were retained for spreadsheet review."
+                )
+            } catch is CancellationError { throw CancellationError() }
+            catch {
+                return (
+                    "", "native-xlsx-cells-v1", "", .unresolvedConversion,
+                    String(error.localizedDescription.prefix(512)) + " Original workbook bytes were retained; package XML was not promoted to instructions."
+                )
+            }
+        }
         #if canImport(PDFKit)
         if data.starts(with: Data("%PDF-".utf8)) {
             guard let document = PDFDocument(data: data) else {

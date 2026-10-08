@@ -11,7 +11,12 @@ readbacks and ordinary observations retain their explicit limits; no
 installation, notarization, App Store upload or distribution was performed.
 Exact owner publication/readback/synchronization refs are retained externally.
 
-Current target identity is **0.27.1 (40)**, a repeated-shutdown patch with build 40.
+Current target identity is **0.28.0 (41)**. The feature-release component advances
+for additive `xlsx_write`, with patch reset and build 41; the importer repair shares
+this phase. G3 source/native agreement passed within 124 methods each; scoped
+wire/Core/Qwen gates also passed. [Contract and remaining gates](NATIVE-XLSX-WRITING.md).
+
+The preceding target identity is **0.27.1 (40)**, a repeated-shutdown patch with build 40.
 [The contract](ORDINARY-RUNTIME-CONTINUATION.md#repeated-subsystem-shutdown) records the verified scope; source/native G3 each passed one additional method.
 
 The preceding target identity is **0.27.0 (39)**. The feature-release component
@@ -155,8 +160,15 @@ focused version test, and CI reject drift between them.
 
 ## Current identity
 
-The current product version target is `0.27.1`, build `40`; root/compiled/PBX
-identities agree. Source/native G3 passed one each; [current evidence](ORDINARY-RUNTIME-CONTINUATION.md#repeated-subsystem-shutdown)
+The current product version target is `0.28.0`, build `41`; source/native G3
+agreement passed within 124 distinct methods each. Canonical build/signing passed
+on the same 454 inputs; scoped wire/Core/Qwen also passed. Installed/GUI, full
+Office/full web and shipment gates remain separate. [Current gate status](NATIVE-XLSX-WRITING.md).
+
+### Preceding 0.27.1 version agreement
+
+The preceding `0.27.1`, build `40` root/compiled/PBX identities agreed. Source/native
+G3 passed one each within 212 distinct methods each; [retained evidence](ORDINARY-RUNTIME-CONTINUATION.md#repeated-subsystem-shutdown)
 keeps installation and shipment separate.
 
 ### Preceding 0.27.0 version agreement

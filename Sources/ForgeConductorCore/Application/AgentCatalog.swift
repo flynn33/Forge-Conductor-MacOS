@@ -160,10 +160,10 @@ public final class AgentCatalog: AgentCatalogProviding, @unchecked Sendable {
             AgentSpec(
                 id: "docs",
                 displayName: "Docs",
-                description: "Write Markdown documentation and export PDF manuals or plain-text DOCX via native tools.",
-                tools: ["fs_read", "fs_write", "fs_edit", "fs_list", "fs_glob", "fs_mkdir", "search_text", "shell_exec", "pdf_write", "pdf_from_file", "docx_write", "git_status", "git_diff", "git_log", "runtime.capabilities", "python.run", "job.status", "job.read_output", "job.cancel", "job.list"],
+                description: "Write Markdown documentation and export PDF manuals, plain-text DOCX or text-only XLSX via native tools.",
+                tools: ["fs_read", "fs_write", "fs_edit", "fs_list", "fs_glob", "fs_mkdir", "search_text", "shell_exec", "pdf_write", "pdf_from_file", "docx_write", "xlsx_write", "git_status", "git_diff", "git_log", "runtime.capabilities", "python.run", "job.status", "job.read_output", "job.cancel", "job.list"],
                 toolsForbidden: ["git_push", "git_commit"],
-                whenToUse: ["README", "PDF manual", "plain-text DOCX", "runbook", "API docs"],
+                whenToUse: ["README", "PDF manual", "plain-text DOCX", "text-only XLSX", "runbook", "API docs"],
                 firstMoves: ["fs_glob docs/README", "fs_read sources", "fs_write markdown", "pdf_from_file if needed", "agent_run_complete"],
                 doneDefinition: ["Artifacts on disk", "files_touched filled", "agent_run_complete"],
                 outputSchema: ["files_touched", "summary", "formats", "how_to_open"],
@@ -177,6 +177,14 @@ public final class AgentCatalog: AgentCatalogProviding, @unchecked Sendable {
                 terminators can add a final LF on import. XML 1.0-disallowed scalars are
                 rejected. This tool does not interpret Markdown or promise layout,
                 images or Office-suite fidelity. Report exact tool errors when blocked.
+                For a text-only worksheet use xlsx_write(path="<project>/docs/TABLE.xlsx",
+                rows=[["Heading", "Value"], ["Item", "text"]]). Use at most 256 rows,
+                64 columns per row, 4096 cells, 4096 UTF-8 bytes per cell and 65536 total
+                cell UTF-8 bytes; encoded output is limited to 1048576 bytes. Empty rows
+                and cells are accepted. Literal cell text is preserved without line
+                normalization; formula-like strings remain text. XML 1.0-disallowed
+                scalars are rejected. Do not promise formulas, formatting, images or
+                Office-suite fidelity.
                 For PDF use pdf_write / pdf_from_file (no pandoc). Always fill files_touched
                 and call agent_run_complete. Never claim PDF done without a file on disk.
                 Find filenames with fs_glob(pattern="*.md", path="<project>/docs");

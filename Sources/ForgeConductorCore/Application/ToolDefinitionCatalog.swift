@@ -287,7 +287,7 @@ public enum ManagerToolCategory: String, Codable, Sendable, Equatable, CaseItera
         if toolID.hasPrefix("agent_")
             || toolID == "forge_status"
             || toolID == "get_forge_status" { return .agents }
-        if toolID.hasPrefix("pdf_") { return .documents }
+        if toolID.hasPrefix("pdf_") || toolID == "xlsx_write" { return .documents }
         if toolID.hasPrefix("runtime_") { return .runtime }
         return .other
     }
@@ -691,6 +691,7 @@ private enum ProductionToolDefinitionSource {
         "pdf_write": "Write a PDF from markdown-ish text using native Unicode layout (no external converter).",
         "pdf_from_file": "Convert a local markdown/text file to PDF.",
         "docx_write": "Write plain text to an explicit .docx destination using native Office Open XML export. Content is limited to 65536 UTF-8 bytes and encoded output to 1048576 bytes. CRLF, CR and U+2029 are normalized to LF; native paragraph terminators can add a final LF on import. XML 1.0-disallowed scalars are rejected. No Markdown interpretation, layout, images or Office-suite fidelity is promised.",
+        "xlsx_write": "Write one text-only worksheet to an explicit .xlsx destination. Rows contain only strings: at most 256 rows, 64 columns per row, 4096 cells, 4096 UTF-8 bytes per cell and 65536 total cell UTF-8 bytes; encoded output is limited to 1048576 bytes. Empty rows and cells are accepted. Literal cell text is preserved without line normalization, including formula-like strings; XML 1.0-disallowed scalars are rejected. No formulas, formatting, images or Office-suite fidelity is promised.",
         "search_text": "Recursive text search (grep), with optional context_lines and include/exclude filename globs.",
         "memory_set": "Store a durable key/value note in Forge local memory (survives chat sessions).",
         "memory_get": "Read a durable memory note by key.",
@@ -932,6 +933,24 @@ private enum ProductionToolDefinitionSource {
                     "content": ["type": "string", "description": "Plain text, at most 65536 UTF-8 bytes; native paragraph/LF semantics apply."] as [String: Any],
                 ] as [String: Any],
                 "required": ["path", "content"],
+                "additionalProperties": false,
+            ]
+        case "xlsx_write":
+            return [
+                "type": "object",
+                "properties": [
+                    "path": ["type": "string", "description": "Required nonblank explicit .xlsx destination; no extension is appended."] as [String: Any],
+                    "rows": [
+                        "type": "array", "maxItems": 256,
+                        "description": "Text cells only; at most 4096 cells and 65536 total cell UTF-8 bytes.",
+                        "items": [
+                            "type": "array", "maxItems": 64,
+                            "items": ["type": "string", "maxLength": 4096,
+                                      "description": "At most 4096 UTF-8 bytes; formula-like strings remain text."] as [String: Any],
+                        ] as [String: Any],
+                    ] as [String: Any],
+                ] as [String: Any],
+                "required": ["path", "rows"],
                 "additionalProperties": false,
             ]
         case "pdf_from_file":

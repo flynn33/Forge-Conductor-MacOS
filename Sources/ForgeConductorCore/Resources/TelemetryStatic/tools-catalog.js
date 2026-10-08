@@ -24,6 +24,7 @@ export const TOOL_PACKS = [
       "pdf_write",
       "pdf_from_file",
       "docx_write",
+      "xlsx_write",
       "fs_edit",
       "fs_list",
       "fs_glob",

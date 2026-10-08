@@ -1,6 +1,20 @@
 # Forge Conductor for macOS
 
-Current source targets **0.27.1 (40)**. Repeated runtime-subsystem shutdown
+Current source targets **0.28.0 (41)**, adding `xlsx_write` for bounded text-only
+worksheets and repairing XLSX instruction import to read cell values instead of
+package XML. Existing repository links, web, DOCX, PDF and shell tools remain.
+
+The retained XLSX baseline exposed package XML even for a blank workbook. The
+owning source and matching native selections passed 124 distinct methods each;
+CLI/app, ordinary Debug and strict candidate checks passed. App/CLI passed 16
+wire controls, both retained Core baseline cases passed, and Qwen consumed two
+actual tool results across three normal API responses.
+[Contract, limits and retained evidence](docs/NATIVE-XLSX-WRITING.md).
+Full Office/full web, all-model, installed/GUI, Release and shipment gates remain open.
+
+## Preceding 0.27.1 (40) shutdown qualification
+
+The preceding source targets **0.27.1 (40)**. Repeated runtime-subsystem shutdown
 preserves a completed result; incomplete shutdown remains retryable.
 
 Owning source/native 211 and separate G3 one each passed **212 distinct methods
@@ -659,8 +673,8 @@ continuity. The user does not start project work through a Forge Managed Run.
 
 | | |
 |---|---|
-| **Version** | **0.27.1** |
-| **Build** | **40** |
+| **Version** | **0.28.0** |
+| **Build** | **41** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |
@@ -777,7 +791,8 @@ was not exercised; its source selects the running app executable, so the CLI
 receipt does not qualify that path. The full scope and remaining
 distribution limits are in the [qualification record](docs/QUALIFICATION-STATUS.md).
 
-The current version authorities target `0.27.1 (40)`; source/native G3 agreement passed.
+The current version authorities target `0.28.0 (41)`; source/native G3 agreement passed within the 124-method selections.
+The preceding .27.1 source/native G3 agreement passed on its retained inputs.
 [Qualification and evidence](docs/ORDINARY-RUNTIME-CONTINUATION.md#repeated-subsystem-shutdown).
 
 The preceding DOCX root version authorities, compiled protocol constants and Xcode

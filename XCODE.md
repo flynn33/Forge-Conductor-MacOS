@@ -1,6 +1,25 @@
 # Forge Conductor — Xcode
 
-Current source version **0.27.1**, build **40**.
+Current source version **0.28.0**, build **41**.
+
+The XLSX slice adds NativeXLSXWriter/NativeXLSXReader and reader/writer test files
+alongside the existing Docs tool, importer and catalog surfaces. Root versions,
+compiled constants and PBX version settings agree in the actual G3 source/native
+methods, included once in 124 distinct methods each. The source command selected
+reader 12, writer 14, instruction-queue 39, catalog 23, PDF 35 and G3 one; the canonical
+native command passed the same exact methods, zero failures/skips/compiler warnings
+or QoS blocks. Source/native terminal times were 24.287/58.173 s, unforced and
+untruncated, on the same 454 inputs. Focused source 26 is a subset.
+CLI/app and ordinary Debug passed in 1.108/1.213/24.684 s; strict Debug candidate
+checks passed seven binaries and exact Docs resource bytes. Four new Swift files
+use the existing Core/test targets; no target was added. Initial compile failure
+and R2 wrong confinement assertion remain retained. Signed App/CLI each passed
+8 controls/15 correlated frames; the same two retained native Core cases and
+three-response Qwen API workflow passed. This adds no Excel/Numbers, installed
+GUI, full Office/full web, Release or shipment acceptance.
+[Contract and exact gate status](docs/NATIVE-XLSX-WRITING.md).
+
+## Preceding 0.27.1 (40) shutdown qualification
 
 The repeated-shutdown repair changes two existing Core files. Six parity methods
 and four audit-drain measurement methods use existing test files and memberships;
@@ -798,7 +817,7 @@ remains `22e7443d13496b3cc08b6e98366bb6d2332e3fd4`; later documentation commits
 do not change the binary identity. The set is ready for owner notarization and
 Apple upload, but is not notarized, stapled, installed, shipped, or released.
 That retained archive used Xcode `MARKETING_VERSION = 0.16.2` and
-`CURRENT_PROJECT_VERSION = 23`. Current source targets `0.27.1 (40)`; the historical build-24 app/archive use
+`CURRENT_PROJECT_VERSION = 23`. Current source targets `0.28.0 (41)`; the historical build-24 app/archive use
 `0.16.3 (24)`; notarization and shipment remain separate.
 
 Implementation revision `91ad90ee7a1e51b7289f4c531ddae4dbbc6812ec`

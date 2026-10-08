@@ -1,6 +1,13 @@
 # Forge Conductor user guide
 
-Current source targets **0.27.1 (40)**. Repeating shutdown after success now
+Current source targets **0.28.0 (41)**. Authorized models can create a bounded
+text-only worksheet with `xlsx_write`; XLSX package import reads cell values with
+sheet labels. Scoped source/native, signed tool, retained-workbook Core and Qwen API
+checks passed. [Limits and remaining gates](docs/NATIVE-XLSX-WRITING.md).
+
+## Preceding shutdown behavior — 0.27.1 (40)
+
+The preceding source targets **0.27.1 (40)**. Repeating shutdown after success now
 returns the completed result; incomplete shutdowns can still be retried.
 [Shutdown contract and qualification](docs/ORDINARY-RUNTIME-CONTINUATION.md#repeated-subsystem-shutdown).
 
@@ -254,7 +261,7 @@ observations retain their recorded scope. Exact owner publication, remote
 readback and synchronization references are retained externally. See the
 [phase record](docs/GRAPHITE-WORKBENCH.md) for evidence and capture limits.
 
-Version **0.27.1**, build **40** (current source target; candidate qualification is separate from installation).
+Version **0.28.0**, build **41** (current source target; candidate qualification is separate from installation).
 
 This guide describes the current LM Studio-driven workflow. The user works in a
 normal LM Studio chat; Forge Conductor supplies project context, tools, policy
@@ -510,8 +517,17 @@ can return errors. [Renderer contract and verified scopes](docs/NATIVE-WEB-RENDE
 | `pdf_write` | `path`, `content`; optional `title`. A missing PDF extension is appended; the default title is the destination filename without its extension. Writes the supported text/Markdown subset through native layout. |
 | `pdf_from_file` | `source_path`; optional `dest_path`, `title`. Reads a bounded regular UTF-8 source. The default destination replaces the source extension with `.pdf`; the default title is the source filename without its extension. |
 | `docx_write` | `path`, `content` strings; explicit `.docx` destination. Plain text up to 65536 UTF-8 bytes, encoded output up to 1048576 bytes. CRLF/CR/U+2029 normalize to LF; native paragraph terminators can add a final LF when imported. Requires its own DOCX tool grant. |
+| `xlsx_write` | `path`, `rows` arrays of strings; explicit `.xlsx` destination. One text-only worksheet: at most 256 rows, 64 columns per row, 4096 cells, 4096 UTF-8 bytes per cell and 65536 total text bytes; encoded output up to 1048576 bytes. Requires its own XLSX tool grant. |
 | `search_text` | `pattern`; optional `path`, integer `context_lines` from 0–20, and `include`/`exclude` filename-glob arrays. Each array accepts at most 32 nonempty globs of 256 UTF-8 bytes each. `.git` and `node_modules` remain excluded. |
 | `git_diff` | Optional `cwd`, `staged` and `file` (repository-relative pathspec). For example, `file: "Sources/App.swift"` limits the diff to that file. Read `stdout_truncated`, `stderr_truncated` and `timed_out` before treating output as complete. |
+
+The XLSX tool preserves literal cell text, including CR, `_xHHHH_`-like text and
+formula-like strings; it does not create formulas, types, styles or images.
+Project roots select context/default paths; tool grants and OS permissions govern
+host-wide access, and the pinned write boundary remains. XLSX instruction import
+retains the original and extracts meaningful cell values.
+Blank or unreadable workbooks stay unresolved; package XML is not runnable text.
+[Contract and remaining gates](docs/NATIVE-XLSX-WRITING.md).
 
 The DOCX tool writes plain text through native Word-document serialization.
 It does not interpret Markdown, add images or promise styled-page/Office-suite

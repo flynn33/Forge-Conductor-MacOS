@@ -1,6 +1,13 @@
 # Documentation guide
 
-Current source targets **0.27.1 (40)**, repairing repeated shutdown while preserving retry.
+Current source targets **0.28.0 (41)**, adding bounded text-cell XLSX writing and
+cell-value instruction import. [XLSX contract](NATIVE-XLSX-WRITING.md) records
+limits, the observed baseline, source/native 124 and build/signing passes, and the
+scoped wire/artifact/Core/Qwen passes and remaining product/shipment gates.
+
+## Preceding 0.27.1 (40) shutdown qualification
+
+The preceding source targets **0.27.1 (40)**, repairing repeated shutdown while preserving retry.
 [Shutdown evidence](ORDINARY-RUNTIME-CONTINUATION.md#repeated-subsystem-shutdown), [audit measurements](DIAGNOSTIC-CAPTURE-CONTRACT.md#bounded-audit-drain-measurements)
 and [provider diagnostics](PROJECT-WEB-QWEN.md#provider-only-diagnostics) retain their separate gates.
 
@@ -155,6 +162,7 @@ qualification is not promoted by this UI phase.
 | [Filesystem list paging](FILESYSTEM-LIST-PAGING.md) | Opt-in directory continuation, metadata/authorization fences, LF-inclusive frame budgets and current qualification status |
 | [Web response budgets](WEB-RESPONSE-BUDGET.md) | Fetch/search stdio ID, notice and LF sizing, preserved continuation and qualification scope |
 | [Native DOCX writing](NATIVE-DOCX-WRITING.md) | Bounded plain-text Word export, signed App/CLI wire, artifact/import/Core/Qwen evidence and retained failures |
+| [Native XLSX writing and import](NATIVE-XLSX-WRITING.md) | Bounded text-cell worksheet creation, cell-value instruction import, retained baseline, scoped qualification and remaining gates |
 | [Native web rendering](NATIVE-WEB-RENDERING.md) | JavaScript snapshots, fixed native child ownership, actual frame budgets and qualification limits |
 | [Binary web and Qwen file workflows](BINARY-WEB-AND-QWEN-FILES.md) | Original HTTP bytes, version alignment, native/model examples and remaining format/browser gates |
 | [Project repository, web access and Qwen verification](PROJECT-WEB-QWEN.md) | GitHub project links, web/file tool additions, actual Qwen findings and current verification boundaries |

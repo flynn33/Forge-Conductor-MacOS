@@ -1,6 +1,14 @@
 # Version and qualification status
 
-Current source target **0.27.1, build 40** repairs repeated shutdown and preserves retry.
+Current source target **0.28.0, build 41** adds text-cell XLSX writing and repairs
+XLSX cell-value import. Owning source/native 124 and CLI/app/ordinary Debug/strict
+candidate gates passed, plus 16 App/CLI controls, both retained native Core cases
+and three-response Qwen API consumption. Broader product/shipment gates remain open.
+[Contract and gates](NATIVE-XLSX-WRITING.md).
+
+## Preceding 0.27.1 (40) shutdown qualification
+
+The preceding source target **0.27.1, build 40** repairs repeated shutdown and preserves retry.
 [The shutdown contract](ORDINARY-RUNTIME-CONTINUATION.md#repeated-subsystem-shutdown) records qualified scope and open gates;
 separate source/native G3 passed one each, for 212 distinct methods each.
 
@@ -1635,7 +1643,7 @@ Dashboard geometry, minimum/normal containment of every primary view, and
 populated policy evaluation rows. Live completion of the reported owner run,
 universal policy enforcement, and distribution qualification remain open.
 
-Current source target: **0.27.1, build 40**, supporting **macOS 26+**. The earlier
+Current source target: **0.28.0, build 41**, supporting **macOS 26+**. The earlier
 0.16.3 Developer ID app and archive are recorded in the historical build-24 section;
 that workflow staged the CLI under `~/.forge-conductor` and manually copied the
 app to `/Applications`. It did not exercise a `.pkg` installation, notarization,
@@ -1647,9 +1655,14 @@ the detailed, source-bound receipts are in the
 
 ## Version and build agreement
 
-The current Swift, CLI, Xcode and documentation target is **0.27.1, build 40**.
-Root/compiled/PBX authorities agree; separate source/native G3 passed one each.
-[Current evidence](ORDINARY-RUNTIME-CONTINUATION.md#repeated-subsystem-shutdown).
+The current Swift, CLI, Xcode and documentation target is **0.28.0, build 41**.
+Current source/native G3 passed within the matching 124-method selections; the
+canonical graph/build/signing gate passed on the same 454 inputs.
+[XLSX gate status](NATIVE-XLSX-WRITING.md).
+
+The preceding .27.1 root/compiled/PBX authorities agreed; separate source/native
+G3 passed one each within 212 distinct methods each.
+[Retained evidence](ORDINARY-RUNTIME-CONTINUATION.md#repeated-subsystem-shutdown).
 
 The preceding DOCX Swift runtime, CLI, Xcode Debug and Release configurations
 and documentation targeted version **0.27.0, build 39**. The root [`VERSION`](../VERSION)

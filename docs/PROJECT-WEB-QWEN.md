@@ -1,10 +1,29 @@
 # Project repository, web access and Qwen verification
 
-Current source targets **0.27.1 (40)**. The repeated-shutdown patch preserves
+Current source targets **0.28.0 (41)**, adding bounded `xlsx_write` and repairing
+XLSX cell-value import. Repository links and web tools remain available;
+[current XLSX gates](NATIVE-XLSX-WRITING.md) record source/native 124, build/signing,
+App/CLI 16 controls and both retained native Core cases passing. Qwen completed
+three normal API responses, actual Low 3/3, consumed the `xlsx_write` and `fs_read`
+results and reported exact SHA/2525 bytes/four cells. Native 6/6 correlated frames
+and normal worker/observer/collector EOF passed. The isolated API/candidate exchange
+is not active installed GUI, production managed adapter, all models or full Office.
+`native-xlsx-qwen-final-0280/summary.json` retains the result. Full web remains open.
+
+## Preceding 0.27.1 shutdown scope
+
+The preceding source targets **0.27.1 (40)**. The repeated-shutdown patch preserves
 repository links, web tools and bounded DOCX; [qualified scope](ORDINARY-RUNTIME-CONTINUATION.md#repeated-subsystem-shutdown)
 remains separate from provider/full-web and installed-GUI acceptance.
 
 ## Provider-only diagnostics
+
+H4 and H5 provider-only follow-ups stopped normally but remained NONPASS: H4
+omitted `pages_consumed` from its six keys; H5 returned seven keys but changed
+exact text. Both observed actual Low and normal worker/observer EOF, with no
+native dispatch or established cause. Their retained summaries are
+`qwen-provider-h1-text-final-cleared-reasoning-0271/summary.json` and
+`qwen-provider-h1-text-final-correction-0271/summary.json`. Earlier failures remain.
 
 On retained .27.0 inputs, **H1 scalar metadata passed** one normal Low response
 with STOP and worker/observer EOF in 29.092 s, with no native dispatch. It reported
