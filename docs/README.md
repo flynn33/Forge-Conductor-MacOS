@@ -1,6 +1,10 @@
 # Documentation guide
 
-Current source targets **0.27.0 (39)**, adding `docx_write` for bounded plain-text
+Current source targets **0.27.1 (40)**, repairing repeated shutdown while preserving retry.
+[Shutdown evidence](ORDINARY-RUNTIME-CONTINUATION.md#repeated-subsystem-shutdown), [audit measurements](DIAGNOSTIC-CAPTURE-CONTRACT.md#bounded-audit-drain-measurements)
+and [provider diagnostics](PROJECT-WEB-QWEN.md#provider-only-diagnostics) retain their separate gates.
+
+The preceding source targets **0.27.0 (39)**, adding `docx_write` for bounded plain-text
 Word documents. It requires its own grant, string arguments and an explicit
 `.docx` destination. Input is limited to 65,536 UTF-8 bytes and encoded output
 to 1,048,576 bytes. CRLF, CR and U+2029 normalize to LF; native paragraph

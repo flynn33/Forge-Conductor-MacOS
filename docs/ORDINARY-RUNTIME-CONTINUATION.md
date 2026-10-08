@@ -1,6 +1,66 @@
 # Ordinary runtime jobs across a handoff
 
-Current source identity is **0.26.0 (36)**. This slice retains native runtime job
+Current source identity is **0.27.1 (40)**. Repeated runtime-subsystem shutdown
+now preserves its first completed report after its own SQLite close. Existing
+continuation, process ownership, durable formats and Managed startup/restart
+contracts remain. The bounded DOCX capability remains available; its .27.0
+qualification is retained separately in the [DOCX record](NATIVE-DOCX-WRITING.md).
+
+## Repeated subsystem shutdown
+
+Before the repair, RuntimeJobSubsystem awaited ExecutionJobService.shutdown and
+closed its repository after a completed report. The next service shutdown still
+queried nonterminalJobs; requiredDatabase threw repositoryClosed, making durable
+inspection unsuccessful and completed false despite the prior successful close.
+The exact isolated `testSubsystemShutdownPreservesSuccessfulReportAfterRepositoryClose`
+executed one method/one failure before the product patch (log
+`b4ea92bfe10efd4e65961ba8b64e3e737331a6164fcc03abc076d08007505984`), then the same
+assertion passed once after it (log
+`2fff38287f17ee7ecb5ec73689653e0d6d9465c6eb0e161d88102a5766f4121b`).
+Original failures remain recorded.
+
+RuntimeJobRepository now owns one private completed-subsystem report. The
+subsystem checks it before awaiting service shutdown. Final actor reconciliation
+returns an existing certificate, otherwise retains only an actual completed report
+before close. It returns incomplete reports without caching or closing, preserving
+retry. This also reconciles calls that entered before certification. Plain public
+repository close creates no certificate; direct ExecutionJobService shutdown still
+re-inspects durability. No new actor, service, task, queue, schema or disk receipt
+is added, and Managed startup/recovery bounds are unchanged.
+
+The six new RuntimeExecutionJobTests preserve unstarted/started same-instance
+repeat parity, plain-close failure, structured concurrent calls, failed-before/
+actual-success-after certificate reconciliation, and direct-service closed-repository
+inspection. The concurrent test uses two async-let calls without claiming a forced
+interleaving. Existing unresolved-process retry and held-startup/permit shutdown
+oracles retain their assertions.
+
+| Current gate | Actual result |
+| --- | --- |
+| Source owning selection | RuntimeExecutionJobTests 171 + ManagedAutonomyRuntimeTests 28 + DiagnosticBoundaryTests 12 = 211 distinct methods; normal exit 0, unforced, 113.567 s, log `fa42e342882d89c207fb97b8e6716eb7abeda028f729d7168a0d5bd465f121a8`, zero failures/skips. |
+| Canonical native selection | Same exact 211 methods; normal exit 0, unforced, 139.918 s, log `ae235cf6680a73187ee73e34c39eaf9d9bfbb38fa22a53af438e7fba976cce8f`, zero failures/skips; includes original application failure oracle, six new parity cases and four audit cells. Three QoS blocks plus three XCTest mirrors remain. |
+| Product compilation | CLI/app normal exit 0 in 0.997/0.900 s; ordinary canonical Debug normal exit 0, unforced, 24.629 s, log `49d43e12804ce4a3924d5992c73cf38781c80f9f257c27e11e44b06ee6e289f0`. |
+| Candidate | Strict Debug verification passed seven binary files and existing Docs/web-render resources; candidate manifest `runtime-subsystem-shutdown-native-candidate-0271.json` SHA `cef51f7717cd7bc54ae6bba88daa6ffc3539949ccbbf2e395dff1dfff2c38058`. Fifteen prior manifests/99 files and three named protected files remain exact. |
+| Version/graph | Root/compiled/PBX identity 0.27.1/40; PBX only twelve marketing/sixteen build settings; existing memberships retained. Source/native G3 agreement passed separately. |
+| Separate G3 | Exact `G1G10AcceptanceTests/testG3_VersionAndReleaseDocumentsAreAligned`: one source and one native method passed, zero failures/skips, normal exit 0, unforced, 1.540/35.836 s. Logs `23225aa7c1fedc63a3cd1125f7425cb44ce3ba5d8c66d8857a72faaedd5fc60f` / `bcd559891f3ef490b19cdfbe7769432ea87b269a8b449575cb7422920c512689`; same 450-input map. Owning 211 + separate 1 = 212 distinct methods each. |
+
+The owning/build receipts bind unchanged 450 product inputs to map
+`566940e74bf975ed796f4c0e9e33cb38d53334fdd4745c8a805a0a3f500ccbd2`.
+The separate G3 is added once: 211 owning + 1 = 212 distinct methods each; focused
+repeats add none. The earlier four-cell measurement native
+class remains NONPASS 11/12 on its original inputs; its actual exported timings
+are [fixture measurements](DIAGNOSTIC-CAPTURE-CONTRACT.md#bounded-audit-drain-measurements),
+not a production QoS repair. Provider cause/full-web, XLSX classification, installed
+GUI, full-feature, PDFKit, Release and shipment remain separate. The three-file
+preservation guard attests only the named app/helper/registration identities.
+Exact source/wiki delivery identities are retained in the external closeout receipt
+after remote verification.
+
+## Preceding ordinary-runtime continuation evidence
+
+The following .26.0/36 results retain their original maps, receipts and failures.
+
+The preceding source identity is **0.26.0 (36)**. This slice retains native runtime job
 references when an ordinary project-bound MCP session hands off. First CLI/app
 compiles and the original repaired regression passed on their integration
 snapshots. The later focused 24-test selection passed without warnings/errors;

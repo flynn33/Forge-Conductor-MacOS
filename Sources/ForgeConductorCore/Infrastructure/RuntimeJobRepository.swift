@@ -217,6 +217,7 @@ public actor RuntimeJobRepository {
     private let databaseCleanup = RuntimeJobDatabaseCleanup()
     private var database: OpaquePointer?
     private var openRegistration: SQLiteOpenRegistration?
+    private var completedSubsystemShutdownReport: RuntimeJobShutdownReport?
 
     public init(
         databaseURL: URL,
@@ -283,6 +284,18 @@ public actor RuntimeJobRepository {
         self.database = nil
         VerifiedMigrationBackup.unregisterOpenDatabase(openRegistration)
         openRegistration = nil
+    }
+
+    func subsystemShutdownReport() -> RuntimeJobShutdownReport? {
+        return completedSubsystemShutdownReport
+    }
+
+    func completeSubsystemShutdown(_ report: RuntimeJobShutdownReport) -> RuntimeJobShutdownReport {
+        if let completedSubsystemShutdownReport { return completedSubsystemShutdownReport }
+        guard report.completed else { return report }
+        completedSubsystemShutdownReport = report
+        close()
+        return report
     }
 
     public func health() throws -> (schemaVersion: Int, integrity: String, journalMode: String) {

@@ -9655,3 +9655,180 @@ extension RuntimeExecutionJobTests {
         XCTAssertEqual(afterReader, debt)
     }
 }
+
+extension RuntimeExecutionJobTests {
+    func testSubsystemShutdownPreservesSuccessfulReportAfterRepositoryClose() async throws {
+        let fixture = try await Fixture.make()
+        let subsystem = try RuntimeJobSubsystem(
+            controlPlaneRepository: fixture.controlRepository,
+            databaseURL: fixture.root.appendingPathComponent("control-plane.sqlite"),
+            artifactRoot: fixture.root.appendingPathComponent("subsystem-artifacts", isDirectory: true),
+            limits: fixture.limits
+        )
+        addTeardownBlock {
+            _ = await subsystem.shutdown()
+            await subsystem.repository.close()
+            await fixture.close()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+
+        let first = await subsystem.shutdown()
+        XCTAssertTrue(first.completed)
+        XCTAssertTrue(first.unresolvedJobIDs.isEmpty)
+        XCTAssertTrue(first.persistencePendingJobIDs.isEmpty)
+        do {
+            _ = try await subsystem.repository.health()
+            XCTFail("Completed subsystem shutdown must close its repository")
+        } catch {
+            XCTAssertEqual(error as? RuntimeJobError, .repositoryClosed)
+        }
+
+        let second = await subsystem.shutdown()
+        XCTAssertEqual(second, first, "The same subsystem must retain its successful shutdown report after closing storage")
+    }
+
+    func testSubsystemShutdownCannotCertifyPlainRepositoryClose() async throws {
+        let fixture = try await Fixture.make()
+        let subsystem = try RuntimeJobSubsystem(
+            controlPlaneRepository: fixture.controlRepository,
+            databaseURL: fixture.root.appendingPathComponent("control-plane.sqlite"),
+            artifactRoot: fixture.root.appendingPathComponent("subsystem-artifacts", isDirectory: true),
+            limits: fixture.limits
+        )
+        addTeardownBlock {
+            _ = await subsystem.shutdown()
+            await subsystem.repository.close()
+            await fixture.close()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+        await subsystem.repository.close()
+
+        let first = await subsystem.shutdown()
+        XCTAssertFalse(first.completed, "Plain close is not a successful shutdown certification")
+        XCTAssertTrue(first.unresolvedJobIDs.isEmpty)
+        XCTAssertTrue(first.persistencePendingJobIDs.isEmpty)
+        let second = await subsystem.shutdown()
+        XCTAssertEqual(second, first)
+    }
+
+    func testConcurrentSubsystemShutdownPreservesSuccessfulReportsAfterClose() async throws {
+        let fixture = try await Fixture.make()
+        let subsystem = try RuntimeJobSubsystem(
+            controlPlaneRepository: fixture.controlRepository,
+            databaseURL: fixture.root.appendingPathComponent("control-plane.sqlite"),
+            artifactRoot: fixture.root.appendingPathComponent("subsystem-artifacts", isDirectory: true),
+            limits: fixture.limits
+        )
+        addTeardownBlock {
+            _ = await subsystem.shutdown()
+            await subsystem.repository.close()
+            await fixture.close()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+
+        // Two structured calls exercise an idle, unstarted actual subsystem.
+        // This is bounded concurrency parity, not a forced scheduler interleaving.
+        async let first = subsystem.shutdown()
+        async let second = subsystem.shutdown()
+        let reports = await (first, second)
+        XCTAssertTrue(reports.0.completed)
+        XCTAssertTrue(reports.1.completed)
+        XCTAssertEqual(reports.0, reports.1)
+        XCTAssertTrue(reports.0.unresolvedJobIDs.isEmpty)
+        XCTAssertTrue(reports.0.persistencePendingJobIDs.isEmpty)
+        let repeated = await subsystem.shutdown()
+        XCTAssertEqual(repeated, reports.0)
+    }
+
+    func testDirectServiceShutdownStillInspectsClosedRepositoryAfterPriorSuccess() async throws {
+        let fixture = try await Fixture.make()
+        addTeardownBlock {
+            await fixture.close()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+        let first = await fixture.service.shutdown()
+        XCTAssertTrue(first.completed)
+        await fixture.runtimeRepository.close()
+
+        let second = await fixture.service.shutdown()
+        XCTAssertFalse(second.completed, "Direct service shutdown must still inspect its closed durable ledger")
+        XCTAssertTrue(second.unresolvedJobIDs.isEmpty)
+        XCTAssertTrue(second.persistencePendingJobIDs.isEmpty)
+    }
+}
+
+extension RuntimeExecutionJobTests {
+    func testSubsystemShutdownReconciliationPreservesFailureUntilActualCertification() async throws {
+        let fixture = try await Fixture.make()
+        let subsystem = try RuntimeJobSubsystem(
+            controlPlaneRepository: fixture.controlRepository,
+            databaseURL: fixture.root.appendingPathComponent("control-plane.sqlite"),
+            artifactRoot: fixture.root.appendingPathComponent("subsystem-artifacts", isDirectory: true),
+            limits: fixture.limits
+        )
+        addTeardownBlock {
+            _ = await subsystem.shutdown()
+            await subsystem.repository.close()
+            await fixture.close()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+        // Only the incoming failed report is a fixture value. Successful
+        // certification must come from the real subsystem shutdown below.
+        let failed = RuntimeJobShutdownReport(
+            completed: false,
+            unresolvedJobIDs: [UUID()],
+            persistencePendingJobIDs: [UUID()]
+        )
+        let beforeCertification = await subsystem.repository.completeSubsystemShutdown(failed)
+        XCTAssertEqual(beforeCertification, failed)
+        let uncertified = await subsystem.repository.subsystemShutdownReport()
+        XCTAssertNil(uncertified)
+        let readable = try await subsystem.repository.health()
+        XCTAssertEqual(readable.integrity, "ok", "An incomplete report must not close readable storage")
+
+        let first = await subsystem.shutdown()
+        XCTAssertTrue(first.completed)
+        XCTAssertTrue(first.unresolvedJobIDs.isEmpty)
+        XCTAssertTrue(first.persistencePendingJobIDs.isEmpty)
+        let certification = await subsystem.repository.subsystemShutdownReport()
+        XCTAssertEqual(certification, Optional(first))
+        let afterCertification = await subsystem.repository.completeSubsystemShutdown(failed)
+        XCTAssertEqual(afterCertification, first, "Reconciliation must return the actual prior successful report")
+        do {
+            _ = try await subsystem.repository.health()
+            XCTFail("Certified subsystem shutdown must leave storage closed")
+        } catch {
+            XCTAssertEqual(error as? RuntimeJobError, .repositoryClosed)
+        }
+    }
+
+    func testStartedSubsystemShutdownPreservesSuccessfulReportAfterRepositoryClose() async throws {
+        let fixture = try await Fixture.make()
+        let subsystem = try RuntimeJobSubsystem(
+            controlPlaneRepository: fixture.controlRepository,
+            databaseURL: fixture.root.appendingPathComponent("control-plane.sqlite"),
+            artifactRoot: fixture.root.appendingPathComponent("subsystem-artifacts", isDirectory: true),
+            limits: fixture.limits
+        )
+        addTeardownBlock {
+            _ = await subsystem.shutdown()
+            await subsystem.repository.close()
+            await fixture.close()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+        try await subsystem.start()
+
+        let first = await subsystem.shutdown()
+        XCTAssertTrue(first.completed)
+        XCTAssertTrue(first.unresolvedJobIDs.isEmpty)
+        XCTAssertTrue(first.persistencePendingJobIDs.isEmpty)
+        do {
+            _ = try await subsystem.repository.health()
+            XCTFail("Completed started-subsystem shutdown must close its repository")
+        } catch {
+            XCTAssertEqual(error as? RuntimeJobError, .repositoryClosed)
+        }
+        let second = await subsystem.shutdown()
+        XCTAssertEqual(second, first)
+    }
+}

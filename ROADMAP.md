@@ -1,8 +1,31 @@
 # Forge Conductor macOS — project roadmap
 
+## Repeated runtime-subsystem shutdown
+
+Current target **0.27.1 (40)** repairs repeated shutdown without adding a tool,
+service, task, schema or storage migration. The bounded plain-text DOCX capability
+remains available; its preceding qualification keeps its own inputs below.
+
+| Milestone | Actual evidence | Remaining boundary |
+| --- | --- | --- |
+| Original failure | The exact isolated subsystem parity assertion executed once and failed before the repair, then passed after it. The earlier whole native DiagnosticBoundaryTests run remains NONPASS: 11/12 passed; the existing second application shutdown assertion failed before the four new measurement cells. | Original failed receipts are retained, not relabeled. |
+| Existing-owner repair | RuntimeJobSubsystem asks its existing repository actor for a completed certificate; final actor reconciliation stores only an actual completed service report before close. Incomplete reports remain retryable, plain close creates no certificate, and direct service re-inspection remains. | No Managed startup/restart, process termination, durable job format or recovery-bound change. |
+| Parity | Owning source 211 and the same exact native 211 passed, zero failures/skips: RuntimeExecutionJobTests 171, ManagedAutonomyRuntimeTests 28 and DiagnosticBoundaryTests 12, including all six new runtime cases and four measurement cells. | Separate source/native G3 passed one each, totaling 212 distinct methods each; focused repeats are not added. Native retains three QoS warning blocks and three XCTest mirrors. |
+| Bounded audit measurements | Four original native attachments exported normally and passed the strict 27-field reader; 4,151 payload bytes. Held 50 ms drains returned false in about 52 ms; released flush and final shutdown completed off the main thread. | Requested QoS labels are not effective OS QoS; no production QoS fix, ordinary GUI inversion or leak claim. Whole original native class remains NONPASS. |
+| Provider diagnostics | H1 scalar metadata passed one normal Low response. H2 representation and H3 streaming did not complete the original exact-text task within its unchanged 90 s budget; H3 retained 1,496 reasoning deltas/4859 bytes and zero answer/STOP/DONE/bodyEOF before forced worker termination. | Provider cause unknown; no production adapter, installed-GUI, full-web or all-model acceptance. |
+| Provider exact-text follow-up | Fresh .27.1 H1 text remained NONPASS: one request/actual Low 1, zero completed responses/answer, confirmed worker KILL -9/full captured EOF, observer exit 0/full EOF; outer exit 1 in 89.605 s with cleanup flag retained. Current 450/candidate guards stayed exact; no native dispatch. | Original R4/H2/H3 NONPASS and earlier H1 scalar PASS remain; cause unknown. |
+| XLSX collector setup | Both external utilities exited 2 before import; Foundation retained the actual user temporary directory after successful setenv and the owned-scratch guard was false. | A separate launch-environment probe also failed requested TMPDIR routing: Foundation retained the canonical OS user temp directory, UID 501/mode 0700. No Core import, XLSX runtime classification, writer acceptance, Foundation-cache cause or product diagnosis. |
+| Graph/build/candidate | Current version/build authorities advance together; existing memberships remain, PBX only twelve marketing/sixteen build settings. CLI/app and ordinary Debug passed; strict Debug verification passed seven binaries and existing resource contracts. Fifteen prior manifests/99 files and three named protected files stayed exact. | Current source/native G3 passed; the three-file guard does not attest all host data. Release, installation and shipment remain separate. |
+| Delivery | Runtime evidence binds the current 450-input map and isolated Debug candidate. | Exact source/wiki delivery identities are retained in the external closeout receipt after remote verification. Runtime checks alone do not demonstrate publication. |
+
+[Shutdown contract](docs/ORDINARY-RUNTIME-CONTINUATION.md#repeated-subsystem-shutdown),
+[measurement scope](docs/DIAGNOSTIC-CAPTURE-CONTRACT.md#bounded-audit-drain-measurements)
+and [provider diagnostics](docs/PROJECT-WEB-QWEN.md#provider-only-diagnostics).
+
 ## Native plain-text DOCX writing
 
-Current target **0.27.0 (39)** adds bounded native plain-text DOCX writing.
+The preceding target **0.27.0 (39)** adds bounded native plain-text DOCX writing.
+The following results retain that phase's original inputs and receipts.
 Its selected source/native, signed wire, independent artifact/import, production
 Core consumer and fresh Qwen API workflow gates passed within the scope below.
 

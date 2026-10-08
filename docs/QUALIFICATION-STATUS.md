@@ -1,6 +1,10 @@
 # Version and qualification status
 
-Current source target **0.27.0, build 39** adds bounded native plain-text DOCX.
+Current source target **0.27.1, build 40** repairs repeated shutdown and preserves retry.
+[The shutdown contract](ORDINARY-RUNTIME-CONTINUATION.md#repeated-subsystem-shutdown) records qualified scope and open gates;
+separate source/native G3 passed one each, for 212 distinct methods each.
+
+The preceding source target **0.27.0, build 39** adds bounded native plain-text DOCX.
 Owning source 154 plus actual G3 passed 155 distinct methods; compiled native 155
 passed the same scope, zero failures/skips on unchanged 450 inputs. Current
 CLI/app, ordinary Debug, strict seven-binary candidate and canonical graph gates
@@ -1631,7 +1635,7 @@ Dashboard geometry, minimum/normal containment of every primary view, and
 populated policy evaluation rows. Live completion of the reported owner run,
 universal policy enforcement, and distribution qualification remain open.
 
-Current source target: **0.27.0, build 39**, supporting **macOS 26+**. The earlier
+Current source target: **0.27.1, build 40**, supporting **macOS 26+**. The earlier
 0.16.3 Developer ID app and archive are recorded in the historical build-24 section;
 that workflow staged the CLI under `~/.forge-conductor` and manually copied the
 app to `/Applications`. It did not exercise a `.pkg` installation, notarization,
@@ -1643,8 +1647,12 @@ the detailed, source-bound receipts are in the
 
 ## Version and build agreement
 
-The Swift runtime, CLI, Xcode Debug and Release configurations, and current
-documentation target version **0.27.0, build 39**. The root [`VERSION`](../VERSION)
+The current Swift, CLI, Xcode and documentation target is **0.27.1, build 40**.
+Root/compiled/PBX authorities agree; separate source/native G3 passed one each.
+[Current evidence](ORDINARY-RUNTIME-CONTINUATION.md#repeated-subsystem-shutdown).
+
+The preceding DOCX Swift runtime, CLI, Xcode Debug and Release configurations
+and documentation targeted version **0.27.0, build 39**. The root [`VERSION`](../VERSION)
 and [`BUILD_NUMBER`](../BUILD_NUMBER) files are canonical; compiled constants
 and Xcode build settings match them. Actual G3 passed current DOCX version/document
 agreement; the compiled native 155 includes that method. Graph review preserves

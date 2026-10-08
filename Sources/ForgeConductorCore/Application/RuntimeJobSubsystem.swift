@@ -38,11 +38,9 @@ public struct RuntimeJobSubsystem: Sendable {
 
     @discardableResult
     public func shutdown() async -> RuntimeJobShutdownReport {
+        if let report = await repository.subsystemShutdownReport() { return report }
         let report = await service.shutdown()
-        if report.completed {
-            await repository.close()
-        }
-        return report
+        return await repository.completeSubsystemShutdown(report)
     }
 }
 

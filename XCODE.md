@@ -1,6 +1,25 @@
 # Forge Conductor — Xcode
 
-Current source version **0.27.0**, build **39**.
+Current source version **0.27.1**, build **40**.
+
+The repeated-shutdown repair changes two existing Core files. Six parity methods
+and four audit-drain measurement methods use existing test files and memberships;
+no file, resource or target is added. PBX changes only twelve marketing and sixteen
+build assignments; package and canonical workspace references remain.
+
+`swift test --filter '(RuntimeExecutionJobTests|ManagedAutonomyRuntimeTests|DiagnosticBoundaryTests)'`
+passed 211 methods in 113.567 s. Canonical ForgeConductorTests native selectors for
+the same three classes passed the same exact 211 in 139.918 s, zero failures/skips,
+with three QoS warning blocks and three XCTest mirrors. CLI/app compiled in
+0.997/0.900 s; the separate ordinary Debug build passed in 24.629 s on the same 450
+inputs. Strict Debug verification passed seven binary identities, exact Docs
+resource bytes and existing web-render resource presence. Fifteen prior manifests/
+99 files and the three named app/helper/LM Studio registration files stayed exact;
+that guard does not attest all host data. Separate source/native G3 passed one each,
+for 212 distinct methods each. Release, installation and shipment are separate.
+[Shutdown evidence](docs/ORDINARY-RUNTIME-CONTINUATION.md#repeated-subsystem-shutdown).
+
+The following DOCX results retain their preceding .27.0/39 inputs and receipts.
 
 The DOCX slice adds a fixed native child mode and bounded worker exporter inside
 existing files. Final review records all 23 changed memberships: thirteen Core
@@ -779,7 +798,7 @@ remains `22e7443d13496b3cc08b6e98366bb6d2332e3fd4`; later documentation commits
 do not change the binary identity. The set is ready for owner notarization and
 Apple upload, but is not notarized, stapled, installed, shipped, or released.
 That retained archive used Xcode `MARKETING_VERSION = 0.16.2` and
-`CURRENT_PROJECT_VERSION = 23`. Current source targets `0.27.0 (39)`; the historical build-24 app/archive use
+`CURRENT_PROJECT_VERSION = 23`. Current source targets `0.27.1 (40)`; the historical build-24 app/archive use
 `0.16.3 (24)`; notarization and shipment remain separate.
 
 Implementation revision `91ad90ee7a1e51b7289f4c531ddae4dbbc6812ec`

@@ -37,3 +37,51 @@ writable selected folder; JSON and Markdown explicitly disclose the omitted
 persisted history. An unwritable destination still fails and permits retry.
 Regression names and exact native candidate evidence are recorded in
 [qualification status](QUALIFICATION-STATUS.md).
+
+## Bounded audit-drain measurements
+
+The .27.1/40 follow-up adds four test-only DiagnosticBoundaryTests cells for
+utility/userInteractive requested caller QoS and flush/shutdown while one utility
+persistence work item is held. Work and caller assert off-main execution; the
+finite gate has a five-second escape. The held drain has a 50 ms allowance and
+must return false below 500 ms. Release is followed by a bounded two-second flush
+and shutdown, monotonically ordered timestamps, and refusal of later submission
+with one dropped submission. This changes no production queue or QoS policy.
+
+The initial focused source command selected all four cells and passed (normal exit 0,
+5.792 s, log `8935660df12a836888d6709f5b8a1352fccbdb486618a65b43b3779da5e89ce4`).
+The original whole native class is **NONPASS**: 12 started, 11 passed, 0 skipped,
+exit 65 in 47.976 s, log
+`9895ab99c0b5da9c6f9331581b2f054a11eb92a33a407d0c852b7adadd4c9efe`.
+The existing application-shutdown method failed its second idempotency assertion
+before the new cells; all four cells passed and three QoS warning blocks remain.
+Its failed receipt is retained independently of the later repair.
+
+All four actual native JSON attachments exported with normal termination/full EOF,
+no forced cleanup. The strict 27-field reader passed; the payload total is 4,151
+bytes. Each requested caller QoS label below uses utility persistence QoS.
+
+| Requested caller / held operation | Held drain ms (returned false) | Flush after release ms | Final shutdown ms |
+| --- | ---: | ---: | ---: |
+| utility / flush | 52.018584 | 0.020375 | 0.002000 |
+| userInteractive / flush | 52.012834 | 0.015709 | 0.000833 |
+| utility / shutdown | 52.015667 | 0.014250 | 0.001500 |
+| userInteractive / shutdown | 52.041416 | 2.002583 | 0.001666 |
+
+Each attachment reports work admitted/completed, off-main caller/work, no gate
+escape timeout, successful released flush/final shutdown, and post-shutdown
+refusal and one drop. Extraction summary
+`audit-drain-qos-r2-exported-measurements-0270/extraction-summary.json` has SHA
+`7c23fcdc5130a81c4ad18487c707f8c648fc71fff21d58665130dcae91962dc9`.
+These intervals include gate bookkeeping, queue completion and caller scheduling.
+Effective OS QoS and the warning's sole cause remain unknown; these are fixture
+measurements, not ordinary GUI inversion, production performance or leak proof.
+
+The .27.1 subsystem repair subsequently passed the original application assertion,
+all four cells and the other owning methods: source 211/native 211, zero failures/
+skips on their current 450-input map. Native still retains three Thread Performance
+Checker blocks (DiagnosticLog:75 application shutdown, the userInteractive flush
+fixture at DiagnosticBoundaryTests:399, and DiagnosticLog:64 userInteractive shutdown)
+and three XCTest warning mirrors. This fixes repeated subsystem completion reports,
+not production audit QoS. See the
+[shutdown contract](ORDINARY-RUNTIME-CONTINUATION.md#repeated-subsystem-shutdown).

@@ -1,4 +1,10 @@
-# Context and agent continuity (v0.27.0)
+# Context and agent continuity (v0.27.1)
+
+Current source documentation targets 0.27.1 (40). The shutdown repair preserves
+handoff, ACK, seal and Managed startup contracts; [current evidence](ORDINARY-RUNTIME-CONTINUATION.md#repeated-subsystem-shutdown)
+keeps successor/installed qualification separate.
+
+<a id="context-and-agent-continuity-v0270"></a>
 
 <a id="context-and-agent-continuity-v0262"></a>
 
@@ -16,7 +22,7 @@
 
 <a id="context-and-agent-continuity-v0180"></a>
 
-Current source documentation targets 0.27.0 (39). A successful `docx_write`
+The preceding source documentation targets 0.27.0 (39). A successful `docx_write`
 call is included in existing progress-tool classification. The addition does
 not create a durable runtime job reference or change handoff formats, ACK,
 seal or successor-session behavior. The two existing progress parity methods

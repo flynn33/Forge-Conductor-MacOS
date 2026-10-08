@@ -11,7 +11,10 @@ readbacks and ordinary observations retain their explicit limits; no
 installation, notarization, App Store upload or distribution was performed.
 Exact owner publication/readback/synchronization refs are retained externally.
 
-Current target identity is **0.27.0 (39)**. The feature-release component
+Current target identity is **0.27.1 (40)**, a repeated-shutdown patch with build 40.
+[The contract](ORDINARY-RUNTIME-CONTINUATION.md#repeated-subsystem-shutdown) records the verified scope; source/native G3 each passed one additional method.
+
+The preceding target identity is **0.27.0 (39)**. The feature-release component
 advances for one backward-compatible user-facing tool, `docx_write`; patch
 resets to zero and build advances to 39. Existing PDF names/schemas/defaults,
 grants, durable formats and runtime tools remain; no storage or protocol-schema
@@ -152,7 +155,13 @@ focused version test, and CI reject drift between them.
 
 ## Current identity
 
-The current product version target is `0.27.0`, build `39`. Root authorities,
+The current product version target is `0.27.1`, build `40`; root/compiled/PBX
+identities agree. Source/native G3 passed one each; [current evidence](ORDINARY-RUNTIME-CONTINUATION.md#repeated-subsystem-shutdown)
+keeps installation and shipment separate.
+
+### Preceding 0.27.0 version agreement
+
+The preceding product version target was `0.27.0`, build `39`. Root authorities,
 compiled constants, twelve marketing-version and sixteen build-number settings
 advance together. Actual G3 passed the current document/version agreement and
 is included in 155 unique source/native methods. The first mistaken selector

@@ -1,6 +1,12 @@
 # Forge Conductor architecture
 
-Version: `0.27.0`; build: `39`.
+Version: `0.27.1`; build: `40`.
+
+Repeated subsystem shutdown retains its completed result on the existing repository
+actor while incomplete shutdown remains retryable.
+[Ownership and evidence](ORDINARY-RUNTIME-CONTINUATION.md#repeated-subsystem-shutdown).
+
+The following DOCX architecture/evidence retains its preceding .27.0/39 inputs.
 
 The app owns one queue-free native DOCX exporter. The exact fixed child mode
 runs before ordinary configuration/UI bootstrap, preserves compiled CLI/App

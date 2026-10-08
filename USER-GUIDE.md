@@ -1,6 +1,10 @@
 # Forge Conductor user guide
 
-Current source targets **0.27.0 (39)**. Use `docx_write` with a `path` ending in
+Current source targets **0.27.1 (40)**. Repeating shutdown after success now
+returns the completed result; incomplete shutdowns can still be retried.
+[Shutdown contract and qualification](docs/ORDINARY-RUNTIME-CONTINUATION.md#repeated-subsystem-shutdown).
+
+The preceding source targets **0.27.0 (39)**. Use `docx_write` with a `path` ending in
 `.docx` and plain-text `content`. It has its own tool grant, a 65,536-byte UTF-8
 input limit and a 1,048,576-byte encoded limit. CRLF, CR and U+2029 normalize to LF;
 native text import can add a final paragraph LF. Invalid XML 1.0 scalars are rejected.
@@ -250,7 +254,7 @@ observations retain their recorded scope. Exact owner publication, remote
 readback and synchronization references are retained externally. See the
 [phase record](docs/GRAPHITE-WORKBENCH.md) for evidence and capture limits.
 
-Version **0.27.0**, build **39** (current source target; candidate qualification is separate from installation).
+Version **0.27.1**, build **40** (current source target; candidate qualification is separate from installation).
 
 This guide describes the current LM Studio-driven workflow. The user works in a
 normal LM Studio chat; Forge Conductor supplies project context, tools, policy

@@ -258,3 +258,240 @@ private final class OneShotDiagnosticPersistenceBlocker: @unchecked Sendable {
         _ = release.wait(timeout: .now() + 5)
     }
 }
+
+extension DiagnosticBoundaryTests {
+    func testBoundedAuditDrainUtilityCallerFlushWhileWorkIsHeld() async throws {
+        let observation = await AuditDrainQoSCell.observe(caller: .utility, drain: .flush)
+        try assertAuditDrainQoSCell(observation)
+    }
+
+    func testBoundedAuditDrainUserInteractiveCallerFlushWhileWorkIsHeld() async throws {
+        let observation = await AuditDrainQoSCell.observe(caller: .userInteractive, drain: .flush)
+        try assertAuditDrainQoSCell(observation)
+    }
+
+    func testBoundedAuditDrainUtilityCallerShutdownWhileWorkIsHeld() async throws {
+        let observation = await AuditDrainQoSCell.observe(caller: .utility, drain: .shutdown)
+        try assertAuditDrainQoSCell(observation)
+    }
+
+    func testBoundedAuditDrainUserInteractiveCallerShutdownWhileWorkIsHeld() async throws {
+        let observation = await AuditDrainQoSCell.observe(caller: .userInteractive, drain: .shutdown)
+        try assertAuditDrainQoSCell(observation)
+    }
+
+    private func assertAuditDrainQoSCell(_ observation: AuditDrainQoSCell.Observation) throws {
+        XCTAssertFalse(observation.callerWasMainThread)
+        XCTAssertTrue(observation.workAdmitted)
+        XCTAssertTrue(observation.workEnteredWithinTwoSeconds)
+        XCTAssertTrue(observation.blockedDrainInvoked)
+        XCTAssertFalse(observation.blockedDrainReturned)
+        XCTAssertLessThan(observation.blockedDrainElapsedSeconds, 0.5)
+        XCTAssertTrue(observation.flushAfterReleaseCompleted)
+        XCTAssertTrue(observation.shutdownAfterReleaseCompleted)
+        XCTAssertTrue(observation.workCompleted)
+        XCTAssertFalse(observation.workWasMainThread)
+        XCTAssertFalse(observation.gateReachedItsFiveSecondTimeout)
+        XCTAssertTrue(observation.submissionAfterShutdownRefused)
+        XCTAssertEqual(observation.droppedSubmissionsAfterRefusal, 1)
+        XCTAssertGreaterThan(observation.workEnteredUptimeNanoseconds, 0)
+        XCTAssertLessThanOrEqual(observation.workEnteredUptimeNanoseconds,
+                                 observation.blockedDrainBeginUptimeNanoseconds)
+        XCTAssertLessThanOrEqual(observation.blockedDrainBeginUptimeNanoseconds,
+                                 observation.blockedDrainEndUptimeNanoseconds)
+        XCTAssertLessThanOrEqual(observation.blockedDrainEndUptimeNanoseconds,
+                                 observation.releaseSignalUptimeNanoseconds)
+        XCTAssertLessThanOrEqual(observation.releaseSignalUptimeNanoseconds,
+                                 observation.workReturnUptimeNanoseconds)
+        XCTAssertLessThanOrEqual(observation.releaseSignalUptimeNanoseconds,
+                                 observation.releasedFlushBeginUptimeNanoseconds)
+        XCTAssertLessThanOrEqual(observation.releasedFlushBeginUptimeNanoseconds,
+                                 observation.releasedFlushEndUptimeNanoseconds)
+        XCTAssertLessThanOrEqual(observation.workReturnUptimeNanoseconds,
+                                 observation.releasedFlushEndUptimeNanoseconds)
+        XCTAssertLessThanOrEqual(observation.releasedFlushEndUptimeNanoseconds,
+                                 observation.finalShutdownBeginUptimeNanoseconds)
+        XCTAssertLessThanOrEqual(observation.finalShutdownBeginUptimeNanoseconds,
+                                 observation.finalShutdownEndUptimeNanoseconds)
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let measurement = try encoder.encode(observation)
+        XCTAssertLessThanOrEqual(measurement.count, 16_384)
+        guard measurement.count <= 16_384 else { return }
+        #if !SWIFT_PACKAGE
+        let attachment = XCTAttachment(data: measurement, uniformTypeIdentifier: "public.json")
+        attachment.name = "audit-drain-\(observation.requestedCallerQoS)-\(observation.drain)"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        #endif
+    }
+}
+
+private enum AuditDrainQoSCell {
+    enum Caller: String, Sendable {
+        case utility
+        case userInteractive
+
+        var requestedQoS: DispatchQoS {
+            switch self {
+            case .utility: return .utility
+            case .userInteractive: return .userInteractive
+            }
+        }
+    }
+
+    enum Drain: String, Sendable {
+        case flush
+        case shutdown
+    }
+
+    struct Observation: Codable, Sendable {
+        let requestedCallerQoS: String
+        let requestedPersistenceQoS: String
+        let drain: String
+        let callerWasMainThread: Bool
+        let workAdmitted: Bool
+        let workEnteredWithinTwoSeconds: Bool
+        let blockedDrainInvoked: Bool
+        let blockedDrainReturned: Bool
+        let blockedDrainElapsedSeconds: Double
+        let blockedDrainBeginUptimeNanoseconds: UInt64
+        let blockedDrainEndUptimeNanoseconds: UInt64
+        let workEnteredUptimeNanoseconds: UInt64
+        let releaseSignalUptimeNanoseconds: UInt64
+        let workReturnUptimeNanoseconds: UInt64
+        let releasedFlushBeginUptimeNanoseconds: UInt64
+        let releasedFlushEndUptimeNanoseconds: UInt64
+        let releasedFlushElapsedSeconds: Double
+        let finalShutdownBeginUptimeNanoseconds: UInt64
+        let finalShutdownEndUptimeNanoseconds: UInt64
+        let finalShutdownElapsedSeconds: Double
+        let flushAfterReleaseCompleted: Bool
+        let shutdownAfterReleaseCompleted: Bool
+        let workCompleted: Bool
+        let workWasMainThread: Bool
+        let gateReachedItsFiveSecondTimeout: Bool
+        let submissionAfterShutdownRefused: Bool
+        let droppedSubmissionsAfterRefusal: Int
+    }
+
+    static func observe(caller: Caller, drain: Drain) async -> Observation {
+        let worker = DispatchQueue(
+            label: "forge.test.audit-drain.\(caller.rawValue).\(drain.rawValue)",
+            qos: caller.requestedQoS
+        )
+        return await withCheckedContinuation { continuation in
+            worker.async(qos: caller.requestedQoS, flags: .enforceQoS) {
+                continuation.resume(returning: collect(caller: caller, drain: drain))
+            }
+        }
+    }
+
+    private static func collect(caller: Caller, drain: Drain) -> Observation {
+        let gate = FiniteAuditDrainWorkGate()
+        let persistence = BoundedAsyncWorkQueue(
+            label: "forge.test.audit-drain.persistence.\(caller.rawValue).\(drain.rawValue)",
+            capacity: 1,
+            qos: .utility
+        )
+        let admitted = persistence.submit { gate.run() }
+        let entered = admitted && gate.entered.wait(timeout: .now() + 2) == .success
+        var blockedDrainReturned = false
+        var elapsed: TimeInterval = 0
+        var blockedDrainBegin: UInt64 = 0
+        var blockedDrainEnd: UInt64 = 0
+        if entered {
+            let began = DispatchTime.now().uptimeNanoseconds
+            blockedDrainBegin = began
+            switch drain {
+            case .flush: blockedDrainReturned = persistence.flush(timeout: 0.05)
+            case .shutdown: blockedDrainReturned = persistence.shutdown(timeout: 0.05)
+            }
+            blockedDrainEnd = DispatchTime.now().uptimeNanoseconds
+            elapsed = Double(blockedDrainEnd - began) / 1_000_000_000
+        }
+        // Every path releases the one accepted item before the two bounded drains.
+        let releaseSignal = DispatchTime.now().uptimeNanoseconds
+        gate.release.signal()
+        let releasedFlushBegin = DispatchTime.now().uptimeNanoseconds
+        let flushed = persistence.flush(timeout: 2)
+        let releasedFlushEnd = DispatchTime.now().uptimeNanoseconds
+        let finalShutdownBegin = DispatchTime.now().uptimeNanoseconds
+        let shutDown = persistence.shutdown(timeout: 2)
+        let finalShutdownEnd = DispatchTime.now().uptimeNanoseconds
+        let refused = !persistence.submit {}
+        let state = gate.snapshot()
+        return Observation(
+            requestedCallerQoS: caller.rawValue,
+            requestedPersistenceQoS: "utility",
+            drain: drain.rawValue,
+            callerWasMainThread: Thread.isMainThread,
+            workAdmitted: admitted,
+            workEnteredWithinTwoSeconds: entered,
+            blockedDrainInvoked: entered,
+            blockedDrainReturned: blockedDrainReturned,
+            blockedDrainElapsedSeconds: elapsed,
+            blockedDrainBeginUptimeNanoseconds: blockedDrainBegin,
+            blockedDrainEndUptimeNanoseconds: blockedDrainEnd,
+            workEnteredUptimeNanoseconds: state.enteredUptimeNanoseconds,
+            releaseSignalUptimeNanoseconds: releaseSignal,
+            workReturnUptimeNanoseconds: state.returnUptimeNanoseconds,
+            releasedFlushBeginUptimeNanoseconds: releasedFlushBegin,
+            releasedFlushEndUptimeNanoseconds: releasedFlushEnd,
+            releasedFlushElapsedSeconds: Double(releasedFlushEnd - releasedFlushBegin) / 1_000_000_000,
+            finalShutdownBeginUptimeNanoseconds: finalShutdownBegin,
+            finalShutdownEndUptimeNanoseconds: finalShutdownEnd,
+            finalShutdownElapsedSeconds: Double(finalShutdownEnd - finalShutdownBegin) / 1_000_000_000,
+            flushAfterReleaseCompleted: flushed,
+            shutdownAfterReleaseCompleted: shutDown,
+            workCompleted: state.completed,
+            workWasMainThread: state.wasMainThread,
+            gateReachedItsFiveSecondTimeout: state.timedOut,
+            submissionAfterShutdownRefused: refused,
+            droppedSubmissionsAfterRefusal: persistence.droppedSubmissions
+        )
+    }
+}
+
+private final class FiniteAuditDrainWorkGate: @unchecked Sendable {
+    let entered = DispatchSemaphore(value: 0)
+    let release = DispatchSemaphore(value: 0)
+    private let lock = NSLock()
+    private var completed = false
+    private var wasMainThread = false
+    private var timedOut = false
+    private var enteredUptimeNanoseconds: UInt64 = 0
+    private var returnUptimeNanoseconds: UInt64 = 0
+
+    struct Snapshot: Sendable {
+        let completed: Bool
+        let wasMainThread: Bool
+        let timedOut: Bool
+        let enteredUptimeNanoseconds: UInt64
+        let returnUptimeNanoseconds: UInt64
+    }
+
+    func run() {
+        let mainThread = Thread.isMainThread
+        lock.lock()
+        enteredUptimeNanoseconds = DispatchTime.now().uptimeNanoseconds
+        lock.unlock()
+        entered.signal()
+        let result = release.wait(timeout: .now() + 5)
+        lock.lock()
+        completed = true
+        wasMainThread = mainThread
+        timedOut = result == .timedOut
+        returnUptimeNanoseconds = DispatchTime.now().uptimeNanoseconds
+        lock.unlock()
+    }
+
+    func snapshot() -> Snapshot {
+        lock.lock()
+        defer { lock.unlock() }
+        return Snapshot(completed: completed, wasMainThread: wasMainThread, timedOut: timedOut,
+                        enteredUptimeNanoseconds: enteredUptimeNanoseconds,
+                        returnUptimeNanoseconds: returnUptimeNanoseconds)
+    }
+}

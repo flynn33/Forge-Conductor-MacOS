@@ -1,6 +1,18 @@
 # Forge Conductor for macOS
 
-Current source targets **0.27.0 (39)**, adding `docx_write` for bounded plain-text
+Current source targets **0.27.1 (40)**. Repeated runtime-subsystem shutdown
+preserves a completed result; incomplete shutdown remains retryable.
+
+Owning source/native 211 and separate G3 one each passed **212 distinct methods
+each**, zero failures/skips.
+CLI/app, ordinary Debug and strict seven-binary candidate checks passed. Three
+native QoS warning blocks remain; current source/native G3 agreement passed.
+[Contract and exact evidence](docs/ORDINARY-RUNTIME-CONTINUATION.md#repeated-subsystem-shutdown).
+
+Bounded plain-text DOCX remains available. Full Office/full web, all-feature,
+PDFKit, installed/GUI, Release and shipment gates remain separate.
+
+The preceding source targets **0.27.0 (39)**, adding `docx_write` for bounded plain-text
 Word documents. It requires its own grant, string arguments and an explicit
 `.docx` destination. Input is limited to 65,536 UTF-8 bytes and encoded output
 to 1,048,576 bytes. CRLF, CR and U+2029 normalize to LF; native paragraph
@@ -647,8 +659,8 @@ continuity. The user does not start project work through a Forge Managed Run.
 
 | | |
 |---|---|
-| **Version** | **0.27.0** |
-| **Build** | **39** |
+| **Version** | **0.27.1** |
+| **Build** | **40** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |
@@ -765,7 +777,10 @@ was not exercised; its source selects the running app executable, so the CLI
 receipt does not qualify that path. The full scope and remaining
 distribution limits are in the [qualification record](docs/QUALIFICATION-STATUS.md).
 
-The current root version authorities, compiled protocol constants and Xcode
+The current version authorities target `0.27.1 (40)`; source/native G3 agreement passed.
+[Qualification and evidence](docs/ORDINARY-RUNTIME-CONTINUATION.md#repeated-subsystem-shutdown).
+
+The preceding DOCX root version authorities, compiled protocol constants and Xcode
 build settings target `0.27.0 (39)`; actual G3 passed current DOCX version/document
 agreement and is included in 155 unique source/native methods. The preceding
 .26.2 version method passed within the

@@ -1,6 +1,12 @@
 # Telemetry architecture (real-time native)
 
-Current source documentation targets `0.27.0`, build `39`. The DOCX tool adds
+Current source documentation targets `0.27.1`, build `40`.
+The shutdown repair changes no telemetry producer or production QoS policy.
+[Contract](ORDINARY-RUNTIME-CONTINUATION.md#repeated-subsystem-shutdown) and [measurements](DIAGNOSTIC-CAPTURE-CONTRACT.md#bounded-audit-drain-measurements) retain the open QoS boundary.
+
+The following DOCX results retain their preceding .27.0/39 map.
+
+The preceding source documentation targets `0.27.0`, build `39`. The DOCX tool adds
 its exact name to existing docs/known-tool collection and the existing static
 catalog group beside PDF tools. It adds no telemetry timer, queue or measured
 latency/heap/leak claim. The four existing telemetry/resource-loading cases
@@ -331,6 +337,6 @@ representative physical-hardware qualification remain open.
 
 ## Version
 
-`0.27.0`
+`0.27.1`
 
-Build: `39`
+Build: `40`

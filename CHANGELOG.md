@@ -10,6 +10,20 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### `0.27.1 (40)` repeated runtime-subsystem shutdown
+
+- Retain the first completed report on the existing repository actor before close.
+  Repeated subsystem shutdown returns that report; incomplete reports remain
+  retryable, with plain-close and direct-service inspection behavior preserved.
+- Add six parity cases without changing Managed startup, tools or durable formats.
+  Owning 211 plus separate G3 one passed 212 distinct methods each in source/native.
+- Record four bounded audit fixture measurements. Original native 11/12 NONPASS and
+  current three QoS warning blocks remain; no production QoS fix is claimed.
+- CLI/app, ordinary Debug and strict candidate checks passed; existing memberships
+  remain and PBX changes only version/build settings. Current source/native G3 agreement passed.
+  Installation, Release and shipment stay separate. Exact delivery identities are
+  retained externally after remote verification.
+
 ### `0.27.0 (39)` native plain-text DOCX writing
 
 - Add `docx_write(path, content)` with strict string arguments, an explicit

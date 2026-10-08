@@ -1,5 +1,53 @@
 # Project repository, web access and Qwen verification
 
+Current source targets **0.27.1 (40)**. The repeated-shutdown patch preserves
+repository links, web tools and bounded DOCX; [qualified scope](ORDINARY-RUNTIME-CONTINUATION.md#repeated-subsystem-shutdown)
+remains separate from provider/full-web and installed-GUI acceptance.
+
+## Provider-only diagnostics
+
+On retained .27.0 inputs, **H1 scalar metadata passed** one normal Low response
+with STOP and worker/observer EOF in 29.092 s, with no native dispatch. It reported
+two retained pages' metadata. This does not pass the original R4 final-text gate.
+
+The fresh **.27.1 H1 exact-text probe is also NONPASS**: one request/actual Low 1,
+zero completed responses/answer bytes, confirmed forced worker KILL (-9) with full
+captured EOF, and normal observer exit 0/full EOF. The outer collector exited 1 in 89.605 s
+with its forced-cleanup flag retained. Current 450 and admitted candidate guards
+stayed exact; no native dispatch or causal conclusion. This leaves the original
+R4 failure and the earlier H1 scalar PASS unchanged.
+`qwen-provider-h1-text-final-0271/summary.json` records the scoped result.
+
+**H2 representation and H3 streaming remain NONPASS** for that original exact-text
+task under the unchanged 90 s budget. H2 completed zero responses/response bytes;
+removing only two tool-content wrappers did not complete it. H3 received HTTP 200
+text/event-stream and 1,496 reasoning deltas/4859 bytes by 87.584539 s, but zero final
+content, no STOP/DONE and no HTTP-body EOF before confirmed forced worker KILL.
+Captured worker EOF is not normal HTTP completion. Actual Low, observer normal
+exit/EOF and unchanged 450 source/17 artifact guards were verified; cause remains
+unknown, with no production-adapter, all-model, full-web or installed-GUI claim.
+
+Exact external receipts: `qwen-provider-scalar-final-rebased-0270/summary.json`,
+`qwen-provider-h2-provider-log-root-review-0270.json` (SHA
+`89cce1d70316c4fd392b5d51f97fa0f3e850f5c5787bf647bc7763e1be7a5123`), and
+`qwen-provider-stream-progress-root-reconciliation-0270.json` (SHA
+`c1a6442c74e2988727a3bed876fd365f10483a3c3e6ce103428c262c3d054406`).
+
+Both external XLSX collectors exited 2 before Core import: Foundation retained the
+user temporary directory after successful setenv, leaving the owned-scratch guard
+false. `native-xlsx-import-baseline-setup-root-reconciliation-0270.json` records
+setup NONPASS, with no runtime XLSX classification, writer acceptance or product diagnosis.
+
+A separate launch-environment probe also remained NONPASS: Foundation used the
+OS user temporary directory despite the incoming requested TMPDIR. Root verified
+its canonical owner UID 501/mode 0700; no Core import or Foundation-cache cause was
+established. `native-xlsx-foundation-launch-tempdir-root-reconciliation-0270.json`
+retains that diagnostic separately from the two earlier setup failures.
+
+## Preceding bounded DOCX workflow
+
+The following results retain their .27.0/39 inputs and original failure boundaries.
+
 The **0.27.0 (39)** follow-up adds bounded native `docx_write`. Source 154+G3
 and native 155 passed, as did current builds/signing/memberships, App/CLI wire,
 independent artifacts/native imports and production Core consumer cases. Fresh
