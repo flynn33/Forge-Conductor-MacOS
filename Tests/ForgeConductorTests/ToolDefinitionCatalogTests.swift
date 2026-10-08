@@ -133,7 +133,7 @@ final class ToolDefinitionCatalogTests: XCTestCase {
             }
             let docsTools: Set<String> = [
                 "fs_read", "fs_write", "fs_edit", "fs_list", "fs_glob", "fs_mkdir", "search_text",
-                "shell_exec", "pdf_write", "pdf_from_file", "docx_write", "xlsx_write", "pptx_write", "git_status", "git_diff", "git_log",
+                "shell_exec", "pdf_write", "pdf_from_file", "docx_write", "xlsx_write", "pptx_write", "ods_write", "git_status", "git_diff", "git_log",
                 "runtime.capabilities", "python.run",
             ]
             let auditTools: Set<String> = [
@@ -1359,6 +1359,252 @@ final class ToolDefinitionCatalogTests: XCTestCase {
             }
             XCTAssertEqual(code, "tool_not_granted")
             XCTAssertFalse(FileManager.default.fileExists(atPath: source.appendingPathComponent("report.pptx").path))
+        }
+    }
+
+    func testODSWriteHasExactTextArraySchemaReplayAndNeighboringDocumentParity() throws {
+        try withProductionApp("ods-schema") { app in
+            let catalog = try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames)
+            let definition = try XCTUnwrap(catalog.definition(named: "ods_write"))
+            let schema = try definition.inputSchemaObject()
+            let properties = try XCTUnwrap(schema["properties"] as? [String: Any])
+            XCTAssertEqual(Set(properties.keys), ["path", "rows", "deadline_ms"])
+            XCTAssertEqual(schema["required"] as? [String], ["path", "rows"])
+            XCTAssertEqual(schema["additionalProperties"] as? Bool, false)
+            XCTAssertTrue(definition.strict)
+            let path = try XCTUnwrap(properties["path"] as? [String: Any])
+            XCTAssertEqual(path["type"] as? String, "string")
+            XCTAssertTrue((path["description"] as? String)?.contains("explicit .ods") == true)
+            let rows = try XCTUnwrap(properties["rows"] as? [String: Any])
+            XCTAssertEqual(rows["type"] as? String, "array")
+            XCTAssertEqual(rows["maxItems"] as? Int, 256)
+            XCTAssertNil(rows["minItems"])
+            let row = try XCTUnwrap(rows["items"] as? [String: Any])
+            XCTAssertEqual(row["type"] as? String, "array")
+            XCTAssertEqual(row["maxItems"] as? Int, 64)
+            XCTAssertNil(row["minItems"])
+            let cell = try XCTUnwrap(row["items"] as? [String: Any])
+            XCTAssertEqual(cell["type"] as? String, "string")
+            XCTAssertEqual(cell["maxLength"] as? Int, 4_096)
+            XCTAssertTrue((cell["description"] as? String)?.contains("4096 UTF-8 bytes") == true)
+            let deadline = try XCTUnwrap(properties["deadline_ms"] as? [String: Any])
+            XCTAssertEqual(deadline["type"] as? String, "integer")
+            XCTAssertEqual(deadline["minimum"] as? Int, 1)
+            XCTAssertEqual(deadline["maximum"] as? Int, ToolRouter.maximumRequestedDeadlineMilliseconds)
+            XCTAssertTrue(definition.description.contains("4096 cells"))
+            XCTAssertTrue(definition.description.contains("65536 total cell UTF-8 bytes"))
+            XCTAssertTrue(definition.description.contains("1048576 bytes"))
+            XCTAssertTrue(definition.description.contains("CRLF and CR normalize to LF"))
+            XCTAssertTrue(definition.description.contains("32768"))
+            XCTAssertTrue(definition.description.contains("formula-like strings"))
+            XCTAssertEqual(ManagerToolCategory.classify("ods_write"), .documents)
+            XCTAssertTrue(ToolRouter.isMutatingTool("ods_write"))
+            let replay = try ProductionToolReplayCatalog.classifier(productionToolNames: app.tools.toolNames)
+            XCTAssertEqual(try replay.replayClass(for: "ods_write"), .idempotent)
+
+            let descriptor = try definition.mcpDescriptor()
+            XCTAssertEqual(try JSONSupport.data(from: try XCTUnwrap(descriptor["inputSchema"] as? [String: Any])),
+                           definition.inputSchemaJSON)
+            let providerDefinitions = try catalog.providerToolDefinitions(allowedToolNames: ["ods_write"])
+            XCTAssertEqual(providerDefinitions.count, 1)
+            let provider = try XCTUnwrap(JSONSerialization.jsonObject(with: try XCTUnwrap(providerDefinitions.first)) as? [String: Any])
+            XCTAssertEqual(provider["name"] as? String, "ods_write")
+            XCTAssertEqual(provider["strict"] as? Bool, true)
+            XCTAssertEqual(try JSONSupport.data(from: try XCTUnwrap(provider["parameters"] as? [String: Any])),
+                           definition.inputSchemaJSON)
+
+            let xlsxDefinition = try XCTUnwrap(catalog.definition(named: "xlsx_write"))
+            let xlsx = try xlsxDefinition.inputSchemaObject()
+            XCTAssertEqual(xlsx["required"] as? [String], ["path", "rows"])
+            let xlsxProperties = try XCTUnwrap(xlsx["properties"] as? [String: Any])
+            XCTAssertEqual(Set(xlsxProperties.keys), ["path", "rows", "deadline_ms"])
+            XCTAssertEqual((xlsxProperties["rows"] as? [String: Any])?["maxItems"] as? Int, 256)
+            XCTAssertTrue(xlsxDefinition.description.contains("without line normalization"))
+            let pptx = try XCTUnwrap(catalog.definition(named: "pptx_write")).inputSchemaObject()
+            XCTAssertEqual(pptx["required"] as? [String], ["path", "slides"])
+            XCTAssertEqual(Set(try XCTUnwrap(pptx["properties"] as? [String: Any]).keys), ["path", "slides", "deadline_ms"])
+            let docx = try XCTUnwrap(catalog.definition(named: "docx_write")).inputSchemaObject()
+            XCTAssertEqual(docx["required"] as? [String], ["path", "content"])
+            XCTAssertEqual(Set(try XCTUnwrap(docx["properties"] as? [String: Any]).keys), ["path", "content", "deadline_ms"])
+            let pdf = try XCTUnwrap(catalog.definition(named: "pdf_write")).inputSchemaObject()
+            XCTAssertEqual(pdf["required"] as? [String], ["path", "content"])
+            XCTAssertEqual(Set(try XCTUnwrap(pdf["properties"] as? [String: Any]).keys), ["path", "content", "title", "deadline_ms"])
+            let missing = try app.tools.call(name: "ods_write", arguments: ["path": "unattached.ods", "rows": [["text"]]],
+                                             clientID: ClientID("ods-unattached"))
+            XCTAssertFalse(missing.ok)
+            XCTAssertEqual(missing.payload["code"] as? String, "project_context_required")
+        }
+    }
+
+    func testODSWriteRejectsRawInvalidPathsAndPreservesRowsWithoutRootConfinement() throws {
+        try withProductionApp("ods-path-admission") { app in
+            let project = app.paths.home.appendingPathComponent("project", isDirectory: true)
+            try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+            let client = ClientID("ods-path-admission")
+            let context = ToolInvocationContext(projectID: ProjectID(), projectGeneration: .initial,
+                clientID: client, authorizationScope: ToolAuthorizationScope(canonicalRoots: [project],
+                    allowedTools: ["ods_write", "docx_write", "pdf_write"], networkAllowed: false, maximumInlineOutputBytes: 65_536))
+            let authorization = ToolAuthorizationService(paths: app.paths, config: app.config)
+            let rows = [["café 日本語", "=1+1", "_x0041_"], ["", " leading and trailing ", "line\r\nnext\rfinal"]]
+            let invalid: [(String, Any?)] = [
+                ("missing", nil), ("number", NSNumber(value: 3)), ("boolean", NSNumber(value: true)),
+                ("null", NSNull()), ("array", ["report.ods"]), ("object", ["name": "report.ods"]),
+                ("empty", ""), ("blank", " \t\r\n"), ("NUL", "before\u{0000}after.ods"),
+            ]
+            for (label, path) in invalid {
+                var arguments: [String: Any] = ["rows": rows]
+                if let path { arguments["path"] = path }
+                let decision = try authorization.authorize(tool: "ods_write", arguments: arguments,
+                    context: context, clientID: client, binding: nil, cancellation: ToolCallCancellation(timeoutSeconds: 5))
+                guard case .denied(let code, _) = decision else {
+                    XCTFail("\(label): raw ODS path must not become an authorized normalized string")
+                    continue
+                }
+                XCTAssertEqual(code, "invalid_path", label)
+            }
+            let arguments: [String: Any] = ["path": "relative.ods", "rows": rows]
+            let ods = try authorization.authorize(tool: "ods_write", arguments: arguments,
+                context: context, clientID: client, binding: nil, cancellation: nil)
+            let docx = try authorization.authorize(tool: "docx_write", arguments: ["path": "relative.ods", "content": "plain"],
+                context: context, clientID: client, binding: nil, cancellation: nil)
+            guard case .allowed(let normalizedODS) = ods, case .allowed(let normalizedDOCX) = docx else {
+                return XCTFail("Valid ODS paths must use the existing write normalization boundary")
+            }
+            XCTAssertEqual(normalizedODS["path"] as? String, normalizedDOCX["path"] as? String)
+            XCTAssertEqual(try JSONSupport.data(from: ["rows": try XCTUnwrap(normalizedODS["rows"] as? [[String]])]),
+                           try JSONSupport.data(from: ["rows": rows]))
+            let outside = app.paths.home.appendingPathComponent("outside.ods")
+            let hostWide = try authorization.authorize(tool: "ods_write", arguments: ["path": outside.path, "rows": rows],
+                context: context, clientID: client, binding: nil, cancellation: nil)
+            guard case .allowed(let normalizedOutside) = hostWide else {
+                return XCTFail("Project roots select identity/default paths and must not add a host-wide write confinement")
+            }
+            XCTAssertEqual(normalizedOutside["path"] as? String, outside.resolvingSymlinksInPath().standardizedFileURL.path)
+            XCTAssertFalse(FileManager.default.fileExists(atPath: outside.path))
+            let legacyPDF = try authorization.authorize(tool: "pdf_write", arguments: ["path": NSNumber(value: 3), "content": "plain"],
+                context: context, clientID: client, binding: nil, cancellation: nil)
+            guard case .allowed = legacyPDF else { return XCTFail("ODS path validation must not alter the PDF path contract") }
+            let strictDOCX = try authorization.authorize(tool: "docx_write", arguments: ["path": NSNumber(value: 3), "content": "plain"],
+                context: context, clientID: client, binding: nil, cancellation: nil)
+            guard case .denied(let docxCode, _) = strictDOCX else { return XCTFail("Existing DOCX raw-path validation must remain strict") }
+            XCTAssertEqual(docxCode, "invalid_path")
+            XCTAssertFalse(FileManager.default.fileExists(atPath: project.appendingPathComponent("relative.ods").path))
+            XCTAssertFalse(FileManager.default.fileExists(atPath: project.appendingPathComponent("3").path))
+        }
+    }
+
+    func testODSWriteDefaultEnrollmentPreservesCustomDenialsAndNarrowGrants() throws {
+        try withProductionApp("ods-default-grants") { app in
+            let catalog = try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames)
+            XCTAssertEqual(ProjectInstructionQueueStore.ordinaryDefaultAllowedTools.filter { $0 == "ods_write" }.count, 1)
+            XCTAssertTrue(ContinuityAutomation.progressTools.contains("ods_write"))
+            let documentTools: Set<String> = ["pdf_write", "pdf_from_file", "docx_write", "xlsx_write", "pptx_write", "ods_write"]
+            for specs in [app.catalog.all(), AgentCatalog.builtinDefaults()] {
+                let docs = try XCTUnwrap(specs.first { $0.id == "docs" })
+                XCTAssertEqual(Set(docs.tools).intersection(documentTools), documentTools)
+                XCTAssertEqual(docs.tools.filter { $0 == "ods_write" }.count, 1)
+                XCTAssertTrue(docs.body.contains("ods_write"))
+                for spec in specs where spec.id != "docs" { XCTAssertFalse(spec.tools.contains("ods_write"), spec.id) }
+            }
+            XCTAssertEqual(try catalog.definitions(allowedToolNames: ["ods_write"]).map(\.name), ["ods_write"])
+            for existing in ["fs_write", "docx_write", "xlsx_write", "pptx_write", "pdf_write", "pdf_from_file"] {
+                XCTAssertEqual(try catalog.definitions(allowedToolNames: [existing]).map(\.name), [existing])
+                XCTAssertFalse(ToolGrantSemantics.grants(tool: "ods_write", from: [existing]))
+                XCTAssertFalse(ToolGrantSemantics.grants(tool: existing, from: ["ods_write"]))
+            }
+            let custom = """
+            ---
+            id: docs
+            display_name: Owner docs
+            tools:
+              - fs_write
+              - docx_write
+            tools_forbidden:
+              - ods_write
+            ---
+            Owner-defined documentation grants.
+            """
+            try custom.write(to: app.paths.agentsDir.appendingPathComponent("docs.md"), atomically: true, encoding: .utf8)
+            app.catalog.reload()
+            let spec = try XCTUnwrap(app.catalog.get("docs"))
+            XCTAssertEqual(spec.source, "custom")
+            XCTAssertEqual(spec.tools, ["fs_write", "docx_write"])
+            XCTAssertEqual(spec.toolsForbidden, ["ods_write"])
+            let project = app.paths.home.appendingPathComponent("project", isDirectory: true)
+            try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+            let client = ClientID("ods-grant-boundary")
+            let authorization = ToolAuthorizationService(paths: app.paths, config: app.config)
+            let projectID = ProjectID()
+            let existingGrants = ["fs_write", "docx_write", "xlsx_write", "pptx_write", "pdf_write", "pdf_from_file"]
+            for existing in existingGrants {
+                for (granted, requested) in [(existing, "ods_write"), ("ods_write", existing)] {
+                    let context = ToolInvocationContext(projectID: projectID, projectGeneration: .initial,
+                        clientID: client, authorizationScope: ToolAuthorizationScope(canonicalRoots: [project],
+                            allowedTools: [granted], networkAllowed: false, maximumInlineOutputBytes: 65_536))
+                    let decision = try authorization.authorize(tool: requested,
+                        arguments: ["path": "report.ods", "rows": [["text"]], "content": "plain"],
+                        context: context, clientID: client, binding: nil, cancellation: nil)
+                    guard case .denied(let code, _) = decision else {
+                        XCTFail("\(granted) must not grant \(requested)")
+                        continue
+                    }
+                    XCTAssertEqual(code, "tool_not_granted")
+                }
+            }
+            let context = ToolInvocationContext(projectID: projectID, projectGeneration: .initial,
+                clientID: client, authorizationScope: ToolAuthorizationScope(canonicalRoots: [project],
+                    allowedTools: ["*"], networkAllowed: false, maximumInlineOutputBytes: 65_536))
+            let binding = ActiveBinding(sessionID: SessionID("ods-custom-binding"), agentID: spec.id,
+                toolsPrimary: spec.tools, toolsForbidden: spec.toolsForbidden, cwd: project.path)
+            let denied = try authorization.authorize(tool: "ods_write", arguments: ["path": "report.ods", "rows": [["text"]]],
+                context: context, clientID: client, binding: binding, cancellation: nil)
+            guard case .denied(let code, _) = denied else {
+                return XCTFail("A wildcard project grant must not override the custom-agent ODS denial")
+            }
+            XCTAssertEqual(code, "tool_forbidden")
+            XCTAssertFalse(FileManager.default.fileExists(atPath: project.appendingPathComponent("report.ods").path))
+        }
+    }
+
+    func testODSWriteDoesNotExpandImportedExplicitCapabilities() throws {
+        try withProductionApp("ods-imported-grants") { app in
+            let projectID = ProjectID()
+            let source = app.paths.home.appendingPathComponent("owner-package", isDirectory: true)
+            try FileManager.default.createDirectory(at: source, withIntermediateDirectories: true)
+            try "Follow the owner's existing document grants.".write(
+                to: source.appendingPathComponent("instructions.md"), atomically: true, encoding: .utf8)
+            let requested = ["fs_read", "docx_write", "xlsx_write", "pptx_write"]
+            let expected = Array(Set(requested).union(["instruction_catalog", "instruction_read"])).sorted()
+            let manifest: [String: Any] = [
+                "schema_version": 1, "package_id": "owner-documents", "version": "1",
+                "mission": "Preserve the owner's explicit document capabilities.",
+                "project_id": projectID.description, "entry_documents": ["instructions.md"],
+                "requested_capabilities": requested,
+                "completion_gates": [ProjectInstructionQueueStore.builtInCompletionGate],
+                "resource_policy": ["profile": "project-default"],
+            ]
+            try JSONSupport.data(from: manifest).write(to: source.appendingPathComponent("forge-package.json"))
+            let store = try ProjectInstructionQueueStore(paths: app.paths)
+            let snapshot = try store.importPackage(sourceURL: source, projectID: projectID, generation: .initial)
+            let package = try XCTUnwrap(snapshot.packages.first)
+            XCTAssertEqual(package.allowedTools, expected)
+            XCTAssertFalse(package.allowedTools.contains("ods_write"))
+            let reread = try store.snapshot(projectID: projectID, generation: .initial)
+            XCTAssertEqual(try XCTUnwrap(reread.packages.first).allowedTools, expected)
+            let catalog = try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames)
+            XCTAssertEqual(Set(try catalog.definitions(allowedToolNames: Set(package.allowedTools)).map(\.name)), Set(expected))
+            let client = ClientID("ods-imported-grants")
+            let context = ToolInvocationContext(projectID: projectID, projectGeneration: .initial,
+                clientID: client, authorizationScope: ToolAuthorizationScope(canonicalRoots: [source],
+                    allowedTools: Set(package.allowedTools), networkAllowed: false, maximumInlineOutputBytes: 65_536))
+            let decision = try ToolAuthorizationService(paths: app.paths, config: app.config).authorize(
+                tool: "ods_write", arguments: ["path": "report.ods", "rows": [["text"]]],
+                context: context, clientID: client, binding: nil, cancellation: nil)
+            guard case .denied(let code, _) = decision else {
+                return XCTFail("New default ODS enrollment must not expand an imported explicit grant")
+            }
+            XCTAssertEqual(code, "tool_not_granted")
+            XCTAssertFalse(FileManager.default.fileExists(atPath: source.appendingPathComponent("report.ods").path))
         }
     }
 

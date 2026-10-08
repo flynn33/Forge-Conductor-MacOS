@@ -1494,6 +1494,7 @@ final class CoreTests: XCTestCase {
         let secret = "document-secret-\(UUID().uuidString)"
         let cases: [(String, [String: Any])] = [
             ("rows", ["path": "table.xlsx", "rows": [[secret, "_x0041_"]], "deadline_ms": 20_000]),
+            ("rows", ["path": "table.ods", "rows": [[secret, "_x0041_", "line\r\nnext"]], "deadline_ms": 20_000]),
             ("slides", ["path": "deck.pptx", "slides": [["title": secret + "-title", "paragraphs": [secret + "-paragraph", ""]]], "deadline_ms": 20_000]),
         ]
         for (contentKey, arguments) in cases {

@@ -1,8 +1,26 @@
 # Forge Conductor macOS — project roadmap
 
-## October 8 web and qualification follow-up
+## Native text-cell ODS writing and import
 
-Product target remains **0.29.0 (42)**. This follow-up changes one existing
+Current target **0.30.0 (43)** adds bounded `ods_write` and semantic ODS import.
+Final scoped source/native, build/signing, wire/artifact/Core and Qwen checks
+passed. Preceding-map passes and original failed receipts remain separate.
+
+| Milestone | Observed evidence or implementation | Remaining gate |
+| --- | --- | --- |
+| Import baseline and repair | The original source/native method each failed 13 assertions on .29 inputs: four documents per workbook and 965 blank-workbook XML instruction bytes. A later valid-list regression failed three assertions. Both repaired methods passed in final source/native; unsupported direct text blocks reject before paragraph/cached-value selection. | Original baseline failures remain NONPASS. Existing saved packages are not rewritten; reimport is required for cell conversion. |
+| Reader/writer and parity | Bounded ODF 1.3 text writing, native cell extraction, grants, authorization and audit parity passed within final 199 distinct source and matching native methods each, including G3 once. Three list fixtures independently passed official RelaxNG. | First reader compilation failed on two missing `try` annotations with no executed methods; retain that NONPASS. Full Office and unsupported content remain outside the text subset. |
+| Runtime consumers | Final App/CLI each passed eight controls and 15 correlated responses. All seven actual artifacts passed official content/manifest RelaxNG and text reconstruction. Public Core passed two new owned App artifacts; Qwen consumed actual write/full-base64-read results across three normal API responses, Low 3/3, with exact final metadata. | Populated Core queue start was not exercised. Qwen's final acknowledgement is metadata only. Candidate/API evidence does not qualify installed GUI, production managed-adapter or Office GUI behavior. |
+| Version/graph/build | Final matching 462-input maps; source/native 50.120/51.392 s, 199 passed each. Final CLI/app, ordinary Debug (25.328 s), strict signature and seven-binary/resource checks passed on .30.0/build 43. Focused 33 and R1 198 are not added to 199. | Native linkd/CG thumbnail diagnostics remain; no cause or general GUI/performance claim. R1 runtime receipts keep their superseded original map/candidate. |
+| Delivery | README, existing Unreleased and affected operating documents record the bounded phase and retained failures. | Exact source/wiki publication and synchronization identities belong in the external closeout after verification. Installed/GUI, full Office/full web, all models, Release and shipment remain open. |
+
+[ODS contract and retained failures](docs/NATIVE-ODS-WRITING.md).
+
+## Preceding 0.29 web and qualification follow-up
+
+### October 8 web and qualification follow-up
+
+The preceding product target remains **0.29.0 (42)**. This follow-up changes one existing
 SwiftPM qualification assertion and records fresh public-web evidence.
 
 | Milestone | Actual evidence | Remaining gate |
@@ -15,9 +33,11 @@ SwiftPM qualification assertion and records fresh public-web evidence.
 
 [Detailed scope and receipts](docs/PROJECT-WEB-QWEN.md#october-8-web-and-qualification-follow-up).
 
-## Native text-slide PPTX writing and import
+<a id="native-text-slide-pptx-writing-and-import"></a>
 
-Current target **0.29.0 (42)**. Bounded implementation and runtime gates passed;
+## Preceding native text-slide PPTX writing and import
+
+Preceding target **0.29.0 (42)**. Bounded implementation and runtime gates passed;
 source/wiki delivery is the phase closeout. Broader acceptance remains open.
 
 | Milestone | Actual evidence or implementation | Remaining gate |

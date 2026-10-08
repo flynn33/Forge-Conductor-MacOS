@@ -1,6 +1,14 @@
-# Context and agent continuity (v0.29.0)
+# Context and agent continuity (v0.30.0)
 
-Current source documentation targets 0.29.0 (42). `pptx_write` joins existing
+Current source documentation targets 0.30.0 (43). `ods_write` joins existing
+progress classification; handoff, ACK, seal and successor contracts remain.
+Scoped checks passed without qualifying rollover. [Contract](NATIVE-ODS-WRITING.md).
+
+<a id="context-and-agent-continuity-v0290"></a>
+
+## Preceding 0.29.0 (42) PPTX qualification
+
+The preceding source documentation targets 0.29.0 (42). `pptx_write` joins existing
 progress classification; no handoff, job-reference, ACK, seal or successor
 contract changes. Source/native 166 each and scoped runtime consumers passed.
 [Contract and retained evidence](NATIVE-PPTX-WRITING.md).

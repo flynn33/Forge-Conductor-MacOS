@@ -2093,3 +2093,173 @@ extension ProjectInstructionQueueTests {
         XCTAssertEqual((protected[.posixPermissions] as? NSNumber)?.intValue, 0o700)
     }
 }
+
+extension ProjectInstructionQueueTests {
+    func testODSImportKeepsPackageXMLOutOfInstructionsAndRetainsBlankSourceUnresolved() async throws {
+        try await Task.detached(priority: .utility) {
+            for populated in [true, false] {
+                let root = FileManager.default.temporaryDirectory
+                    .appendingPathComponent("forge-ods-import-test-\(UUID().uuidString)", isDirectory: true)
+                try FileManager.default.createDirectory(
+                    at: root, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700]
+                )
+                defer { try? FileManager.default.removeItem(at: root) }
+                let paths = AppPaths(home: root.appendingPathComponent("home", isDirectory: true))
+                let store = try ProjectInstructionQueueStore(paths: paths)
+                let project = ProjectID()
+                let name = populated ? "cell.ODS" : "blank.ods"
+                let source = root.appendingPathComponent(name)
+                let original = Self.odsImportFixture(populated: populated)
+
+                // ODF package 3.3: first local entry is stored mimetype, without extras.
+                XCTAssertLessThan(original.count, 8_192)
+                XCTAssertEqual(original.prefix(4), Data([0x50, 0x4B, 0x03, 0x04]))
+                XCTAssertEqual(original.subdata(in: 8..<10), Data([0, 0]))
+                XCTAssertEqual(original.subdata(in: 28..<30), Data([0, 0]))
+                XCTAssertEqual(String(decoding: original.subdata(in: 30..<38), as: UTF8.self), "mimetype")
+                let mediaType = "application/vnd.oasis.opendocument.spreadsheet"
+                XCTAssertEqual(
+                    original.subdata(in: 38..<(38 + mediaType.utf8.count)), Data(mediaType.utf8)
+                )
+                XCTAssertEqual(try SafeZIPArchive.inspect(original).map(\.path), [
+                    "mimetype", "content.xml", "META-INF/manifest.xml",
+                ])
+                try original.write(to: source)
+                let package = try XCTUnwrap(
+                    store.importPackage(sourceURL: source, projectID: project, generation: .initial).packages.first
+                )
+                let catalog = try store.catalogPage(
+                    contentSHA256: package.contentSHA256, projectID: project, generation: .initial,
+                    runID: nil, cursor: 0, limit: 16
+                )
+
+                XCTAssertEqual(package.documentCount, 1, "ODS must remain one source-linked document")
+                XCTAssertEqual(catalog.documents.count, 1)
+                XCTAssertFalse(catalog.documents.contains {
+                    $0["status"] == "converted_instruction"
+                        && $0["source_path"]?.hasSuffix(".xml") == true
+                }, "ODF package XML is structure, not instruction text")
+                let sourceDocument = try XCTUnwrap(catalog.documents.first { $0["source_path"] == name })
+                XCTAssertEqual(sourceDocument["original_sha256"], JSONSupport.sha256Hex(original))
+                let retained = paths.instructionPackageStoreDir.appendingPathComponent(package.contentSHA256)
+                    .appendingPathComponent("originals").appendingPathComponent(name)
+                XCTAssertEqual(try Data(contentsOf: retained), original)
+                XCTAssertEqual(
+                    (try FileManager.default.attributesOfItem(atPath: retained.path)[.posixPermissions] as? NSNumber)?.intValue,
+                    0o400
+                )
+                XCTAssertThrowsError(try store.catalogPage(
+                    contentSHA256: package.contentSHA256, projectID: ProjectID(), generation: .initial,
+                    runID: nil, cursor: 0, limit: 16
+                ))
+
+                if populated {
+                    XCTAssertEqual(package.unresolvedDocumentCount, 0)
+                    XCTAssertEqual(package.asDictionary()["import_ready"] as? Bool, true)
+                    XCTAssertEqual(sourceDocument["status"], "converted_instruction")
+                    // Keep both controls observable on the old source even when no cell document exists.
+                    if sourceDocument["status"] == "converted_instruction" {
+                        let expected = "[Sheet Sheet1]\nA1: ODS-SENTINEL café 日本語 & <literal> _x0041_"
+                        let documentID = try XCTUnwrap(sourceDocument["id"])
+                        var text = "", offset = 0, reachedEnd = false
+                        for _ in 0..<32 {
+                            let page = try store.readDocument(
+                                contentSHA256: package.contentSHA256, documentID: documentID,
+                                projectID: project, generation: .initial, runID: nil,
+                                byteOffset: offset, maximumBytes: 17
+                            )
+                            text += page.content
+                            if let next = page.nextByteOffset { XCTAssertGreaterThan(next, offset); offset = next }
+                            else { reachedEnd = true; break }
+                        }
+                        XCTAssertTrue(reachedEnd)
+                        XCTAssertEqual(text, expected)
+                        XCTAssertEqual(package.instructionByteCount, expected.utf8.count)
+                        XCTAssertEqual(sourceDocument["canonical_sha256"], JSONSupport.sha256Hex(Data(expected.utf8)))
+                        XCTAssertFalse(text.contains("<office:document-content"))
+                        XCTAssertFalse(text.contains("<manifest:manifest"))
+                        XCTAssertThrowsError(try store.readDocument(
+                            contentSHA256: package.contentSHA256, documentID: documentID,
+                            projectID: ProjectID(), generation: .initial, runID: nil,
+                            byteOffset: 0, maximumBytes: 17
+                        ))
+                    }
+                } else {
+                    XCTAssertEqual(package.instructionByteCount, 0)
+                    XCTAssertEqual(package.unresolvedDocumentCount, 1)
+                    XCTAssertEqual(package.asDictionary()["import_ready"] as? Bool, false)
+                    XCTAssertEqual(sourceDocument["status"], "unrepresented_visual_structural")
+                    XCTAssertEqual(sourceDocument["canonical_bytes"], "0")
+                    XCTAssertThrowsError(try store.start(projectID: project, generation: .initial))
+                    XCTAssertThrowsError(try store.documentReferences(contentSHA256: package.contentSHA256))
+                    XCTAssertThrowsError(try store.readDocument(
+                        contentSHA256: package.contentSHA256, documentID: try XCTUnwrap(sourceDocument["id"]),
+                        projectID: project, generation: .initial, runID: nil,
+                        byteOffset: 0, maximumBytes: 17
+                    ))
+                }
+            }
+        }.value
+    }
+
+    private static func odsImportFixture(populated: Bool) -> Data {
+        let cell = populated
+            ? "<table:table-cell office:value-type=\"string\"><text:p>ODS-SENTINEL café 日本語 &amp; &lt;literal&gt; _x0041_</text:p></table:table-cell>"
+            : "<table:table-cell/>"
+        let content = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" office:version="1.3">
+          <office:automatic-styles/>
+          <office:body><office:spreadsheet><table:table table:name="Sheet1"><table:table-column/><table:table-row>\(cell)</table:table-row></table:table></office:spreadsheet></office:body>
+        </office:document-content>
+        """
+        let manifest = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0" manifest:version="1.3">
+          <manifest:file-entry manifest:full-path="/" manifest:version="1.3" manifest:media-type="application/vnd.oasis.opendocument.spreadsheet"/>
+          <manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/>
+        </manifest:manifest>
+        """
+        return odsStoredZIP([
+            ("mimetype", Data("application/vnd.oasis.opendocument.spreadsheet".utf8)),
+            ("content.xml", Data(content.utf8)),
+            ("META-INF/manifest.xml", Data(manifest.utf8)),
+        ])
+    }
+
+    /// Independent finite ZIP fixture; ordered tuples keep mimetype first.
+    private static func odsStoredZIP(_ parts: [(String, Data)]) -> Data {
+        var local = Data(), central = Data()
+        func little(_ value: UInt32, bytes: Int) -> Data {
+            Data((0..<bytes).map { UInt8(truncatingIfNeeded: value >> ($0 * 8)) })
+        }
+        func crc(_ data: Data) -> UInt32 {
+            var value: UInt32 = 0xFFFF_FFFF
+            for byte in data {
+                value ^= UInt32(byte)
+                for _ in 0..<8 { value = (value >> 1) ^ (value & 1 == 0 ? 0 : 0xEDB8_8320) }
+            }
+            return value ^ 0xFFFF_FFFF
+        }
+        for (name, data) in parts {
+            let encoded = Data(name.utf8), checksum = crc(data), offset = local.count
+            local += little(0x0403_4B50, bytes: 4)
+            for value in [UInt32(20), 0, 0, 0, 0] { local += little(value, bytes: 2) }
+            for value in [checksum, UInt32(data.count), UInt32(data.count)] { local += little(value, bytes: 4) }
+            local += little(UInt32(encoded.count), bytes: 2); local += little(0, bytes: 2)
+            local += encoded; local += data
+            central += little(0x0201_4B50, bytes: 4)
+            for value in [UInt32(0x0314), 20, 0, 0, 0, 0] { central += little(value, bytes: 2) }
+            for value in [checksum, UInt32(data.count), UInt32(data.count)] { central += little(value, bytes: 4) }
+            for value in [UInt32(encoded.count), 0, 0, 0, 0] { central += little(value, bytes: 2) }
+            central += little(UInt32(0o100600) << 16, bytes: 4)
+            central += little(UInt32(offset), bytes: 4); central += encoded
+        }
+        let offset = local.count
+        local += central; local += little(0x0605_4B50, bytes: 4)
+        for value in [UInt32(0), 0, UInt32(parts.count), UInt32(parts.count)] { local += little(value, bytes: 2) }
+        local += little(UInt32(central.count), bytes: 4)
+        local += little(UInt32(offset), bytes: 4); local += little(0, bytes: 2)
+        return local
+    }
+}

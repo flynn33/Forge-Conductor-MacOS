@@ -10,6 +10,19 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### `0.30.0 (43)` native text-cell ODS writing and import
+
+- Add bounded `ods_write(path, rows)` for one text-only ODF 1.3 worksheet and an
+  explicit `.ods` destination. Normalize CRLF/CR to LF; preserve literal text.
+- New ODS imports read sheet-labeled cell values instead of package XML. Retain
+  originals; blank/unsupported input stays unresolved. Existing packages require
+  reimport, with no migration. Reject unsupported direct text blocks, including
+  valid lists, before paragraphs or cached values can omit them.
+- Preserve grants, custom denials, host-wide OS access and pinned writes. Final
+  source/native 199 each, build/signing, App/CLI 16 wire controls, seven independent
+  artifacts, two public Core cases and Qwen passed. Original failures and R1 map
+  receipts remain; broader gates stay open. [Contract](docs/NATIVE-ODS-WRITING.md).
+
 ### `0.29.0 (42)` web verification and qualification-test follow-up
 
 - Correct a stale qualification assertion to use `VERSION` and `BUILD_NUMBER`,

@@ -1,6 +1,12 @@
 # Documentation guide
 
-Current source targets **0.29.0 (42)** for bounded native PPTX writing and
+Current source targets **0.30.0 (43)** for bounded ODS text-cell writing and
+instruction import. [ODS contract](NATIVE-ODS-WRITING.md) records final scoped
+passes, retained preceding-map receipts and remaining product/shipment gates.
+
+## Preceding 0.29.0 (42) PPTX qualification
+
+The preceding source targets **0.29.0 (42)** for bounded native PPTX writing and
 slide-text import. [PPTX contract](NATIVE-PPTX-WRITING.md) retains the baseline,
 166 source/native methods each, App/CLI, reference/Core and Qwen passes with
 separate installed/GUI, full Office/full web and shipment gates.
@@ -171,6 +177,7 @@ qualification is not promoted by this UI phase.
 | [Native DOCX writing](NATIVE-DOCX-WRITING.md) | Bounded plain-text Word export, signed App/CLI wire, artifact/import/Core/Qwen evidence and retained failures |
 | [Native XLSX writing and import](NATIVE-XLSX-WRITING.md) | Bounded text-cell worksheet creation, cell-value instruction import, retained baseline, scoped qualification and remaining gates |
 | [Native PPTX writing and import](NATIVE-PPTX-WRITING.md) | Bounded text-slide creation, slide-owned instruction import, retained baseline and scoped validation gates |
+| [Native ODS writing and import](NATIVE-ODS-WRITING.md) | Bounded ODF text-cell creation, sheet-labeled instruction import, retained baseline, scoped qualification and remaining gates |
 | [Native web rendering](NATIVE-WEB-RENDERING.md) | JavaScript snapshots, fixed native child ownership, actual frame budgets and qualification limits |
 | [Binary web and Qwen file workflows](BINARY-WEB-AND-QWEN-FILES.md) | Original HTTP bytes, version alignment, native/model examples and remaining format/browser gates |
 | [Project repository, web access and Qwen verification](PROJECT-WEB-QWEN.md) | GitHub project links, web/file tool additions, actual Qwen findings and current verification boundaries |

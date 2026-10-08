@@ -1,6 +1,12 @@
 # Forge Conductor architecture
 
-Version: `0.29.0`; build: `42`. PPTX uses a call-local native encoder and
+Version: `0.30.0`; build: `43`. ODS uses bounded call-local Swift encoding and
+native XML cell extraction under existing tool and pinned-write owners. Scoped
+checks passed; saved packages require reimport. [Contract](NATIVE-ODS-WRITING.md).
+
+## Preceding 0.29.0 (42) PPTX qualification
+
+Preceding version: `0.29.0`; build: `42`. PPTX uses a call-local native encoder and
 bounded slide-text reader with existing tool and pinned-write owners. The writer
 shares the reader's 32,768-element slide limit. Conflicting XML encodings and
 duplicate expanded attributes are rejected; new document arrays are audit-redacted.

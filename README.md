@@ -1,6 +1,16 @@
 # Forge Conductor for macOS
 
-Current source targets **0.29.0 (42)**, adding bounded `pptx_write` and repairing
+Current source targets **0.30.0 (43)**, adding bounded `ods_write` and ODS
+cell-text instruction import. Final source and matching canonical native
+selections passed 199 distinct methods each, including valid-list rejection.
+CLI/app, ordinary Debug and strict candidate checks passed. Final App/CLI wire,
+seven independent artifacts, two public Core import cases and Qwen API
+consumption also passed. [Contract and retained evidence](docs/NATIVE-ODS-WRITING.md).
+Installed/GUI, full Office/full web, all models, Release and shipment remain open.
+
+## Preceding 0.29.0 (42) PPTX and web qualification
+
+The preceding source targets **0.29.0 (42)**, adding bounded `pptx_write` and repairing
 PPTX instruction import to extract slide text instead of package XML. Source and
 canonical native tests passed 166 methods each; App/CLI wire, seven independent
 reference artifacts, both original Core import cases and Qwen consumption passed.
@@ -689,8 +699,8 @@ continuity. The user does not start project work through a Forge Managed Run.
 
 | | |
 |---|---|
-| **Version** | **0.29.0** |
-| **Build** | **42** |
+| **Version** | **0.30.0** |
+| **Build** | **43** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |
@@ -807,8 +817,10 @@ was not exercised; its source selects the running app executable, so the CLI
 receipt does not qualify that path. The full scope and remaining
 distribution limits are in the [qualification record](docs/QUALIFICATION-STATUS.md).
 
-The current version authorities target `0.29.0 (42)`; source/native G3 passed within matching 166-method selections.
-[Current PPTX qualification](docs/NATIVE-PPTX-WRITING.md).
+The current version authorities target `0.30.0 (43)`; source/native G3 agreement
+passed within matching 199-method selections. [Current ODS scope](docs/NATIVE-ODS-WRITING.md).
+The preceding `0.29.0 (42)` source/native G3 passed within matching 166-method selections.
+[Preceding PPTX qualification](docs/NATIVE-PPTX-WRITING.md).
 The preceding .27.1 source/native G3 agreement passed on its retained inputs.
 [Qualification and evidence](docs/ORDINARY-RUNTIME-CONTINUATION.md#repeated-subsystem-shutdown).
 

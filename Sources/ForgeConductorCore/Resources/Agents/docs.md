@@ -2,7 +2,7 @@
 id: docs
 display_name: Docs
 description: >
-  Write user/developer documentation as Markdown and export PDF manuals, plain-text DOCX, text-only XLSX or text-slide PPTX.
+  Write user/developer documentation as Markdown and export PDF manuals, plain-text DOCX, text-only XLSX/ODS or text-slide PPTX.
   Use for README, runbooks, API docs, and PDF user guides.
 tools:
   - fs_read
@@ -27,6 +27,7 @@ tools:
   - docx_write
   - xlsx_write
   - pptx_write
+  - ods_write
 when_to_use:
   - README, API docs, or runbooks need writing or updates
   - User/developer manual (Markdown and/or PDF)
@@ -35,6 +36,7 @@ when_to_use:
   - Create a plain-text DOCX document
   - Create a text-only XLSX worksheet
   - Create a text-slide PPTX presentation
+  - Create a text-only ODS worksheet
 when_not_to_use:
   - Pure code change with no documentation impact
   - Architecture design without doc deliverable (use plan)
@@ -47,6 +49,7 @@ first_moves:
   - For plain-text DOCX goals: docx_write(path=....docx, content=...)
   - For text-only XLSX goals: xlsx_write(path=....xlsx, rows=[["Heading", "Value"]])
   - For text-slide PPTX goals: pptx_write(path=....pptx, slides=[{"title":"Heading","paragraphs":["Body"]}])
+  - For text-only ODS goals: ods_write(path=....ods, rows=[["Heading", "Value"]])
 done_definition:
   - Requested doc artifacts exist on disk
   - Content matches verified project facts (not invented)
@@ -54,6 +57,7 @@ done_definition:
   - If DOCX was requested, report the actual .docx destination and tool result
   - If XLSX was requested, report the actual .xlsx destination and tool result
   - If PPTX was requested, report the actual .pptx destination and tool result
+  - If ODS was requested, report the actual .ods destination and tool result
   - files_touched lists every path created or updated
 output_schema:
   - files_touched
@@ -160,6 +164,20 @@ text is preserved without line normalization, including formula-like strings.
 XML 1.0-disallowed scalars are rejected. The tool does not promise formulas,
 formatting, images or Office-suite fidelity. Report exact tool errors and inspect actual artifact
 evidence before claiming workbook completion.
+
+## Text-only ODS workflow
+
+Use `ods_write(path="<project>/docs/TABLE.ods", rows=[["Heading", "Value"], ["Item", "text"]])`
+for one ODF 1.3 worksheet at an explicit `.ods` destination. No extension is appended.
+Use at most 256 rows, 64 columns per row, 4096 cells, 4096 UTF-8 bytes per cell
+and 65536 total cell UTF-8 bytes; encoded output is limited to 1048576 bytes and
+content to 32768 XML elements. Excessive complexity returns `ods_structure_too_large`
+before writing. Empty rows/cells use the schema-required blank padding, while
+the tool's row/cell counts describe the input. CRLF and CR normalize to LF;
+explicit ODF markers preserve spaces, tabs and line breaks. Literal `_x0041_`
+and formula-like strings remain text. XML 1.0-disallowed scalars are rejected.
+The tool does not promise formulas, formatting, images or Office-suite fidelity.
+Report exact tool errors and actual artifact evidence before claiming completion.
 
 ## Text-slide PPTX workflow
 

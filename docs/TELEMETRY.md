@@ -1,6 +1,12 @@
 # Telemetry architecture (real-time native)
 
-Current source documentation targets `0.29.0`, build `42`. `pptx_write` joins
+Current source documentation targets `0.30.0`, build `43`. `ods_write` joins
+existing tool-card/docs classification. Scoped checks passed, with no producer,
+timer or performance repair claimed. [Contract](NATIVE-ODS-WRITING.md).
+
+## Preceding 0.29.0 (42) PPTX qualification
+
+The preceding source documentation targets `0.29.0`, build `42`. `pptx_write` joins
 existing docs tool classification; no producer, timer or performance change is
 claimed. Source/native 166 each and scoped runtime consumers passed; no memory
 or performance qualification is inferred. [Contract](NATIVE-PPTX-WRITING.md).

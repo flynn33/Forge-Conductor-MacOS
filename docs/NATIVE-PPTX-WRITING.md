@@ -1,6 +1,6 @@
 # Native text-slide PPTX writing and import
 
-Current source target is **0.29.0 (42)**. Bounded source/native, build/signing,
+Preceding PPTX source target was **0.29.0 (42)**. Bounded source/native, build/signing,
 wire/artifact, reference/Core consumer and Qwen API gates passed. Installed/GUI,
 full Office/full web, all models, Release and shipment remain separate.
 

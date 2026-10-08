@@ -1,6 +1,13 @@
 # Forge Conductor user guide
 
-Current source targets **0.29.0 (42)** for bounded `pptx_write` and slide-text
+Current source targets **0.30.0 (43)** for bounded text-only ODS writing and
+cell-value import. Use a separate ODS grant and an explicit `.ods` destination;
+reimport existing saved packages to gain conversion. Scoped checks passed.
+[Contract and limits](docs/NATIVE-ODS-WRITING.md).
+
+## Preceding 0.29.0 (42) PPTX qualification
+
+The preceding source targets **0.29.0 (42)** for bounded `pptx_write` and slide-text
 import. Source/native 166 each, App/CLI wire, reference/Core consumers and Qwen
 consumption passed on the same candidate inputs. Existing tools and grants remain.
 [Contract and limits](docs/NATIVE-PPTX-WRITING.md).
@@ -269,7 +276,7 @@ observations retain their recorded scope. Exact owner publication, remote
 readback and synchronization references are retained externally. See the
 [phase record](docs/GRAPHITE-WORKBENCH.md) for evidence and capture limits.
 
-Version **0.29.0**, build **42** (current source target; candidate qualification is separate from installation).
+Version **0.30.0**, build **43** (current source target; candidate qualification is separate from installation).
 
 This guide describes the current LM Studio-driven workflow. The user works in a
 normal LM Studio chat; Forge Conductor supplies project context, tools, policy
@@ -527,8 +534,16 @@ can return errors. [Renderer contract and verified scopes](docs/NATIVE-WEB-RENDE
 | `docx_write` | `path`, `content` strings; explicit `.docx` destination. Plain text up to 65536 UTF-8 bytes, encoded output up to 1048576 bytes. CRLF/CR/U+2029 normalize to LF; native paragraph terminators can add a final LF when imported. Requires its own DOCX tool grant. |
 | `xlsx_write` | `path`, `rows` arrays of strings; explicit `.xlsx` destination. One text-only worksheet: at most 256 rows, 64 columns per row, 4096 cells, 4096 UTF-8 bytes per cell and 65536 total text bytes; encoded output up to 1048576 bytes. Requires its own XLSX tool grant. |
 | `pptx_write` | `path`, `slides` with string `title` and string-array `paragraphs`; explicit `.pptx` destination. At most 32 slides, 1024 total paragraphs including nonempty titles, 4096 UTF-8 bytes per string, 65536 total input bytes, 32768 XML elements per slide and 1048576 encoded bytes. Requires its own PPTX tool grant. |
+| `ods_write` | `path`, `rows` arrays of strings; explicit `.ods` destination. One ODF 1.3 worksheet: at most 256 rows, 64 columns per row, 4096 input cells, 4096 UTF-8 bytes per cell, 65536 total input bytes, 32768 content XML elements and 1048576 encoded bytes. Requires its own ODS grant. |
 | `search_text` | `pattern`; optional `path`, integer `context_lines` from 0–20, and `include`/`exclude` filename-glob arrays. Each array accepts at most 32 nonempty globs of 256 UTF-8 bytes each. `.git` and `node_modules` remain excluded. |
 | `git_diff` | Optional `cwd`, `staged` and `file` (repository-relative pathspec). For example, `file: "Sources/App.swift"` limits the diff to that file. Read `stdout_truncated`, `stderr_truncated` and `timed_out` before treating output as complete. |
+
+The ODS tool writes text cells, normalizing CRLF/CR to LF while preserving
+spaces, tabs, line breaks and literal `_x0041_` text. Empty rows use structural
+blank padding; result counts describe the original input. ODS import retains the
+original and extracts meaningful cell text with sheet labels/references. It does
+not evaluate formulas or make package XML runnable. Existing grants and
+OS-authorized host-wide access apply. [Contract and pending gates](docs/NATIVE-ODS-WRITING.md).
 
 The PPTX tool writes plain-text slides with CRLF/CR normalized to LF. Embedded
 LF creates soft breaks; tabs, whitespace and literal `_x0041_` text remain.

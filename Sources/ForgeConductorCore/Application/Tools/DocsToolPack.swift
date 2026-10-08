@@ -1,5 +1,5 @@
 // DocsToolPack.swift
-// What: Provides native PDF, plain-text DOCX, text-cell XLSX, and text-slide PPTX tools to external MCP clients.
+// What: Provides native PDF, plain-text DOCX, text-cell XLSX/ODS, and text-slide PPTX tools to external MCP clients.
 // How: It translates validated tool arguments into PDFWriter operations and returns
 // bounded, structured success or error payloads.
 // Why: Document capability is an optional module rather than a responsibility of Core routing.
@@ -9,7 +9,7 @@ import Darwin
 import AppKit
 import CryptoKit
 
-/// Documentation tools: PDF write / PDF from file / plain-text DOCX / text-cell XLSX / text-slide PPTX.
+/// Documentation tools: PDF write / PDF from file / plain-text DOCX / text-cell XLSX/ODS / text-slide PPTX.
 public struct DocsToolPack: ToolPackHandling {
     private static let maximumSourceBytes = 4 * 1024 * 1024
     private let exporter: NativeDOCXExporter?
@@ -17,7 +17,7 @@ public struct DocsToolPack: ToolPackHandling {
     public init() { exporter = nil }
     init(exporter: NativeDOCXExporter) { self.exporter = exporter }
 
-    public var toolNames: [String] { ["pdf_write", "pdf_from_file", "docx_write", "xlsx_write", "pptx_write"] }
+    public var toolNames: [String] { ["pdf_write", "pdf_from_file", "docx_write", "xlsx_write", "pptx_write", "ods_write"] }
 
     public func handle(
         name: String,
@@ -40,9 +40,55 @@ public struct DocsToolPack: ToolPackHandling {
             return try xlsxWrite(arguments, context: context, app: app, cancellation: cancellation)
         case "pptx_write":
             return try pptxWrite(arguments, context: context, app: app, cancellation: cancellation)
+        case "ods_write":
+            return try odsWrite(arguments, context: context, app: app, cancellation: cancellation)
         default:
             return nil
         }
+    }
+
+    private func odsWrite(_ args: [String: Any], context: ToolInvocationContext?,
+                          app: ForgeApp, cancellation: ToolCallCancellation?) throws -> ToolResult {
+        guard let path = args["path"] as? String,
+              !path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              !path.utf8.contains(0) else {
+            return .failure(code: "invalid_path", message: "ODS path must be a nonblank string without NUL bytes")
+        }
+        let url = ToolArgHelpers.resolvePath(path)
+        guard url.pathExtension.lowercased() == "ods" else {
+            return .failure(code: "invalid_path", message: "An explicit .ods destination is required")
+        }
+        let rows: [[String]]
+        let encoded: Data
+        do {
+            rows = try NativeODSWriter.rows(from: args["rows"])
+            if let context { try app.projectContexts.validate(context, cancellation: cancellation) }
+            encoded = try NativeODSWriter.encode(rows: rows, cancellation: cancellation)
+            try cancellation?.checkCancellation()
+            if let context { try app.projectContexts.validate(context, cancellation: cancellation) }
+        } catch is CancellationError { throw CancellationError() }
+        catch let error as ToolCallDeadlineExceeded { throw error }
+        catch let error as NativeODSError {
+            return .failure(code: error.code, message: error.localizedDescription)
+        } catch {
+            return .failure(code: "ods_encode_failed", message: "Native encoding or project authorization failed")
+        }
+        try cancellation?.checkCancellation()
+        do {
+            try FilesystemToolPack.writePinnedText(encoded, to: url, cancellation: cancellation)
+        } catch is CancellationError { throw CancellationError() }
+        catch let error as ToolCallDeadlineExceeded { throw error }
+        catch {
+            return .failure(code: "ods_write_failed", message: "Destination write or durability confirmation failed; inspect the destination before retrying")
+        }
+        return .success([
+            "path": url.path, "format": "ods", "engine": "swift-odf-stored-zip",
+            "bytes_written": encoded.count,
+            "sha256": SHA256.hash(data: encoded).map { String(format: "%02x", $0) }.joined(),
+            "input_text_bytes": rows.reduce(0) { $0 + $1.reduce(0) { $0 + $1.utf8.count } },
+            "rows": rows.count, "cells": rows.reduce(0) { $0 + $1.count },
+            "text_contract": NativeODSWriter.textContract,
+        ])
     }
 
     private func pptxWrite(_ args: [String: Any], context: ToolInvocationContext?,

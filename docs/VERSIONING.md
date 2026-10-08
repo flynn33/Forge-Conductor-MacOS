@@ -11,7 +11,11 @@ readbacks and ordinary observations retain their explicit limits; no
 installation, notarization, App Store upload or distribution was performed.
 Exact owner publication/readback/synchronization refs are retained externally.
 
-Current target identity is **0.29.0 (42)**. The additive `pptx_write` capability
+Current target identity is **0.30.0 (43)**. Additive `ods_write` advances the
+feature component and build; source/native authority and G3 agreement passed.
+[Contract and remaining gates](NATIVE-ODS-WRITING.md).
+
+The preceding target identity is **0.29.0 (42)**. The additive `pptx_write` capability
 advances the feature component and build. Source/native G3 passed within 166
 distinct methods each; build/signing and scoped runtime consumers passed.
 [Contract and gates](NATIVE-PPTX-WRITING.md).
@@ -165,9 +169,16 @@ focused version test, and CI reject drift between them.
 
 ## Current identity
 
-Current source target is `0.29.0`, build `42`. Source/native G3 passed in matching
+Current source target is `0.30.0`, build `43`. Final source/native G3 passed
+within matching 199-method selections; build/signing and scoped ODS runtime
+checks passed. [Scope](NATIVE-ODS-WRITING.md).
+
+### Preceding 0.29.0 version agreement
+
+The preceding `0.29.0`, build `42` source/native G3 passed in matching
 166-method selections; canonical build/signing and scoped PPTX runtime gates
-passed on the same 458 inputs. Installed/GUI, Release and shipment remain open. [Current gate status](NATIVE-PPTX-WRITING.md).
+passed on the same 458 inputs. Installed/GUI, Release and shipment remain open.
+[Preceding gate status](NATIVE-PPTX-WRITING.md).
 
 ### Preceding 0.28.0 version agreement
 

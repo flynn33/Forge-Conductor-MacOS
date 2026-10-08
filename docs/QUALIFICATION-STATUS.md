@@ -1,6 +1,13 @@
 # Version and qualification status
 
-Current source target **0.29.0, build 42** adds bounded text-slide PPTX writing
+Current source target **0.30.0, build 43** adds bounded ODS writing and semantic
+cell import. Final source/native 199 each, canonical build/signing and scoped
+wire/artifact/Core/Qwen checks passed. Original failures and preceding-map passes
+remain separate; broader gates stay open. [Contract](NATIVE-ODS-WRITING.md).
+
+## Preceding 0.29.0 (42) PPTX qualification
+
+The preceding source target **0.29.0, build 42** adds bounded text-slide PPTX writing
 and semantic instruction import. Source/native 166 each, canonical build/signing,
 App/CLI wire, seven reference artifacts, both retained Core cases and Qwen
 consumption passed. Original failed compilation/structural/parser/audit receipts
@@ -1652,7 +1659,7 @@ Dashboard geometry, minimum/normal containment of every primary view, and
 populated policy evaluation rows. Live completion of the reported owner run,
 universal policy enforcement, and distribution qualification remain open.
 
-Current source target: **0.29.0, build 42**, supporting **macOS 26+**. The earlier
+Current source target: **0.30.0, build 43**, supporting **macOS 26+**. The earlier
 0.16.3 Developer ID app and archive are recorded in the historical build-24 section;
 that workflow staged the CLI under `~/.forge-conductor` and manually copied the
 app to `/Applications`. It did not exercise a `.pkg` installation, notarization,
@@ -1664,10 +1671,13 @@ the detailed, source-bound receipts are in the
 
 ## Version and build agreement
 
-The current Swift, CLI, Xcode and documentation target is **0.29.0, build 42**.
-Source/native G3 passed within matching 166-method selections on 458 inputs;
-canonical build/signing and scoped PPTX runtime gates passed.
-[PPTX gate status](NATIVE-PPTX-WRITING.md).
+The current Swift, CLI, Xcode and documentation target is **0.30.0, build 43**.
+Final source/native G3 passed within matching 199-method selections; canonical
+build/signing and scoped ODS runtime checks passed. [Scope](NATIVE-ODS-WRITING.md).
+
+The preceding .29 source/native G3 passed within matching 166-method selections
+on 458 inputs; canonical build/signing and scoped PPTX runtime gates passed.
+[Preceding PPTX gate status](NATIVE-PPTX-WRITING.md).
 
 Preceding .28 source/native G3 passed within matching 124-method selections; its
 canonical graph/build/signing gate passed on its original 454 inputs.

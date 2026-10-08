@@ -160,10 +160,10 @@ public final class AgentCatalog: AgentCatalogProviding, @unchecked Sendable {
             AgentSpec(
                 id: "docs",
                 displayName: "Docs",
-                description: "Write Markdown documentation and export PDF manuals, plain-text DOCX, text-only XLSX or text-slide PPTX via native tools.",
-                tools: ["fs_read", "fs_write", "fs_edit", "fs_list", "fs_glob", "fs_mkdir", "search_text", "shell_exec", "pdf_write", "pdf_from_file", "docx_write", "xlsx_write", "pptx_write", "git_status", "git_diff", "git_log", "runtime.capabilities", "python.run", "job.status", "job.read_output", "job.cancel", "job.list"],
+                description: "Write Markdown documentation and export PDF manuals, plain-text DOCX, text-only XLSX/ODS or text-slide PPTX via native tools.",
+                tools: ["fs_read", "fs_write", "fs_edit", "fs_list", "fs_glob", "fs_mkdir", "search_text", "shell_exec", "pdf_write", "pdf_from_file", "docx_write", "xlsx_write", "pptx_write", "ods_write", "git_status", "git_diff", "git_log", "runtime.capabilities", "python.run", "job.status", "job.read_output", "job.cancel", "job.list"],
                 toolsForbidden: ["git_push", "git_commit"],
-                whenToUse: ["README", "PDF manual", "plain-text DOCX", "text-only XLSX", "text-slide PPTX", "runbook", "API docs"],
+                whenToUse: ["README", "PDF manual", "plain-text DOCX", "text-only XLSX", "text-only ODS", "text-slide PPTX", "runbook", "API docs"],
                 firstMoves: ["fs_glob docs/README", "fs_read sources", "fs_write markdown", "pdf_from_file if needed", "agent_run_complete"],
                 doneDefinition: ["Artifacts on disk", "files_touched filled", "agent_run_complete"],
                 outputSchema: ["files_touched", "summary", "formats", "how_to_open"],
@@ -185,6 +185,13 @@ public final class AgentCatalog: AgentCatalogProviding, @unchecked Sendable {
                 normalization; formula-like strings remain text. XML 1.0-disallowed
                 scalars are rejected. Do not promise formulas, formatting, images or
                 Office-suite fidelity.
+                For a text-only ODF worksheet use ods_write(path="<project>/docs/TABLE.ods",
+                rows=[["Heading", "Value"], ["Item", "text"]]). The same input dimensions
+                and text byte limits apply, with at most 32768 XML elements and 1048576
+                encoded bytes. CRLF and CR normalize to LF; explicit space, tab and line
+                break markers preserve whitespace. Literal _x0041_ and formula-like
+                strings remain text. Empty rows/cells use required structural padding.
+                Do not promise formulas, formatting, images or Office-suite fidelity.
                 For text slides use pptx_write(path="<project>/docs/DECK.pptx",
                 slides=[{"title":"Heading","paragraphs":["Body"]}]). Use 1 to 32 slides,
                 at most 1024 paragraphs including nonempty titles, 4096 UTF-8 bytes per

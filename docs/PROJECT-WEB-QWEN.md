@@ -1,6 +1,17 @@
 # Project repository, web access and Qwen verification
 
-Current source targets **0.29.0 (42)**. Qwen completed three normal API
+Current source targets **0.30.0 (43)**. Qwen selected `ods_write` then `fs_read`
+and consumed both actual results, including full base64 readback, across three
+normal API responses, actual Low 3/3. Exact final SHA/2,145 bytes/two rows and
+native 6/6 correlated responses passed with normal exit/EOF. The final
+acknowledgement is metadata only; isolated candidate/API proof does not qualify
+installed GUI, production managed-adapter, full Office/full web or all models.
+[ODS contract and retained evidence](NATIVE-ODS-WRITING.md). Existing web evidence
+and installed .18 limits keep their original scopes below.
+
+## Preceding 0.29.0 (42) PPTX and web qualification
+
+The preceding source targets **0.29.0 (42)**. Qwen completed three normal API
 responses, actual Low 3/3, selected `pptx_write` then `fs_read` and consumed both
 actual results. Final exact SHA/11,384 bytes/one slide and native 6/6 correlated
 responses passed with normal exit/EOF, no forced cleanup. Source/native 166 each,

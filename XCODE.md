@@ -1,6 +1,14 @@
 # Forge Conductor — Xcode
 
-Current source version **0.29.0**, build **42**. Four PPTX Swift source/test
+Current source version **0.30.0**, build **43**. Final source and matching
+canonical native selections passed 199 distinct methods each, including G3 and
+valid-list rejection, on the same 462 inputs. Final CLI/app, ordinary Debug
+(25.328 s), strict signature and seven-binary/resource checks passed. Framework
+diagnostics remain; no compiler/QoS warnings occurred. [Scope](docs/NATIVE-ODS-WRITING.md).
+
+## Preceding 0.29.0 (42) PPTX qualification
+
+The preceding source version **0.29.0**, build **42**. Four PPTX Swift source/test
 files join existing Core/test targets in the canonical workspace; no target,
 signing or deployment changes. Source/native 166 each, CLI/app, ordinary Debug
 and strict seven-binary candidate checks passed on 458 inputs. Native tests took
@@ -826,7 +834,7 @@ remains `22e7443d13496b3cc08b6e98366bb6d2332e3fd4`; later documentation commits
 do not change the binary identity. The set is ready for owner notarization and
 Apple upload, but is not notarized, stapled, installed, shipped, or released.
 That retained archive used Xcode `MARKETING_VERSION = 0.16.2` and
-`CURRENT_PROJECT_VERSION = 23`. Current source targets `0.29.0 (42)`; the historical build-24 app/archive use
+`CURRENT_PROJECT_VERSION = 23`. Current source targets `0.30.0 (43)`; the historical build-24 app/archive use
 `0.16.3 (24)`; notarization and shipment remain separate.
 
 Implementation revision `91ad90ee7a1e51b7289f4c531ddae4dbbc6812ec`
