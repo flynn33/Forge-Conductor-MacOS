@@ -1,8 +1,24 @@
 # Forge Conductor macOS — project roadmap
 
-## Web response-budget hotfix
+## MCP notice-receipt hotfix
 
-Current identity **0.26.1 (37)** corrects an existing output contract;
+Current target **0.26.2 (38)** corrects receipt truth without adding a tool,
+argument, grant or schema. The delivered .26.1 source/wiki remain historical.
+
+| Milestone | Actual evidence | Remaining gate |
+| --- | --- | --- |
+| EOF baselines | Two separate one-test/one-failure runs completed normally: a wholly skipped packet and a real incomplete JSON prefix without LF each still called `didPresent` once. | Original baseline failures retained. |
+| Narrow repair | Private transport completion Bools gate both existing receipt commits; skipped/failed writes discard. Owning source and matching native selections each passed 92 distinct methods, zero failures/skips, on identical 450-input maps. The three new EOF/EPIPE methods and existing complete-packet integration are included. | Synchronous pre-dispatch deadline receipt not directly forced; original failed baselines retained. |
+| Test priority qualification | The original native 92 retains five QoS blocks/four source warning lines. Only the private EOF serve controller priority changed afterward; the same one source and native case passed without QoS/source warnings on the final test map. All 449 other inputs remained exact. | Other notice/DiagnosticLog warnings and SQLite/NECP diagnostics remain separate open investigations; no ordinary GUI defect inferred. |
+| Current graph and build | CLI/app compilation and the version method passed. The 49-input canonical inventory keeps 48 exact inputs plus PBX changes only in twelve marketing/sixteen build assignments; all four changed Swift files retain their existing Sources memberships. Final ordinary Debug confirmation passed in 1.552 s; strict deep signing passed for seven final binary identities. Thirteen preceding-phase manifests/85 binaries and three protected file identities stayed exact. | The initial .26.2 candidate was superseded after four signatures/identities changed; its failed unchanged-candidate guard is retained. Candidate qualification is separate from installation and shipment. |
+
+[Contract and current evidence](docs/WEB-RESPONSE-BUDGET.md#notice-receipt-truth-follow-up).
+Default notice-cache lifetime, prior runtime diagnostics, .26.1 Qwen final
+completion, installed/full-web/all-feature and shipment gates remain separate.
+
+## Preceding .26.1 web response-budget hotfix
+
+This preceding identity **0.26.1 (37)** corrects an existing output contract;
 it adds no tool, argument or capability. The delivered .26 source is
 `4a9441ba1c2cc8b66d208bfd9d8d0d3ec9c968b6`; its receipts remain historical.
 

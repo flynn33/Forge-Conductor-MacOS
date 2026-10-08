@@ -1,6 +1,21 @@
 # Forge Conductor architecture
 
-Version: `0.26.1`; build: `37`.
+Version: `0.26.2`; build: `38`.
+
+The stdio writer returns completion only after its encoded JSON plus LF has
+been written. Closed-delivery guards return false; existing write errors still
+throw. Both notice receipt sites commit only complete output and discard
+skipped/error output. The handler result remains authoritative; reader-error,
+shutdown-timeout and worker-error precedence is unchanged. The 92 owning source
+and same 92 native methods passed on their original 450-input map, including
+EOF/EPIPE failures, complete-packet presentation and durable-ledger parity.
+A later test-only priority correction passed the same one source/native case;
+original runtime diagnostics remain. CLI/app, version/graph, final ordinary
+Debug build and strict signing passed. The final candidate has its own manifest;
+the first .26.2 candidate was superseded after signature replacement.
+[Contract](WEB-RESPONSE-BUDGET.md#notice-receipt-truth-follow-up).
+
+The following web-budget evidence retains its preceding .26.1/37 map.
 
 For `web.fetch`/`web.search`, an internal non-escaping router callback captures
 the exact context after deadline configuration and binding validation, before

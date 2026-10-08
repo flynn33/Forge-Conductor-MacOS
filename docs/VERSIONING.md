@@ -11,7 +11,19 @@ readbacks and ordinary observations retain their explicit limits; no
 installation, notarization, App Store upload or distribution was performed.
 Exact owner publication/readback/synchronization refs are retained externally.
 
-Current identity is **0.26.1 (37)**. The patch component advances because
+Current target identity is **0.26.2 (38)**. The patch component advances for
+notice-receipt truth in the existing stdio transport, without a new tool,
+argument, public API or capability. The build number advances to 38. Owning
+source and matching native selection each passed 92 methods on their original
+identical 450-input map, including the version method. One test-only priority
+line then passed the same one source/native case on its final map. CLI/app,
+canonical graph, final ordinary Debug build and strict signing passed. The final
+candidate manifest supersedes the first .26.2 signatures; native diagnostics stay
+retained. No storage/schema migration
+is added.
+[Contract and gates](WEB-RESPONSE-BUDGET.md#notice-receipt-truth-follow-up).
+
+The preceding identity is **0.26.1 (37)**. The patch component advances because
 the web wire-budget repair corrects existing fetch/search behavior without a
 new tool, argument or capability. The build number advances to 37. The version
 method passed within 139 distinct source and the same 139 compiled native cases;
@@ -127,10 +139,14 @@ focused version test, and CI reject drift between them.
 
 ## Current identity
 
-The current product version target is `0.26.1`, build `37`. All root authorities,
+The current product version target is `0.26.2`, build `38`. Root authorities,
 compiled constants, twelve marketing-version and sixteen build-number settings
-agree; actual source/native version assertions and canonical graph review passed.
-Final model completion remains OPEN/NONPASS; runtime diagnostics retain their scope.
+agree. The current version method passed within the 92 source and same 92
+native cases; graph review preserves existing memberships and version-only PBX
+edits. The later one-case priority rerun retains its separate test-input map.
+The preceding .26.1 source/native version and graph checks passed on their
+recorded inputs. Its model completion remains OPEN/NONPASS and runtime
+diagnostics retain their scope.
 
 ### Preceding 0.26 runtime version agreement
 

@@ -1,6 +1,31 @@
 # Version and qualification status
 
-Current source target **0.26.1, build 37** repairs web response-budget accounting.
+Current source target **0.26.2, build 38** repairs MCP notice-receipt truth.
+The skipped and partial EOF baselines each executed one method with one callback
+failure. Owning source passed 92 distinct methods (41.535 s, log `972ba7dc…`)
+and the same 92 compiled native methods passed (81.689 s, log `97ee779a…`),
+zero failures/skips on identical 450-input maps. Their included methods cover
+three new EOF/EPIPE cases, complete-packet/durable-ledger parity, web response
+budgets, router deadlines, notices and current version agreement. Earlier focused
+repeats are not added to 92; three DesktopAttachment methods were not selected.
+The native run retains 117 vnode-unlink and 117 invalidated-fd diagnostics,
+three NECP network lines and five QoS blocks/four source warning lines.
+Only a private test controller priority line changed afterward. The same one
+source/native method passed (5.590/5.567 s, logs `c926a8c9…`/`ef4892e0…`)
+without QoS/source warnings on the final test map; all 449 other inputs stayed
+exact. The original 92-case receipts keep their original test hash. Other
+Stjornarvald notice and DiagnosticLog warnings remain open; no ordinary GUI
+inversion is established. CLI/app and current version/graph checks passed. Final
+ordinary Debug confirmation passed (1.552 s, log `531aad8a…`) with strict deep
+signing for seven final identities. The initial .26.2 candidate was superseded:
+four signatures/identities changed and its failed unchanged-candidate guard is
+retained. Thirteen preceding-phase manifests/85 binaries and three named
+protected file identities remained exact. Synchronous pre-dispatch deadline
+receipt is not directly forced. No installed acceptance,
+host acknowledgement, cache-lifetime or warning-free runtime claim is made.
+[Contract and gates](WEB-RESPONSE-BUDGET.md#notice-receipt-truth-follow-up).
+
+The preceding source target **0.26.1, build 37** repairs web response-budget accounting.
 The signed .26 baseline measured escaped-ID text/base64 frames of 2,477/2,481
 bytes against 2,048, with valid page prefixes/SHA/cursors and normal zero exit/
 full EOF. The final 139 distinct source methods (88 owning + 51 real shared
@@ -1581,7 +1606,7 @@ Dashboard geometry, minimum/normal containment of every primary view, and
 populated policy evaluation rows. Live completion of the reported owner run,
 universal policy enforcement, and distribution qualification remain open.
 
-Current source target: **0.26.1, build 37**, supporting **macOS 26+**. The earlier
+Current source target: **0.26.2, build 38**, supporting **macOS 26+**. The earlier
 0.16.3 Developer ID app and archive are recorded in the historical build-24 section;
 that workflow staged the CLI under `~/.forge-conductor` and manually copied the
 app to `/Applications`. It did not exercise a `.pkg` installation, notarization,
@@ -1594,10 +1619,13 @@ the detailed, source-bound receipts are in the
 ## Version and build agreement
 
 The Swift runtime, CLI, Xcode Debug and Release configurations, and current
-documentation target version **0.26.1, build 37**. The root [`VERSION`](../VERSION)
+documentation target version **0.26.2, build 38**. The root [`VERSION`](../VERSION)
 and [`BUILD_NUMBER`](../BUILD_NUMBER) files are canonical; compiled constants
-and Xcode build settings must match them. The actual hotfix version method
-passed within the final 139 source and same 139 compiled native cases.
+and Xcode build settings match them. The current version method passed within
+the 92 source and same 92 native selections; graph review retains existing
+memberships and version-only PBX edits. The preceding .26.1 hotfix version
+method passed within the
+final 139 source and same 139 compiled native cases.
 The following receipts retain their preceding .26/36 maps. The actual .26 source version method
 and exact Manager parity passed separately after the earlier owning-area 307
 methods passed. Both incremental products and ordinary native Debug build passed;

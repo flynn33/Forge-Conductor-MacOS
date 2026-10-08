@@ -1,4 +1,6 @@
-# Context and agent continuity (v0.26.1)
+# Context and agent continuity (v0.26.2)
+
+<a id="context-and-agent-continuity-v0261"></a>
 
 <a id="context-and-agent-continuity-v0260"></a>
 
@@ -12,7 +14,13 @@
 
 <a id="context-and-agent-continuity-v0180"></a>
 
-Current source documentation targets 0.26.1 (37). Ordinary MCP job submissions
+Current source documentation targets 0.26.2 (38). The notice-receipt hotfix
+changes no continuity packet, job reference, acknowledgement or seal behavior.
+Source/native receipt checks do not prove host acknowledgement or successor
+consumption. [Receipt scope](WEB-RESPONSE-BUDGET.md#notice-receipt-truth-follow-up).
+The following ordinary-runtime receipts retain their preceding .26/36 maps.
+
+Ordinary MCP job submissions
 carry native references alongside authored task content, with a 32-attempt / 16 KiB
 extension admitted to Source before CP COMMIT. Both keyed paths revalidate the
 full native binding and consume a one-use epoch admission. Resume status is a

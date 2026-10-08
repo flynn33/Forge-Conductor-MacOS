@@ -1,8 +1,23 @@
 # Forge Conductor — Xcode
 
-Current source version **0.26.1**, build **37**.
+Current source version **0.26.2**, build **38**.
 
-The web response-budget hotfix edits existing WebToolPack, MCPServer, ToolRouter
+The notice-receipt repair changes existing MCPServer and MCP test inputs. It
+adds no file, resource or target membership. Owning source and matching native
+selections each passed 92 methods, zero failures/skips, on the original identical
+450-input map. A later test-only controller priority line separately passed the
+same one source and native method; the original native diagnostics stay retained.
+CLI/app and version checks passed. All four changed Swift files retain their
+existing Sources memberships; 48 of 49 graph inputs are exact, with only twelve
+marketing/sixteen build assignments changed in PBX. Final ordinary Debug
+confirmation passed in 1.552 s and strict deep signing passed for seven final
+identities. Four of the first .26.2 candidate identities changed after signature
+replacement; that candidate is superseded and its failed identity guard retained.
+Thirteen preceding-phase manifests/85 binaries and three protected file
+identities remained exact.
+[Current receipt contract](docs/WEB-RESPONSE-BUDGET.md#notice-receipt-truth-follow-up).
+
+The preceding .26.1 web response-budget hotfix edits existing WebToolPack, MCPServer, ToolRouter
 and test inputs. It adds no Swift file, resource or target membership; the native
 graph review preserves all seven existing Swift memberships. Its 49-item graph/
 resource/fixture inventory is 48 byte-identical inputs plus version-only PBX
@@ -741,7 +756,7 @@ remains `22e7443d13496b3cc08b6e98366bb6d2332e3fd4`; later documentation commits
 do not change the binary identity. The set is ready for owner notarization and
 Apple upload, but is not notarized, stapled, installed, shipped, or released.
 That retained archive used Xcode `MARKETING_VERSION = 0.16.2` and
-`CURRENT_PROJECT_VERSION = 23`. Current source targets `0.26.1 (37)`; the historical build-24 app/archive use
+`CURRENT_PROJECT_VERSION = 23`. Current source targets `0.26.2 (38)`; the historical build-24 app/archive use
 `0.16.3 (24)`; notarization and shipment remain separate.
 
 Implementation revision `91ad90ee7a1e51b7289f4c531ddae4dbbc6812ec`

@@ -1,6 +1,18 @@
 # Forge Conductor for macOS
 
-Current source targets **0.26.1 (37)**, a web response-budget hotfix.
+Current source targets **0.26.2 (38)**, an MCP notice-receipt hotfix.
+The notice-receipt hotfix records presentation only after the complete
+notice-bearing JSON+LF packet is written. EOF-skipped or partial packets do not
+commit a presentation receipt. The 92 distinct source methods and the same 92
+compiled native methods passed without failures/skips on their original
+450-input map. A later test-only priority correction separately passed the same
+one source and native method; the 92-case receipts keep their original inputs.
+CLI/app compilation, current version/graph checks, final ordinary Debug build
+and strict signing passed. Runtime diagnostics remain.
+This records transport serialization, not host acknowledgement or understanding.
+[Contract and current gates](docs/WEB-RESPONSE-BUDGET.md#notice-receipt-truth-follow-up).
+
+The preceding source targets **0.26.1 (37)**, a web response-budget hotfix.
 Successful `web.fetch` and `web.search` stdio frames include the actual request
 ID, both payload copies, required policy notice and terminating line feed in
 `maximum_bytes`, limited by the same validated invocation scope. Smaller fetch
@@ -620,8 +632,8 @@ continuity. The user does not start project work through a Forge Managed Run.
 
 | | |
 |---|---|
-| **Version** | **0.26.1** |
-| **Build** | **37** |
+| **Version** | **0.26.2** |
+| **Build** | **38** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |
@@ -739,8 +751,10 @@ receipt does not qualify that path. The full scope and remaining
 distribution limits are in the [qualification record](docs/QUALIFICATION-STATUS.md).
 
 The current root version authorities, compiled protocol constants and Xcode
-build settings use `0.26.1 (37)`; the actual version method passed within the
-139 source and same 139 native cases. Historical qualification receipts retain
+build settings target `0.26.2 (38)`; the version method passed within the
+recorded 92 source and same 92 native cases.
+The preceding .26.1 version method passed within the 139 source and same 139
+native cases. Historical qualification receipts retain
 their tested identities.
 The [GitHub wiki](https://github.com/flynn33/Forge-Conductor-MacOS/wiki)
 publication/readback/synchronization refs are retained externally. Installed-app

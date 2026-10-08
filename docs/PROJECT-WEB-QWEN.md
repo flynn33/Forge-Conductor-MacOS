@@ -1,5 +1,14 @@
 # Project repository, web access and Qwen verification
 
+The **0.26.2 (38)** notice-receipt follow-up preserves project, web and model
+features. EOF-skipped or incomplete notice packets are not marked presented.
+The 92 source and same 92 native methods passed on their original 450-input map;
+a later test-only priority correction passed the same one source/native case.
+CLI/app, version/graph, final ordinary Debug build and strict signing passed.
+Native diagnostics remain. This does not close
+the preceding .26.1 Qwen final-report NONPASS, installed acceptance
+or full-web gates. [Current receipt contract](WEB-RESPONSE-BUDGET.md#notice-receipt-truth-follow-up).
+
 The **0.26.1 (37)** response-budget follow-up preserves these tools and the
 historical qualification below. Its signed .26 baseline observed escaped-ID
 frames exceeding 2,048 bytes. The final 139 source and same 139 compiled native

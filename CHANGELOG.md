@@ -10,6 +10,23 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### `0.26.2 (38)` MCP notice-receipt hotfix
+
+- Mark a policy notice presented only after its complete JSON+LF packet is
+  written. Discard pending presentation state for EOF-skipped, partial or
+  failed writes; retain the durable notice's later eligibility.
+- Preserve the authoritative tool result, request admission, response-write
+  deadline, EOF/cancellation behavior and existing error precedence. No tool,
+  argument, public API, grant or storage/schema change is added.
+- Retain both one-test/one-failure EOF baselines. The 92 distinct source cases
+  and same 92 native cases passed without failures/skips on their original
+  450-input map, including the three new EOF/EPIPE cases and existing complete
+  packet integration. A later test-only priority correction separately passed
+  the same one source and native case. CLI/app, version/graph, final ordinary
+  Debug build and strict signing passed. Runtime diagnostics remain.
+  Serialization does not prove host acknowledgement.
+  [Contract and current gates](docs/WEB-RESPONSE-BUDGET.md#notice-receipt-truth-follow-up).
+
 ### `0.26.1 (37)` web response-budget hotfix
 
 - Size successful `web.fetch` and `web.search` stdio responses using the actual

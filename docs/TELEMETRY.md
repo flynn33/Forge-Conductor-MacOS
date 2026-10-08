@@ -1,6 +1,17 @@
 # Telemetry architecture (real-time native)
 
-Current source documentation targets `0.26.1`, build `37`. The ordinary runtime
+Current source documentation targets `0.26.2`, build `38`. Notice-receipt
+truth changes no producer, timer, queue, cache lifetime or diagnostic policy.
+Its native 92-case run retains 117 vnode-unlink, 117 invalidated-fd and three
+NECP diagnostics, plus five QoS blocks/four source warning lines. One private
+test controller priority correction then passed the same one source/native case
+without QoS/source warnings; all 449 other source inputs remained exact.
+Other Stjornarvald notice and DiagnosticLog warnings remain open. This does
+not establish an ordinary GUI inversion or a cache-lifetime repair.
+[Receipt evidence](WEB-RESPONSE-BUDGET.md#notice-receipt-truth-follow-up).
+The following ordinary-runtime receipts retain their preceding .26/36 maps.
+
+The ordinary runtime
 continuation extension is bounded to 32 native attempts and 16 KiB per logical
 epoch. The callback owns a bounded Source mutation while the CP writer is held;
 status uses only the selected native packet's references, with no history scan,
@@ -309,6 +320,6 @@ representative physical-hardware qualification remain open.
 
 ## Version
 
-`0.26.1`
+`0.26.2`
 
-Build: `37`
+Build: `38`

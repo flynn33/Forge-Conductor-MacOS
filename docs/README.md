@@ -1,6 +1,18 @@
 # Documentation guide
 
-Current source targets **0.26.1 (37)**. [Web response budgets](WEB-RESPONSE-BUDGET.md)
+Current source targets **0.26.2 (38)**, an MCP notice-receipt hotfix.
+The notice-receipt hotfix records presentation only after the complete
+notice-bearing JSON+LF packet is written. EOF-skipped or partial packets do not
+commit a presentation receipt. The 92 distinct source methods and the same 92
+compiled native methods passed without failures/skips on their original
+450-input map. A later test-only priority correction separately passed the same
+one source and native method; the 92-case receipts keep their original inputs.
+CLI/app compilation, current version/graph checks, final ordinary Debug build
+and strict signing passed. Runtime diagnostics remain.
+This records transport serialization, not host acknowledgement or understanding.
+[Contract and current gates](WEB-RESPONSE-BUDGET.md#notice-receipt-truth-follow-up).
+
+The preceding source targets **0.26.1 (37)**. [Web response budgets](WEB-RESPONSE-BUDGET.md)
 records the signed escaped-ID failure, complete stdio sizing and preserved
 fetch/search continuation. The final 139 distinct source cases and same 139
 compiled native cases, ordinary Debug build/strict signing and four signed wire

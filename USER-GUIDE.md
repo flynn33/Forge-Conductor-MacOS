@@ -1,6 +1,18 @@
 # Forge Conductor user guide
 
-Current source targets **0.26.1 (37)**. The web response-budget hotfix preserves
+Current source targets **0.26.2 (38)**, an MCP notice-receipt hotfix.
+The notice-receipt hotfix records presentation only after the complete
+notice-bearing JSON+LF packet is written. EOF-skipped or partial packets do not
+commit a presentation receipt. The 92 distinct source methods and the same 92
+compiled native methods passed without failures/skips on their original
+450-input map. A later test-only priority correction separately passed the same
+one source and native method; the 92-case receipts keep their original inputs.
+CLI/app compilation, current version/graph checks, final ordinary Debug build
+and strict signing passed. Runtime diagnostics remain.
+This records transport serialization, not host acknowledgement or understanding.
+[Contract and current gates](docs/WEB-RESPONSE-BUDGET.md#notice-receipt-truth-follow-up).
+
+The preceding source targets **0.26.1 (37)**. The web response-budget hotfix preserves
 fetch/search tools and page continuation while accounting for the complete
 stdio frame. The 139 affected source cases and same 139 compiled native cases
 passed; all four signed native wire cases fit. Native diagnostics remain recorded,
@@ -225,7 +237,7 @@ observations retain their recorded scope. Exact owner publication, remote
 readback and synchronization references are retained externally. See the
 [phase record](docs/GRAPHITE-WORKBENCH.md) for evidence and capture limits.
 
-Version **0.26.1**, build **37** (current source; candidate qualification is separate from installation).
+Version **0.26.2**, build **38** (current source target; candidate qualification is separate from installation).
 
 This guide describes the current LM Studio-driven workflow. The user works in a
 normal LM Studio chat; Forge Conductor supplies project context, tools, policy

@@ -2499,3 +2499,441 @@ private extension MCPWireResponseReader {
         }
     }
 }
+
+extension MCPProtocolAndDiagnosticsTests {
+    func testEOFSkippedNoticePacketDoesNotCommitPresentationReceipt() async throws {
+        try await Task.detached(priority: .utility) {
+            try MCPNoticeSkippedWriteFixture.collect()
+        }.value
+    }
+}
+
+private enum MCPNoticeSkippedWriteFixture {
+    static func collect() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "mcp-notice-skipped-write-\(UUID().uuidString)", isDirectory: true)
+        let project = root.appendingPathComponent("project", isDirectory: true)
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+        let app = try ForgeApp.bootstrap(home: root.appendingPathComponent("home"), startTelemetry: false)
+        let client = ClientID("notice-skipped-write")
+        _ = try app.config.update(["allowed_roots": [root.path]], save: false)
+        XCTAssertTrue(try app.tools.call(name: "project_memory.initialize",
+            arguments: ["project_path": project.path], clientID: client).ok)
+        let context = try app.projectContexts.invocationContext(for: client)
+        let rule = try XCTUnwrap(RavenForgeDevelopmentPolicyAdapter().rules().first)
+        let notice = CodingAgentPolicyNotice(violationID: PolicyViolationID(), ruleReference: rule.source,
+            summary: "Exact skipped-write receipt fixture", suggestedCorrection: "Preserve receipt truth", confidence: 1)
+        let text = try XCTUnwrap(StjornarvaldPolicyNoticeFormatter.interactivePresentation(notices: [notice]))
+        let base = WebEnvelopeScopedNotice(projectID: context.projectID.description,
+            generation: Int(context.projectGeneration.rawValue), clientID: client.rawValue,
+            notice: notice, text: text)
+        let provider = MCPNoticeSkippedWriteGate(base: base)
+        let input = Pipe(), output = Pipe()
+        let closed = DispatchSemaphore(value: 0), finished = DispatchSemaphore(value: 0)
+        let errors = MCPWireErrorBox()
+        let server = MCPServer(app: app, clientID: client, role: .primary, maximumConcurrentRequests: 1,
+            shutdownWaitSeconds: 3, responseWriteTimeoutSeconds: 1,
+            didCloseResponseDeliveryObserver: {
+                provider.markDeliveryClosedAndRelease()
+                closed.signal()
+            }, policyNoticeProvider: provider)
+        let inputHandle = input.fileHandleForReading, outputHandle = output.fileHandleForWriting
+        var joined = false
+        defer {
+            provider.release.signal()
+            try? input.fileHandleForWriting.close()
+            if !joined { joined = finished.wait(timeout: .now() + 4) == .success }
+            try? input.fileHandleForReading.close(); try? output.fileHandleForWriting.close()
+            try? output.fileHandleForReading.close()
+            let complete = app.shutdown().completed
+            if joined && complete { try? FileManager.default.removeItem(at: root) }
+        }
+        DispatchQueue(label: "forge.test.notice-skipped-write", qos: .userInitiated).async(flags: .enforceQoS) {
+            do { try server.run(input: inputHandle, output: outputHandle) }
+            catch { errors.store(error) }
+            finished.signal()
+        }
+        let reader = MCPWireResponseReader(handle: output.fileHandleForReading)
+        try input.fileHandleForWriting.write(contentsOf: MCPStdioTransport.encode([
+            "jsonrpc": "2.0", "id": 1, "method": "initialize",
+            "params": ["protocolVersion": MCPServer.supportedProtocolVersions[0]],
+        ]))
+        XCTAssertEqual((try reader.read(timeout: 2)["id"] as? NSNumber)?.intValue, 1)
+        try input.fileHandleForWriting.write(contentsOf: MCPStdioTransport.encode([
+            "jsonrpc": "2.0", "id": 2, "method": "tools/call",
+            "params": ["name": "job.list", "arguments": [:] as [String: Any]],
+        ]))
+        let entry = provider.entered.wait(timeout: .now() + 2)
+        XCTAssertEqual(entry, .success)
+        guard entry == .success else { throw POSIXError(.ETIMEDOUT) }
+        try input.fileHandleForWriting.close()
+        let closure = closed.wait(timeout: .now() + 2)
+        XCTAssertEqual(closure, .success)
+        guard closure == .success else { throw POSIXError(.ETIMEDOUT) }
+        let completion = finished.wait(timeout: .now() + 4)
+        XCTAssertEqual(completion, .success)
+        joined = completion == .success
+        guard joined else { throw POSIXError(.ETIMEDOUT) }
+        let runError = errors.take()
+        XCTAssertNil(runError)
+        if let runError { throw runError }
+        let gate = provider.snapshot()
+        XCTAssertFalse(gate.timedOut)
+        XCTAssertTrue(gate.deliveryClosed)
+        guard !gate.timedOut, gate.deliveryClosed else { throw POSIXError(.ETIMEDOUT) }
+        try output.fileHandleForWriting.close()
+        let bytes = try output.fileHandleForReading.read(upToCount: 16 * 1_024)
+        XCTAssertTrue(bytes?.isEmpty ?? true, "A notice response was transmitted after delivery closed")
+        XCTAssertEqual(provider.snapshot().presented, 0,
+            "didPresent ran despite EOF causing the complete notice packet to be skipped")
+        withExtendedLifetime((server, provider)) {}
+    }
+}
+
+private final class MCPNoticeSkippedWriteGate: InteractivePolicyNoticeProviding, @unchecked Sendable {
+    let entered = DispatchSemaphore(value: 0), release = DispatchSemaphore(value: 0)
+    private let base: WebEnvelopeScopedNotice
+    private let lock = NSLock()
+    private var presented = 0
+    private var timedOut = false
+    private var deliveryClosed = false
+    init(base: WebEnvelopeScopedNotice) { self.base = base }
+    func presentation(deliveryID: String, projectID: String?, projectGeneration: Int?, clientID: String,
+                      maximumCount: Int, maximumBytes: Int) -> PolicyNoticePresentation? {
+        guard let value = base.presentation(deliveryID: deliveryID, projectID: projectID,
+            projectGeneration: projectGeneration, clientID: clientID,
+            maximumCount: maximumCount, maximumBytes: maximumBytes) else { return nil }
+        entered.signal()
+        if release.wait(timeout: .now() + 2) != .success {
+            lock.lock(); timedOut = true; lock.unlock()
+        }
+        return value
+    }
+    func markDeliveryClosedAndRelease() {
+        lock.lock(); deliveryClosed = true; lock.unlock()
+        release.signal()
+    }
+    func didPresent(_ presentation: PolicyNoticePresentation) {
+        lock.lock(); presented += 1; lock.unlock()
+    }
+    func snapshot() -> (presented: Int, timedOut: Bool, deliveryClosed: Bool) {
+        lock.lock(); defer { lock.unlock() }; return (presented, timedOut, deliveryClosed)
+    }
+}
+
+extension MCPProtocolAndDiagnosticsTests {
+    func testEOFPartialNoticePacketDoesNotCommitPresentationReceipt() async throws {
+        try await Task.detached(priority: .utility) {
+            try mcpCollectEOFPartialNoticePacket()
+        }.value
+    }
+}
+
+private func mcpCollectEOFPartialNoticePacket() throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+        "mcp-notice-partial-write-\(UUID().uuidString)", isDirectory: true)
+    let project = root.appendingPathComponent("project", isDirectory: true)
+    try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+    let app = try ForgeApp.bootstrap(home: root.appendingPathComponent("home"), startTelemetry: false)
+    let client = ClientID("notice-partial-write")
+    _ = try app.config.update(["allowed_roots": [root.path]], save: false)
+    XCTAssertTrue(try app.tools.call(name: "project_memory.initialize",
+        arguments: ["project_path": project.path], clientID: client).ok)
+    let context = try app.projectContexts.invocationContext(for: client)
+    let rule = try XCTUnwrap(RavenForgeDevelopmentPolicyAdapter().rules().first)
+    let notices = (0..<8).map { index in
+        CodingAgentPolicyNotice(violationID: PolicyViolationID(), ruleReference: rule.source,
+            summary: "Owned partial packet fixture \(index)",
+            policyStatement: String(repeating: "\u{0001}", count: 4_096),
+            suggestedCorrection: "Preserve complete-packet receipt truth", confidence: 1)
+    }
+    let text = try XCTUnwrap(StjornarvaldPolicyNoticeFormatter.interactivePresentation(notices: notices))
+    XCTAssertLessThanOrEqual(text.utf8.count, 16 * 1_024)
+    let minimumFrame = try MCPStdioTransport.encode(MCPToolResponse.object(id: 2,
+        result: .success(["jobs": [] as [Any], "count": 0, "has_more": false]), additiveNotice: text))
+    XCTAssertGreaterThan(minimumFrame.count, 80 * 1_024,
+        "The legal notice did not create the intended escaped packet magnitude")
+    XCTAssertLessThanOrEqual(minimumFrame.count, 128 * 1_024)
+    guard minimumFrame.count > 80 * 1_024, minimumFrame.count <= 128 * 1_024 else {
+        throw POSIXError(.E2BIG)
+    }
+    let provider = MCPPartialPacketNoticeProvider(projectID: context.projectID.description,
+        generation: Int(context.projectGeneration.rawValue), clientID: client.rawValue,
+        notices: notices, text: text)
+    let input = Pipe(), output = Pipe()
+    let closed = DispatchSemaphore(value: 0), finished = DispatchSemaphore(value: 0)
+    let errors = MCPWireErrorBox()
+    let server = MCPServer(app: app, clientID: client, role: .primary, maximumConcurrentRequests: 1,
+        shutdownWaitSeconds: 3, responseWriteTimeoutSeconds: 2,
+        didCloseResponseDeliveryObserver: { closed.signal() }, policyNoticeProvider: provider)
+    let inputHandle = input.fileHandleForReading, outputHandle = output.fileHandleForWriting
+    var joined = false
+    defer {
+        try? input.fileHandleForWriting.close()
+        if !joined { joined = finished.wait(timeout: .now() + 4) == .success }
+        try? input.fileHandleForReading.close(); try? output.fileHandleForWriting.close()
+        try? output.fileHandleForReading.close()
+        let complete = app.shutdown().completed
+        if joined && complete { try? FileManager.default.removeItem(at: root) }
+    }
+    DispatchQueue(label: "forge.test.notice-partial-write", qos: .utility).async {
+        do { try server.run(input: inputHandle, output: outputHandle) }
+        catch { errors.store(error) }
+        finished.signal()
+    }
+    let reader = MCPWireResponseReader(handle: output.fileHandleForReading)
+    try input.fileHandleForWriting.write(contentsOf: MCPStdioTransport.encode([
+        "jsonrpc": "2.0", "id": 1, "method": "initialize",
+        "params": ["protocolVersion": MCPServer.supportedProtocolVersions[0]],
+    ]))
+    XCTAssertEqual((try reader.read(timeout: 2)["id"] as? NSNumber)?.intValue, 1)
+    let initialQueued = try mcpPartialPacketQueuedBytes(output.fileHandleForReading.fileDescriptor)
+    XCTAssertEqual(initialQueued, 0)
+    guard initialQueued == 0 else { throw POSIXError(.EBUSY) }
+    try input.fileHandleForWriting.write(contentsOf: MCPStdioTransport.encode([
+        "jsonrpc": "2.0", "id": 2, "method": "tools/call",
+        "params": ["name": "job.list", "arguments": [:] as [String: Any]],
+    ]))
+    var queued = 0
+    for _ in 0..<100 {
+        queued = try mcpPartialPacketQueuedBytes(output.fileHandleForReading.fileDescriptor)
+        if queued >= 4_096 { break }
+        usleep(10_000)
+    }
+    XCTAssertGreaterThanOrEqual(queued, 4_096, "No native response prefix was observed")
+    guard queued >= 4_096 else { throw POSIXError(.ETIMEDOUT) }
+    let presentedBeforeEOF = provider.presentedCount()
+    XCTAssertEqual(presentedBeforeEOF, 0, "The packet already completed before the failure injection")
+    guard presentedBeforeEOF == 0 else { throw POSIXError(.EALREADY) }
+    try input.fileHandleForWriting.close()
+    let closure = closed.wait(timeout: .now() + 1)
+    XCTAssertEqual(closure, .success)
+    guard closure == .success else { throw POSIXError(.ETIMEDOUT) }
+
+    // One bounded read makes a blocked POLLOUT wait progress. Keep the
+    // remainder queued until the writer observes closed delivery.
+    var prefix = try output.fileHandleForReading.read(upToCount: 4_096) ?? Data()
+    XCTAssertEqual(prefix.count, 4_096)
+    guard prefix.count == 4_096 else { throw POSIXError(.EIO) }
+    let completion = finished.wait(timeout: .now() + 4)
+    XCTAssertEqual(completion, .success)
+    joined = completion == .success
+    guard joined else { throw POSIXError(.ETIMEDOUT) }
+    let runError = errors.take()
+    XCTAssertNil(runError)
+    if let runError { throw runError }
+    try output.fileHandleForWriting.close()
+    var observedEOF = false
+    for _ in 0..<33 {
+        let bytes = try output.fileHandleForReading.read(upToCount: 4_096) ?? Data()
+        if bytes.isEmpty { observedEOF = true; break }
+        guard prefix.count + bytes.count <= 128 * 1_024 else { throw POSIXError(.E2BIG) }
+        prefix.append(bytes)
+    }
+    XCTAssertTrue(observedEOF, "Bounded prefix collection did not reach ordinary output EOF")
+    XCTAssertFalse(prefix.isEmpty)
+    XCTAssertEqual(prefix.first, UInt8(123), "Observed bytes were not the native JSON packet prefix")
+    XCTAssertNil(prefix.firstIndex(of: 10), "The whole JSON+LF frame fit; this is not a partial-write baseline")
+    XCTAssertLessThan(prefix.count, minimumFrame.count)
+    guard observedEOF, !prefix.isEmpty, prefix.first == 123,
+          prefix.firstIndex(of: 10) == nil, prefix.count < minimumFrame.count else {
+        throw POSIXError(.EIO)
+    }
+    XCTAssertEqual(provider.presentedCount(), 0,
+        "didPresent ran despite EOF leaving an incomplete notice-bearing JSON+LF packet")
+    withExtendedLifetime((server, provider)) {}
+}
+
+private func mcpPartialPacketQueuedBytes(_ descriptor: Int32) throws -> Int {
+    var count: CInt = 0
+    // Swift cannot import FIONREAD's _IOR macro; use its SDK ioctl encoding.
+    let request = UInt(IOC_OUT) | ((UInt(MemoryLayout<CInt>.size) & UInt(IOCPARM_MASK)) << 16)
+        | (UInt(0x66) << 8) | 127
+    let result = withUnsafeMutablePointer(to: &count) {
+        Darwin.ioctl(descriptor, request, UnsafeMutableRawPointer($0))
+    }
+    guard result == 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+    guard count >= 0, count <= 128 * 1_024 else { throw POSIXError(.E2BIG) }
+    return Int(count)
+}
+
+private final class MCPPartialPacketNoticeProvider: InteractivePolicyNoticeProviding, @unchecked Sendable {
+    private let projectID: String
+    private let generation: Int
+    private let clientID: String
+    private let notices: [CodingAgentPolicyNotice]
+    private let text: String
+    private let lock = NSLock()
+    private var presented = 0
+    init(projectID: String, generation: Int, clientID: String, notices: [CodingAgentPolicyNotice], text: String) {
+        self.projectID = projectID; self.generation = generation; self.clientID = clientID
+        self.notices = notices; self.text = text
+    }
+    func presentation(deliveryID: String, projectID: String?, projectGeneration: Int?, clientID: String,
+                      maximumCount: Int, maximumBytes: Int) -> PolicyNoticePresentation? {
+        guard projectID == self.projectID, projectGeneration == generation, clientID == self.clientID,
+              notices.count <= maximumCount, text.utf8.count <= maximumBytes else { return nil }
+        return PolicyNoticePresentation(id: deliveryID, targetKind: .mcpClient, targetIdentity: clientID,
+            notices: notices, text: text, digestSHA256: JSONSupport.sha256Hex(text))
+    }
+    func didPresent(_ presentation: PolicyNoticePresentation) {
+        lock.lock(); presented += 1; lock.unlock()
+    }
+    func presentedCount() -> Int {
+        lock.lock(); defer { lock.unlock() }; return presented
+    }
+}
+
+extension MCPProtocolAndDiagnosticsTests {
+    func testNoticeWriteErrorPreservesEPIPEAndDiscardsReceiptAcrossServeReuse() async throws {
+        try await Task.detached(priority: .utility) {
+            try mcpCollectNoticeWriteErrorReuseParity()
+        }.value
+    }
+}
+
+private func mcpCollectNoticeWriteErrorReuseParity() throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+        "mcp-notice-error-reuse-\(UUID().uuidString)", isDirectory: true)
+    let project = root.appendingPathComponent("project", isDirectory: true)
+    try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+    let app = try ForgeApp.bootstrap(home: root.appendingPathComponent("home"), startTelemetry: false)
+    let firstInput = Pipe(), firstOutput = Pipe(), secondInput = Pipe(), secondOutput = Pipe()
+    let firstFinished = DispatchSemaphore(value: 0), secondFinished = DispatchSemaphore(value: 0)
+    let firstErrors = MCPWireErrorBox(), secondErrors = MCPWireErrorBox()
+    var firstStarted = false, secondStarted = false, firstJoined = false, secondJoined = false
+    defer {
+        try? firstInput.fileHandleForWriting.close(); try? secondInput.fileHandleForWriting.close()
+        if firstStarted && !firstJoined { firstJoined = firstFinished.wait(timeout: .now() + 4) == .success }
+        if secondStarted && !secondJoined { secondJoined = secondFinished.wait(timeout: .now() + 4) == .success }
+        for pipe in [firstInput, firstOutput, secondInput, secondOutput] {
+            try? pipe.fileHandleForReading.close(); try? pipe.fileHandleForWriting.close()
+        }
+        let complete = app.shutdown().completed
+        if (!firstStarted || firstJoined) && (!secondStarted || secondJoined) && complete {
+            try? FileManager.default.removeItem(at: root)
+        }
+    }
+    let client = ClientID("notice-write-error-reuse")
+    _ = try app.config.update(["allowed_roots": [root.path]], save: false)
+    XCTAssertTrue(try app.tools.call(name: "project_memory.initialize",
+        arguments: ["project_path": project.path], clientID: client).ok)
+    let context = try app.projectContexts.invocationContext(for: client)
+    let rule = try XCTUnwrap(RavenForgeDevelopmentPolicyAdapter().rules().first)
+    let notice = CodingAgentPolicyNotice(violationID: PolicyViolationID(), ruleReference: rule.source,
+        summary: "Owned write-error receipt fixture", suggestedCorrection: "Preserve EPIPE and discard this receipt", confidence: 1)
+    let text = try XCTUnwrap(StjornarvaldPolicyNoticeFormatter.interactivePresentation(notices: [notice]))
+    XCTAssertLessThanOrEqual(text.utf8.count, 16 * 1_024)
+    let provider = MCPWriteErrorCountingNotice(base: WebEnvelopeScopedNotice(
+        projectID: context.projectID.description, generation: Int(context.projectGeneration.rawValue),
+        clientID: client.rawValue, notice: notice, text: text))
+    let deliveryClosed = DispatchSemaphore(value: 0)
+    let server = MCPServer(app: app, clientID: client, role: .primary, maximumConcurrentRequests: 1,
+        shutdownWaitSeconds: 3, responseWriteTimeoutSeconds: 1,
+        didCloseResponseDeliveryObserver: { deliveryClosed.signal() }, policyNoticeProvider: provider)
+    let firstRead = firstInput.fileHandleForReading, firstWrite = firstOutput.fileHandleForWriting
+    firstStarted = true
+    DispatchQueue(label: "forge.test.notice-write-error", qos: .utility).async {
+        do { try server.run(input: firstRead, output: firstWrite) }
+        catch { firstErrors.store(error) }
+        firstFinished.signal()
+    }
+    let firstReader = MCPWireResponseReader(handle: firstOutput.fileHandleForReading)
+    try firstInput.fileHandleForWriting.write(contentsOf: MCPStdioTransport.encode([
+        "jsonrpc": "2.0", "id": 1, "method": "initialize",
+        "params": ["protocolVersion": MCPServer.supportedProtocolVersions[0]],
+    ]))
+    let initialized = try firstReader.read(timeout: 2)
+    XCTAssertEqual((initialized["id"] as? NSNumber)?.intValue, 1)
+    XCTAssertNil(initialized["error"])
+    XCTAssertNotNil(initialized["result"] as? [String: Any])
+    guard (initialized["id"] as? NSNumber)?.intValue == 1, initialized["error"] == nil,
+          initialized["result"] is [String: Any] else { throw POSIXError(.EIO) }
+    // The input remains open until the actual write failure closes delivery.
+    // Only this owned pipe's reader is closed; no process signal or global state changes.
+    try firstOutput.fileHandleForReading.close()
+    try firstInput.fileHandleForWriting.write(contentsOf: MCPStdioTransport.encode([
+        "jsonrpc": "2.0", "id": 2, "method": "tools/call",
+        "params": ["name": "job.list", "arguments": [:] as [String: Any]],
+    ]))
+    let failureClosed = deliveryClosed.wait(timeout: .now() + 2)
+    XCTAssertEqual(failureClosed, .success)
+    guard failureClosed == .success else { throw POSIXError(.ETIMEDOUT) }
+    try firstInput.fileHandleForWriting.close()
+    firstJoined = firstFinished.wait(timeout: .now() + 4) == .success
+    XCTAssertTrue(firstJoined)
+    guard firstJoined else { throw POSIXError(.ETIMEDOUT) }
+    let failedWrite = try XCTUnwrap(firstErrors.take())
+    let posix = failedWrite as NSError
+    XCTAssertEqual(posix.domain, NSPOSIXErrorDomain)
+    XCTAssertEqual(posix.code, Int(EPIPE))
+    guard posix.domain == NSPOSIXErrorDomain, posix.code == Int(EPIPE) else { throw failedWrite }
+    let failedCounts = provider.snapshot()
+    XCTAssertEqual(failedCounts.prepared, 1, "A real scoped notice must have been prepared before EPIPE")
+    XCTAssertEqual(failedCounts.presented, 0)
+    guard failedCounts.prepared == 1, failedCounts.presented == 0 else { throw POSIXError(.EIO) }
+
+    // run() reopens the existing server's admission/delivery boundaries. A ping
+    // with the failed tool's same typed ID must not consume a stale presentation.
+    let secondRead = secondInput.fileHandleForReading, secondWrite = secondOutput.fileHandleForWriting
+    secondStarted = true
+    DispatchQueue(label: "forge.test.notice-write-error-reuse", qos: .utility).async {
+        do { try server.run(input: secondRead, output: secondWrite) }
+        catch { secondErrors.store(error) }
+        secondFinished.signal()
+    }
+    let secondReader = MCPWireResponseReader(handle: secondOutput.fileHandleForReading)
+    try secondInput.fileHandleForWriting.write(contentsOf: MCPStdioTransport.encode([
+        "jsonrpc": "2.0", "id": 2, "method": "ping",
+    ]))
+    let pingFrame = try secondReader.readFrameForWebEnvelope(timeout: 2)
+    XCTAssertLessThanOrEqual(pingFrame.count, 1_024)
+    XCTAssertEqual(pingFrame.last, UInt8(10))
+    XCTAssertEqual(pingFrame.filter { $0 == 10 }.count, 1)
+    let ping = try JSONSupport.object(from: Data(pingFrame.dropLast()))
+    XCTAssertEqual((ping["id"] as? NSNumber)?.intValue, 2)
+    XCTAssertNil(ping["error"])
+    XCTAssertNotNil(ping["result"] as? [String: Any])
+    guard pingFrame.count <= 1_024, pingFrame.last == 10,
+          pingFrame.filter({ $0 == 10 }).count == 1,
+          (ping["id"] as? NSNumber)?.intValue == 2, ping["error"] == nil,
+          ping["result"] is [String: Any] else { throw POSIXError(.EIO) }
+    try secondInput.fileHandleForWriting.close()
+    secondJoined = secondFinished.wait(timeout: .now() + 4) == .success
+    XCTAssertTrue(secondJoined)
+    guard secondJoined else { throw POSIXError(.ETIMEDOUT) }
+    let reuseError = secondErrors.take()
+    XCTAssertNil(reuseError)
+    if let reuseError { throw reuseError }
+    try secondOutput.fileHandleForWriting.close()
+    let trailing = try secondOutput.fileHandleForReading.read(upToCount: 1)
+    XCTAssertTrue(trailing?.isEmpty ?? true, "Unexpected bytes followed the complete reuse ping frame")
+    guard trailing?.isEmpty ?? true else { throw POSIXError(.EIO) }
+    let reusedCounts = provider.snapshot()
+    XCTAssertEqual(reusedCounts.prepared, 1, "The ping must not prepare another tool notice")
+    XCTAssertEqual(reusedCounts.presented, 0,
+        "A stale write-error presentation was acknowledged by the later successful same-ID ping")
+    withExtendedLifetime((server, provider, firstReader, secondReader)) {}
+}
+
+private final class MCPWriteErrorCountingNotice: InteractivePolicyNoticeProviding, @unchecked Sendable {
+    private let base: WebEnvelopeScopedNotice
+    private let lock = NSLock()
+    private var prepared = 0
+    private var presented = 0
+    init(base: WebEnvelopeScopedNotice) { self.base = base }
+    func presentation(deliveryID: String, projectID: String?, projectGeneration: Int?, clientID: String,
+                      maximumCount: Int, maximumBytes: Int) -> PolicyNoticePresentation? {
+        guard let result = base.presentation(deliveryID: deliveryID, projectID: projectID,
+            projectGeneration: projectGeneration, clientID: clientID,
+            maximumCount: maximumCount, maximumBytes: maximumBytes) else { return nil }
+        lock.lock(); prepared += 1; lock.unlock()
+        return result
+    }
+    func didPresent(_ presentation: PolicyNoticePresentation) {
+        lock.lock(); presented += 1; lock.unlock()
+    }
+    func snapshot() -> (prepared: Int, presented: Int) {
+        lock.lock(); defer { lock.unlock() }; return (prepared, presented)
+    }
+}

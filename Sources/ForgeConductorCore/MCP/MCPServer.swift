@@ -619,8 +619,16 @@ public final class MCPServer: @unchecked Sendable {
                 return
             } catch is ToolCallDeadlineExceeded {
                 finishRequest(requestID, cancellation: cancellation)
-                try write(deadlineExceededResponse(id: id, method: "tools/call", cancellation: cancellation), to: output)
-                commitPolicyNoticePresentation(requestID: requestID)
+                do {
+                    if try write(deadlineExceededResponse(id: id, method: "tools/call", cancellation: cancellation), to: output) {
+                        commitPolicyNoticePresentation(requestID: requestID)
+                    } else {
+                        discardPolicyNoticePresentation(requestID: requestID)
+                    }
+                } catch {
+                    discardPolicyNoticePresentation(requestID: requestID)
+                    throw error
+                }
                 return
             } catch {
                 finishRequest(requestID, cancellation: cancellation)
@@ -641,8 +649,11 @@ public final class MCPServer: @unchecked Sendable {
                 // Replacing it with a late cancellation can conceal committed mutations.
                 guard let response = handle(envelope.message, cancellation: cancellation) else { return }
                 do {
-                    try write(response, to: output)
-                    commitPolicyNoticePresentation(requestID: requestID)
+                    if try write(response, to: output) {
+                        commitPolicyNoticePresentation(requestID: requestID)
+                    } else {
+                        discardPolicyNoticePresentation(requestID: requestID)
+                    }
                 } catch {
                     discardPolicyNoticePresentation(requestID: requestID)
                     workerErrors.store(error)
@@ -800,13 +811,14 @@ public final class MCPServer: @unchecked Sendable {
         return resp
     }
 
-    private func write(_ object: [String: Any], to handle: FileHandle) throws {
+    @discardableResult
+    private func write(_ object: [String: Any], to handle: FileHandle) throws -> Bool {
         let packet = try MCPStdioTransport.encode(object)
         responseWriteLock.lock()
         defer { responseWriteLock.unlock() }
-        guard isResponseDeliveryOpen else { return }
+        guard isResponseDeliveryOpen else { return false }
         do {
-            try writeBounded(packet, descriptor: handle.fileDescriptor)
+            return try writeBounded(packet, descriptor: handle.fileDescriptor)
         } catch {
             setResponseDelivery(open: false)
             throw error
@@ -830,7 +842,7 @@ public final class MCPServer: @unchecked Sendable {
         return responseDeliveryOpen
     }
 
-    private func writeBounded(_ packet: Data, descriptor: Int32) throws {
+    private func writeBounded(_ packet: Data, descriptor: Int32) throws -> Bool {
         guard descriptor >= 0 else {
             throw NSError(domain: NSPOSIXErrorDomain, code: Int(EBADF))
         }
@@ -850,11 +862,11 @@ public final class MCPServer: @unchecked Sendable {
             ? UInt64.max
             : startedAt + timeoutNanoseconds
 
-        try packet.withUnsafeBytes { bytes in
-            guard let baseAddress = bytes.baseAddress else { return }
+        return try packet.withUnsafeBytes { bytes -> Bool in
+            guard let baseAddress = bytes.baseAddress else { return false }
             var offset = 0
             while offset < packet.count {
-                guard isResponseDeliveryOpen else { return }
+                guard isResponseDeliveryOpen else { return false }
                 let now = DispatchTime.now().uptimeNanoseconds
                 guard now < deadline else {
                     throw MCPStreamError.responseWriteTimedOut(responseWriteTimeoutSeconds)
@@ -892,6 +904,7 @@ public final class MCPServer: @unchecked Sendable {
                     code: Int(written < 0 ? errno : EIO)
                 )
             }
+            return true
         }
     }
 }
