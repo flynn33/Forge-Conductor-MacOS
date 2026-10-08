@@ -1,6 +1,28 @@
 # Forge Conductor architecture
 
-Version: `0.26.2`; build: `38`.
+Version: `0.27.0`; build: `39`.
+
+The app owns one queue-free native DOCX exporter. The exact fixed child mode
+runs before ordinary configuration/UI bootstrap, preserves compiled CLI/App
+role and named Core admission, and serializes through AppKit on a worker.
+The parent admits only complete bounded output with confirmed termination and
+both EOFs before the existing pinned writer can touch the destination.
+Unconfirmed termination retains the slot; shutdown uses the original operation
+deadline. Security validation and synchronous AppKit serialization are not
+individually cancellable, and the encoded cap is checked after AppKit allocates
+the output. This is not a hard CPU/heap/preemption guarantee.
+The operation end uses a monotonic entry sample before reading remaining time;
+the retained first sixteen-method run observed a 375 ns overshoot with the
+previous ordering. Two boundary methods and the same four corrected regressions
+passed separately. Current source 154 plus G3 and the same compiled native 155
+passed, including all 21 new cases, zero failures/skips on unchanged 450 inputs.
+CLI/app, ordinary Debug, strict seven-binary candidate and existing memberships
+passed. Actual App/CLI wire, independent artifact/native import, production Core
+consumer and fresh Qwen R2 gates passed on the same inputs. These bounded flows
+do not establish framework preemption, peak allocation or full Office fidelity.
+[Contract](NATIVE-DOCX-WRITING.md).
+
+The following notice-receipt evidence retains its preceding .26.2/38 map.
 
 The stdio writer returns completion only after its encoded JSON plus LF has
 been written. Closed-delivery guards return false; existing write errors still

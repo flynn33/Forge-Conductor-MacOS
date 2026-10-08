@@ -1051,7 +1051,7 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
     private static let mutatingTools: Set<String> = [
         "forge_status", "get_forge_status",
         "fs_write", "fs_edit", "fs_mkdir", "fs_delete", "fs_delete_recovery", "fs_move",
-        "git_add", "git_commit", "pdf_write", "pdf_from_file",
+        "git_add", "git_commit", "pdf_write", "pdf_from_file", "docx_write",
         "agent_run_start", "agent_run_status", "agent_run_complete", "shell_exec",
         "memory_set", "memory_delete",
         "project_memory.initialize", "project_memory.remember", "project_memory.remember_batch",
@@ -1075,7 +1075,7 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
         "fs_delete", "fs_delete_recovery", "fs_move", "search_text",
         "web.fetch", "web.search", "web.render",
         "git_status", "git_diff", "git_log", "git_add", "git_commit",
-        "shell_exec", "pdf_write", "pdf_from_file",
+        "shell_exec", "pdf_write", "pdf_from_file", "docx_write",
         "project_memory.remember", "project_memory.remember_batch",
         "project_memory.search", "project_memory.get", "project_memory.update",
         "project_memory.forget", "project_memory.list_recent", "project_memory.link",

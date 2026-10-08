@@ -1,6 +1,19 @@
 # Forge Conductor user guide
 
-Current source targets **0.26.2 (38)**, an MCP notice-receipt hotfix.
+Current source targets **0.27.0 (39)**. Use `docx_write` with a `path` ending in
+`.docx` and plain-text `content`. It has its own tool grant, a 65,536-byte UTF-8
+input limit and a 1,048,576-byte encoded limit. CRLF, CR and U+2029 normalize to LF;
+native text import can add a final paragraph LF. Invalid XML 1.0 scalars are rejected.
+Builtin Docs and ordinary project-default tools include the name; custom/imported
+grants and explicit denials retain their existing scope.
+
+The signed candidate's App/CLI creation/readback, native import, production Core
+consumer and fresh Qwen API workflow passed. Source/native 155 passed each.
+These checks qualify bounded plain-text DOCX, with no installed-GUI, styled
+Office-suite or universal importer-fidelity claim.
+[Contract and retained evidence](docs/NATIVE-DOCX-WRITING.md).
+
+The preceding source targets **0.26.2 (38)**, an MCP notice-receipt hotfix.
 The notice-receipt hotfix records presentation only after the complete
 notice-bearing JSON+LF packet is written. EOF-skipped or partial packets do not
 commit a presentation receipt. The 92 distinct source methods and the same 92
@@ -237,7 +250,7 @@ observations retain their recorded scope. Exact owner publication, remote
 readback and synchronization references are retained externally. See the
 [phase record](docs/GRAPHITE-WORKBENCH.md) for evidence and capture limits.
 
-Version **0.26.2**, build **38** (current source target; candidate qualification is separate from installation).
+Version **0.27.0**, build **39** (current source target; candidate qualification is separate from installation).
 
 This guide describes the current LM Studio-driven workflow. The user works in a
 normal LM Studio chat; Forge Conductor supplies project context, tools, policy
@@ -492,8 +505,16 @@ can return errors. [Renderer contract and verified scopes](docs/NATIVE-WEB-RENDE
 | `fs_write` | `path`, `content`; optional `encoding: "base64"` requires canonical padded base64 without whitespace and accepts at most 2 MiB decoded bytes. The default writes UTF-8 text. |
 | `pdf_write` | `path`, `content`; optional `title`. A missing PDF extension is appended; the default title is the destination filename without its extension. Writes the supported text/Markdown subset through native layout. |
 | `pdf_from_file` | `source_path`; optional `dest_path`, `title`. Reads a bounded regular UTF-8 source. The default destination replaces the source extension with `.pdf`; the default title is the source filename without its extension. |
+| `docx_write` | `path`, `content` strings; explicit `.docx` destination. Plain text up to 65536 UTF-8 bytes, encoded output up to 1048576 bytes. CRLF/CR/U+2029 normalize to LF; native paragraph terminators can add a final LF when imported. Requires its own DOCX tool grant. |
 | `search_text` | `pattern`; optional `path`, integer `context_lines` from 0–20, and `include`/`exclude` filename-glob arrays. Each array accepts at most 32 nonempty globs of 256 UTF-8 bytes each. `.git` and `node_modules` remain excluded. |
 | `git_diff` | Optional `cwd`, `staged` and `file` (repository-relative pathspec). For example, `file: "Sources/App.swift"` limits the diff to that file. Read `stdout_truncated`, `stderr_truncated` and `timed_out` before treating output as complete. |
+
+The DOCX tool writes plain text through native Word-document serialization.
+It does not interpret Markdown, add images or promise styled-page/Office-suite
+fidelity. The builtin Docs agent and ordinary project-default tool sets receive
+the exact name; custom/imported tool grants and explicit denials are not widened.
+A destination durability error can follow a successful rename; inspect that
+destination before retrying. [Contract and remaining checks](docs/NATIVE-DOCX-WRITING.md).
 
 The PDF tools retain their existing authorization, title/destination defaults,
 Markdown subset and 4 MiB content/source limits. Native layout now limits retained

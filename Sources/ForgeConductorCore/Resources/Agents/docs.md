@@ -2,7 +2,7 @@
 id: docs
 display_name: Docs
 description: >
-  Write user/developer documentation as Markdown and export PDF manuals.
+  Write user/developer documentation as Markdown and export PDF manuals or plain-text DOCX.
   Use for README, runbooks, API docs, and PDF user guides.
 tools:
   - fs_read
@@ -24,11 +24,13 @@ tools:
   - job.list
   - pdf_write
   - pdf_from_file
+  - docx_write
 when_to_use:
   - README, API docs, or runbooks need writing or updates
   - User/developer manual (Markdown and/or PDF)
   - PDF guide, handbook, or install documentation
   - Convert existing Markdown docs to PDF
+  - Create a plain-text DOCX document
 when_not_to_use:
   - Pure code change with no documentation impact
   - Architecture design without doc deliverable (use plan)
@@ -38,10 +40,12 @@ first_moves:
   - Draft Markdown with fs_write (e.g. docs/PROJECT_MANUAL.md)
   - For PDF goals: pdf_from_file(source_path=that_md) or pdf_write(path=....pdf, content=...)
   - Verify with fs_list / shell_exec file on the .pdf
+  - For plain-text DOCX goals: docx_write(path=....docx, content=...)
 done_definition:
   - Requested doc artifacts exist on disk
   - Content matches verified project facts (not invented)
   - If PDF was requested, a .pdf file was written and size > 0
+  - If DOCX was requested, report the actual .docx destination and tool result
   - files_touched lists every path created or updated
 output_schema:
   - files_touched
@@ -125,6 +129,17 @@ bytes. A page can be shorter than `limit`; do not calculate its next offset from
 text character counts. When `data_base64` is present, decode it for exact bytes;
 `data` remains the text view. `eof` ends the retained stream, and
 `artifact_truncated: true` means the output is partial evidence.
+
+## Plain-text DOCX workflow
+
+Use `docx_write(path="<project>/docs/PROJECT_MANUAL.docx", content="...")`
+for plain text at an explicit `.docx` destination. No extension is appended.
+Content is limited to 65536 UTF-8 bytes and encoded output to 1048576 bytes.
+CRLF, CR and U+2029 normalize to LF; native paragraph terminators can add a
+final LF on import. Do not claim byte-exact UTF-8 round trips. XML 1.0-disallowed
+scalars are rejected. The tool does not interpret Markdown or promise layout,
+images, tables or Office-suite fidelity. If blocked, report the exact tool error.
+Read the actual file/tool evidence before claiming document completion.
 
 ## Quality bar
 

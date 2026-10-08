@@ -10,6 +10,43 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### `0.27.0 (39)` native plain-text DOCX writing
+
+- Add `docx_write(path, content)` with strict string arguments, an explicit
+  `.docx` destination, 65,536 UTF-8 input bytes and 1,048,576 encoded bytes.
+  Reject XML 1.0-disallowed scalars and normalize CRLF/CR/U+2029 to LF.
+  Native paragraph terminators can add a final LF on text import; no byte-exact
+  UTF-8, styled layout, image or Office-suite claim is made.
+- Serialize on a worker in a fixed exact-self native child before normal app
+  bootstrap. Retain the bounded duplex ownership/termination boundary and the
+  existing pinned atomic destination writer. An unresolved child keeps its slot;
+  durability failure after rename is reported with inspection guidance.
+- Add the exact name only to the builtin Docs agent and ordinary project-default tool sets, replay/progress and
+  existing telemetry groups. Preserve custom/imported grants, denials, PDF
+  schemas/defaults, shell/binary access and durable formats.
+- Preliminary CLI/catalog/ordinary Debug results retain their first input maps.
+  Twenty-one new methods are present: sixteen DOCX writer/exporter cases, two
+  fixed entry/transport-boundary cases and three catalog cases. The first
+  sixteen-method run failed twelve assertions (seven unexpected) across four
+  methods. The product operation deadline now samples the clock before reading
+  remaining time; corrected fixture paths retain their cases and intended
+  assertions. The two boundary methods and same four corrected regressions
+  passed separately. Current owning source 154 plus actual G3 passed 155 distinct
+  methods; the same native 155 passed, zero failures/skips on unchanged 450 inputs.
+  CLI/app and ordinary Debug compilation, strict seven-binary candidate checks,
+  exact Docs resource bytes and all 23 existing file memberships passed. Native
+  logs retain two audit-queue QoS warnings, seven NECP lines and fourteen PDF
+  tagging diagnostics. App/CLI each passed nine wire cases and16/16 consumed
+  requests; six documents passed independent OOXML/binary readback. Eight actual
+  files passed exact expected native text import. Six production Core cases
+  passed, preserving empty originals without inventing usable instructions.
+  Qwen R2 consumed two actual tool results across three normal responses, with
+  actual Low 3/3 and normal native/observer/collector EOF. First Qwen combined
+  NONPASS 2/3 remains; the API result is not installed-GUI acceptance.
+  Both standalone native raw-UTF8 gates remain NONPASS.
+  [Contract and gates](docs/NATIVE-DOCX-WRITING.md).
+
+
 ### `0.26.2 (38)` MCP notice-receipt hotfix
 
 - Mark a policy notice presented only after its complete JSON+LF packet is

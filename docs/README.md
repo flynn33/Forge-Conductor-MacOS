@@ -1,6 +1,21 @@
 # Documentation guide
 
-Current source targets **0.26.2 (38)**, an MCP notice-receipt hotfix.
+Current source targets **0.27.0 (39)**, adding `docx_write` for bounded plain-text
+Word documents. It requires its own grant, string arguments and an explicit
+`.docx` destination. Input is limited to 65,536 UTF-8 bytes and encoded output
+to 1,048,576 bytes. CRLF, CR and U+2029 normalize to LF; native paragraph
+terminators can add a final LF on text import. XML 1.0-disallowed scalars are
+rejected. Existing PDF tools and shell/binary access remain.
+
+Source and compiled native selections passed 155 distinct methods each. The signed
+Debug candidate passed App/CLI wire cases, binary readback, independent OOXML
+checks, eight exact native text imports and six production Core consumer cases.
+Qwen's fresh API workflow passed three responses and consumed both actual tool
+results with normal stop. This qualifies the bounded DOCX workflow; installed
+GUI, full Office/full web, all-feature and shipping gates remain separate.
+[Contract, exact evidence and retained failures](NATIVE-DOCX-WRITING.md).
+
+The preceding source targets **0.26.2 (38)**, an MCP notice-receipt hotfix.
 The notice-receipt hotfix records presentation only after the complete
 notice-bearing JSON+LF packet is written. EOF-skipped or partial packets do not
 commit a presentation receipt. The 92 distinct source methods and the same 92
@@ -135,6 +150,7 @@ qualification is not promoted by this UI phase.
 | [LM Studio connection](LM-STUDIO-CONNECTION.md) | Connect LM Studio; deploy, inspect, and repair MCP roles |
 | [Filesystem list paging](FILESYSTEM-LIST-PAGING.md) | Opt-in directory continuation, metadata/authorization fences, LF-inclusive frame budgets and current qualification status |
 | [Web response budgets](WEB-RESPONSE-BUDGET.md) | Fetch/search stdio ID, notice and LF sizing, preserved continuation and qualification scope |
+| [Native DOCX writing](NATIVE-DOCX-WRITING.md) | Bounded plain-text Word export, signed App/CLI wire, artifact/import/Core/Qwen evidence and retained failures |
 | [Native web rendering](NATIVE-WEB-RENDERING.md) | JavaScript snapshots, fixed native child ownership, actual frame budgets and qualification limits |
 | [Binary web and Qwen file workflows](BINARY-WEB-AND-QWEN-FILES.md) | Original HTTP bytes, version alignment, native/model examples and remaining format/browser gates |
 | [Project repository, web access and Qwen verification](PROJECT-WEB-QWEN.md) | GitHub project links, web/file tool additions, actual Qwen findings and current verification boundaries |

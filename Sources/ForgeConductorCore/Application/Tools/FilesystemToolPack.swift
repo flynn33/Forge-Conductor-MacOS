@@ -4449,7 +4449,7 @@ public struct FilesystemToolPack: ToolPackHandling {
         return (parent, components.last!)
     }
 
-    private static func writePinnedText(_ data: Data, to url: URL, cancellation: ToolCallCancellation?) throws {
+    static func writePinnedText(_ data: Data, to url: URL, cancellation: ToolCallCancellation?) throws {
         let (parent, leaf) = try pinnedTextParent(of: url, create: true, cancellation: cancellation)
         let temporary = ".forge-text-\(UUID().uuidString.lowercased())"
         let descriptor = Darwin.openat(parent.rawValue, temporary, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW | O_RESOLVE_BENEATH, 0o644)

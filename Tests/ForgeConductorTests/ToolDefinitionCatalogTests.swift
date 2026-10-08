@@ -133,7 +133,7 @@ final class ToolDefinitionCatalogTests: XCTestCase {
             }
             let docsTools: Set<String> = [
                 "fs_read", "fs_write", "fs_edit", "fs_list", "fs_glob", "fs_mkdir", "search_text",
-                "shell_exec", "pdf_write", "pdf_from_file", "git_status", "git_diff", "git_log",
+                "shell_exec", "pdf_write", "pdf_from_file", "docx_write", "git_status", "git_diff", "git_log",
                 "runtime.capabilities", "python.run",
             ]
             let auditTools: Set<String> = [
@@ -725,6 +725,171 @@ final class ToolDefinitionCatalogTests: XCTestCase {
                     .staleRevision(expected: 0, actual: 3)
                 )
             }
+        }
+    }
+
+
+    func testDOCXWriteHasExactSchemaReplayAndNeighboringPDFParity() throws {
+        try withProductionApp("docx-schema") { app in
+            let catalog = try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames)
+            let definition = try XCTUnwrap(catalog.definition(named: "docx_write"))
+            let schema = try definition.inputSchemaObject()
+            let properties = try XCTUnwrap(schema["properties"] as? [String: Any])
+            XCTAssertEqual(Set(properties.keys), ["path", "content", "deadline_ms"])
+            XCTAssertEqual(schema["required"] as? [String], ["path", "content"])
+            XCTAssertEqual(schema["additionalProperties"] as? Bool, false)
+            XCTAssertTrue(definition.strict)
+            for key in ["path", "content"] {
+                XCTAssertEqual((properties[key] as? [String: Any])?["type"] as? String, "string", key)
+            }
+            let deadline = try XCTUnwrap(properties["deadline_ms"] as? [String: Any])
+            XCTAssertEqual(deadline["type"] as? String, "integer")
+            XCTAssertEqual(deadline["minimum"] as? Int, 1)
+            XCTAssertEqual(deadline["maximum"] as? Int, ToolRouter.maximumRequestedDeadlineMilliseconds)
+            XCTAssertTrue(definition.description.contains("65536 UTF-8 bytes"))
+            XCTAssertTrue(definition.description.contains("1048576 bytes"))
+            XCTAssertTrue(definition.description.contains("native paragraph terminators"))
+            XCTAssertTrue(ToolRouter.isMutatingTool("docx_write"))
+            let replay = try ProductionToolReplayCatalog.classifier(productionToolNames: app.tools.toolNames)
+            XCTAssertEqual(try replay.replayClass(for: "docx_write"), .idempotent)
+
+            let descriptor = try definition.mcpDescriptor()
+            let mcpSchema = try XCTUnwrap(descriptor["inputSchema"] as? [String: Any])
+            XCTAssertEqual(try JSONSupport.data(from: mcpSchema), definition.inputSchemaJSON)
+            let providerDefinitions = try catalog.providerToolDefinitions(allowedToolNames: ["docx_write"])
+            XCTAssertEqual(providerDefinitions.count, 1)
+            let provider = try XCTUnwrap(JSONSerialization.jsonObject(with: try XCTUnwrap(providerDefinitions.first)) as? [String: Any])
+            XCTAssertEqual(provider["name"] as? String, "docx_write")
+            XCTAssertEqual(provider["strict"] as? Bool, true)
+            let providerSchema = try XCTUnwrap(provider["parameters"] as? [String: Any])
+            XCTAssertEqual(try JSONSupport.data(from: providerSchema), definition.inputSchemaJSON)
+
+            let pdf = try XCTUnwrap(catalog.definition(named: "pdf_write")).inputSchemaObject()
+            XCTAssertEqual(pdf["required"] as? [String], ["path", "content"])
+            XCTAssertEqual(Set(try XCTUnwrap(pdf["properties"] as? [String: Any]).keys), ["path", "content", "title", "deadline_ms"])
+            let fromFile = try XCTUnwrap(catalog.definition(named: "pdf_from_file")).inputSchemaObject()
+            XCTAssertEqual(fromFile["required"] as? [String], ["source_path"])
+            XCTAssertEqual(Set(try XCTUnwrap(fromFile["properties"] as? [String: Any]).keys), ["source_path", "dest_path", "title", "deadline_ms"])
+            let missingContext = try app.tools.call(name: "docx_write", arguments: ["path": "unattached.docx", "content": ""], clientID: ClientID("docx-unattached"))
+            XCTAssertFalse(missingContext.ok)
+            XCTAssertEqual(missingContext.payload["code"] as? String, "project_context_required")
+        }
+    }
+
+    func testDOCXWriteRejectsRawInvalidPathsBeforeAuthorizationNormalization() throws {
+        try withProductionApp("docx-path-admission") { app in
+            let project = app.paths.home.appendingPathComponent("project", isDirectory: true)
+            try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+            let client = ClientID("docx-path-admission")
+            let context = ToolInvocationContext(projectID: ProjectID(), projectGeneration: .initial,
+                clientID: client, authorizationScope: ToolAuthorizationScope(canonicalRoots: [project],
+                    allowedTools: ["docx_write", "pdf_write"], networkAllowed: false, maximumInlineOutputBytes: 65_536))
+            let authorization = ToolAuthorizationService(paths: app.paths, config: app.config)
+            let invalid: [(String, [String: Any])] = [
+                ("missing", ["content": "plain"]),
+                ("number", ["path": NSNumber(value: 3), "content": "plain"]),
+                ("boolean", ["path": NSNumber(value: true), "content": "plain"]),
+                ("null", ["path": NSNull(), "content": "plain"]),
+                ("array", ["path": ["report.docx"], "content": "plain"]),
+                ("object", ["path": ["name": "report.docx"], "content": "plain"]),
+                ("empty", ["path": "", "content": "plain"]),
+                ("blank", ["path": " \t\r\n", "content": "plain"]),
+                ("NUL", ["path": "before\u{0000}after.docx", "content": "plain"]),
+            ]
+            for (label, arguments) in invalid {
+                let decision = try authorization.authorize(tool: "docx_write", arguments: arguments,
+                    context: context, clientID: client, binding: nil, cancellation: ToolCallCancellation(timeoutSeconds: 5))
+                guard case .denied(let code, _) = decision else {
+                    XCTFail("\(label): raw invalid DOCX path must not become an authorized normalized string")
+                    continue
+                }
+                XCTAssertEqual(code, "invalid_path", label)
+            }
+            let arguments: [String: Any] = ["path": "relative.docx", "content": "plain\n"]
+            let docx = try authorization.authorize(tool: "docx_write", arguments: arguments,
+                context: context, clientID: client, binding: nil, cancellation: nil)
+            let pdf = try authorization.authorize(tool: "pdf_write", arguments: arguments,
+                context: context, clientID: client, binding: nil, cancellation: nil)
+            guard case .allowed(let normalizedDOCX) = docx, case .allowed(let normalizedPDF) = pdf else {
+                return XCTFail("Valid DOCX paths must use the existing write normalization boundary")
+            }
+            XCTAssertEqual(normalizedDOCX["path"] as? String, normalizedPDF["path"] as? String)
+            XCTAssertEqual(normalizedDOCX["path"] as? String,
+                project.resolvingSymlinksInPath().standardizedFileURL.appendingPathComponent("relative.docx").standardizedFileURL.path)
+            XCTAssertEqual(normalizedDOCX["content"] as? String, "plain\n")
+            let legacyPDF = try authorization.authorize(tool: "pdf_write", arguments: ["path": NSNumber(value: 3), "content": "plain"],
+                context: context, clientID: client, binding: nil, cancellation: nil)
+            guard case .allowed = legacyPDF else {
+                return XCTFail("The new raw-path rule must not change the existing PDF argument contract")
+            }
+            XCTAssertFalse(FileManager.default.fileExists(atPath: project.appendingPathComponent("relative.docx").path))
+            XCTAssertFalse(FileManager.default.fileExists(atPath: project.appendingPathComponent("3").path))
+        }
+    }
+
+    func testDOCXWriteDefaultGrantsPreserveCustomDenialsAndFilesystemIndependence() throws {
+        try withProductionApp("docx-default-grants") { app in
+            let catalog = try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames)
+            XCTAssertTrue(ProjectInstructionQueueStore.ordinaryDefaultAllowedTools.contains("docx_write"))
+            XCTAssertTrue(ContinuityAutomation.progressTools.contains("docx_write"))
+            for specs in [app.catalog.all(), AgentCatalog.builtinDefaults()] {
+                let docs = try XCTUnwrap(specs.first { $0.id == "docs" })
+                XCTAssertEqual(docs.tools.filter { $0 == "docx_write" }.count, 1)
+                XCTAssertTrue(docs.body.contains("docx_write"))
+                for spec in specs where spec.id != "docs" {
+                    XCTAssertFalse(spec.tools.contains("docx_write"), spec.id)
+                }
+            }
+            XCTAssertEqual(try catalog.definitions(allowedToolNames: ["fs_write"]).map(\.name), ["fs_write"])
+            XCTAssertFalse(ToolGrantSemantics.grants(tool: "docx_write", from: ["fs_write"]))
+            XCTAssertFalse(ToolGrantSemantics.grants(tool: "fs_write", from: ["docx_write"]))
+            XCTAssertTrue(ToolGrantSemantics.grants(tool: "docx_write", from: ["*"]))
+            let custom = """
+            ---
+            id: docs
+            display_name: Owner docs
+            tools:
+              - fs_write
+            tools_forbidden:
+              - docx_write
+            ---
+            Owner-defined write-only documentation role.
+            """
+            try custom.write(to: app.paths.agentsDir.appendingPathComponent("docs.md"), atomically: true, encoding: .utf8)
+            app.catalog.reload()
+            let spec = try XCTUnwrap(app.catalog.get("docs"))
+            XCTAssertEqual(spec.source, "custom")
+            XCTAssertEqual(spec.tools, ["fs_write"])
+            XCTAssertEqual(spec.toolsForbidden, ["docx_write"])
+            let project = app.paths.home.appendingPathComponent("project", isDirectory: true)
+            try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+            let client = ClientID("docx-grant-boundary")
+            let projectID = ProjectID()
+            let authorization = ToolAuthorizationService(paths: app.paths, config: app.config)
+            for (granted, requested) in [("fs_write", "docx_write"), ("docx_write", "fs_write")] {
+                let context = ToolInvocationContext(projectID: projectID, projectGeneration: .initial,
+                    clientID: client, authorizationScope: ToolAuthorizationScope(canonicalRoots: [project],
+                        allowedTools: [granted], networkAllowed: false, maximumInlineOutputBytes: 65_536))
+                let decision = try authorization.authorize(tool: requested, arguments: ["path": "report.docx", "content": "plain"],
+                    context: context, clientID: client, binding: nil, cancellation: nil)
+                guard case .denied(let code, _) = decision else {
+                    XCTFail("\(granted) must not grant \(requested)")
+                    continue
+                }
+                XCTAssertEqual(code, "tool_not_granted")
+            }
+            let context = ToolInvocationContext(projectID: projectID, projectGeneration: .initial,
+                clientID: client, authorizationScope: ToolAuthorizationScope(canonicalRoots: [project],
+                    allowedTools: ["*"], networkAllowed: false, maximumInlineOutputBytes: 65_536))
+            let binding = ActiveBinding(sessionID: SessionID("docx-custom-binding"), agentID: spec.id,
+                toolsPrimary: spec.tools, toolsForbidden: spec.toolsForbidden, cwd: project.path)
+            let decision = try authorization.authorize(tool: "docx_write", arguments: ["path": "report.docx", "content": "plain"],
+                context: context, clientID: client, binding: binding, cancellation: nil)
+            guard case .denied(let code, _) = decision else {
+                return XCTFail("A wildcard durable grant must not override an explicit custom-agent DOCX denial")
+            }
+            XCTAssertEqual(code, "tool_forbidden")
+            XCTAssertFalse(FileManager.default.fileExists(atPath: project.appendingPathComponent("report.docx").path))
         }
     }
 

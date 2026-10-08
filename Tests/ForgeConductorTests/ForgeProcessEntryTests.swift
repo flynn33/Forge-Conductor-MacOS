@@ -80,6 +80,15 @@ final class ForgeProcessEntryTests: XCTestCase {
         XCTAssertEqual(LMStudioMCPPluginInstaller.serveArguments, ["serve"])
     }
 
+    func testDOCXFixedModeAndMalformedCallsRemainHeadless() {
+        for arguments in [["/app", "--internal-docx-export-v1"],
+                          ["/app", "--internal-docx-export-v1", "--home", "/tmp/ignored"]] {
+            XCTAssertEqual(ForgeProcessEntry.parseMode(arguments: arguments), .docxExportChild)
+        }
+        XCTAssertEqual(ForgeProcessEntry.parseMode(arguments: ["/app", "--internal-docx-export-v2"]), .gui)
+        XCTAssertFalse(DOCXExportChildEntry.runIfRequested(arguments: ["/app", "serve"], expectedRole: .app))
+    }
+
     func testResolveBinaryPrefersExplicitPreferred() {
         // Non-existent preferred is ignored; resolution falls through without crash.
         let missing = URL(fileURLWithPath: "/tmp/forge-conductor-missing-binary-\(UUID().uuidString)")

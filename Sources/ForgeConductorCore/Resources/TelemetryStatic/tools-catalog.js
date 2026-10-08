@@ -23,6 +23,7 @@ export const TOOL_PACKS = [
       "fs_write",
       "pdf_write",
       "pdf_from_file",
+      "docx_write",
       "fs_edit",
       "fs_list",
       "fs_glob",

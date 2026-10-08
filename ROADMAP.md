@@ -1,8 +1,28 @@
 # Forge Conductor macOS — project roadmap
 
-## MCP notice-receipt hotfix
+## Native plain-text DOCX writing
 
-Current target **0.26.2 (38)** corrects receipt truth without adding a tool,
+Current target **0.27.0 (39)** adds bounded native plain-text DOCX writing.
+Its selected source/native, signed wire, independent artifact/import, production
+Core consumer and fresh Qwen API workflow gates passed within the scope below.
+
+| Milestone | Actual evidence | Remaining boundary |
+| --- | --- | --- |
+| Standalone native controls | Sixteen retained worker controls; both original raw-UTF8 gates remain NONPASS. Independent reconciliation observed fifteen valid XML documents and one invalid document, retaining 67 input hashes. | These are standalone controls. The new explicit paragraph contract does not turn their original byte-exact gates into passes. |
+| Additive tool/admission | Exact `docx_write(path, content)`, distinct grants, strict raw path validation, 64 KiB input/1 MiB output caps, XML scalar rejection and paragraph semantics. Builtin Docs and ordinary project-default tools receive the name; custom/imported grants and PDF contracts remain. | Source 154 plus G3 passed 155 distinct methods; native 155 passed the same scope, including all 21 new cases. This is not full Office functionality. |
+| Native execution/write ownership | Fixed exact-self child, worker serialization and pinned write passed actual App and CLI wire flows: each9 cases/16 consumed requests/normal exit 0/full EOF, with five exact-code no-write negatives and a producer-only PDF neighbor control. | Security/AppKit calls remain synchronously uncancellable; no universal CPU/peak-heap or PDF semantic claim. QoS2/NECP7/PDF-tagging14 diagnostics are retained. |
+| Regression and canonical identity | First 16 source NONPASS 12 assertions/7 unexpected/4 methods and zero-selected first G3 remain. Corrected source 154 + G3 and native 155 passed; CLI/app/ordinary Debug/strict seven-binary verification passed. All 23 changed memberships and all 14 selected class files remain; PBX edits only 12 marketing/16 build values. | Repeats are not added to 155. Historical first maps/failures remain separate. |
+| Artifacts and current consumers | Six App/CLI DOCX artifacts passed independent bounded OOXML checks and full binary reconstruction. All 8 actual files, including both Qwen artifacts, passed exact expected native UTF-8 import. Production Core passed 6 cases: 4 exact nonempty conversions,2 empty originals retained with no canonical instructions. | Exact expected paragraph semantics, not universal input-byte or importer/render fidelity. Empty files remain unresolved rather than fabricated text. |
+| Qwen workflow | Fresh R2 passed 3 normal responses, 2 actual tool results consumed, actual Low 3/3, scalar STOP and normal native/observer/collector EOF. The 3579-byte artifact independently imported 102 exact expected bytes. First combined NONPASS 2/3 and outer cleanup classification are retained. | Separate API chat and isolated signed candidate; not active installed GUI, general observer readiness or all models. |
+| Delivery | Runtime rollup `native-docx-root-final-runtime-reconciliation-0270.json` binds unchanged 450 inputs, 7 current binaries, 3 protected files and 14 prior manifests/92 named binaries. | Exact source/wiki publication and synchronization identities belong in the separate external closeout receipt after remote byte readback. Runtime receipts alone do not demonstrate delivery. |
+
+[Contract and exact evidence](docs/NATIVE-DOCX-WRITING.md). The 54 capability
+themes, full-web, installed/GUI, PDFKit, Release/notarization and shipment remain
+separate; historical failures do not become passes.
+
+## Preceding MCP notice-receipt hotfix
+
+This preceding target **0.26.2 (38)** corrects receipt truth without adding a tool,
 argument, grant or schema. The delivered .26.1 source/wiki remain historical.
 
 | Milestone | Actual evidence | Remaining gate |

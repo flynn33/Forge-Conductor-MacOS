@@ -23,8 +23,28 @@ public struct ProcessResult: Sendable {
 
 enum OwnedCurrentSelfMode: Sendable {
     case webRenderV1
+    case docxExportV1
 
-    var argument: String { "--internal-web-render-v1" }
+    var argument: String {
+        switch self {
+        case .webRenderV1: "--internal-web-render-v1"
+        case .docxExportV1: "--internal-docx-export-v1"
+        }
+    }
+
+    var maximumInputBytes: Int {
+        switch self {
+        case .webRenderV1: 16_388
+        case .docxExportV1: 65_536
+        }
+    }
+
+    var maximumOutputBytes: Int {
+        switch self {
+        case .webRenderV1: 32_772
+        case .docxExportV1: 1_048_576
+        }
+    }
 }
 
 enum OwnedStreamEnd: Sendable, Equatable {
@@ -249,7 +269,7 @@ extension ProcessRunner {
             throw NSError(domain: "ProcessRunner", code: 20,
                           userInfo: [NSLocalizedDescriptionKey: "owned native mode requires a worker thread"])
         }
-        guard standardInput.count <= 16_388 else {
+        guard standardInput.count <= mode.maximumInputBytes else {
             throw NSError(domain: "ProcessRunner", code: 21,
                           userInfo: [NSLocalizedDescriptionKey: "owned native input exceeds its frame limit"])
         }
@@ -334,7 +354,7 @@ extension ProcessRunner {
             } catch { admission = .childInvalid }
         } else { admission = .ownedChildExited }
 
-        let out = OwnedPipeCapture(limit: 32_772), err = OwnedPipeCapture(limit: 16_384)
+        let out = OwnedPipeCapture(limit: mode.maximumOutputBytes), err = OwnedPipeCapture(limit: 16_384)
         var inputBytes = 0
         var inputClosed = false
         var inputCloseAttempted = false

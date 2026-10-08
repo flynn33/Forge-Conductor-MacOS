@@ -1,6 +1,31 @@
 # Version and qualification status
 
-Current source target **0.26.2, build 38** repairs MCP notice-receipt truth.
+Current source target **0.27.0, build 39** adds bounded native plain-text DOCX.
+Owning source 154 plus actual G3 passed 155 distinct methods; compiled native 155
+passed the same scope, zero failures/skips on unchanged 450 inputs. Current
+CLI/app, ordinary Debug, strict seven-binary candidate and canonical graph gates
+passed. App/CLI each passed 9 wire cases/16 consumed requests with normal exit 0/full
+EOF. Six DOCX artifacts passed independent bounded OOXML/readback; all 8 actual
+files passed exact expected native text import. Production Core passed 6 cases:
+4 exact nonempty conversions and2 empty originals honestly left unresolved.
+
+Fresh Qwen R2 passed 3 normal responses, 2 actual tool results consumed, actual
+Low 3/3, scalar STOP, native6/6 requests and normal observer/collector EOF. Its
+3579-byte artifact independently imported 102 exact expected UTF-8 bytes. First
+combined Qwen NONPASS 2/3 remains, with its distinct outer cleanup classification.
+This is separate API/candidate evidence, not installed-GUI qualification.
+
+The final runtime rollup SHA
+`227ee6c77f3e0949a3f538f8342d795aa780814c33aeb6596a110a0e3493daed`
+binds source450/candidate7/protected3 and 14 prior manifests/92 named binaries,
+all unchanged. Runtime receipts do not demonstrate source/wiki delivery; exact
+publication/readback/synchronization identities belong in the external closeout.
+Native QoS2/NECP7/PDF-tagging14 diagnostics, first 16 source NONPASS, zero-selected
+first G3 and immutable raw-UTF8 control failures remain. Full Office, full web,
+all-feature, PDFKit, installed/GUI, Release and shipment gates remain separate.
+[Contract, exact receipts and preserved failures](NATIVE-DOCX-WRITING.md).
+
+Preceding source target **0.26.2, build 38** repairs MCP notice-receipt truth.
 The skipped and partial EOF baselines each executed one method with one callback
 failure. Owning source passed 92 distinct methods (41.535 s, log `972ba7dc…`)
 and the same 92 compiled native methods passed (81.689 s, log `97ee779a…`),
@@ -1606,7 +1631,7 @@ Dashboard geometry, minimum/normal containment of every primary view, and
 populated policy evaluation rows. Live completion of the reported owner run,
 universal policy enforcement, and distribution qualification remain open.
 
-Current source target: **0.26.2, build 38**, supporting **macOS 26+**. The earlier
+Current source target: **0.27.0, build 39**, supporting **macOS 26+**. The earlier
 0.16.3 Developer ID app and archive are recorded in the historical build-24 section;
 that workflow staged the CLI under `~/.forge-conductor` and manually copied the
 app to `/Applications`. It did not exercise a `.pkg` installation, notarization,
@@ -1619,10 +1644,13 @@ the detailed, source-bound receipts are in the
 ## Version and build agreement
 
 The Swift runtime, CLI, Xcode Debug and Release configurations, and current
-documentation target version **0.26.2, build 38**. The root [`VERSION`](../VERSION)
+documentation target version **0.27.0, build 39**. The root [`VERSION`](../VERSION)
 and [`BUILD_NUMBER`](../BUILD_NUMBER) files are canonical; compiled constants
-and Xcode build settings match them. The current version method passed within
-the 92 source and same 92 native selections; graph review retains existing
+and Xcode build settings match them. Actual G3 passed current DOCX version/document
+agreement; the compiled native 155 includes that method. Graph review preserves
+all 23 existing memberships and the version-only PBX edits. The preceding .26.2
+version method passed within
+the 92 source and same 92 native selections on their historical map; graph review retained existing
 memberships and version-only PBX edits. The preceding .26.1 hotfix version
 method passed within the
 final 139 source and same 139 compiled native cases.

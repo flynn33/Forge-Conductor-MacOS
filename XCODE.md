@@ -1,6 +1,29 @@
 # Forge Conductor — Xcode
 
-Current source version **0.26.2**, build **38**.
+Current source version **0.27.0**, build **39**.
+
+The DOCX slice adds a fixed native child mode and bounded worker exporter inside
+existing files. Final review records all 23 changed memberships: thirteen Core
+Swift files, two Core resources, Protocol, App and CLI entries, and five Core
+test files. All14 selected test class files belong to ForgeConductorTests. No
+source file or target membership was added; PBX changes only twelve marketing
+and sixteen build assignments. Package and canonical workspace references remain.
+
+Owning source 154 plus actual G3 passed 155 distinct methods; the same native 155
+passed, zero failures/skips on unchanged 450 inputs. Core selection uses the
+ForgeConductor scheme and exact ForgeConductorTests selectors, with separate
+test DerivedData. CLI/app compiled in 1.0/1.104 s; ordinary Debug built in 7.29 s.
+Strict Debug candidate checks passed for seven binary files and exact Docs
+resource bytes, preserving fourteen prior manifests/ninety-two files and three
+protected files. Native diagnostics retain two audit-queue QoS warnings, seven
+NECP lines and fourteen PDF tagging messages; no diagnostic-free run is claimed.
+Actual App/CLI wire cases, independent OOXML/readback, eight native text imports,
+six production Core consumer cases and the fresh Qwen R2 workflow passed. Their
+actual API/candidate scopes and first combined Qwen NONPASS remain explicit;
+Release, installed GUI and broader feature matrices are separate.
+[Contract and evidence](docs/NATIVE-DOCX-WRITING.md).
+
+The following notice-receipt results retain their preceding .26.2/38 inputs.
 
 The notice-receipt repair changes existing MCPServer and MCP test inputs. It
 adds no file, resource or target membership. Owning source and matching native
@@ -756,7 +779,7 @@ remains `22e7443d13496b3cc08b6e98366bb6d2332e3fd4`; later documentation commits
 do not change the binary identity. The set is ready for owner notarization and
 Apple upload, but is not notarized, stapled, installed, shipped, or released.
 That retained archive used Xcode `MARKETING_VERSION = 0.16.2` and
-`CURRENT_PROJECT_VERSION = 23`. Current source targets `0.26.2 (38)`; the historical build-24 app/archive use
+`CURRENT_PROJECT_VERSION = 23`. Current source targets `0.27.0 (39)`; the historical build-24 app/archive use
 `0.16.3 (24)`; notarization and shipment remain separate.
 
 Implementation revision `91ad90ee7a1e51b7289f4c531ddae4dbbc6812ec`

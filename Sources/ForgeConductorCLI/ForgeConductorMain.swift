@@ -49,6 +49,7 @@ enum ForgeConductorMain {
 
     static func main() {
         if WebRenderChildEntry.runIfRequested(expectedRole: .cli) { return }
+        if DOCXExportChildEntry.runIfRequested(expectedRole: .cli) { return }
         ForgeNativeSessionHostPlugin.register()
         let args = Array(CommandLine.arguments.dropFirst())
         let command = args.first ?? "help"

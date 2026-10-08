@@ -6,6 +6,30 @@ import XCTest
 @testable import ForgeConductorCore
 
 final class OwnedDuplexProcessTests: XCTestCase {
+    func testDOCXFixedModeCapsPreserveWebTransportAndRejectOversizeBeforeAdmission() throws {
+        XCTAssertEqual(OwnedCurrentSelfMode.webRenderV1.argument, "--internal-web-render-v1")
+        XCTAssertEqual(OwnedCurrentSelfMode.webRenderV1.maximumInputBytes, 16_388)
+        XCTAssertEqual(OwnedCurrentSelfMode.webRenderV1.maximumOutputBytes, 32_772)
+        XCTAssertEqual(OwnedCurrentSelfMode.docxExportV1.argument, "--internal-docx-export-v1")
+        XCTAssertEqual(OwnedCurrentSelfMode.docxExportV1.maximumInputBytes, 65_536)
+        XCTAssertEqual(OwnedCurrentSelfMode.docxExportV1.maximumOutputBytes, 1_048_576)
+        let runner = ProcessRunner()
+        let result = try runOnWorker {
+            try runner.runOwnedCurrentSelf(mode: .docxExportV1,
+                standardInput: Data(repeating: 0, count: 65_537),
+                deadlineUptimeNanoseconds: DispatchTime.now().uptimeNanoseconds + 30_000_000_000,
+                cancellation: ToolCallCancellation())
+        }
+        switch result {
+        case .failure(let error):
+            let failure = error as NSError
+            XCTAssertEqual(failure.domain, "ProcessRunner")
+            XCTAssertEqual(failure.code, 21)
+        case .success: XCTFail("Oversize DOCX input must fail before native admission")
+        }
+        XCTAssertTrue(runner.shutdownOwnedCurrentSelf(deadlineUptimeNanoseconds: 0))
+    }
+
     func testOpenEmptyPipeIsNotEOFAndFinalizationReportsForcedClose() throws {
         let pipe = try OwnedCaptureTestPipe()
         let capture = OwnedPipeCapture(limit: 32)

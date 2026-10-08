@@ -11,7 +11,20 @@ readbacks and ordinary observations retain their explicit limits; no
 installation, notarization, App Store upload or distribution was performed.
 Exact owner publication/readback/synchronization refs are retained externally.
 
-Current target identity is **0.26.2 (38)**. The patch component advances for
+Current target identity is **0.27.0 (39)**. The feature-release component
+advances for one backward-compatible user-facing tool, `docx_write`; patch
+resets to zero and build advances to 39. Existing PDF names/schemas/defaults,
+grants, durable formats and runtime tools remain; no storage or protocol-schema
+migration is added. Preliminary checks retain earlier maps. Current source 154
+plus actual G3 and the same compiled native 155 passed on unchanged 450 inputs;
+current version/docs, canonical graph, CLI/app, ordinary Debug and strict
+seven-binary candidate checks passed. Actual App/CLI wire, bounded artifacts,
+native imports, production Core consumers and fresh Qwen R2 passed on unchanged
+inputs. Runtime receipts do not prove delivery; the external closeout records
+exact source/wiki identities after remote verification and safe synchronization.
+[DOCX contract](NATIVE-DOCX-WRITING.md).
+
+The preceding target identity is **0.26.2 (38)**. The patch component advanced for
 notice-receipt truth in the existing stdio transport, without a new tool,
 argument, public API or capability. The build number advances to 38. Owning
 source and matching native selection each passed 92 methods on their original
@@ -139,7 +152,17 @@ focused version test, and CI reject drift between them.
 
 ## Current identity
 
-The current product version target is `0.26.2`, build `38`. Root authorities,
+The current product version target is `0.27.0`, build `39`. Root authorities,
+compiled constants, twelve marketing-version and sixteen build-number settings
+advance together. Actual G3 passed the current document/version agreement and
+is included in 155 unique source/native methods. The first mistaken selector
+executed zero tests and remains NONPASS despite terminal0. Graph review retains
+all 23 existing memberships and version-only PBX edits. Product identity alone
+is not installation or shipment qualification.
+
+### Preceding 0.26.2 version agreement
+
+The preceding product version target was `0.26.2`, build `38`. Root authorities,
 compiled constants, twelve marketing-version and sixteen build-number settings
 agree. The current version method passed within the 92 source and same 92
 native cases; graph review preserves existing memberships and version-only PBX

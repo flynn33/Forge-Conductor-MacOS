@@ -231,6 +231,17 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
             )
         }
 
+        if tool == "docx_write" {
+            guard let path = arguments["path"] as? String,
+                  !path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  !path.utf8.contains(0) else {
+                return .denied(
+                    code: "invalid_path",
+                    message: "DOCX path must be a nonblank string without NUL bytes"
+                )
+            }
+        }
+
         if let blankPathKey = Self.blankDestructivePathKey(
             tool: tool,
             arguments: arguments
@@ -424,7 +435,7 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
                     access($0, preservesFinalComponent: true)
                 },
             ].compactMap { $0 }
-        case "pdf_write":
+        case "pdf_write", "docx_write":
             return [access("path")].compactMap { $0 }
         case "pdf_from_file":
             var accesses = [access("source_path")].compactMap { $0 }

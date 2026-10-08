@@ -160,10 +160,10 @@ public final class AgentCatalog: AgentCatalogProviding, @unchecked Sendable {
             AgentSpec(
                 id: "docs",
                 displayName: "Docs",
-                description: "Write Markdown documentation and export PDF manuals via native tools.",
-                tools: ["fs_read", "fs_write", "fs_edit", "fs_list", "fs_glob", "fs_mkdir", "search_text", "shell_exec", "pdf_write", "pdf_from_file", "git_status", "git_diff", "git_log", "runtime.capabilities", "python.run", "job.status", "job.read_output", "job.cancel", "job.list"],
+                description: "Write Markdown documentation and export PDF manuals or plain-text DOCX via native tools.",
+                tools: ["fs_read", "fs_write", "fs_edit", "fs_list", "fs_glob", "fs_mkdir", "search_text", "shell_exec", "pdf_write", "pdf_from_file", "docx_write", "git_status", "git_diff", "git_log", "runtime.capabilities", "python.run", "job.status", "job.read_output", "job.cancel", "job.list"],
                 toolsForbidden: ["git_push", "git_commit"],
-                whenToUse: ["README", "PDF manual", "runbook", "API docs"],
+                whenToUse: ["README", "PDF manual", "plain-text DOCX", "runbook", "API docs"],
                 firstMoves: ["fs_glob docs/README", "fs_read sources", "fs_write markdown", "pdf_from_file if needed", "agent_run_complete"],
                 doneDefinition: ["Artifacts on disk", "files_touched filled", "agent_run_complete"],
                 outputSchema: ["files_touched", "summary", "formats", "how_to_open"],
@@ -171,6 +171,12 @@ public final class AgentCatalog: AgentCatalogProviding, @unchecked Sendable {
                 qualityBar: ["No aspirational docs", "Prefer pdf_write over inventing pandoc", "Always agent_run_complete"],
                 body: """
                 You are Docs. Write accurate documentation with tools.
+                For plain-text DOCX use docx_write(path="<project>/docs/PROJECT_MANUAL.docx",
+                content="..."). Content is limited to 65536 UTF-8 bytes and encoded output
+                to 1048576 bytes. CRLF, CR and U+2029 normalize to LF; native paragraph
+                terminators can add a final LF on import. XML 1.0-disallowed scalars are
+                rejected. This tool does not interpret Markdown or promise layout,
+                images or Office-suite fidelity. Report exact tool errors when blocked.
                 For PDF use pdf_write / pdf_from_file (no pandoc). Always fill files_touched
                 and call agent_run_complete. Never claim PDF done without a file on disk.
                 Find filenames with fs_glob(pattern="*.md", path="<project>/docs");

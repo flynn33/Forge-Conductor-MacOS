@@ -690,6 +690,7 @@ private enum ProductionToolDefinitionSource {
         "git_commit": "git commit -m message.",
         "pdf_write": "Write a PDF from markdown-ish text using native Unicode layout (no external converter).",
         "pdf_from_file": "Convert a local markdown/text file to PDF.",
+        "docx_write": "Write plain text to an explicit .docx destination using native Office Open XML export. Content is limited to 65536 UTF-8 bytes and encoded output to 1048576 bytes. CRLF, CR and U+2029 are normalized to LF; native paragraph terminators can add a final LF on import. XML 1.0-disallowed scalars are rejected. No Markdown interpretation, layout, images or Office-suite fidelity is promised.",
         "search_text": "Recursive text search (grep), with optional context_lines and include/exclude filename globs.",
         "memory_set": "Store a durable key/value note in Forge local memory (survives chat sessions).",
         "memory_get": "Read a durable memory note by key.",
@@ -922,6 +923,16 @@ private enum ProductionToolDefinitionSource {
                     "title": ["type": "string"] as [String: Any],
                 ] as [String: Any],
                 "required": ["path", "content"],
+            ]
+        case "docx_write":
+            return [
+                "type": "object",
+                "properties": [
+                    "path": ["type": "string", "description": "Required nonblank explicit .docx destination; no extension is appended."] as [String: Any],
+                    "content": ["type": "string", "description": "Plain text, at most 65536 UTF-8 bytes; native paragraph/LF semantics apply."] as [String: Any],
+                ] as [String: Any],
+                "required": ["path", "content"],
+                "additionalProperties": false,
             ]
         case "pdf_from_file":
             return [

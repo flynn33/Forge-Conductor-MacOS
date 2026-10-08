@@ -30,6 +30,7 @@ public final class ForgeApp: @unchecked Sendable {
     public let continuityControl: ContinuityControlService
     public let runtimeJobs: RuntimeJobSubsystem
     public let webRenderer: WebRendererService
+    let docxExporter: NativeDOCXExporter
     /// Read-side access to the ordered Development Policy sources selected in
     /// Rune Forge. The manager remains the mutation and indexing owner.
     public let developmentPolicySources: (any DevelopmentPolicySourceReading)?
@@ -93,6 +94,7 @@ public final class ForgeApp: @unchecked Sendable {
         self.continuityControl = continuityControl
         self.runtimeJobs = runtimeJobs
         self.webRenderer = WebRendererService()
+        self.docxExporter = NativeDOCXExporter()
         self.developmentPolicySources = developmentPolicySources
         self.developmentPolicySourceCatalog = developmentPolicySources
         self.stjornarvaldObservations = stjornarvaldObservations
@@ -294,13 +296,14 @@ public final class ForgeApp: @unchecked Sendable {
         _ = stjornarvaldObservations.shutdown(timeoutSeconds: 3)
         let runtimeStopped = DispatchSemaphore(value: 0)
         let reportBox = RuntimeShutdownReportBox()
-        Task.detached(priority: .high) { [runtimeJobs, webRenderer] in
+        Task.detached(priority: .high) { [runtimeJobs, webRenderer, docxExporter] in
             async let jobs = runtimeJobs.shutdown()
             async let renderer = webRenderer.shutdown()
+            let docxStopped = docxExporter.shutdown()
             let report = await jobs
             let rendererStopped = await renderer
             reportBox.store(RuntimeJobShutdownReport(
-                completed: report.completed && rendererStopped,
+                completed: report.completed && rendererStopped && docxStopped,
                 unresolvedJobIDs: report.unresolvedJobIDs,
                 persistencePendingJobIDs: report.persistencePendingJobIDs
             ))

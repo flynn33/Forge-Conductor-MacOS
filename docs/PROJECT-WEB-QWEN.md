@@ -1,5 +1,18 @@
 # Project repository, web access and Qwen verification
 
+The **0.27.0 (39)** follow-up adds bounded native `docx_write`. Source 154+G3
+and native 155 passed, as did current builds/signing/memberships, App/CLI wire,
+independent artifacts/native imports and production Core consumer cases. Fresh
+Qwen R2 completed 3 responses and consumed2 actual tool results with actual
+Low 3/3, scalar STOP and normal native/observer/collector EOF. Its artifact passed
+independent exact expected native text import. The first combined NONPASS 2/3
+remains; observing the later banner and3 attributed events proves that run's
+gate, not general subscription readiness or the first miss's root cause.
+The exchange used a separate API chat and isolated candidate, not the active
+installed GUI. The repository link and web tools remain; DOCX does not close
+full-web/all-feature or the preceding web final-report NONPASS.
+[DOCX contract and exact evidence](NATIVE-DOCX-WRITING.md).
+
 The **0.26.2 (38)** notice-receipt follow-up preserves project, web and model
 features. EOF-skipped or incomplete notice packets are not marked presented.
 The 92 source and same 92 native methods passed on their original 450-input map;

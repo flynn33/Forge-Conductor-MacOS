@@ -1,6 +1,21 @@
 # Forge Conductor for macOS
 
-Current source targets **0.26.2 (38)**, an MCP notice-receipt hotfix.
+Current source targets **0.27.0 (39)**, adding `docx_write` for bounded plain-text
+Word documents. It requires its own grant, string arguments and an explicit
+`.docx` destination. Input is limited to 65,536 UTF-8 bytes and encoded output
+to 1,048,576 bytes. CRLF, CR and U+2029 normalize to LF; native paragraph
+terminators can add a final LF on text import. XML 1.0-disallowed scalars are
+rejected. Existing PDF tools and shell/binary access remain.
+
+Source and compiled native selections passed 155 distinct methods each. The signed
+Debug candidate passed App/CLI wire cases, binary readback, independent OOXML
+checks, eight exact native text imports and six production Core consumer cases.
+Qwen's fresh API workflow passed three responses and consumed both actual tool
+results with normal stop. This qualifies the bounded DOCX workflow; installed
+GUI, full Office/full web, all-feature and shipping gates remain separate.
+[Contract, exact evidence and retained failures](docs/NATIVE-DOCX-WRITING.md).
+
+The preceding source targets **0.26.2 (38)**, an MCP notice-receipt hotfix.
 The notice-receipt hotfix records presentation only after the complete
 notice-bearing JSON+LF packet is written. EOF-skipped or partial packets do not
 commit a presentation receipt. The 92 distinct source methods and the same 92
@@ -632,8 +647,8 @@ continuity. The user does not start project work through a Forge Managed Run.
 
 | | |
 |---|---|
-| **Version** | **0.26.2** |
-| **Build** | **38** |
+| **Version** | **0.27.0** |
+| **Build** | **39** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |
@@ -751,8 +766,10 @@ receipt does not qualify that path. The full scope and remaining
 distribution limits are in the [qualification record](docs/QUALIFICATION-STATUS.md).
 
 The current root version authorities, compiled protocol constants and Xcode
-build settings target `0.26.2 (38)`; the version method passed within the
-recorded 92 source and same 92 native cases.
+build settings target `0.27.0 (39)`; actual G3 passed current DOCX version/document
+agreement and is included in 155 unique source/native methods. The preceding
+.26.2 version method passed within the
+recorded 92 source and same 92 native cases on their historical map.
 The preceding .26.1 version method passed within the 139 source and same 139
 native cases. Historical qualification receipts retain
 their tested identities.

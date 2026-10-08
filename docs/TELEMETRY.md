@@ -1,6 +1,17 @@
 # Telemetry architecture (real-time native)
 
-Current source documentation targets `0.26.2`, build `38`. Notice-receipt
+Current source documentation targets `0.27.0`, build `39`. The DOCX tool adds
+its exact name to existing docs/known-tool collection and the existing static
+catalog group beside PDF tools. It adds no telemetry timer, queue or measured
+latency/heap/leak claim. The four existing telemetry/resource-loading cases
+passed in source 154 and the native 155 selection. Strict Debug candidate checks
+confirm exact Docs resource bytes; no new production telemetry measurement is
+claimed. The native log retains two audit-queue QoS warnings, seven NECP lines
+and fourteen PDF tagging diagnostics. Actual tool/artifact/import and fresh
+Qwen R2 flows passed; this adds no production telemetry performance measurement.
+[DOCX contract](NATIVE-DOCX-WRITING.md).
+
+The following preceding .26.2/38 evidence retains its original inputs. Notice-receipt
 truth changes no producer, timer, queue, cache lifetime or diagnostic policy.
 Its native 92-case run retains 117 vnode-unlink, 117 invalidated-fd and three
 NECP diagnostics, plus five QoS blocks/four source warning lines. One private
@@ -320,6 +331,6 @@ representative physical-hardware qualification remain open.
 
 ## Version
 
-`0.26.2`
+`0.27.0`
 
-Build: `38`
+Build: `39`

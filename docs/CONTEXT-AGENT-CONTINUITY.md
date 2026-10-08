@@ -1,4 +1,6 @@
-# Context and agent continuity (v0.26.2)
+# Context and agent continuity (v0.27.0)
+
+<a id="context-and-agent-continuity-v0262"></a>
 
 <a id="context-and-agent-continuity-v0261"></a>
 
@@ -14,7 +16,17 @@
 
 <a id="context-and-agent-continuity-v0180"></a>
 
-Current source documentation targets 0.26.2 (38). The notice-receipt hotfix
+Current source documentation targets 0.27.0 (39). A successful `docx_write`
+call is included in existing progress-tool classification. The addition does
+not create a durable runtime job reference or change handoff formats, ACK,
+seal or successor-session behavior. The two existing progress parity methods
+and all 21 new DOCX cases passed in source 154 and the compiled native 155 selection.
+App/CLI tool flows, native import and the fresh Qwen R2 workflow passed within
+their candidate/API scopes. This is no successor-session, ACK, seal or installed
+GUI qualification, and creates no new runtime-job reference.
+[Contract](NATIVE-DOCX-WRITING.md).
+
+The preceding 0.26.2 (38) notice-receipt hotfix
 changes no continuity packet, job reference, acknowledgement or seal behavior.
 Source/native receipt checks do not prove host acknowledgement or successor
 consumption. [Receipt scope](WEB-RESPONSE-BUDGET.md#notice-receipt-truth-follow-up).
