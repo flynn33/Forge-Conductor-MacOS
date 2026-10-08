@@ -20,6 +20,228 @@ final class NativeRasterWriterTests: XCTestCase {
         try FileManager.default.removeItem(at: temporaryRoot)
     }
 
+    func testWebPOnePixelProducesOneNativeReadableSRGBImage() async throws {
+        try await Task.detached(priority: .utility) {
+            let encoded = try NativeRasterWriter.encode(width: 1, height: 1,
+                content: "/wAA/w==", format: "webp")
+            guard encoded.count >= 20 else { throw FixtureError.malformed }
+            XCTAssertEqual(encoded.prefix(4), Data("RIFF".utf8))
+            XCTAssertEqual(encoded.subdata(in: 8..<12), Data("WEBP".utf8))
+            let source = try XCTUnwrap(CGImageSourceCreateWithData(encoded as CFData, nil))
+            XCTAssertEqual(CGImageSourceGetType(source) as String?, "org.webmproject.webp")
+            XCTAssertEqual(CGImageSourceGetCount(source), 1)
+            let image = try XCTUnwrap(CGImageSourceCreateImageAtIndex(source, 0, nil))
+            XCTAssertEqual(image.width, 1); XCTAssertEqual(image.height, 1)
+            XCTAssertEqual(try XCTUnwrap(image.colorSpace?.copyICCData()) as Data,
+                try XCTUnwrap(NSColorSpace.sRGB.iccProfileData))
+            XCTAssertLessThanOrEqual(encoded.count, NativeRasterWriter.maximumOutputBytes)
+        }.value
+    }
+
+    func testWebPExactWireRGBAAndNativeRenderingMatchPNGReference() async throws {
+        try await Task.detached(priority: .utility) {
+            let fixtures: [(Int, Int, Data)] = [
+                (1, 1, Data([255, 0, 0, 255])), (1, 1, Data([17, 83, 191, 0])),
+                (1, 1, Data([211, 37, 109, 128])),
+                (3, 2, Data([255, 0, 0, 255, 17, 34, 51, 0, 7, 83, 191, 1,
+                             31, 157, 63, 64, 211, 37, 109, 128, 19, 71, 233, 254]))]
+            for (width, height, pixels) in fixtures {
+                let encoded = try NativeRasterWriter.encode(width: width, height: height,
+                    content: pixels.base64EncodedString(), format: "webp")
+                XCTAssertEqual(try Self.decodedWebPWire(encoded, width: width, height: height), pixels)
+                let reference = try NativeRasterWriter.encode(width: width, height: height,
+                    content: pixels.base64EncodedString())
+                // Native premultiplied rendering is compared to the PNG consumer,
+                // separately from wire-exact hidden RGB and straight-alpha checks.
+                XCTAssertEqual(try Self.renderedRaster(encoded, width: width, height: height, type: "org.webmproject.webp"),
+                    try Self.renderedRaster(reference, width: width, height: height, type: "public.png"))
+            }
+        }.value
+    }
+
+    func testWebPAllAlphaValuesDimensionEdgesAndMaximumNoisyWirePixels() async throws {
+        try await Task.detached(priority: .utility) {
+            for (width, height) in [(256, 1), (1024, 1), (1, 1024), (17, 33), (1024, 256)] {
+                var state: UInt32 = 0x13579BDF
+                var pixels = Data(capacity: width * height * 4)
+                for index in 0..<(width * height) {
+                    for _ in 0..<3 {
+                        state = state &* 1_664_525 &+ 1_013_904_223
+                        pixels.append(UInt8(truncatingIfNeeded: state >> 24))
+                    }
+                    pixels.append(UInt8(truncatingIfNeeded: index))
+                }
+                let encoded = try NativeRasterWriter.encode(width: width, height: height,
+                    content: pixels.base64EncodedString(), format: "webp")
+                XCTAssertEqual(try Self.decodedWebPWire(encoded, width: width, height: height), pixels)
+                XCTAssertLessThanOrEqual(encoded.count, NativeRasterWriter.maximumOutputBytes)
+                if width * height == NativeRasterWriter.maximumPixels {
+                    XCTAssertEqual(pixels.count, NativeRasterWriter.maximumInputBytes)
+                    XCTAssertEqual(pixels.base64EncodedString().utf8.count, NativeRasterWriter.maximumBase64Bytes)
+                }
+            }
+        }.value
+    }
+
+    func testWebPWorkerCancellationStrictInputsAndExactOutputPreflight() async throws {
+        let content = Self.controlPixels.base64EncodedString()
+        try await MainActor.run {
+            XCTAssertThrowsError(try NativeRasterWriter.encode(width: 2, height: 2, content: content, format: "webp")) {
+                XCTAssertEqual($0 as? NativeRasterError, .workerRequired)
+            }
+        }
+        try await Task.detached(priority: .utility) {
+            let cancelled = ToolCallCancellation(timeoutSeconds: 10); cancelled.cancel()
+            XCTAssertThrowsError(try NativeRasterWriter.encode(width: 2, height: 2, content: content,
+                format: "webp", cancellation: cancelled)) { XCTAssertTrue($0 is CancellationError) }
+            XCTAssertThrowsError(try NativeRasterWriter.encode(width: 2, height: 2, content: content,
+                format: "webp", cancellation: ToolCallCancellation(timeoutSeconds: 0))) { XCTAssertTrue($0 is ToolCallDeadlineExceeded) }
+            let encoded = try NativeRasterWriter.encode(width: 2, height: 2, content: content, format: "webp")
+            XCTAssertEqual(try NativeRasterWriter.encode(width: 2, height: 2, content: content,
+                format: "webp", outputByteLimit: encoded.count), encoded)
+            for limit in [0, 1, encoded.count - 1, NativeRasterWriter.maximumOutputBytes + 1] {
+                XCTAssertThrowsError(try NativeRasterWriter.encode(width: 2, height: 2, content: content,
+                    format: "webp", outputByteLimit: limit)) { XCTAssertEqual($0 as? NativeRasterError, .outputTooLarge) }
+            }
+            for (width, height) in [(0, 1), (1, 1025), (512, 513), (Int.max, Int.max)] {
+                XCTAssertThrowsError(try NativeRasterWriter.encode(width: width, height: height, content: "", format: "webp")) {
+                    XCTAssertEqual($0 as? NativeRasterError, .invalidDimensions)
+                }
+            }
+            for invalid in ["AAAAAB==", "/wAA/w==\n", "", "!!!!AA=="] {
+                XCTAssertThrowsError(try NativeRasterWriter.encode(width: 1, height: 1, content: invalid, format: "webp")) {
+                    XCTAssertEqual($0 as? NativeRasterError, .invalidContent)
+                }
+            }
+            XCTAssertThrowsError(try NativeRasterWriter.encode(width: 2, height: 2, content: content,
+                pixelFormat: "bgra8", format: "webp")) { XCTAssertEqual($0 as? NativeRasterError, .invalidPixelFormat) }
+            for invalid in ["WEBP", "bmp"] {
+                XCTAssertThrowsError(try NativeRasterWriter.encode(width: 2, height: 2, content: content, format: invalid)) {
+                    XCTAssertEqual($0 as? NativeRasterError, .invalidFormat)
+                }
+            }
+        }.value
+    }
+
+    func testWebPSubsetInspectorRejectsMalformedContainersAndWrongDimensions() async throws {
+        try await Task.detached(priority: .utility) {
+            let encoded = try NativeRasterWriter.encode(width: 2, height: 2,
+                content: Self.controlPixels.base64EncodedString(), format: "webp")
+            var invalid = [Data(encoded.dropLast()), encoded + Data([0])]
+            for (offset, mask) in [(0, UInt8(1)), (4, 1), (20, 1), (24, 0x80), (25, 1), (encoded.count - 1, 0x80)] {
+                var changed = encoded; changed[offset] ^= mask; invalid.append(changed)
+            }
+            for bytes in invalid { XCTAssertThrowsError(try Self.decodedWebPWire(bytes, width: 2, height: 2)) }
+            XCTAssertThrowsError(try Self.decodedWebPWire(encoded, width: 1, height: 2))
+        }.value
+    }
+
+    func testWebPToolMetadataReadbackAndWriteProtections() async throws {
+        let root = try XCTUnwrap(temporaryRoot)
+        try await Task.detached(priority: .utility) { [root] in
+            try Self.withToolApp(root: root) { app, client, project in
+                let prior = Data("WebP destination sentinel".utf8)
+                let existing = project.appendingPathComponent("replace.webp")
+                try prior.write(to: existing); XCTAssertEqual(Darwin.chmod(existing.path, 0o600), 0)
+                func arguments(_ file: URL) -> [String: Any] {
+                    ["path": file.path, "width": 2, "height": 2, "content": Self.controlPixels.base64EncodedString(), "format": "webp"]
+                }
+                for file in [existing, project.appendingPathComponent("fresh.webp"), project.appendingPathComponent("uppercase.WEBP")] {
+                    let result = try app.tools.call(name: "image_write", arguments: arguments(file), clientID: client)
+                    XCTAssertTrue(result.ok, "\(result.payload)")
+                    let bytes = try Data(contentsOf: file)
+                    XCTAssertEqual(try Self.decodedWebPWire(bytes, width: 2, height: 2), Self.controlPixels)
+                    XCTAssertEqual(result.payload["format"] as? String, "webp")
+                    XCTAssertEqual(result.payload["engine"] as? String, "swift-webp-vp8l")
+                    XCTAssertEqual(result.payload["path"] as? String, file.path)
+                    XCTAssertEqual(result.payload["width"] as? Int, 2); XCTAssertEqual(result.payload["height"] as? Int, 2)
+                    XCTAssertEqual(result.payload["pixel_format"] as? String, "rgba8")
+                    XCTAssertEqual(result.payload["color_space"] as? String, "srgb")
+                    XCTAssertEqual(result.payload["pixel_bytes"] as? Int, 16)
+                    XCTAssertEqual(result.payload["pixel_contract"] as? String, NativeRasterWriter.pixelContract)
+                    XCTAssertEqual(result.payload["output_contract"] as? String, "webp-lossless-rgba8-srgb-v1")
+                    XCTAssertEqual(result.payload["bytes_written"] as? Int, bytes.count)
+                    XCTAssertEqual(result.payload["sha256"] as? String, JSONSupport.sha256Hex(bytes))
+                    XCTAssertNil(result.payload["content"])
+                    XCTAssertEqual((try FileManager.default.attributesOfItem(atPath: file.path)[.posixPermissions] as? NSNumber)?.intValue,
+                        file == existing ? 0o600 : 0o644)
+                    let read = try app.tools.call(name: "fs_read", arguments: ["path": file.path, "encoding": "base64", "maximum_bytes": 32768], clientID: client)
+                    XCTAssertTrue(read.ok, "\(read.payload)")
+                    XCTAssertEqual(Data(base64Encoded: try XCTUnwrap(read.payload["content"] as? String)), bytes)
+                }
+                for (name, format) in [("protected.png", "tiff"), ("protected.tiff", "webp"), ("protected.gif", "webp"), ("protected.jpg", "webp"), ("protected.webp", "png"),
+                                       ("protected.webp", "absent"), ("no-extension", "webp")] {
+                    let file = project.appendingPathComponent(name); try prior.write(to: file)
+                    var value = arguments(file)
+                    if format == "absent" { value.removeValue(forKey: "format") } else { value["format"] = format }
+                    let result = try app.tools.call(name: "image_write", arguments: value, clientID: client)
+                    XCTAssertFalse(result.ok); XCTAssertEqual(result.payload["code"] as? String, "invalid_path")
+                    XCTAssertEqual(try Data(contentsOf: file), prior)
+                }
+                let sentinel = project.appendingPathComponent("cancel.webp"); try prior.write(to: sentinel)
+                for control in [ToolCallCancellation(timeoutSeconds: 10), ToolCallCancellation(timeoutSeconds: 0)] {
+                    if !control.isDeadlineExceeded { control.cancel() }
+                    XCTAssertThrowsError(try DocsToolPack().handle(name: "image_write", arguments: arguments(sentinel),
+                        context: nil, clientID: client, app: app, cancellation: control)) {
+                        XCTAssertTrue($0 is CancellationError || $0 is ToolCallDeadlineExceeded)
+                    }
+                }
+                XCTAssertEqual(try Data(contentsOf: sentinel), prior)
+                let outside = root.appendingPathComponent("webp-outside", isDirectory: true)
+                try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+                let outsideFile = outside.appendingPathComponent("target.webp"); try prior.write(to: outsideFile)
+                let link = project.appendingPathComponent("alias", isDirectory: true)
+                try FileManager.default.createSymbolicLink(at: link, withDestinationURL: outside)
+                let symlink = try XCTUnwrap(try DocsToolPack().handle(name: "image_write",
+                    arguments: arguments(link.appendingPathComponent("target.webp")), context: nil, clientID: client, app: app, cancellation: nil))
+                XCTAssertFalse(symlink.ok); XCTAssertEqual(symlink.payload["code"] as? String, "image_write_failed")
+                XCTAssertEqual(try Data(contentsOf: outsideFile), prior)
+                XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: outside.path), ["target.webp"])
+                let directory = project.appendingPathComponent("directory.webp", isDirectory: true)
+                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                try prior.write(to: directory.appendingPathComponent("keep"))
+                let rename = try XCTUnwrap(try DocsToolPack().handle(name: "image_write", arguments: arguments(directory),
+                    context: nil, clientID: client, app: app, cancellation: nil))
+                XCTAssertFalse(rename.ok); XCTAssertEqual(rename.payload["code"] as? String, "image_write_failed")
+                XCTAssertEqual(try Data(contentsOf: directory.appendingPathComponent("keep")), prior)
+                XCTAssertTrue(app.audit.flushAttempts(timeout: 2))
+                let event = try XCTUnwrap(app.audit.recent(limit: 32).first(where: { $0.tool == "image_write" && $0.status == "ok" }))
+                XCTAssertFalse(event.argsJSON?.contains(Self.controlPixels.base64EncodedString()) == true)
+                XCTAssertTrue(event.argsJSON?.contains("redacted") == true)
+                XCTAssertFalse(try FileManager.default.contentsOfDirectory(atPath: project.path).contains { $0.hasPrefix(".forge-") })
+            }
+        }.value
+    }
+
+    func testWebPStaleProjectContextAndOwnGrantPreventWrites() async throws {
+        let root = try XCTUnwrap(temporaryRoot)
+        try await Task.detached(priority: .utility) { [root] in
+            try Self.withToolApp(root: root) { app, client, project in
+                let file = project.appendingPathComponent("protected.webp")
+                let prior = Data("protected WebP".utf8); try prior.write(to: file)
+                let value: [String: Any] = ["path": file.path, "width": 2, "height": 2,
+                    "content": Self.controlPixels.base64EncodedString(), "format": "webp"]
+                let context = try app.projectContexts.invocationContext(for: client)
+                let deniedClient = ClientID("webp-denied-client")
+                _ = try app.projectContexts.bind(owner: ProjectBindingOwner(kind: .mcpClient, id: deniedClient.rawValue),
+                    projectID: context.projectID, generation: context.projectGeneration,
+                    authorizationScope: ToolAuthorizationScope(canonicalRoots: context.authorizationScope.canonicalRoots,
+                        allowedTools: ["fs_read"], networkAllowed: context.authorizationScope.networkAllowed,
+                        maximumInlineOutputBytes: context.authorizationScope.maximumInlineOutputBytes))
+                let denied = try app.tools.call(name: "image_write", arguments: value, clientID: deniedClient)
+                XCTAssertFalse(denied.ok); XCTAssertEqual(denied.payload["code"] as? String, "tool_not_granted")
+                _ = try app.projectContexts.beginReset(projectID: context.projectID, expectedGeneration: context.projectGeneration)
+                _ = try app.projectContexts.completeReset(projectID: context.projectID, expectedGeneration: context.projectGeneration)
+                let stale = try XCTUnwrap(try DocsToolPack().handle(name: "image_write", arguments: value,
+                    context: context, clientID: client, app: app, cancellation: nil))
+                XCTAssertFalse(stale.ok); XCTAssertEqual(stale.payload["code"] as? String, "image_encode_failed")
+                XCTAssertEqual(try Data(contentsOf: file), prior)
+                XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: project.path), ["protected.webp"])
+            }
+        }.value
+    }
+
+
     func testGIFOnePixelProducesOneNativeReadableGIF89aImage() async throws {
         try await Task.detached(priority: .utility) {
             let encoded = try NativeRasterWriter.encode(width: 1, height: 1,
@@ -178,7 +400,7 @@ final class NativeRasterWriterTests: XCTestCase {
             }
             XCTAssertThrowsError(try NativeRasterWriter.encode(width: 2, height: 2, content: content,
                 pixelFormat: "bgra8", format: "gif")) { XCTAssertEqual($0 as? NativeRasterError, .invalidPixelFormat) }
-            for invalid in ["GIF", "webp"] {
+            for invalid in ["GIF", "bmp"] {
                 XCTAssertThrowsError(try NativeRasterWriter.encode(width: 2, height: 2, content: content, format: invalid)) {
                     XCTAssertEqual($0 as? NativeRasterError, .invalidFormat)
                 }
@@ -399,7 +621,7 @@ final class NativeRasterWriterTests: XCTestCase {
             }
             XCTAssertThrowsError(try NativeRasterWriter.encode(width: 2, height: 2, content: content,
                 pixelFormat: "bgra8", format: "jpeg")) { XCTAssertEqual($0 as? NativeRasterError, .invalidPixelFormat) }
-            for invalid in ["jpg", "JPEG", "webp"] {
+            for invalid in ["jpg", "JPEG", "bmp"] {
                 XCTAssertThrowsError(try NativeRasterWriter.encode(width: 2, height: 2, content: content, format: invalid)) {
                     XCTAssertEqual($0 as? NativeRasterError, .invalidFormat)
                 }
@@ -681,7 +903,7 @@ final class NativeRasterWriterTests: XCTestCase {
             XCTAssertThrowsError(try NativeRasterWriter.encode(width: 2, height: 2, content: content, pixelFormat: "bgra8")) {
                 XCTAssertEqual($0 as? NativeRasterError, .invalidPixelFormat)
             }
-            XCTAssertThrowsError(try NativeRasterWriter.encode(width: 2, height: 2, content: content, format: "webp")) {
+            XCTAssertThrowsError(try NativeRasterWriter.encode(width: 2, height: 2, content: content, format: "bmp")) {
                 XCTAssertEqual($0 as? NativeRasterError, .invalidFormat)
             }
         }.value
@@ -705,7 +927,7 @@ final class NativeRasterWriterTests: XCTestCase {
                     ("height", [false, NSNull(), -1, 1025, 1.5] as [Any], "invalid_image_dimensions"),
                     ("content", [7, false, NSNull(), "", "AAAAAB=="] as [Any], "invalid_content"),
                     ("pixel_format", [7, NSNull(), "bgra8", "RGBA8"] as [Any], "invalid_pixel_format"),
-                    ("format", [true, NSNull(), "webp", "PNG"] as [Any], "invalid_image_format")
+                    ("format", [true, NSNull(), "bmp", "PNG"] as [Any], "invalid_image_format")
                 ] {
                     for replacement in values { var value = valid; value[key] = replacement; cases.append((value, code)) }
                 }
@@ -1019,6 +1241,162 @@ final class NativeRasterWriterTests: XCTestCase {
             var outside = encoded; outside[image + 1] = 1
             XCTAssertThrowsError(try Self.inspectGIF(outside, width: 2, height: 2))
         }.value
+    }
+
+    // Independent bounded canonical-tree reader for the emitted no-transform,
+    // no-cache, literal VP8L subset; not a general WebP decoder.
+    // Adapted from the actually exercised v3 reader, separate from writer bits.
+    private struct WebPBitsIn {
+        let data: Data
+        var position = 0
+        mutating func integer(_ count: Int) throws -> Int {
+            guard count >= 0, count <= 24, count <= data.count * 8 - position else { throw FixtureError.malformed }
+            var value = 0
+            for index in 0..<count {
+                value |= Int((data[position / 8] >> (position % 8)) & 1) << index
+                position += 1
+            }
+            return value
+        }
+        mutating func zeroTail() throws {
+            guard data.count * 8 - position <= 7 else { throw FixtureError.malformed }
+            while position < data.count * 8 { guard try integer(1) == 0 else { throw FixtureError.malformed } }
+        }
+    }
+    private struct WebPPrefixTree {
+        private let entries: [Int: Int]
+        private let single: Int?
+        init(_ lengths: [Int]) throws {
+            guard !lengths.isEmpty, lengths.count <= 280,
+                  lengths.allSatisfy({ (0...15).contains($0) }) else { throw FixtureError.malformed }
+            let active = lengths.indices.filter { lengths[$0] > 0 }
+            guard !active.isEmpty else { throw FixtureError.malformed }
+            if active.count == 1 {
+                guard lengths[active[0]] == 1 else { throw FixtureError.malformed }
+                single = active[0]; entries = [:]; return
+            }
+            guard lengths.reduce(0, { $0 + ($1 == 0 ? 0 : (1 << (15 - $1))) }) == 1 << 15 else { throw FixtureError.malformed }
+            single = nil
+            var counts = [Int](repeating: 0, count: 16), next = counts
+            for length in lengths where length > 0 { counts[length] += 1 }
+            var code = 0
+            for width in 1...15 { code = (code + counts[width - 1]) << 1; next[width] = code }
+            var table: [Int: Int] = [:]
+            for symbol in lengths.indices where lengths[symbol] > 0 {
+                let width = lengths[symbol], value = next[width]; next[width] += 1
+                guard table.updateValue(symbol, forKey: (width << 16) | value) == nil else { throw FixtureError.malformed }
+            }
+            entries = table
+        }
+        func symbol(_ bits: inout WebPBitsIn) throws -> Int {
+            if let single { return single }
+            var value = 0
+            for width in 1...15 {
+                value = (value << 1) | (try bits.integer(1))
+                if let symbol = entries[(width << 16) | value] { return symbol }
+            }
+            throw FixtureError.malformed
+        }
+    }
+    private static func readWebPTree(_ bits: inout WebPBitsIn, alphabet: Int) throws -> WebPPrefixTree {
+        guard (1...280).contains(alphabet) else { throw FixtureError.malformed }
+        var lengths = [Int](repeating: 0, count: alphabet)
+        if try bits.integer(1) == 1 {
+            let count = try bits.integer(1) + 1
+            let firstWidth = try bits.integer(1) == 1 ? 8 : 1
+            let first = try bits.integer(firstWidth)
+            guard first < alphabet else { throw FixtureError.malformed }; lengths[first] = 1
+            if count == 2 {
+                let second = try bits.integer(8)
+                guard second < alphabet, second != first else { throw FixtureError.malformed }; lengths[second] = 1
+            }
+        } else {
+            let count = try bits.integer(4) + 4
+            let order = [17, 18, 0, 1, 2, 3, 4, 5, 16, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+            var metaLengths = [Int](repeating: 0, count: 19)
+            for index in 0..<count { metaLengths[order[index]] = try bits.integer(3) }
+            let meta = try WebPPrefixTree(metaLengths)
+            var symbols = alphabet
+            if try bits.integer(1) != 0 {
+                let width = try bits.integer(3) * 2 + 2
+                symbols = try bits.integer(width) + 2
+                guard symbols <= alphabet else { throw FixtureError.malformed }
+            }
+            // Restricted oracle admits literal code lengths, not repeat codes.
+            for index in 0..<symbols {
+                let value = try meta.symbol(&bits); guard value <= 15 else { throw FixtureError.malformed }
+                lengths[index] = value
+            }
+        }
+        return try WebPPrefixTree(lengths)
+    }
+    private struct WebPWireImage { let width: Int; let height: Int; let raw: Data; let alphaHint: Int }
+    private static func inspectWebPWire(_ file: Data) throws -> WebPWireImage {
+        guard file.count >= 25, file.count <= NativeRasterWriter.maximumOutputBytes else { throw FixtureError.malformed }
+        func word(_ at: Int) throws -> Int {
+            guard at >= 0, at <= file.count - 4 else { throw FixtureError.malformed }
+            return (0..<4).reduce(0) { $0 | (Int(file[at + $1]) << ($1 * 8)) }
+        }
+        guard file.prefix(4) == Data("RIFF".utf8), try word(4) == file.count - 8,
+              file.subdata(in: 8..<12) == Data("WEBP".utf8) else { throw FixtureError.malformed }
+        var at = 12, payload: Data?
+        while at < file.count {
+            guard file.count - at >= 8, file.subdata(in: at..<(at + 4)) == Data("VP8L".utf8), payload == nil else { throw FixtureError.malformed }
+            let size = try word(at + 4); at += 8
+            guard size >= 5, size <= file.count - at else { throw FixtureError.malformed }
+            payload = file.subdata(in: at..<(at + size)); at += size
+            if size % 2 != 0 { guard at < file.count, file[at] == 0 else { throw FixtureError.malformed }; at += 1 }
+        }
+        guard at == file.count, let payload else { throw FixtureError.malformed }
+        var bits = WebPBitsIn(data: payload)
+        guard try bits.integer(8) == 0x2f else { throw FixtureError.malformed }
+        let width = try bits.integer(14) + 1, height = try bits.integer(14) + 1
+        guard (1...1024).contains(width), (1...1024).contains(height), width * height <= 262_144 else { throw FixtureError.malformed }
+        let pixels = width * height, alphaHint = try bits.integer(1)
+        guard try bits.integer(3) == 0, try bits.integer(1) == 0,
+              try bits.integer(1) == 0, try bits.integer(1) == 0 else { throw FixtureError.malformed }
+        let green = try readWebPTree(&bits, alphabet: 280), red = try readWebPTree(&bits, alphabet: 256)
+        let blue = try readWebPTree(&bits, alphabet: 256), alpha = try readWebPTree(&bits, alphabet: 256)
+        _ = try readWebPTree(&bits, alphabet: 40)
+        var raw = Data(capacity: pixels * 4), nonopaque = false
+        for _ in 0..<pixels {
+            let g = try green.symbol(&bits); guard g < 256 else { throw FixtureError.malformed }
+            let r = try red.symbol(&bits), b = try blue.symbol(&bits), a = try alpha.symbol(&bits)
+            guard r < 256, b < 256, a < 256 else { throw FixtureError.malformed }
+            raw.append(contentsOf: [UInt8(r), UInt8(g), UInt8(b), UInt8(a)]); nonopaque = nonopaque || a != 255
+        }
+        try bits.zeroTail()
+        guard alphaHint == (nonopaque ? 1 : 0) else { throw FixtureError.malformed }
+        return WebPWireImage(width: width, height: height, raw: raw, alphaHint: alphaHint)
+    }
+
+    private static func decodedWebPWire(_ data: Data, width: Int, height: Int) throws -> Data {
+        let image = try inspectWebPWire(data)
+        guard image.width == width, image.height == height else { throw FixtureError.malformed }
+        return image.raw
+    }
+
+    private static func renderedRaster(_ data: Data, width: Int, height: Int, type: String) throws -> Data {
+        guard (1...1024).contains(width), (1...1024).contains(height), width * height <= 262_144,
+              data.count <= NativeRasterWriter.maximumOutputBytes else { throw FixtureError.malformed }
+        let source = try XCTUnwrap(CGImageSourceCreateWithData(data as CFData, nil))
+        XCTAssertEqual(CGImageSourceGetType(source) as String?, type)
+        XCTAssertEqual(CGImageSourceGetCount(source), 1)
+        let image = try XCTUnwrap(CGImageSourceCreateImageAtIndex(source, 0, nil))
+        guard image.width == width, image.height == height, image.bitsPerComponent == 8,
+              image.colorSpace?.model == .rgb else { throw FixtureError.malformed }
+        XCTAssertEqual(try XCTUnwrap(image.colorSpace?.copyICCData()) as Data,
+            try XCTUnwrap(NSColorSpace.sRGB.iccProfileData))
+        let space = try XCTUnwrap(CGColorSpace(name: CGColorSpace.sRGB))
+        var pixels = Data(repeating: 0, count: width * height * 4)
+        try pixels.withUnsafeMutableBytes { bytes in
+            let context = try XCTUnwrap(CGContext(data: bytes.baseAddress, width: width, height: height,
+                bitsPerComponent: 8, bytesPerRow: width * 4, space: space,
+                bitmapInfo: CGBitmapInfo.byteOrder32Big.rawValue | CGImageAlphaInfo.premultipliedLast.rawValue))
+            context.interpolationQuality = .none; context.setBlendMode(.copy)
+            context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        }
+        return pixels
     }
 
     private static var binaryPixels: Data {

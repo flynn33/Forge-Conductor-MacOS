@@ -1,5 +1,28 @@
 # Documentation guide
 
+Current source target **0.35.0 (48)** adds bounded lossless WebP to
+[image writing](NATIVE-IMAGE-WRITING.md): exact supplied file RGBA, separate native
+premultiplied rendering and preserved PNG/TIFF/JPEG/GIF contracts.
+Owning source **225 distinct methods** passed in **75.739 s**; canonical native
+passed the exact same **225** in **75.173 s**, zero failures/skips; those owning selections exclude G3.
+CLI/app compilation **0.900/0.893 s**, ordinary Debug **26.412 s** and strict
+candidate signature **0.143 s** passed on the receipted **464-input ce81874f… map**. G3 expectation alignment produced test-only map 6dcfd15c…; these receipts retain
+their immutable ce81874f… inputs.
+Signed App/CLI each passed **15 groups/32 responses/30 tool frames**, full EOF.
+Actual Qwen completed three normal Low API responses and consumed two write/read
+results; its strict final acknowledgement matched 194-byte/2×2 artifact metadata.
+Seven production WebP/PNG native comparisons passed; decoded sRGB profiles and
+premultiplied renders matched the references. Initial-document G3 passed once
+in source/native (**5.514/5.334 s**), establishing matching **226 distinct methods**
+per route with the earlier 225; this was not one 226-test invocation. Focused
+seven and repeated checks add no distinct coverage.
+Installed GUI, production managed-adapter, full web, all models, other formats,
+Release and shipment remain open.
+Complete preceding format receipts retain their original identities.
+Final-document rechecks and exact owner source/wiki delivery remain pending.
+
+## Preceding 0.34.0 (47) GIF qualification
+
 Current source target **0.34.0 (47)** adds bounded single-image GIF to
 [image writing](NATIVE-IMAGE-WRITING.md): binary alpha, palette RGB limits,
 GIF89a header normalization and preserved PNG/TIFF/JPEG.
@@ -216,7 +239,7 @@ qualification is not promoted by this UI phase.
 | [Native XLSX writing and import](NATIVE-XLSX-WRITING.md) | Bounded text-cell worksheet creation, cell-value instruction import, retained baseline, scoped qualification and remaining gates |
 | [Native PPTX writing and import](NATIVE-PPTX-WRITING.md) | Bounded text-slide creation, slide-owned instruction import, retained baseline and scoped validation gates |
 | [Native ODS writing and import](NATIVE-ODS-WRITING.md) | Bounded ODF text-cell creation, sheet-labeled instruction import, retained baseline, scoped qualification and remaining gates |
-| [Native image pixel writing](NATIVE-IMAGE-WRITING.md) | Bounded GIF binary-alpha/palette contract, source/native/candidate/App/CLI/Qwen qualification, preserved PNG/TIFF/JPEG receipts and installed/delivery boundaries |
+| [Native image pixel writing](NATIVE-IMAGE-WRITING.md) | Bounded lossless WebP exact file RGBA and separate native rendering; actual source/native 225 plus separate G3 one each, complete PNG/TIFF/JPEG/GIF receipts and installed/delivery boundaries |
 | [Native web rendering](NATIVE-WEB-RENDERING.md) | JavaScript snapshots, fixed native child ownership, actual frame budgets and qualification limits |
 | [Binary web and Qwen file workflows](BINARY-WEB-AND-QWEN-FILES.md) | Original HTTP bytes, version alignment, native/model examples and remaining format/browser gates |
 | [Project repository, web access and Qwen verification](PROJECT-WEB-QWEN.md) | GitHub project links, web/file tool additions, actual Qwen findings and current verification boundaries |

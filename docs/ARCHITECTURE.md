@@ -1,5 +1,34 @@
 # Forge Conductor architecture
 
+Version: `0.35.0`; build: `48`. The call-local Swift VP8L literal writer owns
+one bounded output `Data` and a partial byte. Complete size is preflighted
+before allocation; alpha scanning, pixel/output work and completion check
+cooperative cancellation. Exact decoded file RGBA includes hidden transparent
+RGB; native premultiplied rendering is a separate PNG-reference comparison.
+No dependency, graph member, new tool/grant, signing change or embedded ICC is added.
+PNG/TIFF/JPEG/GIF and common pinned-write ownership remain.
+Owning source **225 distinct methods** passed in **75.739 s**; canonical native
+passed the exact same **225** in **75.173 s**, zero failures/skips; those owning selections exclude G3.
+CLI/app compilation **0.900/0.893 s**, ordinary Debug **26.412 s** and strict
+candidate signature **0.143 s** passed on the receipted **464-input ce81874f… map**. G3 expectation alignment produced test-only map 6dcfd15c…; these receipts retain
+their immutable ce81874f… inputs.
+Signed App/CLI each passed **15 groups/32 responses/30 tool frames**, full EOF.
+Actual Qwen completed three normal Low API responses and consumed two write/read
+results; its strict final acknowledgement matched 194-byte/2×2 artifact metadata.
+Seven production WebP/PNG native comparisons passed; decoded sRGB profiles and
+premultiplied renders matched the references. Initial-document G3 passed once
+in source/native (**5.514/5.334 s**), establishing matching **226 distinct methods**
+per route with the earlier 225; this was not one 226-test invocation. Focused
+seven and repeated checks add no distinct coverage.
+Installed GUI, production managed-adapter, full web, all models, other formats,
+Release and shipment remain open.
+Middle-of-bit-loop cancellation is not deterministically exercised. Common-writer
+late-cancel-before-rename/revocation remains unexercised source E2; this is no
+performance or product leak claim. Final-document rechecks and exact owner source/wiki delivery remain pending.
+[WebP contract and gates](NATIVE-IMAGE-WRITING.md).
+
+## Preceding 0.34.0 (47) GIF qualification
+
 Version: `0.34.0`; build: `47`. GIF extends the call-local ImageIO path,
 rejecting alpha 1...254 before encoding/writing and normalizing only a finalized
 GIF87a signature to GIF89a. The source/native header method verified identical

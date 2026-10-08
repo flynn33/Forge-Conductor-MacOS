@@ -1,5 +1,5 @@
 // DocsToolPack.swift
-// What: Provides native PDF, plain-text DOCX, text-cell XLSX/ODS, text-slide PPTX, and PNG/TIFF/JPEG/GIF tools to external MCP clients.
+// What: Provides native PDF, plain-text DOCX, text-cell XLSX/ODS, text-slide PPTX, and PNG/TIFF/JPEG/GIF/WebP tools to external MCP clients.
 // How: It translates validated tool arguments into PDFWriter operations and returns
 // bounded, structured success or error payloads.
 // Why: Document capability is an optional module rather than a responsibility of Core routing.
@@ -9,7 +9,7 @@ import Darwin
 import AppKit
 import CryptoKit
 
-/// Documentation tools: PDF write / PDF from file / plain-text DOCX / text-cell XLSX/ODS / text-slide PPTX / PNG/TIFF/JPEG/GIF.
+/// Documentation tools: PDF write / PDF from file / plain-text DOCX / text-cell XLSX/ODS / text-slide PPTX / PNG/TIFF/JPEG/GIF/WebP.
 public struct DocsToolPack: ToolPackHandling {
     private static let maximumSourceBytes = 4 * 1024 * 1024
     private let exporter: NativeDOCXExporter?
@@ -60,12 +60,14 @@ public struct DocsToolPack: ToolPackHandling {
         let isTIFF = (args["format"] as? String) == "tiff"
         let isJPEG = (args["format"] as? String) == "jpeg"
         let isGIF = (args["format"] as? String) == "gif"
-        let extensions = isTIFF ? ["tif", "tiff"] : isJPEG ? ["jpg", "jpeg"] : isGIF ? ["gif"] : ["png"]
+        let isWebP = (args["format"] as? String) == "webp"
+        let extensions = isTIFF ? ["tif", "tiff"] : isJPEG ? ["jpg", "jpeg"] : isGIF ? ["gif"] : isWebP ? ["webp"] : ["png"]
         guard extensions.contains(url.pathExtension.lowercased()) else {
             return .failure(code: "invalid_path", message: isTIFF
                 ? "An explicit .tif or .tiff destination is required for format=tiff"
                 : isJPEG ? "An explicit .jpg or .jpeg destination is required for format=jpeg"
                 : isGIF ? "An explicit .gif destination is required for format=gif"
+                : isWebP ? "An explicit .webp destination is required for format=webp"
                 : "An explicit .png destination is required")
         }
         guard let content = args["content"] as? String else {
@@ -112,7 +114,7 @@ public struct DocsToolPack: ToolPackHandling {
             return .failure(code: "image_write_failed", message: "Destination write or durability confirmation failed; inspect the destination before retrying")
         }
         var result = ToolResult.success([
-            "path": url.path, "format": format, "engine": format == "tiff" ? "swift-tiff-rgba8" : "apple-imageio",
+            "path": url.path, "format": format, "engine": format == "tiff" ? "swift-tiff-rgba8" : isWebP ? "swift-webp-vp8l" : "apple-imageio",
             "width": width, "height": height, "pixel_format": "rgba8", "color_space": "srgb",
             "bytes_written": encoded.count,
             "sha256": SHA256.hash(data: encoded).map { String(format: "%02x", $0) }.joined(),
@@ -120,6 +122,7 @@ public struct DocsToolPack: ToolPackHandling {
         ])
         if isJPEG { result.payload["output_contract"] = NativeRasterWriter.jpegOutputContract }
         if isGIF { result.payload["output_contract"] = NativeRasterWriter.gifOutputContract }
+        if isWebP { result.payload["output_contract"] = NativeRasterWriter.webpOutputContract }
         return result
     }
 

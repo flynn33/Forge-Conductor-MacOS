@@ -1,5 +1,31 @@
 # Forge Conductor for macOS
 
+Current source target **0.35.0 (48)** adds bounded lossless WebP to
+`image_write`, preserving PNG/TIFF/JPEG/GIF. Explicit lowercase `format: "webp"`
+requires a case-insensitive `.webp` destination. File decoding preserves exact
+supplied straight RGBA bytes, including hidden RGB under alpha zero; native
+premultiplied rendering has a separate PNG-reference comparison.
+Owning source **225 distinct methods** passed in **75.739 s**; canonical native
+passed the exact same **225** in **75.173 s**, zero failures/skips; those owning selections exclude G3.
+CLI/app compilation **0.900/0.893 s**, ordinary Debug **26.412 s** and strict
+candidate signature **0.143 s** passed on the receipted **464-input ce81874f… map**. G3 expectation alignment produced test-only map 6dcfd15c…; these receipts retain
+their immutable ce81874f… inputs.
+Signed App/CLI each passed **15 groups/32 responses/30 tool frames**, full EOF.
+Actual Qwen completed three normal Low API responses and consumed two write/read
+results; its strict final acknowledgement matched 194-byte/2×2 artifact metadata.
+Seven production WebP/PNG native comparisons passed; decoded sRGB profiles and
+premultiplied renders matched the references. Initial-document G3 passed once
+in source/native (**5.514/5.334 s**), establishing matching **226 distinct methods**
+per route with the earlier 225; this was not one 226-test invocation. Focused
+seven and repeated checks add no distinct coverage.
+Installed GUI, production managed-adapter, full web, all models, other formats,
+Release and shipment remain open.
+Final-document rechecks and exact owner source/wiki publication/readback/
+synchronization use external closeout receipts; delivery remains pending.
+[WebP contract and gates](docs/NATIVE-IMAGE-WRITING.md).
+
+## Preceding 0.34.0 (47) GIF qualification
+
 Current source target **0.34.0 (47)** adds bounded single-image GIF to
 `image_write`, preserving PNG/TIFF/JPEG. Explicit `format: "gif"` requires a
 case-insensitive `.gif` destination and binary alpha (0 or 255). Palette RGB
@@ -748,8 +774,8 @@ continuity. The user does not start project work through a Forge Managed Run.
 
 | | |
 |---|---|
-| **Version** | **0.34.0** |
-| **Build** | **47** |
+| **Version** | **0.35.0** |
+| **Build** | **48** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |
@@ -865,6 +891,13 @@ attached context; `fs_list`, `git_status`, `instruction_catalog`, and
 was not exercised; its source selects the running app executable, so the CLI
 receipt does not qualify that path. The full scope and remaining
 distribution limits are in the [qualification record](docs/QUALIFICATION-STATUS.md).
+
+The current target is `0.35.0 (48)` for bounded WebP. Matching source/native 225, direct
+builds and strict Debug signature passed. Separate initial-document G3 one each
+establishes matching 226-method unions; final rechecks and source/wiki delivery
+remain pending. [WebP scope](docs/NATIVE-IMAGE-WRITING.md).
+
+Preceding .34 identity and qualification record (retained):
 
 The current target is `0.34.0 (47)` for bounded GIF. Matching 219 distinct
 source/native methods, direct builds, strict candidate and scoped App/CLI/Qwen

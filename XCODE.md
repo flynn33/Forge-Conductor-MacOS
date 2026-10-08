@@ -1,5 +1,35 @@
 # Forge Conductor — Xcode
 
+Current source version **0.35.0**, build **48** includes bounded Swift VP8L WebP.
+Owning source **225 distinct methods** passed in **75.739 s**; canonical native
+passed the exact same **225** in **75.173 s**, zero failures/skips; those owning selections exclude G3.
+CLI/app compilation **0.900/0.893 s**, ordinary Debug **26.412 s** and strict
+candidate signature **0.143 s** passed on the receipted **464-input ce81874f… map**. G3 expectation alignment produced test-only map 6dcfd15c…; these receipts retain
+their immutable ce81874f… inputs.
+Signed App/CLI each passed **15 groups/32 responses/30 tool frames**, full EOF.
+Actual Qwen completed three normal Low API responses and consumed two write/read
+results; its strict final acknowledgement matched 194-byte/2×2 artifact metadata.
+Seven production WebP/PNG native comparisons passed; decoded sRGB profiles and
+premultiplied renders matched the references. Initial-document G3 passed once
+in source/native (**5.514/5.334 s**), establishing matching **226 distinct methods**
+per route with the earlier 225; this was not one 226-test invocation. Focused
+seven and repeated checks add no distinct coverage.
+Installed GUI, production managed-adapter, full web, all models, other formats,
+Release and shipment remain open.
+Existing canonical memberships and signing policy are preserved; only twelve
+marketing and sixteen build-version values changed in the project.
+Selected methods and a strict Debug signature establish no full-suite, GUI,
+performance or lifetime acceptance. Final-document rechecks and exact owner source/wiki delivery remain pending.
+[WebP contract and gates](docs/NATIVE-IMAGE-WRITING.md).
+
+The 225/build/candidate/wire receipts retain ce81874f…; root applied only two
+expected G3 literals, producing separate test-only map 6dcfd15c…. All other 463
+inputs, production/resources and graph are unchanged. The candidate retains its
+earlier test source. Separate initial-document G3 passed once in each route on
+6dcfd15c…; no earlier candidate or owning-test receipt is rebound.
+
+## Preceding 0.34.0 (47) GIF qualification
+
 Current source version **0.34.0**, build **47** includes bounded GIF support.
 Owning source 218 plus separate G3 one passed (72.701/1.526 s); canonical native
 219 passed (72.081 s). CLI/app compilation passed (0.899/0.895 s), ordinary
@@ -887,7 +917,7 @@ remains `22e7443d13496b3cc08b6e98366bb6d2332e3fd4`; later documentation commits
 do not change the binary identity. The set is ready for owner notarization and
 Apple upload, but is not notarized, stapled, installed, shipped, or released.
 That retained archive used Xcode `MARKETING_VERSION = 0.16.2` and
-`CURRENT_PROJECT_VERSION = 23`. Current source targets `0.34.0 (47)` for bounded GIF; native Debug build and strict candidate signature passed. Preceding source targeted `0.33.0 (46)` for opaque lossy JPEG; the preceding .32 TIFF source and historical build-24 app/archive keep their identities. The historical build-24 app/archive use
+`CURRENT_PROJECT_VERSION = 23`. Current source targets `0.35.0 (48)` for bounded WebP; native Debug build and strict signature passed; separate initial-document G3 one each establishes matching 226-method unions. Final narrow-document rechecks remain pending. Preceding .34 target record (retained): Current source targets `0.34.0 (47)` for bounded GIF; native Debug build and strict candidate signature passed. Preceding source targeted `0.33.0 (46)` for opaque lossy JPEG; the preceding .32 TIFF source and historical build-24 app/archive keep their identities. The historical build-24 app/archive use
 `0.16.3 (24)`; notarization and shipment remain separate.
 
 Implementation revision `91ad90ee7a1e51b7289f4c531ddae4dbbc6812ec`

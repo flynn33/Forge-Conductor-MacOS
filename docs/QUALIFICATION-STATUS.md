@@ -1,5 +1,40 @@
 # Version and qualification status
 
+Current source target **0.35.0, build 48** adds bounded lossless WebP, preserving
+PNG/TIFF/JPEG/GIF. Owning source **225 methods** passed in **75.739 s**, zero
+failures/skips; raster 40 includes seven WebP methods. The same seven focused
+methods are subsets, not additional coverage. Owning selections exclude G3;
+separate initial-document G3 passed once in source/native (5.514/5.334 s).
+CLI/app **0.900/0.893 s**, ordinary Debug **26.412 s** and strict signature
+**0.143 s** passed on the receipted **464-input ce81874f…** map, before the applied G3 test-only transition to 6dcfd15c….
+Strict candidate `native-webp-native-candidate-0350.json`, SHA
+`750371a30b90fea43d66a8b40bc4021a0afe60a6df1404d0979bf8e7da554ade`,
+binds .35/48 Debug, seven current binaries, three protected inputs and the
+unchanged preceding .34 candidate. It qualifies no installation.
+Canonical native **225** passed in **75.173 s**, matching the exact source set.
+Signed App/CLI each passed **15 groups/32 responses/30 tool frames**, full EOF;
+three WebPs/three PNG references/TIFF/JPEG/GIF each passed independent file inspection.
+Actual Qwen completed three normal Low responses/two consumed write/read results,
+acknowledging exact 194-byte/2×2 metadata. Seven production native WebP/PNG
+comparisons passed. Actual 225+G3 set comparison establishes matching **226
+distinct methods** per route, not one 226-test invocation or added repeat coverage.
+External seven fixtures/fourteen native-synthetic/twenty-one parser controls
+retain separate mechanism scopes; the original missing-feature failure remains NONPASS.
+Middle-loop cancellation and common-writer late-cancel/revocation E2 are open.
+Final-document rechecks and exact owner source/wiki publication/readback/
+synchronization use external closeout receipts; delivery remains pending.
+Installed GUI, production managed-adapter, full web, all models, other formats,
+Release and shipment remain open.
+[WebP contract and gates](NATIVE-IMAGE-WRITING.md).
+
+The 225/build/candidate/wire receipts retain ce81874f…; root applied only two
+expected G3 literals, producing separate test-only map 6dcfd15c…. All other 463
+inputs, production/resources and graph are unchanged. The candidate retains its
+earlier test source. Separate initial-document G3 passed once in each route on
+6dcfd15c…; no earlier candidate or owning-test receipt is rebound.
+
+## Preceding 0.34.0 (47) GIF qualification
+
 Current source target **0.34.0, build 47** adds bounded binary-alpha single-image
 GIF, preserving PNG/TIFF/JPEG. Source 218 (72.701 s) plus separate initial-document
 G3 one (1.526 s) and canonical native 219 (72.081 s) passed with matching **219
@@ -1734,6 +1769,14 @@ Dashboard geometry, minimum/normal containment of every primary view, and
 populated policy evaluation rows. Live completion of the reported owner run,
 universal policy enforcement, and distribution qualification remain open.
 
+Current source target: **0.35.0, build 48**, supporting **macOS 26+**; bounded WebP
+owning source/native 225 plus separate G3 one each establish matching 226-method
+unions; direct builds/strict signature and scoped App/CLI/Qwen/native consumers
+passed. Final rechecks and exact delivery remain pending; preceding .34 receipts
+retain their identity.
+
+Preceding .34 status sentence (retained):
+
 Current source target: **0.34.0, build 47**, supporting **macOS 26+**; bounded GIF
 source/native/candidate/App/CLI/Qwen checks passed as recorded above. Exact delivery
 identities are retained externally; preceding .33 tested inputs retain their identity.
@@ -1751,6 +1794,14 @@ the detailed, source-bound receipts are in the
 [roadmap](../ROADMAP.md).
 
 ## Version and build agreement
+
+The current target is **0.35.0, build 48** for bounded WebP. Product authorities
+and graph/build inputs agree; owning source/native 225 plus separate initial-document
+G3 one each establish matching 226-method unions. Direct builds/strict signature
+passed. Final rechecks and exact source/wiki delivery remain pending.
+[WebP scope](NATIVE-IMAGE-WRITING.md).
+
+Preceding .34 agreement and qualification record (retained):
 
 The current target is **0.34.0, build 47** for bounded GIF. Authority agreement
 and matching 219 distinct source/native methods passed, including G3 once.

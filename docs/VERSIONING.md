@@ -1,5 +1,37 @@
 # Versioning policy
 
+Current target identity is **0.35.0 (48)** for additive lossless WebP.
+VERSION, BUILD_NUMBER and compiled product constants advance with twelve
+project marketing and sixteen build-version values; graph/signing remain unchanged.
+Owning source **225 distinct methods** passed in **75.739 s**; canonical native
+passed the exact same **225** in **75.173 s**, zero failures/skips; those owning selections exclude G3.
+CLI/app compilation **0.900/0.893 s**, ordinary Debug **26.412 s** and strict
+candidate signature **0.143 s** passed on the receipted **464-input ce81874f… map**. G3 expectation alignment produced test-only map 6dcfd15c…; these receipts retain
+their immutable ce81874f… inputs.
+Signed App/CLI each passed **15 groups/32 responses/30 tool frames**, full EOF.
+Actual Qwen completed three normal Low API responses and consumed two write/read
+results; its strict final acknowledgement matched 194-byte/2×2 artifact metadata.
+Seven production WebP/PNG native comparisons passed; decoded sRGB profiles and
+premultiplied renders matched the references. Initial-document G3 passed once
+in source/native (**5.514/5.334 s**), establishing matching **226 distinct methods**
+per route with the earlier 225; this was not one 226-test invocation. Focused
+seven and repeated checks add no distinct coverage.
+Installed GUI, production managed-adapter, full web, all models, other formats,
+Release and shipment remain open.
+The existing Unreleased section records this additive phase; complete GIF/JPEG/
+TIFF/PNG records preserve their tested identities. Repeated G3 adds no distinct
+owning coverage. Initial-document G3 passed; final rechecks and exact owner
+source/wiki delivery use external closeout receipts and remain pending.
+[WebP contract and gates](NATIVE-IMAGE-WRITING.md).
+
+The 225/build/candidate/wire receipts retain ce81874f…; root applied only two
+expected G3 literals, producing separate test-only map 6dcfd15c…. All other 463
+inputs, production/resources and graph are unchanged. The candidate retains its
+earlier test source. Separate initial-document G3 passed once in each route on
+6dcfd15c…; no earlier candidate or owning-test receipt is rebound.
+
+## Preceding 0.34.0 (47) GIF qualification
+
 Current target identity is **0.34.0 (47)** for additive GIF support. Root source,
 compiled and canonical-project authorities agree; the project changes only
 twelve marketing and sixteen build-version values. Source 218 plus separate
@@ -202,6 +234,12 @@ Update all four surfaces together. `script/check_repository_hygiene.sh`, the
 focused version test, and CI reject drift between them.
 
 ## Current identity
+
+Current source target is `0.35.0`, build `48`. Matching source/native 225, direct builds
+and strict Debug signature passed; G3 and final
+document/delivery gates remain pending. [WebP scope](NATIVE-IMAGE-WRITING.md).
+
+Preceding .34 identity and qualification record (retained):
 
 Current source target is `0.34.0`, build `47`. Matching 219 distinct source/native
 methods, direct builds and scoped candidate/App/CLI/Qwen checks passed.

@@ -1,5 +1,30 @@
 # Forge Conductor user guide
 
+Version **0.35.0**, build **48** is the current source target. `image_write`
+accepts explicit lowercase `webp` with a case-insensitive `.webp` destination.
+All alpha values are accepted. Decoded WebP file pixels preserve supplied RGBA;
+native premultiplied rendering is compared separately against PNG. PNG default
+and explicit TIFF/JPEG/GIF retain their contracts and the tool's own grant.
+Owning source **225 distinct methods** passed in **75.739 s**; canonical native
+passed the exact same **225** in **75.173 s**, zero failures/skips; those owning selections exclude G3.
+CLI/app compilation **0.900/0.893 s**, ordinary Debug **26.412 s** and strict
+candidate signature **0.143 s** passed on the receipted **464-input ce81874f… map**. G3 expectation alignment produced test-only map 6dcfd15c…; these receipts retain
+their immutable ce81874f… inputs.
+Signed App/CLI each passed **15 groups/32 responses/30 tool frames**, full EOF.
+Actual Qwen completed three normal Low API responses and consumed two write/read
+results; its strict final acknowledgement matched 194-byte/2×2 artifact metadata.
+Seven production WebP/PNG native comparisons passed; decoded sRGB profiles and
+premultiplied renders matched the references. Initial-document G3 passed once
+in source/native (**5.514/5.334 s**), establishing matching **226 distinct methods**
+per route with the earlier 225; this was not one 226-test invocation. Focused
+seven and repeated checks add no distinct coverage.
+Installed GUI, production managed-adapter, full web, all models, other formats,
+Release and shipment remain open.
+Final-document rechecks and exact owner source/wiki delivery remain pending.
+[WebP contract and gates](docs/NATIVE-IMAGE-WRITING.md).
+
+## Preceding 0.34.0 (47) GIF qualification
+
 Version **0.34.0**, build **47** is the current source target. `image_write`
 accepts explicit `gif` with a case-insensitive `.gif` destination and alpha
 0/255; partial alpha returns `invalid_image_alpha` before writing. Palette RGB
@@ -322,6 +347,10 @@ observations retain their recorded scope. Exact owner publication, remote
 readback and synchronization references are retained externally. See the
 [phase record](docs/GRAPHITE-WORKBENCH.md) for evidence and capture limits.
 
+Version **0.35.0**, build **48** (current source target; owning source/native 225 plus separate G3 one each establish matching 226-method unions; direct builds/strict Debug signature and scoped App/CLI/Qwen/native consumers passed; installed acceptance remains pending).
+
+Preceding .34 identity record (retained):
+
 Version **0.34.0**, build **47** (current source target; bounded GIF source/candidate/API checks passed; installed acceptance remains open).
 
 Preceding JPEG identity record (retained):
@@ -589,7 +618,7 @@ can return errors. [Renderer contract and verified scopes](docs/NATIVE-WEB-RENDE
 | `xlsx_write` | `path`, `rows` arrays of strings; explicit `.xlsx` destination. One text-only worksheet: at most 256 rows, 64 columns per row, 4096 cells, 4096 UTF-8 bytes per cell and 65536 total text bytes; encoded output up to 1048576 bytes. Requires its own XLSX tool grant. |
 | `pptx_write` | `path`, `slides` with string `title` and string-array `paragraphs`; explicit `.pptx` destination. At most 32 slides, 1024 total paragraphs including nonempty titles, 4096 UTF-8 bytes per string, 65536 total input bytes, 32768 XML elements per slide and 1048576 encoded bytes. Requires its own PPTX tool grant. |
 | `ods_write` | `path`, `rows` arrays of strings; explicit `.ods` destination. One ODF 1.3 worksheet: at most 256 rows, 64 columns per row, 4096 input cells, 4096 UTF-8 bytes per cell, 65536 total input bytes, 32768 content XML elements and 1048576 encoded bytes. Requires its own ODS grant. |
-| `image_write` | `path`, integer `width`/`height`, canonical padded base64 `content`; optional `pixel_format: "rgba8"`. Explicit `.png` for absent/default `png`, `.tif`/`.tiff` for explicit `tiff`, `.jpg`/`.jpeg` for explicit `jpeg`; explicit `gif` requires case-insensitive `.gif`. Input is straight RGBA8/sRGB top-to-bottom. JPEG requires alpha 255; GIF requires alpha 0/255 and rejects partial alpha with `invalid_image_alpha`. Each dimension 1–1024; at most 262144 pixels, exactly width×height×4 decoded bytes (at most 1048576), 1398104 base64 bytes and 2097152 output bytes. PNG/JPEG/GIF use ImageIO; TIFF uses Swift. JPEG quality 1.0 remains lossy; GIF palette RGB can change even with ≤256 colors, and hidden RGB is unpromised. JPEG/GIF output contracts describe encoded output; `rgba8-straight-srgb-v1` describes input. Own image grant required. Matching 219 distinct source/native methods, builds, strict candidate and scoped App/CLI/Qwen checks passed. Final-document and exact delivery receipts are retained externally; preceding JPEG qualification is retained in the image guide. Installed-GUI acceptance remains open. |
+| `image_write` | `path`, integer `width`/`height`, canonical padded base64 `content`; optional `pixel_format: "rgba8"`. Explicit `.png` for absent/default `png`, `.tif`/`.tiff` for explicit `tiff`, `.jpg`/`.jpeg` for explicit `jpeg`; explicit `gif` requires case-insensitive `.gif`, explicit lowercase `webp` requires case-insensitive `.webp`. Input is straight RGBA8/sRGB top-to-bottom. JPEG requires alpha 255; GIF requires alpha 0/255 and rejects partial alpha with `invalid_image_alpha`. Each dimension 1–1024; at most 262144 pixels, exactly width×height×4 decoded bytes (at most 1048576), 1398104 base64 bytes and 2097152 output bytes. PNG/JPEG/GIF use ImageIO; TIFF and lossless VP8L WebP use call-local Swift. JPEG quality 1.0 remains lossy; GIF palette RGB can change even with ≤256 colors, and hidden RGB is unpromised. WebP accepts all alpha values and preserves exact decoded file RGBA, including hidden transparent RGB; native premultiplied rendering is a separate PNG-reference check. WebP engine is `swift-webp-vp8l`, output contract `webp-lossless-rgba8-srgb-v1`. JPEG/GIF/WebP output contracts describe encoded output; `rgba8-straight-srgb-v1` describes input. Own image grant required. Owning source/native 225 plus separate G3 one each establish matching 226-method unions; direct builds/strict Debug signature and scoped App/CLI/Qwen/native consumers passed. Final rechecks and delivery use external closeout receipts and remain pending. Complete preceding format qualification is retained in the image guide. Installed-GUI acceptance remains open. |
 | `search_text` | `pattern`; optional `path`, integer `context_lines` from 0–20, and `include`/`exclude` filename-glob arrays. Each array accepts at most 32 nonempty globs of 256 UTF-8 bytes each. `.git` and `node_modules` remain excluded. |
 | `git_diff` | Optional `cwd`, `staged` and `file` (repository-relative pathspec). For example, `file: "Sources/App.swift"` limits the diff to that file. Read `stdout_truncated`, `stderr_truncated` and `timed_out` before treating output as complete. |
 

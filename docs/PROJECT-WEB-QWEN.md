@@ -1,5 +1,32 @@
 # Project repository, web access and Qwen verification
 
+Current source target **0.35.0 (48)** adds bounded WebP to supplied-pixel
+`image_write`, preserving PNG/TIFF/JPEG/GIF. Actual new-candidate Qwen completed
+three normal Low public API responses, consumed two selected write/read results
+and acknowledged exact 194-byte/2×2 metadata. Image understanding is unqualified.
+Owning source **225 distinct methods** passed in **75.739 s**; canonical native
+passed the exact same **225** in **75.173 s**, zero failures/skips; those owning selections exclude G3.
+CLI/app compilation **0.900/0.893 s**, ordinary Debug **26.412 s** and strict
+candidate signature **0.143 s** passed on the receipted **464-input ce81874f… map**. G3 expectation alignment produced test-only map 6dcfd15c…; these receipts retain
+their immutable ce81874f… inputs.
+Signed App/CLI each passed **15 groups/32 responses/30 tool frames**, full EOF.
+Actual Qwen completed three normal Low API responses and consumed two write/read
+results; its strict final acknowledgement matched 194-byte/2×2 artifact metadata.
+Seven production WebP/PNG native comparisons passed; decoded sRGB profiles and
+premultiplied renders matched the references. Initial-document G3 passed once
+in source/native (**5.514/5.334 s**), establishing matching **226 distinct methods**
+per route with the earlier 225; this was not one 226-test invocation. Focused
+seven and repeated checks add no distinct coverage.
+Installed GUI, production managed-adapter, full web, all models, other formats,
+Release and shipment remain open.
+The project GitHub-linking and full-web goals remain in force. The retained
+installed .18.0/build-28 diagnostic advertised 76 tools with all three web
+tools absent; it qualifies no new installation or web request.
+Final-document rechecks and exact owner source/wiki delivery remain pending.
+[WebP contract and gates](NATIVE-IMAGE-WRITING.md).
+
+## Preceding 0.34.0 (47) GIF qualification
+
 Current source target **0.34.0 (47)** adds bounded GIF to supplied-pixel
 `image_write`, preserving PNG/TIFF/JPEG. Signed App/CLI controls and Qwen API
 consumption passed. Actual `qwen/qwen3.8-27b` completed three normal responses,

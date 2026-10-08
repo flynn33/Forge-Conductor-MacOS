@@ -1,5 +1,241 @@
 # Native image pixel writing
 
+## Additive WebP phase — 0.35.0 (48), bounded source/candidate qualification
+
+Current source target is **0.35.0 (48)**. Owning source and direct builds/strict
+Debug signature and the exact matching 225-method canonical native run passed.
+Actual Qwen write/read consumption and independent production file checks passed.
+Seven production native WebP/PNG comparisons passed. Separate initial-document
+G3 one each establishes matching 226-method unions with the earlier 225. Complete
+GIF/JPEG/TIFF/PNG sections retain
+their original evidence, boundaries and NONPASS records.
+
+### WebP tool contract
+
+Existing `image_write` keeps required `path`, `width`, `height`, `content`, optional
+`pixel_format: "rgba8"`, its own grant, replay behavior and absent-format default PNG.
+Explicit exactly lowercase `format: "webp"` requires a case-insensitive `.webp`
+destination; append none. Uppercase format tokens remain invalid. No new input
+field, dependency, tool, service, graph member, production runtime or signing
+change is introduced. PNG/TIFF/JPEG/GIF contracts remain available.
+
+Input remains canonical padded base64 of tightly packed top-to-bottom straight
+RGBA8/sRGB with `pixel_contract: "rgba8-straight-srgb-v1"`. WebP accepts all alpha
+bytes 0...255. The simple RIFF container contains one lossless VP8L image;
+independent file decoding preserves exact supplied RGBA bytes, including hidden
+RGB under alpha zero. Native premultiplied rendering is compared separately
+against a PNG reference; it does not promise preservation of rendered hidden RGB.
+sRGB interpretation has no raw embedded ICC promise. Animation, photographic
+synthesis, image interpretation and a general WebP decoder are not added.
+
+WebP returns `engine: "swift-webp-vp8l"` and WebP-only
+`output_contract: "webp-lossless-rgba8-srgb-v1"`. The existing pixel contract
+describes supplied input. PNG/TIFF receive no output_contract key; JPEG/GIF
+retain their existing contracts and alpha restrictions.
+
+Dimensions remain 1...1024, at most 262144 pixels, exactly width×height×4 decoded
+bytes (at most 1048576), canonical base64 at most 1398104 UTF-8 bytes and encoded
+output at most 2097152 bytes. The literal encoder preflights complete size before
+allocating its single output Data: 178 + raw byte count, maximum **1048754 bytes**.
+A partial byte is call-local; no per-pixel Data/array, output lock or retained
+callback owner is introduced. Cooperative checks cover alpha scanning, every
+2048 pixels, bounded output work and completion. Worker/context/pinned-write/mode/audit
+and grant interfaces remain the existing owners.
+
+Pre-cancel/deadline tests do not deterministically exercise cancellation in the
+middle of the bit loop. Common-writer late-cancel-before-rename/revocation remains
+unexercised source E2. Existing ImageIO native-call preemption remains unqualified
+for preceding formats. No product leak, performance or cross-OS claim follows.
+
+### Mechanism and source checkpoints
+
+The external v3 mechanism passed **seven fixtures** and **fourteen native/synthetic
+controls**. The independent review additionally passed **twenty-one parser controls**;
+its independent file/native fixture checks distinguish exact decoded file RGBA from native
+premultiplied rendering against PNG. Native sRGB profile equality is consumer
+interpretation, not raw ICC embedding. Independent review
+`webp-independent-artifact-review-0350-v3.json`, SHA
+`0872978bdcded91d22fa9513c635c78504518e2d74877ebdce735dd923b5e8b6`,
+binds 59 reads/5913474 bytes. These controls are not product XCTest methods or
+App/CLI/Qwen runs. The v2 initializer-label compilation NONPASS remains retained.
+
+The missing-feature baseline executed one owning method and failed normally
+in **5.407 s** with `format must be png, tiff, jpeg or gif`; its original log SHA
+`f0f33302e9d31706353dc39ce221dff32a00ed620466077130af39d9144078d1`
+remains NONPASS. The same method then passed within the seven-method focused
+WebP checkpoint (**14.241 s**, zero failures/skips; log SHA
+`056926216fae398fcdc6b326e9a4e545f96807c2b4e9c1452acccd7b55965592`).
+Initial support-bundle zero-selected output supplies no coverage. Focused
+methods are subsets; repeated executions add no distinct owning methods.
+
+### Current source, graph, build and candidate evidence
+
+Owning source passed **225 distinct methods** in **75.739 s**, normal exit 0,
+zero failures/skips. These owning selections exclude G3. Actual declared/
+started/passed sets matched; exact readback
+`native-webp-owning-source-readback-0350.json`, SHA
+`c2814e2db9acea67d51f0c7c6fc71c63ec5a8ea3c9ea14454b762fa586abe3d6`.
+
+| Owning class | Matching source/native distinct methods |
+| --- | ---: |
+| NativeRasterWriterTests | 40 (12 PNG, five TIFF, seven JPEG, nine GIF, seven WebP) |
+| MCPProtocolAndDiagnosticsTests | 44 |
+| ToolDefinitionCatalogTests | 35 |
+| ProjectInstructionQueueTests | 40 |
+| NativeODSReaderTests / NativeODSWriterTests | 13 / 15 |
+| PDFWriterTests | 35 |
+| Core tool audit | 3 |
+| Document-dependent G3 | 1 per route in separate initial-document runs; excluded from owning 225 |
+
+The seven WebP methods cover native-readable one-pixel output, independent
+restricted file RGBA inspection and PNG-reference rendering, all alpha values/
+dimension edges/maximum noise, worker/strict input/output preflight, malformed
+containers, tool metadata/full readback/mode/protections and stale context/own grant.
+Retained PNG/TIFF/JPEG/GIF tests passed in both selections. Canonical native
+**225** passed in **75.173 s**, normal exit 0, zero failures/skips and the exact
+same source method set. Readback `native-webp-owning-native-readback-0350.json`,
+SHA `328fbace0917148f8b36de4dca5bd290ff14f14a9e9800e8d037b30429ff3280`;
+log SHA `ffe4a06d36b5bf43878cabc07e7f248907c4ab5869653eb648ec0e03e32cd541`.
+G3 is excluded from both 225 sets. Separate initial-document G3 passed once in
+source/native; exact union comparison establishes matching 226 distinct methods
+per route, not one 226-test invocation. Repeated focused/G3 runs add no coverage.
+
+CLI compilation **0.900 s**, app compilation **0.893 s**, ordinary canonical
+Debug build **26.412 s** and strict signature **0.143 s** passed, normal exit 0,
+unforced and same **464 source inputs**. Source map SHA
+`ce81874fa889044ad12a96c7a6ca470a2b71af2c5a92df691b0b5bbae8872ccb`.
+Source log SHA `5d679d1bb82bc7720c0b84d018cf34220b7352dc7c1ff8d6acda45fb74aec96c`;
+ordinary Debug log SHA
+`1510998c43dee44891bee72aae1b2cd64910f7cf655dc56684fa3b5c7bb733b4`;
+strict signature log SHA
+`7e163472f4ffe58ef869d6ada6e26d51d875dc3b0e3777d9913327ab77fc3227`.
+Existing canonical memberships/signing remain; project changes only twelve
+marketing and sixteen build-version values. Source/native selected methods
+establish no full-suite, GUI, performance or lifetime pass. Native diagnostics
+retain DVTAssertionsWarning in IDELaunchSession.m:395 and linkd NSCocoaErrorDomain
+4097; no diagnostic-free claim follows.
+
+Strict Debug candidate `native-webp-native-candidate-0350.json`, SHA
+`750371a30b90fea43d66a8b40bc4021a0afe60a6df1404d0979bf8e7da554ade`,
+binds .35/48, the seven current binaries, packaged source/version inputs,
+three protected installed/registration inputs and unchanged prior .34 candidate.
+Signature/build identity is separate from actual compiled peer, tool and model
+qualification. After App/CLI, 464 source/seven candidate/three protected/seventy-five harness/seven preceding candidate inputs remained unchanged; Qwen after-guards also passed; its harness map contained 76 entries.
+
+### Signed App/CLI, Qwen and native consumers
+
+Signed App and packaged CLI each passed **fifteen logical groups**, **thirty-two
+correlated native responses** and **thirty tool frames**, with normal exit 0/
+full stdout/stderr EOF, no forced cleanup or unconsumed tail. Outer durations
+were **1.334 s** (App) and **0.778 s** (CLI). Nine actual negative calls across
+five groups cover typed path, extension/default-format pairing, format type/token
+(including uppercase format rejection), dimensions and canonical base64.
+Actual **32×64 explicit cancellation** returned cancelled `-32800` and preserved
+the existing destination. This immediate cancellation does not close middle-bit-loop
+or late-cancel-before-rename/revocation gates.
+
+Each mode produced **nine artifacts**: three WebPs, three candidate PNG references,
+plus retained TIFF/JPEG/GIF parity outputs. The WebPs were opaque 2×2 (**194 bytes**),
+transparent-hidden-RGB 1×1 (**182 bytes**) and partial-alpha 2×2 (**194 bytes**).
+All nine independent file inspections passed, with exact supplied RGBA for the
+three WebPs/PNG references/TIFF. JPEG remains lossy and GIF palettized; their
+structural checks do not promise exact RGB. Native WebP/PNG comparison is
+qualified separately below.
+
+App/CLI actual text and structured tool payloads agreed; complete `fs_read`
+base64, metadata and artifact hashes were bound. Guards preserved 464 source,
+seven candidate, three protected, seventy-five harness and seven preceding
+candidate inputs. Root App readback SHA
+`07a696cfb634dea85421e3736acc00b4449c03a5c528fe1de5e4c774dac455d3`;
+CLI readback SHA
+`d0b7416886c41512f669fdaa14d246ee59e781dc7486785b57fa2a0e09e2ffe9`.
+
+Actual `qwen/qwen3.8-27b` completed **three normal public API responses** in
+**34.163 s**, with **three observed Low template events**. Two selected, fully
+written/correlated/delivered `image_write`/`fs_read` results were consumed by
+completed successor turns. Actual MCP text, structured payload and model
+follow-up tool content agreed; strict final acknowledgement matched **194 bytes**,
+**2×2**, SHA `fa3a326b5efd57a18eaff8cf16276f3c9d463cc272d11a9b0fdd1da88ea0ce65`.
+The native session consumed **eight responses/six tool frames**, including two
+preflight PNG calls, normal exit 0/full EOF/unforced. It produced a WebP and a
+candidate PNG reference, each passing independent file inspection. This is
+artifact metadata acknowledgement; image understanding is unqualified.
+
+Across App/CLI/Qwen, **seven WebPs** and **seven PNG references** passed the
+independent exact-file RGBA checks. App/CLI additionally produced six retained
+TIFF/JPEG/GIF parity artifacts (twenty actual files total); lossy/palette RGB
+limits remain. Guards preserved the 464 source/seven current candidate/three protected/
+seven prior candidate inputs; harness maps contained 75 entries for App/CLI
+and 76 for Qwen. Qwen readback `native-webp-qwen-root-readback-0350.json`, SHA
+`20d0a511d1fa01b4c9564477344b82873b99b487071e218a60ef0b2dddb31385`.
+
+Native ImageIO consumer qualification then passed **seven production WebP/PNG
+pairs**: App three, CLI three and Qwen one (**fourteen artifacts**). Each WebP
+native premultiplied render matched its PNG reference. Both decoded profiles
+were **3144 bytes**, equal to native sRGB SHA
+`2b3aa1645779a9e634744faf9b01e9102b0c9b88fd6deced7934df86b949af7e`.
+The two opaque cases also rendered exact raw RGBA. Hidden alpha-zero RGB remains
+an independent file-byte claim, not a native-rendering promise; decoded profile
+equality establishes no raw ICC embedding.
+
+Compilation passed in **1.979 s**; the native run passed in **0.391 s**, normal
+exit 0/unforced. Fourteen success-provider records each observed one admitted
+callback/one release/no first error; these bounded external observations
+establish no product lifetime or leak closure. The native consumer accounted
+**44 input reads/433188 bytes**; root read back **sixteen output files** and
+unchanged 464 source/eighty-one harness/seven candidate/three protected/seven
+prior candidate guards. Native summary SHA
+`62fce7f798bfe2f43c55a2dbbaa0c2833a177f2199c60124d467a1375e70131b`;
+root consumer readback SHA
+`c6d23a59bc00723c36bca9be663ea638878fba743b36020f513f64be4bb98449`.
+
+### G3 test-only transition and pending delivery
+
+The 225-method selections, builds, candidate, wire and native consumer receipts
+remain bound to their immutable **ce81874f…** source map. The applied G3 alignment
+changed only two expected literals in existing
+`Tests/ForgeConductorTests/G1G10AcceptanceTests.swift`: **0.34.0/47 → 0.35.0/48**.
+Every assertion, document marker, selector and 12/16 project-count assertion
+remains. Production/resource inputs and graph membership do not change.
+The applied test SHA is
+`b43be406e874658ed6566c3b1eeb4f5f3c3ebcd49044dd331def4f42e619e3b5`
+from before SHA
+`d106fa4b55e540a4fdf5eb98e5e34386359b350f9263e6e61440bba37f9fe821`.
+Root recorded actual test-only 464-input map
+`6dcfd15c3d2b681762e534c0307d7cf4b6b9f3943e61ecc0f4edd66f15348923`;
+all other 463 inputs, production/resources/authorities and graph remained unchanged.
+Applied receipt SHA `ed1dcf0180d78ce0aadae3e306abba2fad470b39279d860ab4f9125a955dc539`.
+The candidate retains its earlier test source. Separate initial-document G3
+actually passed once in source (**5.514 s**) and canonical native (**5.334 s**),
+normal exit 0/unforced, zero failures/skips. The exact earlier 225 sets plus this
+one method establish matching **226 distinct methods** per route; there was no
+one 226-test invocation. Source log SHA
+`d18f9156030ee180350a8a4fb36b4323224896fcb63b411ae5467ac8bcef77ad`;
+native log SHA
+`b9212df947747279df4d4fecb041807bbfd3d5d331a3538d71961cae256083af`.
+Corrected root readback `native-webp-initial-document-g3-root-readback-0350-v2.json`,
+SHA `312560f88f2e252fe19966796bb5ed435d516af4ecbcd8673cad34a2220e2cef`,
+retains the exact native `DVTAssertions: Warning` spelling at IDELaunchSession.m:395.
+The original v1 filter-miss receipt remains retained; only diagnostic attribution
+was corrected. No linkd warning was observed in this G3 run; the earlier native
+225 warning remains historical evidence. Initial support-bundle zero-selected
+output supplies no coverage. Repeated G3 adds no distinct method.
+
+Initial hygiene and whitespace passed in **0.663/0.140 s**, normal exit 0/unforced;
+hygiene log SHA `0a1da2bcff56d3813da8f2f640de03bd77f41016f39fe9175dc06708c1cc9aac`,
+whitespace output was empty. Final narrow-document G3/hygiene/link rechecks and
+exact owner source/wiki publication, readback and synchronization remain pending.
+Their actual outcomes use external closeout receipts.
+Published commit identities stay in external closeout receipts; do not insert
+self-referential identities into these documents.
+
+The retained installed status/catalog diagnostic is **0.18.0**, with build **28**
+independently read from installed Info.plist and **76 advertised tools**;
+`web_search`, `web_fetch`, `web_render` were absent. Qwen's reported 66 count was
+incorrect; its mechanism is unknown. That read-only observation dispatched no web
+request and qualifies no new installation. Installed GUI, production managed-adapter,
+full web, all models, other formats, Release and shipment remain open.
+
 ## Additive GIF phase — 0.34.0 (47), bounded source/candidate qualification
 
 Current source target is **0.34.0 (47)**. Bounded GIF source/native, direct builds,

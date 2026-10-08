@@ -1,6 +1,24 @@
 # Forge Conductor macOS — project roadmap
 
-## Additive native GIF pixel writing
+## Additive native WebP pixel writing
+
+Current target **0.35.0 (48)** extends `image_write` with bounded lossless WebP,
+preserving PNG/TIFF/JPEG/GIF. Explicit lowercase `webp` accepts all RGBA alpha
+bytes; exact decoded file pixels and native premultiplied rendering are separate.
+
+| Milestone | Observed evidence or implementation | Remaining gate |
+| --- | --- | --- |
+| Mechanism | External v3 seven fixtures/fourteen native-synthetic controls and independent twenty-one parser controls passed; exact file RGBA/native PNG-reference interpretation are separate. | Not product XCTest or App/CLI/Qwen coverage; v2 initializer-label NONPASS retained; no raw ICC/performance/leak claim. |
+| Tool and parity | Matching owning source/canonical native 225 passed, zero failures/skips (75.739/75.173 s); raster 40 includes seven WebP methods and retained 33. Separate initial-document G3 one each passed (5.514/5.334 s); exact 225+G3 union sets match at 226 distinct methods per route, not one 226-test invocation. Baseline one failed before feature and now passed. Applied G3 two-literal test-only map 6dcfd15c… follows immutable owning/build/wire/consumer map ce81874f…; all other 463 inputs/production/resources/graph remained unchanged. | Focused seven/repeats add no distinct coverage. Middle-loop cancellation and common-writer late-cancel/revocation E2 remain open. |
+| Graph and builds | Same 464 map ce81874f…; memberships/signing unchanged, only 12 marketing/16 build values. Source 75.739 s, CLI/app 0.900/0.893 s, ordinary Debug 26.412 s and strict signature 0.143 s passed; .35/48 Debug candidate 750371a3… binds seven current binaries/three protected inputs/prior .34 candidate. | Debug/signature and isolated App/CLI qualification establish no installed GUI, performance or lifetime acceptance. After App/CLI, 464 source/seven candidate/three protected/seventy-five harness/seven preceding candidate inputs remained unchanged; Qwen after-guards also passed; its harness map contained 76 entries. Native DVTAssertionsWarning IDELaunchSession.m:395 and linkd NSCocoaErrorDomain4097 are retained; no diagnostic-free claim. |
+| Native consumers | Actual App/CLI controls passed in 1.334/0.778 s, normal exit 0/full EOF/unforced. Three WebPs per mode independently decoded to exact supplied RGBA, including examined hidden alpha-zero RGB. Signed App/CLI each passed fifteen groups/thirty-two correlated responses/thirty tool frames, nine actual negative calls across five groups and actual 32×64 explicit cancellation. Each produced three WebPs, three PNG references and TIFF/JPEG/GIF parity artifacts; independent file inspection passed. Actual Qwen completed three normal Low responses, consumed two actual write/read results and acknowledged exact 194-byte/2×2 metadata. Seven actual production WebP/PNG native comparisons passed, with sRGB profiles and matching premultiplied renders. | Metadata acknowledgement does not qualify image understanding, full web or all models. Immediate cancellation leaves middle-bit-loop and common-writer late-cancel/revocation boundaries unqualified. |
+| Delivery | README, existing Unreleased and thirteen affected current documents record the bounded scope, actual checks and complete GIF/JPEG/TIFF/PNG histories/NONPASS receipts. Initial-document G3 source/native one each and initial hygiene/whitespace passed (5.514/5.334/0.663/0.140 s). | Final narrow-document rechecks/link and exact owner source/wiki publication/readback/synchronization remain pending; installed GUI/managed adapter/full web/all models/other formats/Release/shipment remain open. |
+
+[WebP contract and gates](docs/NATIVE-IMAGE-WRITING.md).
+
+<a id="additive-native-gif-pixel-writing"></a>
+
+## Preceding additive native GIF pixel writing
 
 Current target **0.34.0 (47)** extends `image_write` with bounded single-image
 GIF, preserving PNG/TIFF/JPEG. Binary alpha is accepted; partial alpha is rejected.

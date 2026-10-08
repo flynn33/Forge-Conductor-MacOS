@@ -160,10 +160,10 @@ public final class AgentCatalog: AgentCatalogProviding, @unchecked Sendable {
             AgentSpec(
                 id: "docs",
                 displayName: "Docs",
-                description: "Write Markdown documentation and export PDF manuals, plain-text DOCX, text-only XLSX/ODS, text-slide PPTX or PNG/TIFF/JPEG/GIF pixel artifacts via native tools.",
+                description: "Write Markdown documentation and export PDF manuals, plain-text DOCX, text-only XLSX/ODS, text-slide PPTX or PNG/TIFF/JPEG/GIF/WebP pixel artifacts via native tools.",
                 tools: ["fs_read", "fs_write", "fs_edit", "fs_list", "fs_glob", "fs_mkdir", "search_text", "shell_exec", "pdf_write", "pdf_from_file", "docx_write", "xlsx_write", "pptx_write", "ods_write", "image_write", "git_status", "git_diff", "git_log", "runtime.capabilities", "python.run", "job.status", "job.read_output", "job.cancel", "job.list"],
                 toolsForbidden: ["git_push", "git_commit"],
-                whenToUse: ["README", "PDF manual", "plain-text DOCX", "text-only XLSX", "text-only ODS", "text-slide PPTX", "PNG pixel artifact", "TIFF pixel artifact", "runbook", "API docs"],
+                whenToUse: ["README", "PDF manual", "plain-text DOCX", "text-only XLSX", "text-only ODS", "text-slide PPTX", "PNG pixel artifact", "TIFF pixel artifact", "WebP pixel artifact", "runbook", "API docs"],
                 firstMoves: ["fs_glob docs/README", "fs_read sources", "fs_write markdown", "pdf_from_file if needed", "agent_run_complete"],
                 doneDefinition: ["Artifacts on disk", "files_touched filled", "agent_run_complete"],
                 outputSchema: ["files_touched", "summary", "formats", "how_to_open"],
@@ -215,6 +215,13 @@ public final class AgentCatalog: AgentCatalogProviding, @unchecked Sendable {
                 GIF palette encoding may change RGB; hidden transparent RGB is not
                 preserved. Its output_contract is gif-binary-alpha-palettized-srgb-v1.
                 GIF is one image, with no animation or embedded ICC guarantee.
+                For WebP use exact lowercase format="webp" with an explicit .webp
+                destination. The native Swift lossless VP8L writer preserves every
+                supplied RGBA byte, including alpha 0...255 and hidden RGB, in the
+                encoded stream. Native premultiplied rendering is separate. Its
+                output_contract is webp-lossless-rgba8-srgb-v1 and engine is
+                swift-webp-vp8l. One sRGB-interpreted image; no animation or embedded
+                ICC guarantee. Destination extensions are case-insensitive.
                 Report the actual destination and result;
                 this tool encodes supplied pixels.
                 For PDF use pdf_write / pdf_from_file (no pandoc). Always fill files_touched

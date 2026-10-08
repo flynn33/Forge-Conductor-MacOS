@@ -10,6 +10,30 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### `0.35.0 (48)` additive native lossless WebP pixel writing
+
+- Add explicit lowercase `format: "webp"` with case-insensitive `.webp` to
+  existing `image_write`, preserving absent-format PNG and explicit TIFF/JPEG/GIF.
+- Encode one lossless VP8L image in call-local bounded Swift. Exact decoded file
+  RGBA includes hidden transparent RGB; native premultiplied rendering is a
+  separate PNG-reference check. Accept all alpha values; no raw ICC or animation
+  promise. WebP engine is `swift-webp-vp8l`, output contract
+  `webp-lossless-rgba8-srgb-v1`; retained input contract is `rgba8-straight-srgb-v1`.
+- Keep common dimensions/input/output bounds, own grant, replay/context/pinned
+  writer, audit and previous format contracts. Complete output is preflighted
+  before its bounded Data allocation; canonical graph/signing remain unchanged.
+- Actual matching owning source/canonical native 225, CLI/app/ordinary Debug and
+  strict signature passed. Signed App/CLI each passed fifteen groups/full EOF,
+  nine artifacts and actual cancellation. Actual Qwen completed three normal Low responses/two consumed tool results;
+  metadata acknowledgement matched 194 bytes/2×2. Seven production native
+  WebP/PNG comparisons passed. Separate initial-document G3 one each passed in
+  source/native, establishing matching 226-method unions with the earlier 225.
+  Final rechecks and exact owner source/wiki delivery remain pending.
+  Focused seven and external mechanism/parser controls retain separate scopes.
+- Middle-loop cancellation and common-writer late-cancel/revocation E2 remain open.
+  Installed GUI, production managed-adapter, full web, all models, other formats,
+  Release and shipment remain open. [WebP contract](docs/NATIVE-IMAGE-WRITING.md).
+
 ### `0.34.0 (47)` additive native single-image GIF pixel writing
 
 - Add explicit `format: "gif"` and case-insensitive `.gif` to existing

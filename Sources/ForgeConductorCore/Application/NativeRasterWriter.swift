@@ -26,7 +26,7 @@ enum NativeRasterError: Error, Equatable, LocalizedError {
         case .invalidDimensions: "width and height must be integers from 1 through 1024, with at most 262144 pixels"
         case .invalidContent: "content must be canonical padded base64 containing exactly width × height × 4 RGBA8 bytes, at most 1048576 bytes"
         case .invalidPixelFormat: "pixel_format must be rgba8"
-        case .invalidFormat: "format must be png, tiff, jpeg or gif"
+        case .invalidFormat: "format must be png, tiff, jpeg, gif or webp"
         case .invalidAlpha: "JPEG requires every RGBA8 alpha byte to be 255; use png or tiff for transparency"
         case .invalidGIFAlpha: "GIF requires every RGBA8 alpha byte to be 0 or 255; use png or tiff for partial transparency"
         case .outputTooLarge: "Encoded image is limited to 2097152 bytes"
@@ -35,7 +35,7 @@ enum NativeRasterError: Error, Equatable, LocalizedError {
     }
 }
 
-/// Call-local PNG/TIFF, opaque JPEG and palettized binary-alpha GIF encoding.
+/// Call-local PNG/TIFF/WebP, opaque JPEG and palettized binary-alpha GIF encoding.
 enum NativeRasterWriter {
     static let maximumDimension = 1024
     static let maximumPixels = 262_144
@@ -45,6 +45,7 @@ enum NativeRasterWriter {
     static let pixelContract = "rgba8-straight-srgb-v1"
     static let jpegOutputContract = "jpeg-opaque-lossy-srgb-v1"
     static let gifOutputContract = "gif-binary-alpha-palettized-srgb-v1"
+    static let webpOutputContract = "webp-lossless-rgba8-srgb-v1"
 
     static func integerDimension(_ value: Any?) throws -> Int {
         guard let dimension = JSONSupport.exactInteger(value), (1...maximumDimension).contains(dimension) else {
@@ -59,7 +60,7 @@ enum NativeRasterWriter {
                        outputByteLimit: Int = maximumOutputBytes) throws -> Data {
         guard !Thread.isMainThread else { throw NativeRasterError.workerRequired }
         try cancellation?.checkCancellation()
-        guard format == "png" || format == "tiff" || format == "jpeg" || format == "gif" else {
+        guard format == "png" || format == "tiff" || format == "jpeg" || format == "gif" || format == "webp" else {
             throw NativeRasterError.invalidFormat
         }
         guard pixelFormat == "rgba8" else { throw NativeRasterError.invalidPixelFormat }
@@ -76,6 +77,9 @@ enum NativeRasterWriter {
         try cancellation?.checkCancellation()
         guard outputByteLimit > 0, outputByteLimit <= maximumOutputBytes else {
             throw NativeRasterError.outputTooLarge
+        }
+        if format == "webp" {
+            return try encodeWebP(raw, width: width, height: height, cancellation: cancellation, outputByteLimit: outputByteLimit)
         }
         if format == "tiff" {
             return try encodeTIFF(raw, width: width, height: height, cancellation: cancellation, outputByteLimit: outputByteLimit)
@@ -135,6 +139,101 @@ enum NativeRasterWriter {
             try cancellation?.checkCancellation()
         }
         return encoded
+    }
+
+    private static func encodeWebP(_ raw: Data, width: Int, height: Int,
+                                   cancellation: ToolCallCancellation?, outputByteLimit: Int) throws -> Data {
+        try cancellation?.checkCancellation()
+        // Fixed no-transform/no-cache literal trees: 1263 header/tree bits.
+        // Google VP8L sections 3, 5.2.1, 6.2/7 and Simple Lossless RIFF.
+        let payloadBytes = (1263 + raw.count * 8 + 7) / 8
+        let totalBytes = 20 + payloadBytes + payloadBytes % 2
+        guard totalBytes <= outputByteLimit else { throw NativeRasterError.outputTooLarge }
+        var alphaUsed = false
+        try raw.withUnsafeBytes { bytes in
+            for offset in stride(from: 3, to: bytes.count, by: 4) {
+                if offset % 8192 == 3 { try cancellation?.checkCancellation() }
+                alphaUsed = alphaUsed || bytes[offset] != 255
+            }
+        }
+        var bits = WebPBits(totalBytes: totalBytes, payloadBytes: payloadBytes,
+                            cancellation: cancellation)
+        try bits.integer(0x2f, bits: 8)
+        try bits.integer(width - 1, bits: 14); try bits.integer(height - 1, bits: 14)
+        try bits.integer(alphaUsed ? 1 : 0, bits: 1); try bits.integer(0, bits: 3)
+        try bits.bit(0); try bits.bit(0); try bits.bit(0)
+        let order = [17, 18, 0, 1, 2, 3, 4, 5, 16, 6, 7, 8]
+        for alphabet in [280, 256, 256, 256] {
+            try bits.bit(0); try bits.integer(8, bits: 4)
+            for symbol in order { try bits.integer(symbol == 0 || symbol == 8 ? 1 : 0, bits: 3) }
+            try bits.bit(0)
+            for symbol in 0..<alphabet { try bits.prefix(symbol < 256 ? 1 : 0, bits: 1) }
+        }
+        try bits.bit(1); try bits.bit(0); try bits.bit(0); try bits.bit(0)
+        try raw.withUnsafeBytes { bytes in
+            for offset in stride(from: 0, to: bytes.count, by: 4) {
+                if offset % 8192 == 0 { try cancellation?.checkCancellation() }
+                try bits.prefix(Int(bytes[offset + 1]), bits: 8)
+                try bits.prefix(Int(bytes[offset]), bits: 8)
+                try bits.prefix(Int(bytes[offset + 2]), bits: 8)
+                try bits.prefix(Int(bytes[offset + 3]), bits: 8)
+            }
+        }
+        return try bits.finish()
+    }
+
+    // One call-local bounded output buffer and one partial byte; no callback,
+    // retained owner, lock, per-pixel Data or second payload buffer is needed.
+    private struct WebPBits {
+        private var data = Data()
+        private var partial: UInt8 = 0
+        private var occupied = 0
+        private let totalBytes: Int
+        private let payloadBytes: Int
+        private let cancellation: ToolCallCancellation?
+
+        init(totalBytes: Int, payloadBytes: Int, cancellation: ToolCallCancellation?) {
+            self.totalBytes = totalBytes; self.payloadBytes = payloadBytes
+            self.cancellation = cancellation
+            data.reserveCapacity(totalBytes)
+            data.append(contentsOf: "RIFF".utf8)
+            for shift in 0..<4 { data.append(UInt8(truncatingIfNeeded: (totalBytes - 8) >> (shift * 8))) }
+            data.append(contentsOf: "WEBPVP8L".utf8)
+            for shift in 0..<4 { data.append(UInt8(truncatingIfNeeded: payloadBytes >> (shift * 8))) }
+        }
+
+        mutating func bit(_ value: Int) throws {
+            partial |= UInt8(value & 1) << occupied
+            occupied += 1
+            if occupied == 8 {
+                guard data.count < 20 + payloadBytes else { throw NativeRasterError.outputTooLarge }
+                data.append(partial); partial = 0; occupied = 0
+                if (data.count - 20) % 8192 == 0 { try cancellation?.checkCancellation() }
+            }
+        }
+
+        mutating func integer(_ value: Int, bits: Int) throws {
+            for shift in 0..<bits { try bit((value >> shift) & 1) }
+        }
+
+        mutating func prefix(_ value: Int, bits: Int) throws {
+            for shift in stride(from: bits - 1, through: 0, by: -1) { try bit((value >> shift) & 1) }
+        }
+
+        mutating func finish() throws -> Data {
+            if occupied != 0 {
+                guard data.count < 20 + payloadBytes else { throw NativeRasterError.outputTooLarge }
+                data.append(partial); partial = 0; occupied = 0
+            }
+            guard data.count == 20 + payloadBytes else { throw NativeRasterError.encoderUnavailable }
+            if payloadBytes % 2 != 0 {
+                guard data.count < totalBytes else { throw NativeRasterError.outputTooLarge }
+                data.append(0)
+            }
+            guard data.count == totalBytes else { throw NativeRasterError.encoderUnavailable }
+            try cancellation?.checkCancellation()
+            return data
+        }
     }
 
     private static func encodeTIFF(_ raw: Data, width: Int, height: Int,

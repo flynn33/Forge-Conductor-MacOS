@@ -1,5 +1,30 @@
 # Telemetry architecture (real-time native)
 
+Current source documentation targets `0.35.0`, build `48`. WebP stays within
+the existing `image_write` documents/tool-card surface. Catalog, queue and audit
+parity are included in the actual matching 225-method source/native selections.
+Owning source **225 distinct methods** passed in **75.739 s**; canonical native
+passed the exact same **225** in **75.173 s**, zero failures/skips; those owning selections exclude G3.
+CLI/app compilation **0.900/0.893 s**, ordinary Debug **26.412 s** and strict
+candidate signature **0.143 s** passed on the receipted **464-input ce81874f… map**. G3 expectation alignment produced test-only map 6dcfd15c…; these receipts retain
+their immutable ce81874f… inputs.
+Signed App/CLI each passed **15 groups/32 responses/30 tool frames**, full EOF.
+Actual Qwen completed three normal Low API responses and consumed two write/read
+results; its strict final acknowledgement matched 194-byte/2×2 artifact metadata.
+Seven production WebP/PNG native comparisons passed; decoded sRGB profiles and
+premultiplied renders matched the references. Initial-document G3 passed once
+in source/native (**5.514/5.334 s**), establishing matching **226 distinct methods**
+per route with the earlier 225; this was not one 226-test invocation. Focused
+seven and repeated checks add no distinct coverage.
+Installed GUI, production managed-adapter, full web, all models, other formats,
+Release and shipment remain open.
+No producer, timer, delivery queue, performance or lifetime repair is claimed.
+Middle-loop cancellation and common-writer late-cancel/revocation remain open.
+Final-document rechecks and exact owner source/wiki delivery remain pending.
+[WebP contract and gates](NATIVE-IMAGE-WRITING.md).
+
+## Preceding 0.34.0 (47) GIF qualification
+
 Current source documentation targets `0.34.0`, build `47`. GIF stays within the
 existing `image_write` documents/tool-card surface. Catalog, queue and audit
 parity passed within source 218 plus separate G3 one and matching canonical
@@ -395,6 +420,10 @@ autonomous continuity, long-duration resource budgets, and owner-deferred
 representative physical-hardware qualification remain open.
 
 ## Version
+
+Current source target: `0.35.0`; build: `48`.
+
+Preceding 0.27.1 version record (retained):
 
 `0.27.1`
 
