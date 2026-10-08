@@ -189,7 +189,9 @@ prior candidate guards. Native summary SHA
 root consumer readback SHA
 `c6d23a59bc00723c36bca9be663ea638878fba743b36020f513f64be4bb98449`.
 
-### G3 test-only transition and pending delivery
+<a id="g3-test-only-transition-and-pending-delivery"></a>
+
+### G3 test-only transition and external closeout
 
 The 225-method selections, builds, candidate, wire and native consumer receipts
 remain bound to their immutable **ce81874f…** source map. The applied G3 alignment
@@ -223,9 +225,14 @@ output supplies no coverage. Repeated G3 adds no distinct method.
 
 Initial hygiene and whitespace passed in **0.663/0.140 s**, normal exit 0/unforced;
 hygiene log SHA `0a1da2bcff56d3813da8f2f640de03bd77f41016f39fe9175dc06708c1cc9aac`,
-whitespace output was empty. Final narrow-document G3/hygiene/link rechecks and
-exact owner source/wiki publication, readback and synchronization remain pending.
-Their actual outcomes use external closeout receipts.
+whitespace output was empty. Final-document G3 then passed once again in source
+(**1.438 s**) and canonical native (**1.867 s**), normal exit 0/unforced, zero
+failures/skips; repeated G3 adds no distinct method to the matching 226 unions.
+Final hygiene/whitespace passed (**0.673/0.133 s**), normal exit 0/unforced;
+whitespace output was empty. Native G3 retained the IDELaunchSession.m:395 warning.
+Initial source publication/readback/synchronization matched **479 exact remote blobs**,
+**26380364 bytes**, with unchanged production/resource/graph inputs.
+Exact source/wiki publication, readback and synchronization outcomes are retained in external closeout receipts.
 Published commit identities stay in external closeout receipts; do not insert
 self-referential identities into these documents.
 

@@ -20,7 +20,9 @@ Installed GUI, production managed-adapter, full web, all models, other formats,
 Release and shipment remain open.
 No producer, timer, delivery queue, performance or lifetime repair is claimed.
 Middle-loop cancellation and common-writer late-cancel/revocation remain open.
-Final-document rechecks and exact owner source/wiki delivery remain pending.
+Final-document G3 source/native one each passed (**1.438/1.867 s**), adding no
+distinct methods; hygiene/whitespace passed (**0.673/0.133 s**), normal exit 0/unforced.
+Exact source/wiki publication, readback and synchronization outcomes are retained in external closeout receipts.
 [WebP contract and gates](NATIVE-IMAGE-WRITING.md).
 
 ## Preceding 0.34.0 (47) GIF qualification

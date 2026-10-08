@@ -24,7 +24,9 @@ Installed GUI, production managed-adapter, full web, all models, other formats,
 Release and shipment remain open.
 Middle-of-bit-loop cancellation is not deterministically exercised. Common-writer
 late-cancel-before-rename/revocation remains unexercised source E2; this is no
-performance or product leak claim. Final-document rechecks and exact owner source/wiki delivery remain pending.
+performance or product leak claim. Final-document G3 source/native one each passed (**1.438/1.867 s**), adding no
+distinct methods; hygiene/whitespace passed (**0.673/0.133 s**), normal exit 0/unforced.
+Exact source/wiki publication, readback and synchronization outcomes are retained in external closeout receipts.
 [WebP contract and gates](NATIVE-IMAGE-WRITING.md).
 
 ## Preceding 0.34.0 (47) GIF qualification

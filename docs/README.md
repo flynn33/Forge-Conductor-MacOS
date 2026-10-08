@@ -19,7 +19,9 @@ seven and repeated checks add no distinct coverage.
 Installed GUI, production managed-adapter, full web, all models, other formats,
 Release and shipment remain open.
 Complete preceding format receipts retain their original identities.
-Final-document rechecks and exact owner source/wiki delivery remain pending.
+Final-document G3 source/native one each passed (**1.438/1.867 s**), adding no
+distinct methods; hygiene/whitespace passed (**0.673/0.133 s**), normal exit 0/unforced.
+Exact source/wiki publication, readback and synchronization outcomes are retained in external closeout receipts.
 
 ## Preceding 0.34.0 (47) GIF qualification
 

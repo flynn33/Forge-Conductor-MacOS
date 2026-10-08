@@ -22,7 +22,9 @@ Release and shipment remain open.
 The project GitHub-linking and full-web goals remain in force. The retained
 installed .18.0/build-28 diagnostic advertised 76 tools with all three web
 tools absent; it qualifies no new installation or web request.
-Final-document rechecks and exact owner source/wiki delivery remain pending.
+Final-document G3 source/native one each passed (**1.438/1.867 s**), adding no
+distinct methods; hygiene/whitespace passed (**0.673/0.133 s**), normal exit 0/unforced.
+Exact source/wiki publication, readback and synchronization outcomes are retained in external closeout receipts.
 [WebP contract and gates](NATIVE-IMAGE-WRITING.md).
 
 ## Preceding 0.34.0 (47) GIF qualification

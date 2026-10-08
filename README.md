@@ -20,8 +20,9 @@ per route with the earlier 225; this was not one 226-test invocation. Focused
 seven and repeated checks add no distinct coverage.
 Installed GUI, production managed-adapter, full web, all models, other formats,
 Release and shipment remain open.
-Final-document rechecks and exact owner source/wiki publication/readback/
-synchronization use external closeout receipts; delivery remains pending.
+Final-document G3 source/native one each passed (**1.438/1.867 s**), adding no
+distinct methods; hygiene/whitespace passed (**0.673/0.133 s**), normal exit 0/unforced.
+Exact source/wiki publication, readback and synchronization outcomes are retained in external closeout receipts.
 [WebP contract and gates](docs/NATIVE-IMAGE-WRITING.md).
 
 ## Preceding 0.34.0 (47) GIF qualification
@@ -894,8 +895,8 @@ distribution limits are in the [qualification record](docs/QUALIFICATION-STATUS.
 
 The current target is `0.35.0 (48)` for bounded WebP. Matching source/native 225, direct
 builds and strict Debug signature passed. Separate initial-document G3 one each
-establishes matching 226-method unions; final rechecks and source/wiki delivery
-remain pending. [WebP scope](docs/NATIVE-IMAGE-WRITING.md).
+establishes matching 226-method unions; final-document G3 source/native one each
+and hygiene/whitespace passed, adding no distinct methods. Exact source/wiki publication, readback and synchronization outcomes are retained in external closeout receipts. [WebP scope](docs/NATIVE-IMAGE-WRITING.md).
 
 Preceding .34 identity and qualification record (retained):
 

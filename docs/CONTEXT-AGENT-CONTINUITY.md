@@ -21,7 +21,9 @@ seven and repeated checks add no distinct coverage.
 Installed GUI, production managed-adapter, full web, all models, other formats,
 Release and shipment remain open.
 Middle-loop cancellation and common-writer late-cancel/revocation E2 remain open.
-Final-document rechecks and exact owner source/wiki delivery remain pending.
+Final-document G3 source/native one each passed (**1.438/1.867 s**), adding no
+distinct methods; hygiene/whitespace passed (**0.673/0.133 s**), normal exit 0/unforced.
+Exact source/wiki publication, readback and synchronization outcomes are retained in external closeout receipts.
 [WebP contract and gates](NATIVE-IMAGE-WRITING.md).
 
 <a id="context-and-agent-continuity-v0340"></a>

@@ -21,8 +21,9 @@ distinct methods** per route, not one 226-test invocation or added repeat covera
 External seven fixtures/fourteen native-synthetic/twenty-one parser controls
 retain separate mechanism scopes; the original missing-feature failure remains NONPASS.
 Middle-loop cancellation and common-writer late-cancel/revocation E2 are open.
-Final-document rechecks and exact owner source/wiki publication/readback/
-synchronization use external closeout receipts; delivery remains pending.
+Final-document G3 source/native one each passed (**1.438/1.867 s**), adding no
+distinct methods; hygiene/whitespace passed (**0.673/0.133 s**), normal exit 0/unforced.
+Exact source/wiki publication, readback and synchronization outcomes are retained in external closeout receipts.
 Installed GUI, production managed-adapter, full web, all models, other formats,
 Release and shipment remain open.
 [WebP contract and gates](NATIVE-IMAGE-WRITING.md).
@@ -1772,8 +1773,9 @@ universal policy enforcement, and distribution qualification remain open.
 Current source target: **0.35.0, build 48**, supporting **macOS 26+**; bounded WebP
 owning source/native 225 plus separate G3 one each establish matching 226-method
 unions; direct builds/strict signature and scoped App/CLI/Qwen/native consumers
-passed. Final rechecks and exact delivery remain pending; preceding .34 receipts
-retain their identity.
+passed. Final-document G3 source/native one each and hygiene/whitespace passed,
+adding no distinct methods. Exact source/wiki publication, readback and synchronization outcomes are retained in external closeout receipts.
+Preceding .34 receipts retain their identity.
 
 Preceding .34 status sentence (retained):
 
@@ -1798,7 +1800,8 @@ the detailed, source-bound receipts are in the
 The current target is **0.35.0, build 48** for bounded WebP. Product authorities
 and graph/build inputs agree; owning source/native 225 plus separate initial-document
 G3 one each establish matching 226-method unions. Direct builds/strict signature
-passed. Final rechecks and exact source/wiki delivery remain pending.
+passed. Final-document G3 source/native one each and hygiene/whitespace passed,
+adding no distinct methods. Exact source/wiki publication, readback and synchronization outcomes are retained in external closeout receipts.
 [WebP scope](NATIVE-IMAGE-WRITING.md).
 
 Preceding .34 agreement and qualification record (retained):

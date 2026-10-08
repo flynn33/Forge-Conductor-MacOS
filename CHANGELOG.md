@@ -28,7 +28,9 @@ Product versions do not by themselves claim shipment.
   metadata acknowledgement matched 194 bytes/2×2. Seven production native
   WebP/PNG comparisons passed. Separate initial-document G3 one each passed in
   source/native, establishing matching 226-method unions with the earlier 225.
-  Final rechecks and exact owner source/wiki delivery remain pending.
+  Final-document G3 source/native one each passed (1.438/1.867 s), adding no
+  distinct methods; hygiene/whitespace passed (0.673/0.133 s), exit 0/unforced.
+  Exact source/wiki publication, readback and synchronization outcomes are retained in external closeout receipts.
   Focused seven and external mechanism/parser controls retain separate scopes.
 - Middle-loop cancellation and common-writer late-cancel/revocation E2 remain open.
   Installed GUI, production managed-adapter, full web, all models, other formats,

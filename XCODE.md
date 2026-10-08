@@ -19,7 +19,9 @@ Release and shipment remain open.
 Existing canonical memberships and signing policy are preserved; only twelve
 marketing and sixteen build-version values changed in the project.
 Selected methods and a strict Debug signature establish no full-suite, GUI,
-performance or lifetime acceptance. Final-document rechecks and exact owner source/wiki delivery remain pending.
+performance or lifetime acceptance. Final-document G3 source/native one each passed (**1.438/1.867 s**), adding no
+distinct methods; hygiene/whitespace passed (**0.673/0.133 s**), normal exit 0/unforced.
+Exact source/wiki publication, readback and synchronization outcomes are retained in external closeout receipts.
 [WebP contract and gates](docs/NATIVE-IMAGE-WRITING.md).
 
 The 225/build/candidate/wire receipts retain ce81874f…; root applied only two
@@ -917,7 +919,7 @@ remains `22e7443d13496b3cc08b6e98366bb6d2332e3fd4`; later documentation commits
 do not change the binary identity. The set is ready for owner notarization and
 Apple upload, but is not notarized, stapled, installed, shipped, or released.
 That retained archive used Xcode `MARKETING_VERSION = 0.16.2` and
-`CURRENT_PROJECT_VERSION = 23`. Current source targets `0.35.0 (48)` for bounded WebP; native Debug build and strict signature passed; separate initial-document G3 one each establishes matching 226-method unions. Final narrow-document rechecks remain pending. Preceding .34 target record (retained): Current source targets `0.34.0 (47)` for bounded GIF; native Debug build and strict candidate signature passed. Preceding source targeted `0.33.0 (46)` for opaque lossy JPEG; the preceding .32 TIFF source and historical build-24 app/archive keep their identities. The historical build-24 app/archive use
+`CURRENT_PROJECT_VERSION = 23`. Current source targets `0.35.0 (48)` for bounded WebP; native Debug build and strict signature passed; separate initial-document G3 one each establishes matching 226-method unions. Final-document G3 source/native one each and hygiene/whitespace passed, adding no distinct methods. Exact source/wiki publication, readback and synchronization outcomes are retained in external closeout receipts. Preceding .34 target record (retained): Current source targets `0.34.0 (47)` for bounded GIF; native Debug build and strict candidate signature passed. Preceding source targeted `0.33.0 (46)` for opaque lossy JPEG; the preceding .32 TIFF source and historical build-24 app/archive keep their identities. The historical build-24 app/archive use
 `0.16.3 (24)`; notarization and shipment remain separate.
 
 Implementation revision `91ad90ee7a1e51b7289f4c531ddae4dbbc6812ec`
