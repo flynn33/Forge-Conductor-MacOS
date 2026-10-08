@@ -11,7 +11,12 @@ readbacks and ordinary observations retain their explicit limits; no
 installation, notarization, App Store upload or distribution was performed.
 Exact owner publication/readback/synchronization refs are retained externally.
 
-Current target identity is **0.28.0 (41)**. The feature-release component advances
+Current target identity is **0.29.0 (42)**. The additive `pptx_write` capability
+advances the feature component and build. Source/native G3 passed within 166
+distinct methods each; build/signing and scoped runtime consumers passed.
+[Contract and gates](NATIVE-PPTX-WRITING.md).
+
+The preceding target identity is **0.28.0 (41)**. The feature-release component advances
 for additive `xlsx_write`, with patch reset and build 41; the importer repair shares
 this phase. G3 source/native agreement passed within 124 methods each; scoped
 wire/Core/Qwen gates also passed. [Contract and remaining gates](NATIVE-XLSX-WRITING.md).
@@ -160,10 +165,16 @@ focused version test, and CI reject drift between them.
 
 ## Current identity
 
-The current product version target is `0.28.0`, build `41`; source/native G3
+Current source target is `0.29.0`, build `42`. Source/native G3 passed in matching
+166-method selections; canonical build/signing and scoped PPTX runtime gates
+passed on the same 458 inputs. Installed/GUI, Release and shipment remain open. [Current gate status](NATIVE-PPTX-WRITING.md).
+
+### Preceding 0.28.0 version agreement
+
+The preceding product version target was `0.28.0`, build `41`; source/native G3
 agreement passed within 124 distinct methods each. Canonical build/signing passed
 on the same 454 inputs; scoped wire/Core/Qwen also passed. Installed/GUI, full
-Office/full web and shipment gates remain separate. [Current gate status](NATIVE-XLSX-WRITING.md).
+Office/full web and shipment gates remain separate. [Preceding XLSX gate status](NATIVE-XLSX-WRITING.md).
 
 ### Preceding 0.27.1 version agreement
 

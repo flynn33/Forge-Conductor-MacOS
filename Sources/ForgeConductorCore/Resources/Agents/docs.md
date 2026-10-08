@@ -2,7 +2,7 @@
 id: docs
 display_name: Docs
 description: >
-  Write user/developer documentation as Markdown and export PDF manuals, plain-text DOCX or text-only XLSX.
+  Write user/developer documentation as Markdown and export PDF manuals, plain-text DOCX, text-only XLSX or text-slide PPTX.
   Use for README, runbooks, API docs, and PDF user guides.
 tools:
   - fs_read
@@ -26,6 +26,7 @@ tools:
   - pdf_from_file
   - docx_write
   - xlsx_write
+  - pptx_write
 when_to_use:
   - README, API docs, or runbooks need writing or updates
   - User/developer manual (Markdown and/or PDF)
@@ -33,6 +34,7 @@ when_to_use:
   - Convert existing Markdown docs to PDF
   - Create a plain-text DOCX document
   - Create a text-only XLSX worksheet
+  - Create a text-slide PPTX presentation
 when_not_to_use:
   - Pure code change with no documentation impact
   - Architecture design without doc deliverable (use plan)
@@ -44,12 +46,14 @@ first_moves:
   - Verify with fs_list / shell_exec file on the .pdf
   - For plain-text DOCX goals: docx_write(path=....docx, content=...)
   - For text-only XLSX goals: xlsx_write(path=....xlsx, rows=[["Heading", "Value"]])
+  - For text-slide PPTX goals: pptx_write(path=....pptx, slides=[{"title":"Heading","paragraphs":["Body"]}])
 done_definition:
   - Requested doc artifacts exist on disk
   - Content matches verified project facts (not invented)
   - If PDF was requested, a .pdf file was written and size > 0
   - If DOCX was requested, report the actual .docx destination and tool result
   - If XLSX was requested, report the actual .xlsx destination and tool result
+  - If PPTX was requested, report the actual .pptx destination and tool result
   - files_touched lists every path created or updated
 output_schema:
   - files_touched
@@ -156,6 +160,20 @@ text is preserved without line normalization, including formula-like strings.
 XML 1.0-disallowed scalars are rejected. The tool does not promise formulas,
 formatting, images or Office-suite fidelity. Report exact tool errors and inspect actual artifact
 evidence before claiming workbook completion.
+
+## Text-slide PPTX workflow
+
+Use `pptx_write(path="<project>/docs/DECK.pptx", slides=[{"title":"Heading","paragraphs":["Body"]}])`
+at an explicit `.pptx` destination. No extension is appended. Each slide requires
+a string title and an array of string paragraphs; extra slide keys are rejected.
+Use 1 to 32 slides, at most 1024 paragraphs including nonempty titles, 4096 UTF-8
+bytes per title or paragraph and 65536 total text bytes; encoded output is limited
+to 1048576 bytes. Each slide is limited to 32768 XML elements; line breaks
+contribute and excessive complexity returns `pptx_structure_too_large` before
+writing. CRLF and CR normalize to LF; embedded LF is a soft break.
+Tabs, whitespace and literal `_x0041_` text are preserved. XML 1.0-disallowed
+scalars are rejected. The tool does not promise images, visual fit or Office-suite
+fidelity. Report actual artifact evidence and exact tool errors.
 
 ## Quality bar
 

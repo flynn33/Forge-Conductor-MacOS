@@ -1,6 +1,15 @@
-# Context and agent continuity (v0.28.0)
+# Context and agent continuity (v0.29.0)
 
-Current source documentation targets 0.28.0 (41). The XLSX tool joins existing
+Current source documentation targets 0.29.0 (42). `pptx_write` joins existing
+progress classification; no handoff, job-reference, ACK, seal or successor
+contract changes. Source/native 166 each and scoped runtime consumers passed.
+[Contract and retained evidence](NATIVE-PPTX-WRITING.md).
+
+<a id="context-and-agent-continuity-v0280"></a>
+
+## Preceding 0.28.0 (41) XLSX qualification
+
+The preceding source documentation targets 0.28.0 (41). The XLSX tool joins existing
 progress classification; it adds no runtime-job reference or handoff format.
 Source/native 124, build/signing and scoped wire/Core/Qwen flows passed; these do
 not qualify successor creation. [Contract and remaining gates](NATIVE-XLSX-WRITING.md).

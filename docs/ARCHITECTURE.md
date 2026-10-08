@@ -1,6 +1,15 @@
 # Forge Conductor architecture
 
-Version: `0.28.0`; build: `41`.
+Version: `0.29.0`; build: `42`. PPTX uses a call-local native encoder and
+bounded slide-text reader with existing tool and pinned-write owners. The writer
+shares the reader's 32,768-element slide limit. Conflicting XML encodings and
+duplicate expanded attributes are rejected; new document arrays are audit-redacted.
+No new service, runtime, dependency or storage format. Source/native 166 each and
+scoped runtime consumers passed. [Contract](NATIVE-PPTX-WRITING.md).
+
+## Preceding 0.28.0 (41) XLSX qualification
+
+Preceding version: `0.28.0`; build: `41`.
 
 XLSX encoding uses a bounded call-local Swift writer on the existing worker path
 and pinned destination writer. Import uses bounded Foundation XMLParser cell

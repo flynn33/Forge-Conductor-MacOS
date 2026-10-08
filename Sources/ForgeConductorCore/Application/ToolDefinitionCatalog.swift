@@ -287,7 +287,7 @@ public enum ManagerToolCategory: String, Codable, Sendable, Equatable, CaseItera
         if toolID.hasPrefix("agent_")
             || toolID == "forge_status"
             || toolID == "get_forge_status" { return .agents }
-        if toolID.hasPrefix("pdf_") || toolID == "xlsx_write" { return .documents }
+        if toolID.hasPrefix("pdf_") || toolID == "xlsx_write" || toolID == "pptx_write" { return .documents }
         if toolID.hasPrefix("runtime_") { return .runtime }
         return .other
     }
@@ -692,6 +692,7 @@ private enum ProductionToolDefinitionSource {
         "pdf_from_file": "Convert a local markdown/text file to PDF.",
         "docx_write": "Write plain text to an explicit .docx destination using native Office Open XML export. Content is limited to 65536 UTF-8 bytes and encoded output to 1048576 bytes. CRLF, CR and U+2029 are normalized to LF; native paragraph terminators can add a final LF on import. XML 1.0-disallowed scalars are rejected. No Markdown interpretation, layout, images or Office-suite fidelity is promised.",
         "xlsx_write": "Write one text-only worksheet to an explicit .xlsx destination. Rows contain only strings: at most 256 rows, 64 columns per row, 4096 cells, 4096 UTF-8 bytes per cell and 65536 total cell UTF-8 bytes; encoded output is limited to 1048576 bytes. Empty rows and cells are accepted. Literal cell text is preserved without line normalization, including formula-like strings; XML 1.0-disallowed scalars are rejected. No formulas, formatting, images or Office-suite fidelity is promised.",
+        "pptx_write": "Write 1 to 32 plain-text slides to an explicit .pptx destination using native bounded Office Open XML encoding. Each slide has only title and paragraphs, both required: title is a string and paragraphs is an array of strings. Each string is limited to 4096 UTF-8 bytes, with at most 1024 total paragraphs including nonempty titles and 65536 total input UTF-8 bytes; encoded output is limited to 1048576 bytes. Every array paragraph, including an empty one, counts. Each slide is limited to 32768 XML elements; line breaks contribute and excessive complexity returns pptx_structure_too_large before writing. CRLF and CR normalize to LF; embedded LF becomes a line break and array elements remain separate paragraphs. Tabs, whitespace and literal _xHHHH_-like text are preserved. No images, styled layout or Office-suite fidelity is promised.",
         "search_text": "Recursive text search (grep), with optional context_lines and include/exclude filename globs.",
         "memory_set": "Store a durable key/value note in Forge local memory (survives chat sessions).",
         "memory_get": "Read a durable memory note by key.",
@@ -951,6 +952,33 @@ private enum ProductionToolDefinitionSource {
                     ] as [String: Any],
                 ] as [String: Any],
                 "required": ["path", "rows"],
+                "additionalProperties": false,
+            ]
+        case "pptx_write":
+            return [
+                "type": "object",
+                "properties": [
+                    "path": ["type": "string", "description": "Required nonblank explicit .pptx destination; no extension is appended."] as [String: Any],
+                    "slides": [
+                        "type": "array", "minItems": 1, "maxItems": 32,
+                        "description": "Plain text only; at most 1024 total paragraphs including nonempty titles and every array paragraph, and 65536 total input UTF-8 bytes.",
+                        "items": [
+                            "type": "object",
+                            "properties": [
+                                "title": ["type": "string", "maxLength": 4096,
+                                          "description": "At most 4096 UTF-8 bytes; a nonempty title counts toward the total paragraph limit."] as [String: Any],
+                                "paragraphs": [
+                                    "type": "array", "maxItems": 1024,
+                                    "items": ["type": "string", "maxLength": 4096,
+                                              "description": "At most 4096 UTF-8 bytes; CRLF/CR normalize to LF and embedded LF remains a line break."] as [String: Any],
+                                ] as [String: Any],
+                            ] as [String: Any],
+                            "required": ["title", "paragraphs"],
+                            "additionalProperties": false,
+                        ] as [String: Any],
+                    ] as [String: Any],
+                ] as [String: Any],
+                "required": ["path", "slides"],
                 "additionalProperties": false,
             ]
         case "pdf_from_file":

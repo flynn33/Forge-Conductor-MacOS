@@ -10,6 +10,20 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### `0.29.0 (42)` native text-slide PPTX writing and import
+
+- Add `pptx_write(path, slides)` for bounded plain-text slides and an explicit
+  `.pptx` destination. Normalize CRLF/CR to LF; preserve literal text and soft
+  breaks. Reject excessive slide XML complexity before publication.
+- Import slide-owned text in declared order, retaining original decks. Blank and
+  malformed decks remain unresolved without runnable package XML. Reject conflicting
+  XML encodings and duplicate expanded attributes; redact document arrays in new audit calls.
+- Preserve existing tools, grants, OS-authorized host-wide access and durable formats.
+  Source/native 166 each, canonical build/signing, App/CLI 16 wire controls,
+  seven reference artifacts, both original Core cases and Qwen consumption passed.
+  Original failed receipts remain; installed/GUI, full Office/full web and shipment
+  are separate. [Contract and evidence](docs/NATIVE-PPTX-WRITING.md).
+
 ### `0.28.0 (41)` native text-cell XLSX writing and import
 
 - Add `xlsx_write(path, rows)` for one text-only worksheet and an explicit `.xlsx`

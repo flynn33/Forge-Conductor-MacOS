@@ -1,6 +1,15 @@
 # Version and qualification status
 
-Current source target **0.28.0, build 41** adds text-cell XLSX writing and repairs
+Current source target **0.29.0, build 42** adds bounded text-slide PPTX writing
+and semantic instruction import. Source/native 166 each, canonical build/signing,
+App/CLI wire, seven reference artifacts, both retained Core cases and Qwen
+consumption passed. Original failed compilation/structural/parser/audit receipts
+remain NONPASS. Installed/GUI, full Office/full web, all models and shipment are
+separate. [Contract and evidence](NATIVE-PPTX-WRITING.md).
+
+## Preceding 0.28.0 (41) XLSX qualification
+
+The preceding source target **0.28.0, build 41** adds text-cell XLSX writing and repairs
 XLSX cell-value import. Owning source/native 124 and CLI/app/ordinary Debug/strict
 candidate gates passed, plus 16 App/CLI controls, both retained native Core cases
 and three-response Qwen API consumption. Broader product/shipment gates remain open.
@@ -1643,7 +1652,7 @@ Dashboard geometry, minimum/normal containment of every primary view, and
 populated policy evaluation rows. Live completion of the reported owner run,
 universal policy enforcement, and distribution qualification remain open.
 
-Current source target: **0.28.0, build 41**, supporting **macOS 26+**. The earlier
+Current source target: **0.29.0, build 42**, supporting **macOS 26+**. The earlier
 0.16.3 Developer ID app and archive are recorded in the historical build-24 section;
 that workflow staged the CLI under `~/.forge-conductor` and manually copied the
 app to `/Applications`. It did not exercise a `.pkg` installation, notarization,
@@ -1655,10 +1664,14 @@ the detailed, source-bound receipts are in the
 
 ## Version and build agreement
 
-The current Swift, CLI, Xcode and documentation target is **0.28.0, build 41**.
-Current source/native G3 passed within the matching 124-method selections; the
-canonical graph/build/signing gate passed on the same 454 inputs.
-[XLSX gate status](NATIVE-XLSX-WRITING.md).
+The current Swift, CLI, Xcode and documentation target is **0.29.0, build 42**.
+Source/native G3 passed within matching 166-method selections on 458 inputs;
+canonical build/signing and scoped PPTX runtime gates passed.
+[PPTX gate status](NATIVE-PPTX-WRITING.md).
+
+Preceding .28 source/native G3 passed within matching 124-method selections; its
+canonical graph/build/signing gate passed on its original 454 inputs.
+[Preceding XLSX gate status](NATIVE-XLSX-WRITING.md).
 
 The preceding .27.1 root/compiled/PBX authorities agreed; separate source/native
 G3 passed one each within 212 distinct methods each.

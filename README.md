@@ -1,6 +1,15 @@
 # Forge Conductor for macOS
 
-Current source targets **0.28.0 (41)**, adding `xlsx_write` for bounded text-only
+Current source targets **0.29.0 (42)**, adding bounded `pptx_write` and repairing
+PPTX instruction import to extract slide text instead of package XML. Source and
+canonical native tests passed 166 methods each; App/CLI wire, seven independent
+reference artifacts, both original Core import cases and Qwen consumption passed.
+[Contract and retained evidence](docs/NATIVE-PPTX-WRITING.md).
+Installed/GUI, full Office/full web, all models, Release and shipment remain open.
+
+## Preceding 0.28.0 (41) XLSX qualification
+
+The preceding source targets **0.28.0 (41)**, adding `xlsx_write` for bounded text-only
 worksheets and repairing XLSX instruction import to read cell values instead of
 package XML. Existing repository links, web, DOCX, PDF and shell tools remain.
 
@@ -673,8 +682,8 @@ continuity. The user does not start project work through a Forge Managed Run.
 
 | | |
 |---|---|
-| **Version** | **0.28.0** |
-| **Build** | **41** |
+| **Version** | **0.29.0** |
+| **Build** | **42** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |
@@ -791,7 +800,8 @@ was not exercised; its source selects the running app executable, so the CLI
 receipt does not qualify that path. The full scope and remaining
 distribution limits are in the [qualification record](docs/QUALIFICATION-STATUS.md).
 
-The current version authorities target `0.28.0 (41)`; source/native G3 agreement passed within the 124-method selections.
+The current version authorities target `0.29.0 (42)`; source/native G3 passed within matching 166-method selections.
+[Current PPTX qualification](docs/NATIVE-PPTX-WRITING.md).
 The preceding .27.1 source/native G3 agreement passed on its retained inputs.
 [Qualification and evidence](docs/ORDINARY-RUNTIME-CONTINUATION.md#repeated-subsystem-shutdown).
 

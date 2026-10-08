@@ -1490,6 +1490,24 @@ final class CoreTests: XCTestCase {
         XCTAssertTrue(event.argsJSON?.contains("redacted") == true)
     }
 
+    func testToolAuditRedactsXLSXAndPPTXDocumentContents() throws {
+        let secret = "document-secret-\(UUID().uuidString)"
+        let cases: [(String, [String: Any])] = [
+            ("rows", ["path": "table.xlsx", "rows": [[secret, "_x0041_"]], "deadline_ms": 20_000]),
+            ("slides", ["path": "deck.pptx", "slides": [["title": secret + "-title", "paragraphs": [secret + "-paragraph", ""]]], "deadline_ms": 20_000]),
+        ]
+        for (contentKey, arguments) in cases {
+            let original = try JSONSupport.data(from: arguments)
+            let sanitized = ToolAuditSanitizer.sanitize(arguments)
+            let encoded = try JSONSupport.string(from: sanitized)
+            XCTAssertFalse(encoded.contains(secret), contentKey)
+            XCTAssertEqual(sanitized[contentKey] as? String, "<redacted>", contentKey)
+            XCTAssertEqual(sanitized["path"] as? String, arguments["path"] as? String, contentKey)
+            XCTAssertEqual(sanitized["deadline_ms"] as? Int, 20_000, contentKey)
+            XCTAssertEqual(try JSONSupport.data(from: arguments), original, contentKey)
+        }
+    }
+
     func testToolAuditRecursivelyRedactsBatchContents() throws {
         let sensitiveValue = "nested-sensitive-content-\(UUID().uuidString)"
         let sanitized = ToolAuditSanitizer.sanitize([

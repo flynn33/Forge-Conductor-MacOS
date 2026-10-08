@@ -253,6 +253,17 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
             }
         }
 
+        if tool == "pptx_write" {
+            guard let path = arguments["path"] as? String,
+                  !path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  !path.utf8.contains(0) else {
+                return .denied(
+                    code: "invalid_path",
+                    message: "PPTX path must be a nonblank string without NUL bytes"
+                )
+            }
+        }
+
         if let blankPathKey = Self.blankDestructivePathKey(
             tool: tool,
             arguments: arguments
@@ -446,7 +457,7 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
                     access($0, preservesFinalComponent: true)
                 },
             ].compactMap { $0 }
-        case "pdf_write", "docx_write", "xlsx_write":
+        case "pdf_write", "docx_write", "xlsx_write", "pptx_write":
             return [access("path")].compactMap { $0 }
         case "pdf_from_file":
             var accesses = [access("source_path")].compactMap { $0 }
@@ -706,6 +717,7 @@ public enum ToolAuditSanitizer {
     private static let maximumStringBytes = 4 * 1_024
     private static let sensitiveKeys: Set<String> = [
         "command", "content", "old", "new", "report", "goal", "body", "value",
+        "rows", "slides",
         "narrative", "summary", "resume_seed", "blockers", "next_actions",
         "decisions", "key_files", "cwd", "project_slug", "project", "chat_label", "chat", "status",
     ]

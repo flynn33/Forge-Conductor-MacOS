@@ -160,10 +160,10 @@ public final class AgentCatalog: AgentCatalogProviding, @unchecked Sendable {
             AgentSpec(
                 id: "docs",
                 displayName: "Docs",
-                description: "Write Markdown documentation and export PDF manuals, plain-text DOCX or text-only XLSX via native tools.",
-                tools: ["fs_read", "fs_write", "fs_edit", "fs_list", "fs_glob", "fs_mkdir", "search_text", "shell_exec", "pdf_write", "pdf_from_file", "docx_write", "xlsx_write", "git_status", "git_diff", "git_log", "runtime.capabilities", "python.run", "job.status", "job.read_output", "job.cancel", "job.list"],
+                description: "Write Markdown documentation and export PDF manuals, plain-text DOCX, text-only XLSX or text-slide PPTX via native tools.",
+                tools: ["fs_read", "fs_write", "fs_edit", "fs_list", "fs_glob", "fs_mkdir", "search_text", "shell_exec", "pdf_write", "pdf_from_file", "docx_write", "xlsx_write", "pptx_write", "git_status", "git_diff", "git_log", "runtime.capabilities", "python.run", "job.status", "job.read_output", "job.cancel", "job.list"],
                 toolsForbidden: ["git_push", "git_commit"],
-                whenToUse: ["README", "PDF manual", "plain-text DOCX", "text-only XLSX", "runbook", "API docs"],
+                whenToUse: ["README", "PDF manual", "plain-text DOCX", "text-only XLSX", "text-slide PPTX", "runbook", "API docs"],
                 firstMoves: ["fs_glob docs/README", "fs_read sources", "fs_write markdown", "pdf_from_file if needed", "agent_run_complete"],
                 doneDefinition: ["Artifacts on disk", "files_touched filled", "agent_run_complete"],
                 outputSchema: ["files_touched", "summary", "formats", "how_to_open"],
@@ -185,6 +185,13 @@ public final class AgentCatalog: AgentCatalogProviding, @unchecked Sendable {
                 normalization; formula-like strings remain text. XML 1.0-disallowed
                 scalars are rejected. Do not promise formulas, formatting, images or
                 Office-suite fidelity.
+                For text slides use pptx_write(path="<project>/docs/DECK.pptx",
+                slides=[{"title":"Heading","paragraphs":["Body"]}]). Use 1 to 32 slides,
+                at most 1024 paragraphs including nonempty titles, 4096 UTF-8 bytes per
+                title or paragraph and 65536 total text bytes; encoded output is limited
+                to 1048576 bytes. CRLF and CR normalize to LF; embedded LF is a soft
+                break. Literal _x0041_ text is preserved. Do not promise images,
+                visual fit or Office-suite fidelity.
                 For PDF use pdf_write / pdf_from_file (no pandoc). Always fill files_touched
                 and call agent_run_complete. Never claim PDF done without a file on disk.
                 Find filenames with fs_glob(pattern="*.md", path="<project>/docs");

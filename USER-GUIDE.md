@@ -1,6 +1,14 @@
 # Forge Conductor user guide
 
-Current source targets **0.28.0 (41)**. Authorized models can create a bounded
+Current source targets **0.29.0 (42)** for bounded `pptx_write` and slide-text
+import. Source/native 166 each, App/CLI wire, reference/Core consumers and Qwen
+consumption passed on the same candidate inputs. Existing tools and grants remain.
+[Contract and limits](docs/NATIVE-PPTX-WRITING.md).
+Installed/GUI, full Office/full web, all models and shipment remain open.
+
+## Preceding 0.28.0 (41) XLSX qualification
+
+The preceding source targets **0.28.0 (41)**. Authorized models can create a bounded
 text-only worksheet with `xlsx_write`; XLSX package import reads cell values with
 sheet labels. Scoped source/native, signed tool, retained-workbook Core and Qwen API
 checks passed. [Limits and remaining gates](docs/NATIVE-XLSX-WRITING.md).
@@ -261,7 +269,7 @@ observations retain their recorded scope. Exact owner publication, remote
 readback and synchronization references are retained externally. See the
 [phase record](docs/GRAPHITE-WORKBENCH.md) for evidence and capture limits.
 
-Version **0.28.0**, build **41** (current source target; candidate qualification is separate from installation).
+Version **0.29.0**, build **42** (current source target; candidate qualification is separate from installation).
 
 This guide describes the current LM Studio-driven workflow. The user works in a
 normal LM Studio chat; Forge Conductor supplies project context, tools, policy
@@ -518,8 +526,18 @@ can return errors. [Renderer contract and verified scopes](docs/NATIVE-WEB-RENDE
 | `pdf_from_file` | `source_path`; optional `dest_path`, `title`. Reads a bounded regular UTF-8 source. The default destination replaces the source extension with `.pdf`; the default title is the source filename without its extension. |
 | `docx_write` | `path`, `content` strings; explicit `.docx` destination. Plain text up to 65536 UTF-8 bytes, encoded output up to 1048576 bytes. CRLF/CR/U+2029 normalize to LF; native paragraph terminators can add a final LF when imported. Requires its own DOCX tool grant. |
 | `xlsx_write` | `path`, `rows` arrays of strings; explicit `.xlsx` destination. One text-only worksheet: at most 256 rows, 64 columns per row, 4096 cells, 4096 UTF-8 bytes per cell and 65536 total text bytes; encoded output up to 1048576 bytes. Requires its own XLSX tool grant. |
+| `pptx_write` | `path`, `slides` with string `title` and string-array `paragraphs`; explicit `.pptx` destination. At most 32 slides, 1024 total paragraphs including nonempty titles, 4096 UTF-8 bytes per string, 65536 total input bytes, 32768 XML elements per slide and 1048576 encoded bytes. Requires its own PPTX tool grant. |
 | `search_text` | `pattern`; optional `path`, integer `context_lines` from 0–20, and `include`/`exclude` filename-glob arrays. Each array accepts at most 32 nonempty globs of 256 UTF-8 bytes each. `.git` and `node_modules` remain excluded. |
 | `git_diff` | Optional `cwd`, `staged` and `file` (repository-relative pathspec). For example, `file: "Sources/App.swift"` limits the diff to that file. Read `stdout_truncated`, `stderr_truncated` and `timed_out` before treating output as complete. |
+
+The PPTX tool writes plain-text slides with CRLF/CR normalized to LF. Embedded
+LF creates soft breaks; tabs, whitespace and literal `_x0041_` text remain.
+It rejects excessive XML complexity before saving, preserves existing grants
+and OS-authorized host-wide access, and promises neither visual fit nor images.
+PPTX import retains the original and extracts slide-owned text in declared order;
+blank or malformed decks remain unresolved without runnable package XML.
+New audit arguments redact slide and worksheet content arrays.
+[Contract and remaining gates](docs/NATIVE-PPTX-WRITING.md).
 
 The XLSX tool preserves literal cell text, including CR, `_xHHHH_`-like text and
 formula-like strings; it does not create formulas, types, styles or images.

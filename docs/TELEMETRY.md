@@ -1,6 +1,13 @@
 # Telemetry architecture (real-time native)
 
-Current source documentation targets `0.28.0`, build `41`.
+Current source documentation targets `0.29.0`, build `42`. `pptx_write` joins
+existing docs tool classification; no producer, timer or performance change is
+claimed. Source/native 166 each and scoped runtime consumers passed; no memory
+or performance qualification is inferred. [Contract](NATIVE-PPTX-WRITING.md).
+
+## Preceding 0.28.0 (41) XLSX qualification
+
+The preceding source documentation targets `0.28.0`, build `41`.
 The additive XLSX name joins existing tool/catalog classification; no telemetry
 performance result is claimed. Source/native 124, build/signing and scoped wire/Core/
 Qwen flows passed; [contract and remaining gates](NATIVE-XLSX-WRITING.md).

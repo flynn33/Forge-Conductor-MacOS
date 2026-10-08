@@ -1,6 +1,16 @@
 # Project repository, web access and Qwen verification
 
-Current source targets **0.28.0 (41)**, adding bounded `xlsx_write` and repairing
+Current source targets **0.29.0 (42)**. Qwen completed three normal API
+responses, actual Low 3/3, selected `pptx_write` then `fs_read` and consumed both
+actual results. Final exact SHA/11,384 bytes/one slide and native 6/6 correlated
+responses passed with normal exit/EOF, no forced cleanup. Source/native 166 each,
+App/CLI wire and reference/Core consumers also passed. This isolated candidate/API
+workflow does not qualify installed GUI, full Office/full web or all models.
+[Contract and retained evidence](NATIVE-PPTX-WRITING.md).
+
+## Preceding 0.28.0 (41) XLSX qualification
+
+The preceding source targets **0.28.0 (41)**, adding bounded `xlsx_write` and repairing
 XLSX cell-value import. Repository links and web tools remain available;
 [current XLSX gates](NATIVE-XLSX-WRITING.md) record source/native 124, build/signing,
 App/CLI 16 controls and both retained native Core cases passing. Qwen completed

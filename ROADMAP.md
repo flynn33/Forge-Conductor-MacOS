@@ -1,8 +1,26 @@
 # Forge Conductor macOS — project roadmap
 
+## Native text-slide PPTX writing and import
+
+Current target **0.29.0 (42)**. Bounded implementation and runtime gates passed;
+source/wiki delivery is the phase closeout. Broader acceptance remains open.
+
+| Milestone | Actual evidence or implementation | Remaining gate |
+| --- | --- | --- |
+| Baseline | Public native .28 Core collected both reference-library decks normally, exit 0 in 25.064 s. Each produced 39 documents and 31 exact XML-member instruction documents; populated 81,783 instruction bytes, blank 81,328, both import-ready true/unresolved 2. Originals exact/0400. | Collection succeeded; semantic feature contract failed. Queue start was not exercised. |
+| Reader/writer | Native bounded slide-text conversion and additive `pptx_write`, explicit grants and pinned publication. Source/native 166 each passed, including 35 PPTX methods and three audit methods. Writer/reader XML limits agree; conflicting encodings and duplicate expanded attributes reject. | First compile (zero methods), structural 1, parser 2 and audit 1 original receipts remain NONPASS. Full Office fidelity is outside the text-slide contract. |
+| Wire/reference/Core | App/CLI passed eight controls each; six artifacts passed exact stored-ZIP/XML/binary readback. All seven artifacts including Qwen passed python-pptx1.0.2 consumption. Same original reference decks now produce one document each: populated 64 instruction bytes/four UTF-8 pages; blank 0/unresolved 1/notready/read+reference+start denied. Originals exact/0400, raw XML 0 and wrong-project denials. | Populated queue start and existing-package reconversion were not exercised. Keynote visual review stopped at its first-run license prompt without accepting it. |
+| Qwen | Three normal API responses, actual Low 3/3; two selected/written/correlated/delivered/consumed tool results. Exact SHA/11,384 bytes/one slide; native 6/6 responses, normal worker/observer/collector/native exit+EOF, no forced cleanup. | Isolated candidate/API exchange; installed active GUI, production managed adapter, all models and full web remain open. |
+| Version/graph/build | Source/native 166 each include G3. CLI/app, ordinary Debug and strict seven-binary candidate passed on the same 458 inputs. Four Swift memberships added to existing targets; workspace, signing and deployment preserved. | Ordinary Debug 24.519 s; 166 native tests in 70.202 s, zero failures/skips/compiler warnings/QoS blocks. Release and shipment remain open. |
+| Delivery | Started from synchronized main `7ae11ba3de42386fba7772af55cde565024baa1d`. README, existing Unreleased and affected current docs record the tested scope. | Exact source/wiki revisions and readback/synchronization identities are retained externally after verification; installed/GUI and shipment remain separate. |
+
+[Contract and retained evidence](docs/NATIVE-PPTX-WRITING.md).
+
+## Preceding XLSX phase
+
 ## Native text-cell XLSX writing and import
 
-Current target **0.28.0 (41)** adds bounded `xlsx_write` and repairs XLSX import.
+Preceding target **0.28.0 (41)** adds bounded `xlsx_write` and repairs XLSX import.
 The bounded source/native, build/signing, wire/artifact, retained Core-consumer
 and Qwen API gates passed; broader product and shipment gates remain separate.
 

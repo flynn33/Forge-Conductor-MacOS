@@ -1110,7 +1110,7 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
         "search_text", "instruction_catalog", "instruction_read", "shell_exec",
         "web.fetch", "web.search", "web.render",
         "git_status", "git_diff", "git_log", "git_add", "git_commit",
-        "pdf_write", "pdf_from_file", "docx_write", "xlsx_write",
+        "pdf_write", "pdf_from_file", "docx_write", "xlsx_write", "pptx_write",
         "runtime.capabilities", "process.run", "shell.run", "bash.run", "python.run",
         "powershell.run", "job.status", "job.read_output", "job.cancel", "job.list",
         "xcode.discover", "xcode.run", "xcode.result", "xcode.debug", "xcode.simulator",
@@ -2247,7 +2247,7 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
         let package: IngestedPackage
         if values.isRegularFile == true {
             let sourceData = try readRegularFile(source)
-            if !["docx", "xlsx"].contains(source.pathExtension.lowercased()),
+            if !["docx", "xlsx", "pptx"].contains(source.pathExtension.lowercased()),
                SafeZIPArchive.isZIP(sourceData, path: source.path) {
                 package = try archivePackage(source, data: sourceData)
             } else if source.pathExtension.lowercased() == "forgepackage"
@@ -2743,6 +2743,22 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
         emptyStatus: InstructionDocumentStatus,
         emptyDetail: String
     )? {
+        if path.lowercased().hasSuffix(".pptx") {
+            do {
+                return (
+                    try NativePPTXReader.text(in: data), "native-pptx-slides-v1",
+                    "Extracted paragraph text from declared slides in presentation order; master, layout and package XML are not instruction text. The original deck remains source-linked.",
+                    .unrepresentedVisualStructural,
+                    "The presentation contained no non-whitespace slide text. Original bytes were retained for presentation review."
+                )
+            } catch is CancellationError { throw CancellationError() }
+            catch {
+                return (
+                    "", "native-pptx-slides-v1", "", .unresolvedConversion,
+                    String(error.localizedDescription.prefix(512)) + " Original presentation bytes were retained; package XML was not promoted to instructions."
+                )
+            }
+        }
         if path.lowercased().hasSuffix(".xlsx") {
             do {
                 return (

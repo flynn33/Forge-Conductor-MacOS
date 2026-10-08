@@ -1,5 +1,5 @@
 // DocsToolPack.swift
-// What: Provides native PDF, plain-text DOCX, and text-cell XLSX tools to external MCP clients.
+// What: Provides native PDF, plain-text DOCX, text-cell XLSX, and text-slide PPTX tools to external MCP clients.
 // How: It translates validated tool arguments into PDFWriter operations and returns
 // bounded, structured success or error payloads.
 // Why: Document capability is an optional module rather than a responsibility of Core routing.
@@ -9,7 +9,7 @@ import Darwin
 import AppKit
 import CryptoKit
 
-/// Documentation tools: PDF write / PDF from file / plain-text DOCX / text-cell XLSX.
+/// Documentation tools: PDF write / PDF from file / plain-text DOCX / text-cell XLSX / text-slide PPTX.
 public struct DocsToolPack: ToolPackHandling {
     private static let maximumSourceBytes = 4 * 1024 * 1024
     private let exporter: NativeDOCXExporter?
@@ -17,7 +17,7 @@ public struct DocsToolPack: ToolPackHandling {
     public init() { exporter = nil }
     init(exporter: NativeDOCXExporter) { self.exporter = exporter }
 
-    public var toolNames: [String] { ["pdf_write", "pdf_from_file", "docx_write", "xlsx_write"] }
+    public var toolNames: [String] { ["pdf_write", "pdf_from_file", "docx_write", "xlsx_write", "pptx_write"] }
 
     public func handle(
         name: String,
@@ -38,9 +38,56 @@ public struct DocsToolPack: ToolPackHandling {
             return try docxWrite(arguments, context: context, app: app, cancellation: cancellation)
         case "xlsx_write":
             return try xlsxWrite(arguments, context: context, app: app, cancellation: cancellation)
+        case "pptx_write":
+            return try pptxWrite(arguments, context: context, app: app, cancellation: cancellation)
         default:
             return nil
         }
+    }
+
+    private func pptxWrite(_ args: [String: Any], context: ToolInvocationContext?,
+                           app: ForgeApp, cancellation: ToolCallCancellation?) throws -> ToolResult {
+        guard let path = args["path"] as? String,
+              !path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              !path.utf8.contains(0) else {
+            return .failure(code: "invalid_path", message: "PPTX path must be a nonblank string without NUL bytes")
+        }
+        let url = ToolArgHelpers.resolvePath(path)
+        guard url.pathExtension.lowercased() == "pptx" else {
+            return .failure(code: "invalid_path", message: "An explicit .pptx destination is required")
+        }
+        let slides: [NativePPTXWriter.Slide]
+        let encoded: Data
+        do {
+            slides = try NativePPTXWriter.slides(from: args["slides"])
+            if let context { try app.projectContexts.validate(context, cancellation: cancellation) }
+            encoded = try NativePPTXWriter.encode(slides: slides, cancellation: cancellation)
+            try cancellation?.checkCancellation()
+            if let context { try app.projectContexts.validate(context, cancellation: cancellation) }
+        } catch is CancellationError { throw CancellationError() }
+        catch let error as ToolCallDeadlineExceeded { throw error }
+        catch let error as NativePPTXError {
+            return .failure(code: error.code, message: error.localizedDescription)
+        } catch {
+            return .failure(code: "pptx_encode_failed", message: "Native encoding or project authorization failed")
+        }
+        try cancellation?.checkCancellation()
+        do {
+            try FilesystemToolPack.writePinnedText(encoded, to: url, cancellation: cancellation)
+        } catch is CancellationError { throw CancellationError() }
+        catch let error as ToolCallDeadlineExceeded { throw error }
+        catch {
+            return .failure(code: "pptx_write_failed", message: "Destination write or durability confirmation failed; inspect the destination before retrying")
+        }
+        return .success([
+            "path": url.path, "format": "pptx", "engine": "swift-ooxml-stored-zip",
+            "bytes_written": encoded.count,
+            "sha256": SHA256.hash(data: encoded).map { String(format: "%02x", $0) }.joined(),
+            "input_text_bytes": slides.reduce(0) { $0 + $1.title.utf8.count + $1.paragraphs.reduce(0) { $0 + $1.utf8.count } },
+            "slides": slides.count,
+            "paragraphs": slides.reduce(0) { $0 + $1.paragraphs.count + ($1.title.isEmpty ? 0 : 1) },
+            "text_contract": NativePPTXWriter.textContract,
+        ])
     }
 
     private func xlsxWrite(_ args: [String: Any], context: ToolInvocationContext?,
