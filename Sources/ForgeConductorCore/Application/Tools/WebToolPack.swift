@@ -524,6 +524,108 @@ public struct WebToolPack: ToolPackHandling, Sendable {
         return result
     }
 
+    static func responseBudget(arguments: [String: Any], scope: ToolAuthorizationScope?) -> Int {
+        let requested = (try? integer(arguments, "maximum_bytes", defaultValue: 16_384,
+                                      range: 1...maximumInlineBytes)) ?? 16_384
+        return min(requested, scope?.maximumInlineOutputBytes ?? maximumInlineBytes)
+    }
+
+    /// Reduce only successful reads against the final duplicated payload, real
+    /// request ID, required notice and stdio newline. Existing failures retain
+    /// their codes and continuation guidance even if their envelope cannot fit.
+    static func finalMCPResponse(name: String, id: Any?, result: ToolResult,
+                                 additiveNotice: String?, budget: Int) -> [String: Any] {
+        func response(_ payload: [String: Any]) -> [String: Any] {
+            MCPToolResponse.object(id: id, result: .success(payload), additiveNotice: additiveNotice)
+        }
+        func fits(_ object: [String: Any]) -> Bool {
+            guard budget > 0, let bytes = try? MCPStdioTransport.encode(object) else { return false }
+            return bytes.count <= budget
+        }
+        let original = MCPToolResponse.object(id: id, result: result, additiveNotice: additiveNotice)
+        guard names.contains(name), result.ok, !result.isError, !fits(original) else { return original }
+        var payload = result.payload
+        if name == "web.search", var entries = payload["results"] as? [[String: String]] {
+            while entries.count > 1 {
+                entries.removeLast()
+                payload["results"] = entries
+                payload["count"] = entries.count
+                payload["truncated"] = true
+                let candidate = response(payload)
+                if fits(candidate) { return candidate }
+            }
+        } else if name == "web.fetch",
+                  let content = payload["content"] as? String,
+                  let offset = payload["byte_offset"] as? Int,
+                  let total = payload["total_content_bytes"] as? Int,
+                  let returned = payload["returned_content_bytes"] as? Int,
+                  offset >= 0, total >= offset, returned >= 0, returned <= total - offset {
+            let binary = payload["format"] as? String == "base64"
+            let bytes = binary ? Data(base64Encoded: content) : Data(content.utf8)
+            if let bytes, bytes.count == returned, !bytes.isEmpty {
+                func page(_ count: Int) -> [String: Any] {
+                    var page = payload
+                    let piece = bytes.prefix(count)
+                    page["content"] = binary ? Data(piece).base64EncodedString() : String(data: piece, encoding: .utf8)
+                    page["returned_content_bytes"] = count
+                    let more = count < total - offset
+                    page["has_more"] = more
+                    page["truncated"] = more
+                    page["next_byte_offset"] = more ? offset + count : NSNull()
+                    return page
+                }
+                let minimum = binary ? 1 : (content.unicodeScalars.first.map(String.init)?.utf8.count ?? 0)
+                if !fits(response(page(minimum))) {
+                    for key in ["title", "heading", "title_truncated", "heading_truncated"] {
+                        payload.removeValue(forKey: key)
+                    }
+                }
+                // EOF changes cursor/boolean sizes; test the complete available
+                // page before searching monotone positive continuation prefixes.
+                let full = response(page(returned))
+                if fits(full) { return full }
+                if fits(response(page(minimum))) {
+                    var count: Int
+                    if binary {
+                        // Full groups keep encoded prefix bytes stable. Short
+                        // one/two-byte tails are measured separately.
+                        var lower = 0, upper = min(returned, budget) / 3
+                        while lower < upper {
+                            let candidate = lower + (upper - lower + 1) / 2
+                            if fits(response(page(candidate * 3))) { lower = candidate }
+                            else { upper = candidate - 1 }
+                        }
+                        count = lower * 3
+                        for candidate in (count + 1)...(count + 2) where candidate <= returned {
+                            if fits(response(page(candidate))) { count = candidate }
+                        }
+                    } else {
+                        var lower = minimum, upper = min(returned, budget)
+                        while lower < upper {
+                            let candidate = lower + (upper - lower + 1) / 2
+                            let size = prefixUTF8(content, bytes: candidate).utf8.count
+                            if fits(response(page(size))) { lower = candidate }
+                            else { upper = candidate - 1 }
+                        }
+                        count = prefixUTF8(content, bytes: lower).utf8.count
+                    }
+                    let candidate = response(page(count))
+                    if count > 0, fits(candidate) { return candidate }
+                }
+            }
+        }
+        // A budget rejection cannot advertise content or an advanced cursor.
+        // Retain unrelated router/authorization fields, including handoff data.
+        for key in ["content", "results", "count", "returned_content_bytes", "has_more", "next_byte_offset",
+                    "truncated", "title", "heading", "title_truncated", "heading_truncated"] {
+            payload.removeValue(forKey: key)
+        }
+        payload.merge(ToolResult.failure(code: "web_output_budget_too_small",
+            message: "Inline response budget cannot fit the response metadata and content").payload) { _, new in new }
+        return MCPToolResponse.object(id: id, result: ToolResult(ok: false, payload: payload, isError: true),
+                                      additiveNotice: additiveNotice)
+    }
+
     private static func fits(_ result: ToolResult, budget: Int) -> Bool {
         guard budget > 0, let data = try? MCPToolResponse.data(id: String(repeating: "x", count: 128), result: result) else { return false }
         return data.count <= budget

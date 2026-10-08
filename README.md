@@ -1,6 +1,19 @@
 # Forge Conductor for macOS
 
-Current source is **0.26.0 (36)**. Ordinary project-bound MCP submissions now
+Current source targets **0.26.1 (37)**, a web response-budget hotfix.
+Successful `web.fetch` and `web.search` stdio frames include the actual request
+ID, both payload copies, required policy notice and terminating line feed in
+`maximum_bytes`, limited by the same validated invocation scope. Smaller fetch
+pages preserve the whole-content SHA and returned cursor; search keeps whole
+ordered entries. Existing errors and handoff guidance remain available.
+The signed .26 baseline exceeded a 2,048-byte allowance with escaped IDs
+(2,477 text / 2,481 base64 bytes). The final 139 distinct source methods and the
+same 139 compiled native methods passed without failures/skips on the same
+450 inputs. Signed Debug repeated all four wire cases within 2,048; ordinary
+build and strict signing passed. Native runtime diagnostics remain recorded;
+Qwen completion remains OPEN/NONPASS. [Evidence and limits](docs/WEB-RESPONSE-BUDGET.md).
+
+The preceding source checkpoint is **0.26.0 (36)**. Ordinary project-bound MCP submissions now
 carry native job references into the handoff, with Source admission before CP
 COMMIT and current-authorized resume status before epoch reset. The installed
 0.18 Qwen failure and its manual exact-ID recovery are retained; the original
@@ -607,8 +620,8 @@ continuity. The user does not start project work through a Forge Managed Run.
 
 | | |
 |---|---|
-| **Version** | **0.26.0** |
-| **Build** | **36** |
+| **Version** | **0.26.1** |
+| **Build** | **37** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |
@@ -726,9 +739,9 @@ receipt does not qualify that path. The full scope and remaining
 distribution limits are in the [qualification record](docs/QUALIFICATION-STATUS.md).
 
 The current root version authorities, compiled protocol constants and Xcode
-build settings use `0.26.0 (36)`; the current document markers must pass
-the version-alignment regression, which passed its actual source selection. Historical
-qualification receipts retain their tested identities.
+build settings use `0.26.1 (37)`; the actual version method passed within the
+139 source and same 139 native cases. Historical qualification receipts retain
+their tested identities.
 The [GitHub wiki](https://github.com/flynn33/Forge-Conductor-MacOS/wiki)
 publication/readback/synchronization refs are retained externally. Installed-app
 references are dated qualification snapshots; the later publication readback

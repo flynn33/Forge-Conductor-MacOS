@@ -1,4 +1,6 @@
-# Context and agent continuity (v0.26.0)
+# Context and agent continuity (v0.26.1)
+
+<a id="context-and-agent-continuity-v0260"></a>
 
 <a id="context-and-agent-continuity-v0250"></a>
 
@@ -10,7 +12,7 @@
 
 <a id="context-and-agent-continuity-v0180"></a>
 
-Current source documentation targets 0.26.0 (36). Ordinary MCP job submissions
+Current source documentation targets 0.26.1 (37). Ordinary MCP job submissions
 carry native references alongside authored task content, with a 32-attempt / 16 KiB
 extension admitted to Source before CP COMMIT. Both keyed paths revalidate the
 full native binding and consume a one-use epoch admission. Resume status is a

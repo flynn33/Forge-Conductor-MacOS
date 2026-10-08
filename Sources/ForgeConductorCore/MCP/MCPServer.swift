@@ -400,13 +400,19 @@ public final class MCPServer: @unchecked Sendable {
                     connected: connected, cancellation: requestCancellation
                 ) { return toolCallResponse(id: id, result: result, rendererBudget: rendererBudget, listingBudget: listingBudget,
                     cancellation: requestCancellation) }
-                let result = try app.tools.call(
-                    name: name,
-                    arguments: arguments,
-                    clientID: clientID,
-                    cancellation: requestCancellation
-                )
+                var webBudget: Int?
+                let result: ToolResult
+                if WebToolPack.names.contains(name) {
+                    result = try app.tools.callWithResolvedContext(name: name, arguments: arguments,
+                        clientID: clientID, cancellation: requestCancellation) { context in
+                        webBudget = WebToolPack.responseBudget(arguments: arguments, scope: context.authorizationScope)
+                    }
+                } else {
+                    result = try app.tools.call(name: name, arguments: arguments, clientID: clientID,
+                                                cancellation: requestCancellation)
+                }
                 return toolCallResponse(id: id, result: result, rendererBudget: rendererBudget, listingBudget: listingBudget,
+                    webToolName: name, webBudget: webBudget,
                     cancellation: requestCancellation)
             case "resources/list":
                 return ok(id: id, result: ["resources": [] as [Any]])
@@ -724,6 +730,7 @@ public final class MCPServer: @unchecked Sendable {
     }
 
     private func toolCallResponse(id: Any?, result: ToolResult, rendererBudget: Int? = nil, listingBudget: Int? = nil,
+                                  webToolName: String? = nil, webBudget: Int? = nil,
                                   cancellation: ToolCallCancellation) -> [String: Any] {
         func response(notice: String? = nil) -> [String: Any] {
             if let rendererBudget {
@@ -733,6 +740,10 @@ public final class MCPServer: @unchecked Sendable {
             if let listingBudget {
                 return FilesystemListingPage.finalMCPResponse(id: id, result: result,
                     additiveNotice: notice, budget: listingBudget)
+            }
+            if let webToolName, let webBudget {
+                return WebToolPack.finalMCPResponse(name: webToolName, id: id, result: result,
+                    additiveNotice: notice, budget: webBudget)
             }
             return MCPToolResponse.object(id: id, result: result, additiveNotice: notice)
         }

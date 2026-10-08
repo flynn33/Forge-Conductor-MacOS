@@ -1,6 +1,18 @@
 # Forge Conductor architecture
 
-Version: `0.26.0`; build: `36`.
+Version: `0.26.1`; build: `37`.
+
+For `web.fetch`/`web.search`, an internal non-escaping router callback captures
+the exact context after deadline configuration and binding validation, before
+dispatch. MCP final sizing uses that scope's allowance and the actual ID, policy
+notice, duplicated payload and terminating LF. Only successful content/results
+are reduced; fetch whole-content digests and byte cursors, search order and
+existing failure/control fields remain. No grant, network, HTTP-task or public
+API expansion is added. The 139 source and same 139 compiled native cases,
+ordinary Debug build/strict signing and four native wire cases passed. Native
+runtime diagnostics remain; Qwen completion is OPEN/NONPASS. [Contract](WEB-RESPONSE-BUDGET.md).
+
+The following ordinary-runtime evidence retains its preceding .26/36 maps.
 
 Ordinary MCP runtime submissions now persist the selected job UUID through a
 separate Source callback inside the CP submission transaction, before COMMIT.

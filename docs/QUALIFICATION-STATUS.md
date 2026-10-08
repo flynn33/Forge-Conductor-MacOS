@@ -1,6 +1,24 @@
 # Version and qualification status
 
-Current source **0.26.0, build 36** implements ordinary runtime job reference
+Current source target **0.26.1, build 37** repairs web response-budget accounting.
+The signed .26 baseline measured escaped-ID text/base64 frames of 2,477/2,481
+bytes against 2,048, with valid page prefixes/SHA/cursors and normal zero exit/
+full EOF. The final 139 distinct source methods (88 owning + 51 real shared
+parity) and the same 139 compiled native methods passed without failures/skips
+on the same 450 inputs. Unmatched ProjectContextTests/WebRenderToolTests filter
+names get no credit; actual ProjectContextIntegrationTests/WebRenderProtocolTests
+were exercised. Ordinary Debug build/strict signing and all four native wire
+cases passed: escaped first pages measured 2,047 text / 2,041 base64, ordinary
+sizes unchanged, helper normal0/full EOF. The native run retains 116 SQLite
+vnode-unlink and 116 invalidated-fd diagnostics, 20 unconnected-network lines
+and three QoS blocks with two source warning lines. Their separate repair is
+open; this is not warning-free runtime qualification or an installed-failure
+claim. Model completion remains OPEN/NONPASS. The ordered content-block R4
+repeat verified two actual pages, but its final API worker hit the 90 s deadline
+without a consumed final report. Original/R2/R3/R4 NONPASS receipts are retained.
+[Contract, exact receipts and scope](WEB-RESPONSE-BUDGET.md).
+
+The preceding source **0.26.0, build 36** implements ordinary runtime job reference
 continuation. Earlier affected source checks passed **309 distinct methods**:
 154 Continuity + 153 Runtime in the owning-area command, then the exact Manager
 parity and version method in a separate command. Both incremental SwiftPM
@@ -1563,7 +1581,7 @@ Dashboard geometry, minimum/normal containment of every primary view, and
 populated policy evaluation rows. Live completion of the reported owner run,
 universal policy enforcement, and distribution qualification remain open.
 
-Current source identity: **0.26.0, build 36**, supporting **macOS 26+**. The earlier
+Current source target: **0.26.1, build 37**, supporting **macOS 26+**. The earlier
 0.16.3 Developer ID app and archive are recorded in the historical build-24 section;
 that workflow staged the CLI under `~/.forge-conductor` and manually copied the
 app to `/Applications`. It did not exercise a `.pkg` installation, notarization,
@@ -1576,9 +1594,11 @@ the detailed, source-bound receipts are in the
 ## Version and build agreement
 
 The Swift runtime, CLI, Xcode Debug and Release configurations, and current
-documentation target version **0.26.0, build 36**. The root [`VERSION`](../VERSION)
+documentation target version **0.26.1, build 37**. The root [`VERSION`](../VERSION)
 and [`BUILD_NUMBER`](../BUILD_NUMBER) files are canonical; compiled constants
-and Xcode build settings must match them. The actual .26 source version method
+and Xcode build settings must match them. The actual hotfix version method
+passed within the final 139 source and same 139 compiled native cases.
+The following receipts retain their preceding .26/36 maps. The actual .26 source version method
 and exact Manager parity passed separately after the earlier owning-area 307
 methods passed. Both incremental products and ordinary native Debug build passed;
 native 309 and focused native 4 passed on their distinct fixture maps, with

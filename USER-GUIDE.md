@@ -1,6 +1,13 @@
 # Forge Conductor user guide
 
-Current source targets 0.26.0 (36). First CLI/app compiles and one repaired
+Current source targets **0.26.1 (37)**. The web response-budget hotfix preserves
+fetch/search tools and page continuation while accounting for the complete
+stdio frame. The 139 affected source cases and same 139 compiled native cases
+passed; all four signed native wire cases fit. Native diagnostics remain recorded,
+and Qwen completion remains OPEN/NONPASS. Installation is separate.
+[Contract and scope](docs/WEB-RESPONSE-BUDGET.md).
+
+The preceding source checkpoint targets 0.26.0 (36). First CLI/app compiles and one repaired
 regression passed on their first snapshots; 24 later new source tests passed.
 The first broader NONPASS remains historical. The later checkpoint guard
 correction and two genuine unavailable-reader fixtures passed three source
@@ -218,7 +225,7 @@ observations retain their recorded scope. Exact owner publication, remote
 readback and synchronization references are retained externally. See the
 [phase record](docs/GRAPHITE-WORKBENCH.md) for evidence and capture limits.
 
-Version **0.26.0**, build **36** (current source; qualification is pending and separate from installation).
+Version **0.26.1**, build **37** (current source; candidate qualification is separate from installation).
 
 This guide describes the current LM Studio-driven workflow. The user works in a
 normal LM Studio chat; Forge Conductor supplies project context, tools, policy
@@ -501,7 +508,14 @@ results do not qualify the installed active chat, full Markdown or Office export
 
 Web tools accept integer `timeout_sec` from 1–30 (default 20), and
 `maximum_bytes` from 1–65,536 (default 16,384) for the encoded inline response;
-the project budget can reduce that allowance. Successful `web.render` stdio
+the project budget can reduce that allowance. Successful `web.fetch` and
+`web.search` stdio frames count the actual ID, duplicated payload, required notice
+and LF. A reduced fetch page retains the whole-content SHA and advances only by
+returned UTF-8 or decoded base64 bytes; always use its returned cursor. Search
+removes trailing whole entries rather than inventing an empty result. Existing
+errors keep their codes and handoff fields; an impossible error envelope may
+exceed the allowance. [Contract and qualification](docs/WEB-RESPONSE-BUDGET.md).
+Successful `web.render` stdio
 responses include the actual request ID, required policy notice and terminating
 line feed in that allowance. The post-publication LF boundary correction has
 [source and new Debug/Release native coverage](docs/FILESYSTEM-LIST-PAGING.md#renderer-line-feed-boundary-after-023-publication);

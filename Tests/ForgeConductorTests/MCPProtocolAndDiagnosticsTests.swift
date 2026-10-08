@@ -464,7 +464,9 @@ final class MCPProtocolAndDiagnosticsTests: XCTestCase {
         let start = Date()
         let arguments: [String: Any] = toolName == "fs_list"
             ? ["path": project.path, "limit": 1]
-            : ["url": "https://example.com/"]
+            : toolName == "web.search"
+                ? ["query": "deadline-before-dispatch"]
+                : ["url": "https://example.com/"]
         let response = try XCTUnwrap(server.handle([
             "jsonrpc": "2.0", "id": "contended-render", "method": "tools/call",
             "params": ["name": toolName, "arguments": arguments]
@@ -2220,6 +2222,280 @@ private enum MCPWireTestError: Error, LocalizedError {
         switch self {
         case .fixture(let message): message
         case .timeout(let operation): "Timed out waiting for \(operation)"
+        }
+    }
+}
+
+extension MCPProtocolAndDiagnosticsTests {
+    func testWebFetchWireBudgetIncludesEscapedIDLineFeedAndScopedNotice() async throws {
+        let proof = try await Task.detached(priority: .utility) {
+            try WebEnvelopeWireFixture.collect()
+        }.value
+        let first = try JSONSupport.object(from: Data(proof.frames[0].dropLast()))
+        let second = try JSONSupport.object(from: Data(proof.frames[1].dropLast()))
+        XCTAssertEqual(first["id"] as? String, proof.escapedID)
+        XCTAssertEqual(second["id"] as? Int, 92)
+        var expectedOffset = 0
+        for frame in proof.frames {
+            XCTAssertEqual(frame.last, 10)
+            XCTAssertEqual(frame.filter { $0 == 10 }.count, 1,
+                "Escaped newlines must not become extra wire frames")
+            XCTAssertLessThanOrEqual(frame.count, proof.projectBudget,
+                "Measure the actual received ID, both payload copies, required notice and LF")
+            let response = try JSONSupport.object(from: Data(frame.dropLast()))
+            XCTAssertNil(response["error"])
+            let result = try XCTUnwrap(response["result"] as? [String: Any])
+            XCTAssertEqual(result["isError"] as? Bool, false)
+            let payload = try XCTUnwrap(result["structuredContent"] as? [String: Any])
+            let blocks = try XCTUnwrap(result["content"] as? [[String: Any]])
+            XCTAssertEqual(blocks.count, 2)
+            XCTAssertEqual(blocks[1]["text"] as? String, proof.notice)
+            let canonical = try XCTUnwrap(blocks[0]["text"] as? String)
+            XCTAssertEqual(try JSONSupport.canonicalJSON(JSONSupport.object(from: Data(canonical.utf8))),
+                try JSONSupport.canonicalJSON(payload))
+            XCTAssertEqual(payload["project_id"] as? String, proof.projectID)
+            XCTAssertEqual((payload["project_generation"] as? NSNumber)?.uint64Value, proof.generation)
+            XCTAssertEqual(payload["format"] as? String, "source")
+            XCTAssertEqual(payload["content_sha256"] as? String, JSONSupport.sha256Hex(proof.source))
+            XCTAssertEqual(payload["total_content_bytes"] as? Int, proof.source.count)
+            XCTAssertEqual(payload["byte_offset"] as? Int, expectedOffset)
+            let content = try XCTUnwrap(payload["content"] as? String)
+            XCTAssertFalse(content.isEmpty)
+            XCTAssertTrue(Data(proof.source.dropFirst(expectedOffset)).starts(with: Data(content.utf8)))
+            XCTAssertEqual(payload["returned_content_bytes"] as? Int, content.utf8.count)
+            expectedOffset += content.utf8.count
+            XCTAssertEqual(payload["has_more"] as? Bool, expectedOffset < proof.source.count)
+            XCTAssertEqual(payload["truncated"] as? Bool, expectedOffset < proof.source.count)
+            if expectedOffset < proof.source.count {
+                XCTAssertEqual(payload["next_byte_offset"] as? Int, expectedOffset)
+            } else {
+                XCTAssertTrue(payload["next_byte_offset"] is NSNull)
+            }
+        }
+    }
+
+    func testWebFetchContextLookupHonorsRequestDeadlineDuringProjectContention() async throws {
+        try await checkRendererDeadlineDuringProjectContention(timeoutSeconds: 0.1, toolName: "web.fetch")
+    }
+
+    func testAlreadyExpiredWebFetchHonorsRequestDeadlineDuringProjectContention() async throws {
+        try await checkRendererDeadlineDuringProjectContention(timeoutSeconds: 0, toolName: "web.fetch")
+    }
+
+    func testWebSearchContextLookupHonorsRequestDeadlineDuringProjectContention() async throws {
+        try await checkRendererDeadlineDuringProjectContention(timeoutSeconds: 0.1, toolName: "web.search")
+    }
+
+    func testAlreadyExpiredWebSearchHonorsRequestDeadlineDuringProjectContention() async throws {
+        try await checkRendererDeadlineDuringProjectContention(timeoutSeconds: 0, toolName: "web.search")
+    }
+
+    func testWebReadsWithoutProjectKeepContextDenialAndDeniedAudit() async throws {
+        let proofs = try await Task.detached(priority: .utility) {
+            try WebEnvelopeWireFixture.missingContext()
+        }.value
+        XCTAssertEqual(proofs.count, 2)
+        for proof in proofs {
+            let response = try JSONSupport.object(from: Data(proof.frame.dropLast()))
+            XCTAssertEqual(response["id"] as? String, proof.tool)
+            XCTAssertNil(response["error"])
+            let result = try XCTUnwrap(response["result"] as? [String: Any])
+            XCTAssertEqual(result["isError"] as? Bool, true)
+            let payload = try XCTUnwrap(result["structuredContent"] as? [String: Any])
+            XCTAssertEqual(payload["code"] as? String, "project_context_required")
+            XCTAssertEqual(proof.audit.tool, proof.tool)
+            XCTAssertEqual(proof.audit.status, "denied")
+            XCTAssertEqual(proof.audit.clientID, proof.clientID)
+        }
+    }
+}
+
+private struct WebEnvelopeWireFixture {
+    struct Proof: Sendable {
+        let frames: [Data]
+        let source: Data
+        let escapedID: String
+        let notice: String
+        let projectID: String
+        let generation: UInt64
+        let projectBudget: Int
+    }
+    struct DenialProof: Sendable {
+        let frame: Data
+        let tool: String
+        let clientID: String
+        let audit: AuditEvent
+    }
+    enum FixtureError: Error { case invalid(String) }
+
+    static func collect() throws -> Proof {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("forge-web-envelope-\(UUID())")
+        let project = root.appendingPathComponent("project", isDirectory: true)
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+        let app = try ForgeApp.bootstrap(home: root.appendingPathComponent("home"))
+        defer { _ = app.shutdown(); try? FileManager.default.removeItem(at: root) }
+        _ = try app.config.update(["allowed_roots": [root.path]], save: false)
+        let bootstrap = ClientID("web-envelope-bootstrap")
+        let initialized = try app.tools.call(name: "project_memory.initialize",
+            arguments: ["project_path": project.path], clientID: bootstrap)
+        guard initialized.ok else { throw FixtureError.invalid("project initialize failed") }
+        let registered = try app.projectContexts.invocationContext(for: bootstrap)
+        let projectBudget = 8_192
+        let client = ClientID("web-envelope-scoped")
+        let scope = ToolAuthorizationScope(canonicalRoots: registered.authorizationScope.canonicalRoots,
+            allowedTools: ["web.fetch"], networkAllowed: true, maximumInlineOutputBytes: projectBudget)
+        _ = try app.projectContexts.bind(owner: .init(kind: .mcpClient, id: client.rawValue),
+            projectID: registered.projectID, generation: registered.projectGeneration, authorizationScope: scope)
+        let context = try app.projectContexts.invocationContext(for: client)
+        guard context.authorizationScope.maximumInlineOutputBytes == projectBudget else {
+            throw FixtureError.invalid("project budget did not bind")
+        }
+        let source = Data(("<html><head><title>Owned envelope fixture</title></head><body>"
+            + String(repeating: "owned😀\"\\\n", count: 2_048) + "</body></html>").utf8)
+        try FileManager.default.createDirectory(at: app.telemetry.staticDir, withIntermediateDirectories: true)
+        try source.write(to: app.telemetry.staticDir.appendingPathComponent("index.html"))
+        let http = DashboardServer(app: app, host: "127.0.0.1", port: try freeLoopbackPort())
+        try http.start()
+        defer { http.stop() }
+        guard let rule = RavenForgeDevelopmentPolicyAdapter().rules().first else {
+            throw FixtureError.invalid("policy rule missing")
+        }
+        let notice = CodingAgentPolicyNotice(violationID: PolicyViolationID(), ruleReference: rule.source,
+            summary: "Required project policy fixture 😀 \"quoted\" \\ newline\n",
+            suggestedCorrection: "Preserve this separate additive notice.", confidence: 0.95)
+        guard let text = StjornarvaldPolicyNoticeFormatter.interactivePresentation(
+            notices: [notice], maximumBytes: StjornarvaldPolicyNoticeFormatter.maximumPresentationBytes) else {
+            throw FixtureError.invalid("policy presentation missing")
+        }
+        let provider = WebEnvelopeScopedNotice(projectID: context.projectID.description,
+            generation: Int(context.projectGeneration.rawValue), clientID: client.rawValue, notice: notice, text: text)
+        let mcp = MCPServer(app: app, clientID: client, role: .primary,
+            maximumConcurrentRequests: 1, shutdownWaitSeconds: 5,
+            requestTimeoutSeconds: 5, policyNoticeProvider: provider)
+        let input = Pipe(), output = Pipe()
+        let inputHandle = input.fileHandleForReading, outputHandle = output.fileHandleForWriting
+        let finished = DispatchSemaphore(value: 0), errors = MCPWireErrorBox()
+        var joined = false
+        defer {
+            try? input.fileHandleForWriting.close()
+            if !joined { _ = finished.wait(timeout: .now() + 10) }
+            try? input.fileHandleForReading.close()
+            try? output.fileHandleForWriting.close()
+            try? output.fileHandleForReading.close()
+        }
+        DispatchQueue(label: "forge.test.web-envelope", qos: .utility).async {
+            do { try mcp.run(input: inputHandle, output: outputHandle) }
+            catch { errors.store(error) }
+            finished.signal()
+        }
+        let reader = MCPWireResponseReader(handle: output.fileHandleForReading)
+        try input.fileHandleForWriting.write(contentsOf: MCPStdioTransport.encode([
+            "jsonrpc": "2.0", "id": 90, "method": "initialize",
+            "params": ["protocolVersion": MCPServer.supportedProtocolVersions[0]]]))
+        _ = try reader.read(timeout: 3)
+        let escapedID = String(repeating: "id😀\"\\\n", count: 140)
+        let url = http.baseURL.appendingPathComponent("index.html").absoluteString
+        func send(id: Any, offset: Int) throws {
+            var arguments: [String: Any] = ["url": url, "format": "source", "maximum_bytes": 16_384,
+                "byte_offset": offset, "deadline_ms": 5_000, "timeout_sec": 3]
+            if offset > 0 { arguments["if_content_sha256"] = JSONSupport.sha256Hex(source) }
+            try input.fileHandleForWriting.write(contentsOf: MCPStdioTransport.encode([
+                "jsonrpc": "2.0", "id": id, "method": "tools/call",
+                "params": ["name": "web.fetch", "arguments": arguments]]))
+        }
+        try send(id: escapedID, offset: 0)
+        let first = try reader.readFrameForWebEnvelope(timeout: 5)
+        let response = try JSONSupport.object(from: Data(first.dropLast()))
+        guard let result = response["result"] as? [String: Any],
+              let payload = result["structuredContent"] as? [String: Any],
+              let offset = payload["next_byte_offset"] as? Int, offset > 0 else {
+            throw FixtureError.invalid("first page has no real continuation")
+        }
+        try send(id: 92, offset: offset)
+        let second = try reader.readFrameForWebEnvelope(timeout: 5)
+        try input.fileHandleForWriting.close()
+        joined = finished.wait(timeout: .now() + 10) == .success
+        guard joined, errors.take() == nil else { throw FixtureError.invalid("MCP serve did not finish normally") }
+        guard !(try reader.hasMessage(timeout: 0.1)) else { throw FixtureError.invalid("unexpected response") }
+        return Proof(frames: [first, second], source: source, escapedID: escapedID, notice: text,
+            projectID: context.projectID.description, generation: context.projectGeneration.rawValue, projectBudget: projectBudget)
+    }
+
+    static func missingContext() throws -> [DenialProof] {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("forge-web-no-context-\(UUID())")
+        let app = try ForgeApp.bootstrap(home: root)
+        defer { _ = app.shutdown(); try? FileManager.default.removeItem(at: root) }
+        let client = ClientID("unbound-web-envelope")
+        let mcp = MCPServer(app: app, clientID: client, role: .primary,
+            policyNoticeProvider: NoInteractivePolicyNoticeProvider())
+        var proofs: [DenialProof] = []
+        for tool in ["web.fetch", "web.search"] {
+            let arguments = tool == "web.fetch" ? ["url": "http://127.0.0.1:1/never-requested"] : ["query": "never requested"]
+            guard let result = mcp.handle(["jsonrpc": "2.0", "id": tool, "method": "tools/call",
+                "params": ["name": tool, "arguments": arguments]]) else { throw FixtureError.invalid("no denial response") }
+            guard app.audit.flushAttempts(timeout: 2),
+                  let audit = try app.audit.recent(limit: 20).first(where: { $0.clientID == client.rawValue && $0.tool == tool }) else {
+                throw FixtureError.invalid("denied audit missing")
+            }
+            proofs.append(DenialProof(frame: try MCPStdioTransport.encode(result), tool: tool,
+                clientID: client.rawValue, audit: audit))
+        }
+        return proofs
+    }
+
+    private static func freeLoopbackPort() throws -> UInt16 {
+        let fd = Darwin.socket(AF_INET, SOCK_STREAM, 0)
+        guard fd >= 0 else { throw FixtureError.invalid("socket failed") }
+        defer { Darwin.close(fd) }
+        var address = sockaddr_in()
+        address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+        address.sin_family = sa_family_t(AF_INET)
+        address.sin_addr = in_addr(s_addr: inet_addr("127.0.0.1"))
+        let status = withUnsafePointer(to: &address) { p in
+            p.withMemoryRebound(to: sockaddr.self, capacity: 1) { Darwin.bind(fd, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) }
+        }
+        guard status == 0 else { throw FixtureError.invalid("loopback bind failed") }
+        var length = socklen_t(MemoryLayout<sockaddr_in>.size)
+        let named = withUnsafeMutablePointer(to: &address) { p in
+            p.withMemoryRebound(to: sockaddr.self, capacity: 1) { Darwin.getsockname(fd, $0, &length) }
+        }
+        guard named == 0 else { throw FixtureError.invalid("loopback port lookup failed") }
+        return UInt16(bigEndian: address.sin_port)
+    }
+}
+
+private struct WebEnvelopeScopedNotice: InteractivePolicyNoticeProviding {
+    let projectID: String
+    let generation: Int
+    let clientID: String
+    let notice: CodingAgentPolicyNotice
+    let text: String
+
+    func presentation(deliveryID: String, projectID: String?, projectGeneration: Int?, clientID: String,
+                      maximumCount: Int, maximumBytes: Int) -> PolicyNoticePresentation? {
+        guard projectID == self.projectID, projectGeneration == generation, clientID == self.clientID,
+              maximumCount >= 1, text.utf8.count <= maximumBytes else { return nil }
+        return PolicyNoticePresentation(id: deliveryID, targetKind: .mcpClient, targetIdentity: clientID,
+            notices: [notice], text: text, digestSHA256: JSONSupport.sha256Hex(text))
+    }
+    func didPresent(_ presentation: PolicyNoticePresentation) {}
+}
+
+private extension MCPWireResponseReader {
+    func readFrameForWebEnvelope(timeout: TimeInterval) throws -> Data {
+        let deadline = Date().addingTimeInterval(timeout)
+        while true {
+            if let newline = buffer.firstIndex(of: 10) {
+                let frame = Data(buffer[...newline])
+                buffer.removeSubrange(...newline)
+                return frame
+            }
+            let remaining = deadline.timeIntervalSinceNow
+            guard remaining > 0, try waitForData(timeout: remaining) else { throw MCPWireTestError.timeout("web frame") }
+            let chunk = try readAvailableData()
+            guard !chunk.isEmpty else { throw MCPWireTestError.fixture("web frame stream closed") }
+            guard buffer.count <= 131_072 - chunk.count else { throw MCPWireTestError.fixture("web frame capture exceeded 131072") }
+            buffer.append(chunk)
         }
     }
 }

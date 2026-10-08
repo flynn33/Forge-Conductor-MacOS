@@ -11,7 +11,16 @@ readbacks and ordinary observations retain their explicit limits; no
 installation, notarization, App Store upload or distribution was performed.
 Exact owner publication/readback/synchronization refs are retained externally.
 
-Current identity is **0.26.0 (36)**. Ordinary runtime job continuation advances
+Current identity is **0.26.1 (37)**. The patch component advances because
+the web wire-budget repair corrects existing fetch/search behavior without a
+new tool, argument or capability. The build number advances to 37. The version
+method passed within 139 distinct source and the same 139 compiled native cases;
+ordinary Debug build/strict signing and four signed wire cases passed. Model
+completion remains OPEN/NONPASS and native diagnostics remain; no storage/schema
+migration is added.
+[Contract and evidence scope](WEB-RESPONSE-BUDGET.md).
+
+The preceding identity is **0.26.0 (36)**. Ordinary runtime job continuation advances
 the feature-release component: native admission references and exact-packet resume
 status are additive, with no schema/journal migration. Existing names, grants,
 output semantics and public managed/provider paths remain required. Earlier
@@ -118,7 +127,14 @@ focused version test, and CI reject drift between them.
 
 ## Current identity
 
-The current product version is `0.26.0`, build `36`. `VERSION`, `BUILD_NUMBER`,
+The current product version target is `0.26.1`, build `37`. All root authorities,
+compiled constants, twelve marketing-version and sixteen build-number settings
+agree; actual source/native version assertions and canonical graph review passed.
+Final model completion remains OPEN/NONPASS; runtime diagnostics retain their scope.
+
+### Preceding 0.26 runtime version agreement
+
+The preceding product version is `0.26.0`, build `36`. `VERSION`, `BUILD_NUMBER`,
 compiled protocol constants, all twelve Xcode marketing-version settings,
 all sixteen build-number settings and current document markers must agree.
 The actual .26 source version regression passed; ordinary native Debug build

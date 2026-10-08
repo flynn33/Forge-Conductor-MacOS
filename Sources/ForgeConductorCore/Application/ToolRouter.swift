@@ -76,6 +76,17 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
         clientID: ClientID,
         cancellation: ToolCallCancellation?
     ) throws -> ToolResult {
+        try callWithResolvedContext(name: name, arguments: arguments, clientID: clientID,
+                                    cancellation: cancellation, onContext: { _ in })
+    }
+
+    func callWithResolvedContext(
+        name: String,
+        arguments: [String: Any],
+        clientID: ClientID,
+        cancellation: ToolCallCancellation?,
+        onContext: (ToolInvocationContext) -> Void
+    ) throws -> ToolResult {
         if let result = try ContinuityControlToolPack.sharedConnectionResult(
             name: name, arguments: arguments, app: app, cancellation: cancellation
         ) { return result }
@@ -161,6 +172,7 @@ public final class ToolRouter: ToolExecuting, @unchecked Sendable {
                 cancellation: requestControl
             )
         }
+        if let context { onContext(context) }
         return try callInternal(
             name: name,
             arguments: arguments,

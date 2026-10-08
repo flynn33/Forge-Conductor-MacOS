@@ -1,6 +1,13 @@
 # Documentation guide
 
-Current source is **0.26.0 (36)**. [Ordinary runtime continuation](ORDINARY-RUNTIME-CONTINUATION.md)
+Current source targets **0.26.1 (37)**. [Web response budgets](WEB-RESPONSE-BUDGET.md)
+records the signed escaped-ID failure, complete stdio sizing and preserved
+fetch/search continuation. The final 139 distinct source cases and same 139
+compiled native cases, ordinary Debug build/strict signing and four signed wire
+cases passed. Native diagnostics remain recorded; model completion is
+OPEN/NONPASS. Preceding qualification records keep their original identities.
+
+The preceding source checkpoint is **0.26.0 (36)**. [Ordinary runtime continuation](ORDINARY-RUNTIME-CONTINUATION.md)
 records native job UUID admission before CP COMMIT, exact-packet resume status,
 one-use epoch/full-grant fences and unresolved/no-replay handling. The installed
 .18 failure/manual recovery and original one-test/one-failure baseline remain
@@ -115,6 +122,7 @@ qualification is not promoted by this UI phase.
 | [Provider integrations](PROVIDER-INTEGRATIONS.md) | Connect and check LM Studio, Claude, or Codex; inspect, deactivate, or remove Forge-owned integrations; understand the deferred non-selectable Grok boundary |
 | [LM Studio connection](LM-STUDIO-CONNECTION.md) | Connect LM Studio; deploy, inspect, and repair MCP roles |
 | [Filesystem list paging](FILESYSTEM-LIST-PAGING.md) | Opt-in directory continuation, metadata/authorization fences, LF-inclusive frame budgets and current qualification status |
+| [Web response budgets](WEB-RESPONSE-BUDGET.md) | Fetch/search stdio ID, notice and LF sizing, preserved continuation and qualification scope |
 | [Native web rendering](NATIVE-WEB-RENDERING.md) | JavaScript snapshots, fixed native child ownership, actual frame budgets and qualification limits |
 | [Binary web and Qwen file workflows](BINARY-WEB-AND-QWEN-FILES.md) | Original HTTP bytes, version alignment, native/model examples and remaining format/browser gates |
 | [Project repository, web access and Qwen verification](PROJECT-WEB-QWEN.md) | GitHub project links, web/file tool additions, actual Qwen findings and current verification boundaries |

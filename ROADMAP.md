@@ -1,8 +1,24 @@
 # Forge Conductor macOS — project roadmap
 
+## Web response-budget hotfix
+
+Current identity **0.26.1 (37)** corrects an existing output contract;
+it adds no tool, argument or capability. The delivered .26 source is
+`4a9441ba1c2cc8b66d208bfd9d8d0d3ec9c968b6`; its receipts remain historical.
+
+| Milestone | Actual evidence | Remaining gate |
+| --- | --- | --- |
+| Signed wire baseline | Ordinary-ID pages fit 2,048 bytes; escaped-ID first text/base64 frames measured 2,477/2,481 bytes including LF. Exact prefixes, whole SHA and cursors were valid. One parent exited normally at zero with both EOF; eight owned GETs and every source/candidate/protected guard were unchanged. | Original receipt remains NONPASS; it exercised zero policy notices and only two-page prefixes. |
+| Final response sizing | The 88 owning-area methods plus 51 real shared-parity methods passed: 139 distinct source cases. The same 139 compiled native methods passed without failures/skips on identical 450 inputs. Internal non-escaping context capture couples budget to dispatch; whole digests/cursors, search order and error/handoff fields are preserved. | Native retained 116 SQLite vnode-unlink, 116 invalidated-fd and 20 unconnected-network diagnostics, plus three QoS blocks/two source warning lines; the separate diagnostic repair remains open. Unmatched source filter names get no credit. |
+| Canonical build and graph | Incremental CLI/app passed; ordinary Debug build passed in 25.389 s, strict deep signing at exit0 for seven binaries. All seven changed Swift inputs keep existing memberships. Of 49 graph/resource/fixture inputs, 48 are exact; PBX changes only twelve marketing/sixteen build assignments. Twelve preceding candidate manifests/78 binaries and three protected identities remain unchanged. | Debug candidate scope; Release, installation and shipment are separate. |
+| Repeated complete wire | All four native cases passed: eight positive pages/twelve LF responses, normal zero/full EOF and unchanged guards. Escaped first pages measured 2,047 text / 2,041 base64 versus original 2,477/2,481; ordinary-ID sizes are unchanged. | Two-page prefixes and zero actual notices; not full-body or live notice-delivery qualification. Qwen completion remains OPEN/NONPASS; retain the original zero-model harness failure and R2–R4 final-API deadline negatives. No final report was consumed. |
+
+[Contract and retained evidence](docs/WEB-RESPONSE-BUDGET.md). Full-web,
+installed/all-feature and shipment gates remain open.
+
 ## October 7 ordinary runtime job continuation
 
-Current source identity is **0.26.0 (36)**, starting from delivered, clean,
+This preceding checkpoint's source identity is **0.26.0 (36)**, starting from delivered, clean,
 synchronized .25 source `5ff5559ad02192a90a4887154f48e38c81fa54fe` and wiki
 `3dc576814d2bafdaa2ff303e5011072026e0a378`. Implementation and draft documentation
 are present. First CLI/app compiles and one repaired regression passed on their

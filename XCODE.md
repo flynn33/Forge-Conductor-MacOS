@@ -1,6 +1,20 @@
 # Forge Conductor — Xcode
 
-Current source version **0.26.0**, build **36**.
+Current source version **0.26.1**, build **37**.
+
+The web response-budget hotfix edits existing WebToolPack, MCPServer, ToolRouter
+and test inputs. It adds no Swift file, resource or target membership; the native
+graph review preserves all seven existing Swift memberships. Its 49-item graph/
+resource/fixture inventory is 48 byte-identical inputs plus version-only PBX
+changes (twelve marketing/sixteen build settings). Incremental CLI/app passed
+in 0.881/0.872 s with 53 bytes each; the ordinary canonical Debug build passed
+in 25.389 s with no compiler warnings and its destination warning retained.
+Strict deep signing passed for seven binaries. Source 139 and the identical
+native 139 methods passed without failures/skips on the same 450 inputs.
+Native runtime diagnostics remain; all four signed wire cases passed and Qwen
+completion remains OPEN/NONPASS. [Exact evidence](docs/WEB-RESPONSE-BUDGET.md).
+
+The following runtime-continuation receipts describe the preceding .26/36 maps.
 
 The ordinary runtime continuation slice edits existing source/test inputs and
 adds no source, resource, test-file or workspace membership. Canonical identity
@@ -727,7 +741,7 @@ remains `22e7443d13496b3cc08b6e98366bb6d2332e3fd4`; later documentation commits
 do not change the binary identity. The set is ready for owner notarization and
 Apple upload, but is not notarized, stapled, installed, shipped, or released.
 That retained archive used Xcode `MARKETING_VERSION = 0.16.2` and
-`CURRENT_PROJECT_VERSION = 23`. Current source uses `0.26.0 (36)`; the historical build-24 app/archive use
+`CURRENT_PROJECT_VERSION = 23`. Current source targets `0.26.1 (37)`; the historical build-24 app/archive use
 `0.16.3 (24)`; notarization and shipment remain separate.
 
 Implementation revision `91ad90ee7a1e51b7289f4c531ddae4dbbc6812ec`

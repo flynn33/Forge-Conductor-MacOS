@@ -1,6 +1,6 @@
 # Telemetry architecture (real-time native)
 
-Current source documentation is `0.26.0`, build `36`. The ordinary runtime
+Current source documentation targets `0.26.1`, build `37`. The ordinary runtime
 continuation extension is bounded to 32 native attempts and 16 KiB per logical
 epoch. The callback owns a bounded Source mutation while the CP writer is held;
 status uses only the selected native packet's references, with no history scan,
@@ -309,6 +309,6 @@ representative physical-hardware qualification remain open.
 
 ## Version
 
-`0.26.0`
+`0.26.1`
 
-Build: `36`
+Build: `37`

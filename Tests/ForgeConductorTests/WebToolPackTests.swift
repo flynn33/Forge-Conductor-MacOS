@@ -460,6 +460,341 @@ final class WebToolPackTests: XCTestCase {
         await repository.close()
     }
 
+    func testFinalWebFrameCountsActualEscapedIDNoticeAndTerminatingLF() throws {
+        try withApp { app in
+            let source = String(repeating: "x", count: 512)
+            let session = session(body: Data(source.utf8), contentType: "text/plain; charset=utf-8")
+            defer { session.invalidateAndCancel() }
+            let pack = WebToolPack(session: session), context = context(app: app)
+            let url = fixtureURL(), id = String(repeating: "id\"\\\n😀", count: 40)
+            let notice = "Required notice with \"quotes\", \\ and LF\n"
+            var original = try XCTUnwrap(pack.handle(name: "web.fetch", arguments: ["url": url, "format": "source"],
+                context: context, clientID: context.clientID, app: app, cancellation: nil))
+            XCTAssertTrue(original.ok)
+            original.payload["extra_router_marker"] = "retain this field"
+            let budget = try MCPToolResponse.data(id: id, result: original, additiveNotice: notice).count
+            XCTAssertLessThanOrEqual(budget, WebToolPack.maximumInlineBytes)
+            XCTAssertEqual(try MCPStdioTransport.encode(MCPToolResponse.object(id: id,
+                result: original, additiveNotice: notice)).count, budget + 1)
+            var produced = try XCTUnwrap(pack.handle(name: "web.fetch", arguments: ["url": url, "format": "source",
+                "maximum_bytes": budget], context: context, clientID: context.clientID, app: app, cancellation: nil))
+            produced.payload["extra_router_marker"] = "retain this field"
+            XCTAssertEqual(produced.payload["content"] as? String, source)
+            let payload = try webWirePayload(WebToolPack.finalMCPResponse(name: "web.fetch", id: id,
+                result: produced, additiveNotice: notice, budget: budget), id: id, notice: notice, budget: budget)
+            let piece = try XCTUnwrap(payload["content"] as? String)
+            XCTAssertFalse(piece.isEmpty)
+            XCTAssertLessThan(piece.utf8.count, source.utf8.count)
+            XCTAssertTrue(Data(source.utf8).starts(with: Data(piece.utf8)))
+            XCTAssertEqual(payload["content_sha256"] as? String, JSONSupport.sha256Hex(Data(source.utf8)))
+            XCTAssertEqual(payload["returned_content_bytes"] as? Int, piece.utf8.count)
+            XCTAssertEqual(payload["next_byte_offset"] as? Int, piece.utf8.count)
+            XCTAssertEqual(payload["has_more"] as? Bool, true)
+            XCTAssertEqual(payload["truncated"] as? Bool, true)
+            XCTAssertEqual(payload["extra_router_marker"] as? String, "retain this field")
+        }
+    }
+
+    func testFinalWebUTF8PagesPreserveWholeDigestAndNonzeroScalarCursor() throws {
+        try withApp { app in
+            let prefix = "SKIP🌍"
+            let source = prefix + String(repeating: "Quoted \"\\\n e\u{0301} 😀 日本語 ", count: 80)
+            let bytes = Data(source.utf8), digest = JSONSupport.sha256Hex(Data(source.utf8))
+            let session = session(body: bytes, contentType: "text/plain; charset=utf-8")
+            defer { session.invalidateAndCancel() }
+            let pack = WebToolPack(session: session), context = context(app: app, maximum: 3_000)
+            let url = fixtureURL(), notice = "Required UTF-8 page notice\n"
+            XCTAssertEqual(WebToolPack.responseBudget(arguments: [:], scope: context.authorizationScope), 3_000)
+            XCTAssertEqual(WebToolPack.responseBudget(arguments: ["maximum_bytes": 1_024],
+                scope: context.authorizationScope), 1_024)
+            for format in ["text", "source"] {
+                var offset = prefix.utf8.count, reconstructed = Data(), finished = false, pages = 0
+                for page in 0..<16 {
+                    let arguments: [String: Any] = ["url": url, "format": format, "byte_offset": offset,
+                        "if_content_sha256": digest, "maximum_bytes": 4_000]
+                    let budget = WebToolPack.responseBudget(arguments: arguments, scope: context.authorizationScope)
+                    XCTAssertEqual(budget, 3_000)
+                    let produced = try XCTUnwrap(pack.handle(name: "web.fetch", arguments: arguments,
+                        context: context, clientID: context.clientID, app: app, cancellation: nil))
+                    XCTAssertTrue(produced.ok, "\(produced.payload)")
+                    let id = "utf8-\(format)-\(page)-" + String(repeating: "\"\\\n😀", count: 30)
+                    let payload = try webWirePayload(WebToolPack.finalMCPResponse(name: "web.fetch", id: id,
+                        result: produced, additiveNotice: notice, budget: budget), id: id, notice: notice, budget: budget)
+                    let piece = try XCTUnwrap(payload["content"] as? String), count = piece.utf8.count
+                    guard count > 0, count <= bytes.count - offset else { return XCTFail("Invalid UTF-8 page extent") }
+                    XCTAssertEqual(Data(piece.utf8), bytes.subdata(in: offset..<(offset + count)))
+                    XCTAssertEqual(payload["format"] as? String, format)
+                    XCTAssertEqual(payload["javascript_executed"] as? Bool, false)
+                    XCTAssertEqual(payload["content_trust"] as? String, "untrusted_external_data")
+                    XCTAssertEqual(payload["byte_offset"] as? Int, offset)
+                    XCTAssertEqual(payload["returned_content_bytes"] as? Int, count)
+                    XCTAssertEqual(payload["total_content_bytes"] as? Int, bytes.count)
+                    XCTAssertEqual(payload["content_sha256"] as? String, digest)
+                    reconstructed.append(Data(piece.utf8)); pages += 1
+                    let hasMore = offset + count < bytes.count
+                    XCTAssertEqual(payload["has_more"] as? Bool, hasMore)
+                    XCTAssertEqual(payload["truncated"] as? Bool, hasMore)
+                    if !hasMore { XCTAssertTrue(payload["next_byte_offset"] is NSNull); finished = true; break }
+                    let next = try XCTUnwrap(payload["next_byte_offset"] as? Int)
+                    XCTAssertEqual(next, offset + count); XCTAssertGreaterThan(next, offset)
+                    guard next == offset + count, next > offset else { return XCTFail("Invalid UTF-8 continuation") }
+                    offset = next
+                }
+                XCTAssertTrue(finished); XCTAssertGreaterThan(pages, 1)
+                XCTAssertEqual(reconstructed, Data(bytes.dropFirst(prefix.utf8.count)))
+            }
+        }
+    }
+
+    func testFinalWebBase64PagesKeepRawDigestAndArbitraryByteCursor() throws {
+        try withApp { app in
+            let bytes = Data((0..<2_050).map { UInt8($0 % 256) }), digest = JSONSupport.sha256Hex(bytes)
+            let session = session(body: bytes, contentType: "application/octet-stream")
+            defer { session.invalidateAndCancel() }
+            let pack = WebToolPack(session: session), context = context(app: app, maximum: 2_700)
+            let url = fixtureURL(), notice = "Required binary page notice\n"
+            var offset = 1, reconstructed = Data(), finished = false, pages = 0
+            for page in 0..<24 {
+                let arguments: [String: Any] = ["url": url, "format": "base64", "byte_offset": offset,
+                    "if_content_sha256": digest, "maximum_bytes": 4_000]
+                let budget = WebToolPack.responseBudget(arguments: arguments, scope: context.authorizationScope)
+                XCTAssertEqual(budget, 2_700)
+                let produced = try XCTUnwrap(pack.handle(name: "web.fetch", arguments: arguments,
+                    context: context, clientID: context.clientID, app: app, cancellation: nil))
+                XCTAssertTrue(produced.ok, "\(produced.payload)")
+                let id = "binary-\(page)-" + String(repeating: "\"\\\n😀", count: 30)
+                let payload = try webWirePayload(WebToolPack.finalMCPResponse(name: "web.fetch", id: id,
+                    result: produced, additiveNotice: notice, budget: budget), id: id, notice: notice, budget: budget)
+                let encoded = try XCTUnwrap(payload["content"] as? String)
+                let piece = try XCTUnwrap(Data(base64Encoded: encoded)), count = piece.count
+                guard count > 0, count <= bytes.count - offset else { return XCTFail("Invalid raw-byte page extent") }
+                XCTAssertEqual(encoded, piece.base64EncodedString())
+                XCTAssertEqual(piece, bytes.subdata(in: offset..<(offset + count)))
+                XCTAssertEqual(payload["content_encoding"] as? String, "base64")
+                XCTAssertEqual(payload["format"] as? String, "base64")
+                XCTAssertEqual(payload["javascript_executed"] as? Bool, false)
+                XCTAssertEqual(payload["content_trust"] as? String, "untrusted_external_data")
+                XCTAssertEqual(payload["byte_offset"] as? Int, offset)
+                XCTAssertEqual(payload["returned_content_bytes"] as? Int, count)
+                XCTAssertEqual(payload["total_content_bytes"] as? Int, bytes.count)
+                XCTAssertEqual(payload["content_sha256"] as? String, digest)
+                reconstructed.append(piece); pages += 1
+                let hasMore = offset + count < bytes.count
+                XCTAssertEqual(payload["has_more"] as? Bool, hasMore)
+                XCTAssertEqual(payload["truncated"] as? Bool, hasMore)
+                if !hasMore { XCTAssertTrue(payload["next_byte_offset"] is NSNull); finished = true; break }
+                let next = try XCTUnwrap(payload["next_byte_offset"] as? Int)
+                XCTAssertEqual(next, offset + count); XCTAssertGreaterThan(next, offset)
+                guard next == offset + count, next > offset else { return XCTFail("Invalid raw-byte continuation") }
+                offset = next
+            }
+            XCTAssertTrue(finished); XCTAssertGreaterThan(pages, 1)
+            XCTAssertEqual(reconstructed, Data(bytes.dropFirst()))
+        }
+    }
+
+    func testFinalWebBase64OneTwoByteTailsAndEmptyEndRemainExact() throws {
+        try withApp { app in
+            let bytes = Data([0, 255, 128, 7, 8]), session = session(body: Data([0, 255, 128, 7, 8]), contentType: "image/png")
+            defer { session.invalidateAndCancel() }
+            let pack = WebToolPack(session: session), context = context(app: app)
+            for offset in [bytes.count - 2, bytes.count - 1, bytes.count] {
+                let produced = try XCTUnwrap(pack.handle(name: "web.fetch", arguments: ["url": fixtureURL(),
+                    "format": "base64", "byte_offset": offset], context: context, clientID: context.clientID, app: app, cancellation: nil))
+                XCTAssertTrue(produced.ok)
+                let id = "tail-\(offset)", notice = "Required tail notice"
+                let payload = try webWirePayload(WebToolPack.finalMCPResponse(name: "web.fetch", id: id,
+                    result: produced, additiveNotice: notice, budget: 4_096), id: id, notice: notice, budget: 4_096)
+                XCTAssertTrue((payload as NSDictionary).isEqual(to: produced.payload))
+                XCTAssertEqual(payload["content"] as? String, Data(bytes.dropFirst(offset)).base64EncodedString())
+                XCTAssertEqual(payload["content_sha256"] as? String, JSONSupport.sha256Hex(bytes))
+                XCTAssertEqual(payload["returned_content_bytes"] as? Int, bytes.count - offset)
+                XCTAssertEqual(payload["has_more"] as? Bool, false); XCTAssertTrue(payload["next_byte_offset"] is NSNull)
+            }
+            WebResponseProtocol.configure(body: Data(), contentType: "image/png")
+            let empty = try XCTUnwrap(pack.handle(name: "web.fetch", arguments: ["url": fixtureURL(), "format": "base64"],
+                context: context, clientID: context.clientID, app: app, cancellation: nil))
+            let payload = try webWirePayload(WebToolPack.finalMCPResponse(name: "web.fetch", id: "empty",
+                result: empty, additiveNotice: nil, budget: 4_096), id: "empty", notice: nil, budget: 4_096)
+            XCTAssertEqual(payload["content"] as? String, ""); XCTAssertEqual(payload["returned_content_bytes"] as? Int, 0)
+            XCTAssertEqual(payload["content_sha256"] as? String, JSONSupport.sha256Hex(Data()))
+            XCTAssertEqual(payload["has_more"] as? Bool, false); XCTAssertTrue(payload["next_byte_offset"] is NSNull)
+        }
+    }
+
+    func testFinalWebOptionalHTMLMetadataCannotDisplacePositiveBodyPage() throws {
+        try withApp { app in
+            let html = "<title>" + String(repeating: "Title 😀 ", count: 70) + "</title><h1>" +
+                String(repeating: "Heading 🌍 ", count: 70) + "</h1><p>" + String(repeating: "body ", count: 200) + "</p>"
+            let session = session(body: Data(html.utf8))
+            defer { session.invalidateAndCancel() }
+            let context = context(app: app)
+            let original = try XCTUnwrap(WebToolPack(session: session).handle(name: "web.fetch", arguments: ["url": fixtureURL()],
+                context: context, clientID: context.clientID, app: app, cancellation: nil))
+            XCTAssertTrue(original.ok); XCTAssertNotNil(original.payload["title"]); XCTAssertNotNil(original.payload["heading"])
+            let content = try XCTUnwrap(original.payload["content"] as? String)
+            let first = try XCTUnwrap(content.unicodeScalars.first.map(String.init))
+            var minimum = original.payload
+            minimum["content"] = first; minimum["returned_content_bytes"] = first.utf8.count
+            minimum["has_more"] = true; minimum["truncated"] = true; minimum["next_byte_offset"] = first.utf8.count
+            let id = "metadata-\"\\\n😀", notice = "Required metadata notice"
+            let withMetadata = try MCPStdioTransport.encode(MCPToolResponse.object(id: id,
+                result: .success(minimum), additiveNotice: notice)).count
+            for key in ["title", "heading", "title_truncated", "heading_truncated"] { minimum.removeValue(forKey: key) }
+            let budget = try MCPStdioTransport.encode(MCPToolResponse.object(id: id,
+                result: .success(minimum), additiveNotice: notice)).count + 32
+            XCTAssertGreaterThan(withMetadata, budget)
+            let payload = try webWirePayload(WebToolPack.finalMCPResponse(name: "web.fetch", id: id,
+                result: original, additiveNotice: notice, budget: budget), id: id, notice: notice, budget: budget)
+            for key in ["title", "heading", "title_truncated", "heading_truncated"] { XCTAssertNil(payload[key], key) }
+            let piece = try XCTUnwrap(payload["content"] as? String)
+            XCTAssertFalse(piece.isEmpty); XCTAssertTrue(Data(content.utf8).starts(with: Data(piece.utf8)))
+            XCTAssertEqual(payload["content_sha256"] as? String, original.payload["content_sha256"] as? String)
+            XCTAssertEqual(payload["returned_content_bytes"] as? Int, piece.utf8.count)
+            XCTAssertEqual(payload["next_byte_offset"] as? Int, piece.utf8.count)
+        }
+    }
+
+    func testFinalWebExistingErrorsKeepCodesAndHandoffFieldsEvenForImpossibleEnvelope() throws {
+        try withApp { app in
+            let session = session(body: Data("unavailable".utf8), status: 503)
+            defer { session.invalidateAndCancel() }
+            let pack = WebToolPack(session: session), allowed = context(app: app), denied = context(app: app, network: false)
+            let inputs: [(String, [String: Any], ToolInvocationContext)] = [
+                ("network_not_authorized", ["url": fixtureURL()], denied),
+                ("web_invalid_argument", ["url": "file:///private/unsupported"], allowed),
+                ("web_invalid_argument", ["url": fixtureURL(), "maximum_bytes": 1.5], allowed),
+                ("web_http_error", ["url": fixtureURL()], allowed),
+            ]
+            for (code, arguments, context) in inputs {
+                var failure = try XCTUnwrap(pack.handle(name: "web.fetch", arguments: arguments,
+                    context: context, clientID: context.clientID, app: app, cancellation: nil))
+                XCTAssertFalse(failure.ok); XCTAssertEqual(failure.payload["code"] as? String, code)
+                failure.payload["handoff_required"] = true; failure.payload["handoff_id"] = "retain-handoff"
+                failure.payload["resume_seed"] = "Preserve the authored task."
+                failure.payload["continuity_attention"] = ["state": "requires_attention"]
+                let id = String(repeating: "impossible-\"\\\n😀", count: 20), notice = "Required notice retained"
+                let response = WebToolPack.finalMCPResponse(name: "web.fetch", id: id, result: failure,
+                    additiveNotice: notice, budget: 1)
+                let payload = try webWirePayload(response, id: id, notice: notice, isError: true)
+                XCTAssertTrue((payload as NSDictionary).isEqual(to: failure.payload))
+                XCTAssertGreaterThan(try MCPStdioTransport.encode(response).count, 1,
+                    "An impossible error envelope must not be advertised as fitting")
+            }
+        }
+    }
+
+    func testFinalWebBudgetRejectionKeepsContinuationGuidanceWithoutAdvancedCursor() throws {
+        try withApp { app in
+            let session = session(body: Data(String(repeating: "x", count: 4_096).utf8), contentType: "text/plain")
+            defer { session.invalidateAndCancel() }
+            let context = context(app: app, maximum: 4_096)
+            var original = try XCTUnwrap(WebToolPack(session: session).handle(name: "web.fetch",
+                arguments: ["url": fixtureURL(), "byte_offset": 1], context: context, clientID: context.clientID, app: app, cancellation: nil))
+            XCTAssertTrue(original.ok); XCTAssertGreaterThan(try XCTUnwrap(original.payload["next_byte_offset"] as? Int), 1)
+            let controls: [String: Any] = ["auto_handoff_id": "retain-id", "handoff_id": "retain-id", "auto_continuity": "handoff",
+                "extra_router_marker": "retain this field",
+                "handoff_required": true, "resume_seed": "Preserve authored task.",
+                "continuity_note": "Resume the saved handoff.", "continuity_attention": ["state": "requires_attention"]]
+            original.payload.merge(controls) { _, new in new }
+            let id = String(repeating: "\"\\\n😀", count: 100), notice = "Required notice"
+            let payload = try webWirePayload(WebToolPack.finalMCPResponse(name: "web.fetch", id: id,
+                result: original, additiveNotice: notice, budget: 128), id: id, notice: notice, isError: true)
+            XCTAssertEqual(payload["code"] as? String, "web_output_budget_too_small")
+            for (key, value) in controls {
+                let actual = try XCTUnwrap(payload[key], key)
+                XCTAssertTrue((["value": actual] as NSDictionary).isEqual(to: ["value": value]), key)
+            }
+            XCTAssertNil(payload["next_byte_offset"])
+            XCTAssertNil(payload["content"])
+            XCTAssertNil(payload["returned_content_bytes"])
+            XCTAssertNil(payload["has_more"])
+            XCTAssertNotEqual(payload["ok"] as? Bool, true)
+        }
+    }
+
+    func testFinalWebSearchRetainsWholeOrderedEntriesAndExistingTruncation() throws {
+        try withApp { app in
+            let session = session(body: Data(webWireSearchHTML().utf8))
+            defer { session.invalidateAndCancel() }
+            let pack = WebToolPack(session: session), context = context(app: app)
+            let arguments: [String: Any] = ["query": "native wire results", "limit": 3]
+            let original = try XCTUnwrap(pack.handle(name: "web.search", arguments: arguments,
+                context: context, clientID: context.clientID, app: app, cancellation: nil))
+            let entries = try XCTUnwrap(original.payload["results"] as? [[String: String]])
+            XCTAssertTrue(original.ok); XCTAssertEqual(entries.count, 3)
+            var one = original.payload
+            one["results"] = Array(entries.prefix(1)); one["count"] = 1; one["truncated"] = true
+            let id = "search-\"\\\n😀", notice = "Required search notice"
+            let budget = try MCPStdioTransport.encode(MCPToolResponse.object(id: id, result: .success(one), additiveNotice: notice)).count
+            let payload = try webWirePayload(WebToolPack.finalMCPResponse(name: "web.search", id: id,
+                result: original, additiveNotice: notice, budget: budget), id: id, notice: notice, budget: budget)
+            XCTAssertEqual(payload["results"] as? [[String: String]], Array(entries.prefix(1)))
+            XCTAssertEqual(payload["count"] as? Int, 1); XCTAssertEqual(payload["truncated"] as? Bool, true)
+            let small = try MCPToolResponse.data(id: String(repeating: "x", count: 128), result: .success(one)).count + 64
+            let limited = try XCTUnwrap(pack.handle(name: "web.search", arguments: arguments.merging(["maximum_bytes": small]) { _, new in new },
+                context: context, clientID: context.clientID, app: app, cancellation: nil))
+            XCTAssertTrue(limited.ok); XCTAssertEqual(limited.payload["truncated"] as? Bool, true)
+            XCTAssertEqual(limited.payload["results"] as? [[String: String]], Array(entries.prefix(1)))
+            let retained = try webWirePayload(WebToolPack.finalMCPResponse(name: "web.search", id: id,
+                result: limited, additiveNotice: notice, budget: 16_384), id: id, notice: notice, budget: 16_384)
+            XCTAssertTrue((retained as NSDictionary).isEqual(to: limited.payload))
+        }
+    }
+
+    func testFinalWebSearchRejectsBudgetInventedZeroButKeepsGenuineNoResults() throws {
+        try withApp { app in
+            let session = session(body: Data(webWireSearchHTML().utf8))
+            defer { session.invalidateAndCancel() }
+            let pack = WebToolPack(session: session), context = context(app: app)
+            let original = try XCTUnwrap(pack.handle(name: "web.search", arguments: ["query": "native wire results", "limit": 3],
+                context: context, clientID: context.clientID, app: app, cancellation: nil))
+            XCTAssertTrue(original.ok); XCTAssertEqual(original.payload["count"] as? Int, 3)
+            var zero = original.payload
+            zero["results"] = [[String: String]](); zero["count"] = 0; zero["truncated"] = true
+            let id = "search-zero", notice = "Required search notice"
+            let budget = try MCPStdioTransport.encode(MCPToolResponse.object(id: id, result: .success(zero), additiveNotice: notice)).count
+            let rejected = try webWirePayload(WebToolPack.finalMCPResponse(name: "web.search", id: id,
+                result: original, additiveNotice: notice, budget: budget), id: id, notice: notice, isError: true)
+            XCTAssertEqual(rejected["code"] as? String, "web_output_budget_too_small")
+            XCTAssertNotEqual(rejected["ok"] as? Bool, true)
+            WebResponseProtocol.configure(body: Data("<div class=\"no-results\">No results found</div>".utf8), contentType: "text/html")
+            let genuine = try XCTUnwrap(pack.handle(name: "web.search", arguments: ["query": "no fixture results"],
+                context: context, clientID: context.clientID, app: app, cancellation: nil))
+            XCTAssertTrue(genuine.ok); XCTAssertEqual(genuine.payload["count"] as? Int, 0)
+            let payload = try webWirePayload(WebToolPack.finalMCPResponse(name: "web.search", id: id,
+                result: genuine, additiveNotice: notice, budget: 4_096), id: id, notice: notice, budget: 4_096)
+            XCTAssertTrue((payload as NSDictionary).isEqual(to: genuine.payload))
+            XCTAssertEqual(payload["truncated"] as? Bool, false)
+        }
+    }
+
+    private func webWirePayload(_ response: [String: Any], id: String, notice: String?,
+                                budget: Int? = nil, isError: Bool = false) throws -> [String: Any] {
+        XCTAssertEqual(response["id"] as? String, id)
+        let frame = try MCPStdioTransport.encode(response)
+        XCTAssertTrue(frame.last == 0x0A); XCTAssertEqual(frame.filter { $0 == 0x0A }.count, 1)
+        if let budget { XCTAssertLessThanOrEqual(frame.count, budget) }
+        let envelope = try XCTUnwrap(response["result"] as? [String: Any])
+        XCTAssertEqual(envelope["isError"] as? Bool, isError)
+        let payload = try XCTUnwrap(envelope["structuredContent"] as? [String: Any])
+        XCTAssertEqual(payload["ok"] as? Bool, !isError)
+        let blocks = try XCTUnwrap(envelope["content"] as? [[String: Any]])
+        let text = try XCTUnwrap(blocks.first?["text"] as? String)
+        XCTAssertTrue((try JSONSupport.object(from: Data(text.utf8)) as NSDictionary).isEqual(to: payload))
+        XCTAssertEqual(blocks.count, notice == nil ? 1 : 2)
+        if let notice { XCTAssertEqual(blocks.last?["text"] as? String, notice) }
+        return payload
+    }
+
+    private func webWireSearchHTML() -> String {
+        """
+        <a class="result__a" href="https://first.example/docs">First &quot;😀&quot;</a><div class="result__snippet">\(String(repeating: "First bounded snippet. ", count: 20))</div>
+        <a class="result__a" href="https://second.example/docs">Second 日本語</a><div class="result__snippet">\(String(repeating: "Second bounded snippet. ", count: 20))</div>
+        <a class="result__a" href="https://third.example/docs">Third café</a><div class="result__snippet">\(String(repeating: "Third bounded snippet. ", count: 20))</div>
+        """
+    }
+
     private func fixtureURL() -> String { "https://forge-web.fixture/\(UUID().uuidString)" }
     private func context(app: ForgeApp, network: Bool = true, tools: Set<String> = ["*"], maximum: Int = 65_536) -> ToolInvocationContext {
         ToolInvocationContext(projectID: ProjectID(), projectGeneration: .initial, clientID: ClientID("web-fixture"),

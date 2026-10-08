@@ -1,5 +1,13 @@
 # Project repository, web access and Qwen verification
 
+The **0.26.1 (37)** response-budget follow-up preserves these tools and the
+historical qualification below. Its signed .26 baseline observed escaped-ID
+frames exceeding 2,048 bytes. The final 139 source and same 139 compiled native
+cases passed, followed by ordinary Debug build/strict signing and four repeated
+signed wire cases within the allowance. Native diagnostics remain; hotfix Qwen
+completion is OPEN/NONPASS. Older qualification below keeps its identity.
+[Current fetch/search budget contract](WEB-RESPONSE-BUDGET.md).
+
 The October 7 owner request authorizes project-linked GitHub entry, web access
 through Forge, and collaboration with Qwen on real failures and additions.
 This checkpoint's source is **0.19.0 (29)**, based on synchronized

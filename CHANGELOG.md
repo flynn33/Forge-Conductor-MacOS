@@ -10,6 +10,24 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### `0.26.1 (37)` web response-budget hotfix
+
+- Size successful `web.fetch` and `web.search` stdio responses using the actual
+  request ID, duplicated payload, required policy notice and terminating LF.
+  Capture the allowance from the exact validated context used to dispatch.
+- Reduce UTF-8 or decoded base64 pages while preserving the whole-content SHA,
+  offset and returned cursor; keep whole ordered search entries. Preserve
+  existing failure codes and router handoff fields. An impossible success
+  envelope returns `web_output_budget_too_small` without a delivered body or
+  advanced cursor; an impossible error envelope can exceed the allowance.
+- Retain the signed .26 escaped-ID baseline: 2,477 text / 2,481 base64 bytes
+  against 2,048, normal parent exit and complete EOF. The final 139 distinct
+  source cases and the same 139 native cases passed without failures/skips.
+  Ordinary Debug build/strict signing and all four repeated native wire cases
+  passed; escaped first pages are now 2,047 text / 2,041 base64. Native runtime
+  diagnostics are retained, and Qwen completion remains OPEN/NONPASS.
+  [Contract and scope](docs/WEB-RESPONSE-BUDGET.md).
+
 ### `0.26.0 (36)` ordinary runtime job continuation and owner recovery
 
 - Add native submission references for ordinary project-bound `process.run`,
