@@ -10,6 +10,14 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### `0.37.0 (53)` additive standard-size ICO pixel writing
+
+- `image_write` accepts exact lowercase `ico` with an explicit case-insensitive `.ico` path. Square 16/32/48/256 produces one bounded 32-bit bottom-up BI_RGB DIB/AND image, preserving encoded alpha 0…255 and hidden RGB; native premultiplied rendering is separate. Engine is `swift-ico-dib32`, output contract `ico-dib32-rgba8-srgb-v1`; no embedded ICC or Windows interoperability guarantee.
+- PNG default, all six preceding formats, own grant/context, input keys, pinned writer/modes/audit, schema strictness and replay remain. Source/native missing-feature failures are retained. Matching raster 56 plus five separate neighbors passed, for 61 distinct methods per route; focused source eight is duplicate coverage.
+- CLI/app/ordinary Debug/strict signature/native version checks passed on unchanged 464 inputs with actual .37.0/53 seven-artifact candidate. App/CLI wire each passed 23 groups, 46 responses, 44 tool frames and 11 artifacts, including 17 negatives and two immediate cancellations. Qwen completed three observed Low turns and consumed two intact results; seven ICO/PNG native pairs passed with 14 measured provider teardown witnesses. Final document checks and exact source/wiki delivery outcomes are retained externally. No new GUI/full-web/all-model/installed/shipment acceptance or in-work/late-cancel proof is claimed; prior native-pipe blocker and original NONPASSs remain recorded.
+
+- Current candidate identity is the separately preserved ordinary Debug **f477a0b0…**. After the native G3 test action re-signed the prior main, the restored App passed a fresh **0.849 s** run with all **11 artifacts byte-identical** to the original App outputs; the six other compiled artifacts remain exact. Earlier CLI/Qwen and native-consumer results are reused only on the unchanged CLI/core and generated artifact inputs, with no new model or native-consumer invocation. Original candidate/signing evidence remains historical; the current transition is detailed in [the image guide](docs/NATIVE-IMAGE-WRITING.md). Final document recheck and source/wiki delivery outcomes remain in external root receipts.
+
 ### `0.36.3 (52)` decoded UTF-8 web cursor correction
 
 - Correct `web.fetch` text/source continuation when supported text expands while

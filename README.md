@@ -1,5 +1,16 @@
 # Forge Conductor for macOS
 
+Current source target **0.37.0 (53)** adds standard-size ICO to `image_write`, preserving PNG/TIFF/JPEG/GIF/WebP/BMP. Exact lowercase `format: "ico"` requires an explicit case-insensitive `.ico` destination and equal width/height of **16, 32, 48 or 256**. The call-local Swift writer preserves all supplied alpha and hidden RGB in one bottom-up 32-bit BI_RGB DIB with a padded AND mask. Native premultiplied rendering is separate; no embedded ICC or Windows interoperability is promised.
+
+Matching full raster source/native selections passed **56 methods** in **13.550/24.569 s**; five separate neighbors passed in **2.201/2.504 s**, giving **61 distinct methods per route**. Focused source eight is a subset and adds no distinct methods.
+CLI/app compilation passed in **0.890/0.902 s**; ordinary Debug/strict signature in **1.953/0.135 s**, and native CLI version in **0.614 s**, normal 0/unforced/full EOF. Candidate **78bfcd19…** binds seven artifacts, actual **0.37.0/53** and the unchanged **464-input 3d6f16dd… map**.
+Actual signed App/CLI wire runs passed in **0.893/0.822 s**; each exercised **23 groups, 46 responses, 44 tool frames, 17 negatives, two immediate cancellations and 11 artifacts**. Qwen completed three observed Low turns and consumed two intact actual tool results in **96.856 s**. The separate native consumer passed seven ICO/PNG pairs with 14 measured provider teardown witnesses.
+[Native image writing](docs/NATIVE-IMAGE-WRITING.md) records the contract, retained baselines and exact exercised scope. Candidate App/CLI/Qwen wire and seven native ICO/PNG consumer pairs passed in isolated contexts. Two immediate canceled calls were exercised per App/CLI route; cancellation after work has started and the common writer’s late-cancel/revocation-before-rename boundary remain unexercised. Final G3/hygiene/whitespace and exact owner source/wiki delivery outcomes are retained in external root receipts. Projects GitHub Save/reopen/stable identity and filtered Tools web rows remain blocked by the retained CUA native-pipe failure; installed/full-web/all-model/managed-adapter/other-format/Release/shipment gates remain open.
+
+Current candidate identity is the separately preserved ordinary Debug **f477a0b0…**. After the native G3 test action re-signed the prior main, the restored App passed a fresh **0.849 s** run with all **11 artifacts byte-identical** to the original App outputs; the six other compiled artifacts remain exact. Earlier CLI/Qwen and native-consumer results are reused only on the unchanged CLI/core and generated artifact inputs, with no new model or native-consumer invocation. Original candidate/signing evidence remains historical; the current transition is detailed in [the image guide](docs/NATIVE-IMAGE-WRITING.md). Final document recheck and source/wiki delivery outcomes remain in external root receipts.
+
+## Preceding 0.36.3 (52) decoded UTF-8 web qualification
+
 Current source target **0.36.3 (52)** corrects `web.fetch` continuation for
 text that expands when decoded to UTF-8. HTTP receive and base64 cursor limits
 remain **1 MiB**; text/source content and cursors are bounded to **3 MiB**.
@@ -876,8 +887,8 @@ continuity. The user does not start project work through a Forge Managed Run.
 
 | | |
 |---|---|
-| **Version** | **0.36.3** |
-| **Build** | **52** |
+| **Version** | **0.37.0** |
+| **Build** | **53** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |
@@ -994,7 +1005,7 @@ was not exercised; its source selects the running app executable, so the CLI
 receipt does not qualify that path. The full scope and remaining
 distribution limits are in the [qualification record](docs/QUALIFICATION-STATUS.md).
 
-The current target is `0.36.3 (52)` for the decoded UTF-8 cursor correction; see the latest phase above.
+The current target is `0.37.0 (53)` for additive standard-size ICO; see the latest phase above.
 
 Preceding .36.2 identity record (retained):
 

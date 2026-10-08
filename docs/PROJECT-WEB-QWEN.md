@@ -1,5 +1,13 @@
 # Project repository, web access and Qwen verification
 
+Current source target **0.37.0 (53)** adds standard-size ICO to `image_write`; GitHub project linkage and all three web tools retain their current contracts. Matching full raster source/native selections passed **56 methods** in **13.550/24.569 s**; five separate neighbors passed in **2.201/2.504 s**, giving **61 distinct methods per route**. Focused source eight is a subset and adds no distinct methods.
+Candidate build/signature/version and App/CLI/Qwen image checks passed. Actual `qwen/qwen3.8-27b` completed three observed Low turns and consumed the intact `image_write`/`fs_read` results at turns 1/2; the strict final acknowledgement contained four metadata scalars. This does not prove image understanding, full-web or installed acceptance. Candidate App/CLI/Qwen wire and seven native ICO/PNG consumer pairs passed in isolated contexts. Two immediate canceled calls were exercised per App/CLI route; cancellation after work has started and the common writer’s late-cancel/revocation-before-rename boundary remain unexercised. Final G3/hygiene/whitespace and exact owner source/wiki delivery outcomes are retained in external root receipts. Projects GitHub Save/reopen/stable identity and filtered Tools web rows remain blocked by the retained CUA native-pipe failure; installed/full-web/all-model/managed-adapter/other-format/Release/shipment gates remain open.
+The preceding .36.3 web results, original Qwen strict-format NONPASS/separate correction and Doctor/Dashboard-only GUI observations follow unchanged; [web budget history](WEB-RESPONSE-BUDGET.md) retains 1 MiB raw/base64 and 3 MiB decoded UTF-8 bounds.
+
+Current candidate identity is the separately preserved ordinary Debug **f477a0b0…**. After the native G3 test action re-signed the prior main, the restored App passed a fresh **0.849 s** run with all **11 artifacts byte-identical** to the original App outputs; the six other compiled artifacts remain exact. Earlier CLI/Qwen and native-consumer results are reused only on the unchanged CLI/core and generated artifact inputs, with no new model or native-consumer invocation. Original candidate/signing evidence remains historical; the current transition is detailed in [the image guide](NATIVE-IMAGE-WRITING.md). Final document recheck and source/wiki delivery outcomes remain in external root receipts.
+
+## Preceding 0.36.3 (52) decoded UTF-8 web qualification
+
 Current source target **0.36.3 (52)** corrects `web.fetch` continuation when
 supported non-UTF-8 text expands during decoding. HTTP receive/base64 cursors
 retain 1 MiB; decoded text/source content and cursors allow at most 3 MiB.

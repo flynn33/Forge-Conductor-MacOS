@@ -1,5 +1,21 @@
 # Forge Conductor macOS — project roadmap
 
+## Additive standard-size ICO pixel writing
+
+Current target **0.37.0 (53)** adds ICO to the existing supplied-pixel tool while preserving all six preceding formats.
+
+| Milestone | Observed evidence | Remaining gate |
+| --- | --- | --- |
+| Baseline and local contract | One source/native missing-feature method failed in 6.822/43.672 s, normal 1/65/unforced, before production edits; both remain NONPASS. The new Swift DIB/AND branch accepts square 16/32/48/256 and preserves exact encoded alpha/hidden RGB. | No generalized dimension/length cause, embedded ICC or Windows interoperability claim. |
+| Source/native parity | Matching full raster 56 passed in 13.550/24.569 s, preserving all 48 old methods byte-for-byte. Five separate schema/wire neighbors passed in 2.201/2.504 s, giving 61 distinct methods per route on the same 464-input 3d6f16dd… map. Focused source 8 passed in 13.931 s and adds no distinct methods. | Focused area qualification only; no full-suite or leak-freedom result. |
+| Authorities and candidate | Existing memberships/workspace/signing preserved; only root-selected version/build authorities advance. CLI/app 0.890/0.902 s, ordinary Debug 1.953 s, strict signature 0.135 s and native CLI version 0.614 s passed, normal 0/unforced. Candidate 78bfcd19… binds seven artifacts/actual .37.0/53. | Signed Debug/CLI proof remains separate from installation and shipment. |
+| App/CLI/Qwen and native consumers | App/CLI passed in 0.893/0.822 s, each 23 groups/46 responses/44 frames/11 artifacts with 17 negatives and two immediate cancellations. Actual Qwen passed in 96.856 s: three observed Low completions/two intact consumed results. Seven ICO/PNG pairs/14 native decodes matched profiles, supplied alpha and premultiplied renders; 14 provider release/deinit/weak witnesses passed. | Metadata acknowledgement does not prove image understanding; in-work/late-cancel reachability, general lifecycle/Windows acceptance remain unexercised. |
+| Preserved candidate and fresh App | Source/native G3 one each passed in 1.423/2.276 s, followed by hygiene/whitespace 0.664/0.139 s. That test action re-signed the prior main; ordinary rebuilding produced current main 97014c73… and separately preserved candidate f477a0b0… . Fresh App 0.849 s passed the same 23 groups/46 responses/44 frames; all 11 artifacts are byte-identical to original App outputs. The other six compiled artifacts stayed exact. | Original signing/guard event remains retained; prior CLI/Qwen/native consumers are reused only on exact unchanged inputs, with no new model/consumer invocation. Separate final document recheck and publication outcomes remain external. |
+| Documents and delivery | Thirteen current document surfaces explain ICO and retain complete preceding histories, including unchanged web response budgets. | Actual final G3/hygiene/whitespace and exact owner source/wiki publication/readback/synchronization outcomes are retained in external root receipts; no future identity or pass is guessed. |
+| Original user-facing acceptance | Existing GitHub linkage and web contracts are retained. Preceding native GUI Doctor/Dashboard observations remain scoped; no Projects mutation or Save/reopen acceptance occurred. | CUA native-pipe blocker retains Projects Save/reopen/stable linked identity and filtered Tools web-row gates open; installed/full-web/all-model/managed-adapter/other-format/Release/shipment remain open. |
+
+[ICO contract and exact current scope](docs/NATIVE-IMAGE-WRITING.md). Complete preceding phases follow unchanged.
+
 ## Decoded UTF-8 web continuation correction
 
 Current target **0.36.3 (52)** corrects `web.fetch` cursors for decoded text,

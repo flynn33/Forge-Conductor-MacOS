@@ -1,4 +1,11 @@
-# Context and agent continuity (v0.36.3)
+# Context and agent continuity (v0.37.0)
+
+Current source documentation targets 0.37.0 (53). Standard-size ICO extends the existing `image_write` format enum under its own grant and durable project context. Context validation occurs before/after encoding; the existing pinned writer handles publication and modes. Handoff, checkpoint, successor/ACK/seal, replay class, job-reference, progress and tool names remain unchanged. Matching full raster source/native selections passed **56 methods** in **13.550/24.569 s**; five separate neighbors passed in **2.201/2.504 s**, giving **61 distinct methods per route**. Focused source eight is a subset and adds no distinct methods.
+Tests cover stale generation and own-grant denial; pre-cancel/deadline checks do not prove late cancel/revocation before rename. Candidate App/CLI/Qwen wire and seven native ICO/PNG consumer pairs passed in isolated contexts. Two immediate canceled calls were exercised per App/CLI route; cancellation after work has started and the common writer’s late-cancel/revocation-before-rename boundary remain unexercised. Final G3/hygiene/whitespace and exact owner source/wiki delivery outcomes are retained in external root receipts. Projects GitHub Save/reopen/stable identity and filtered Tools web rows remain blocked by the retained CUA native-pipe failure; installed/full-web/all-model/managed-adapter/other-format/Release/shipment gates remain open.
+
+Current candidate identity is the separately preserved ordinary Debug **f477a0b0…**. After the native G3 test action re-signed the prior main, the restored App passed a fresh **0.849 s** run with all **11 artifacts byte-identical** to the original App outputs; the six other compiled artifacts remain exact. Earlier CLI/Qwen and native-consumer results are reused only on the unchanged CLI/core and generated artifact inputs, with no new model or native-consumer invocation. Original candidate/signing evidence remains historical; the current transition is detailed in [the image guide](NATIVE-IMAGE-WRITING.md). Final document recheck and source/wiki delivery outcomes remain in external root receipts.
+
+## Preceding 0.36.3 (52) decoded UTF-8 web qualification
 
 Current source documentation targets 0.36.3 (52). `web.fetch` text/source
 continuation addresses decoded UTF-8 bytes up to 3 MiB while receive/base64 bounds

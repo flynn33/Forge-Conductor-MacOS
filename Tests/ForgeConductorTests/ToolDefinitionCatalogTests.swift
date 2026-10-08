@@ -1385,7 +1385,7 @@ final class ToolDefinitionCatalogTests: XCTestCase {
             for (key, value) in [("pixel_format", "rgba8"), ("format", "png")] {
                 let format = try XCTUnwrap(properties[key] as? [String: Any])
                 XCTAssertEqual(format["type"] as? String, "string")
-                XCTAssertEqual(format["enum"] as? [String], key == "format" ? ["png", "tiff", "jpeg", "gif", "webp", "bmp"] : [value])
+                XCTAssertEqual(format["enum"] as? [String], key == "format" ? ["png", "tiff", "jpeg", "gif", "webp", "bmp", "ico"] : [value])
                 XCTAssertEqual(format["default"] as? String, value)
             }
             XCTAssertTrue(((properties["path"] as? [String: Any])?["description"] as? String)?.contains(".tif/.tiff") == true)
@@ -1405,6 +1405,16 @@ final class ToolDefinitionCatalogTests: XCTestCase {
             XCTAssertTrue(((properties["path"] as? [String: Any])?["description"] as? String)?.contains(".bmp") == true)
             for value in ["BMP", "32-bit top-down V5/BITFIELDS", "sRGB marker", "straight RGBA8 bytes"] {
                 XCTAssertTrue(definition.description.contains(value), value)
+            }
+            XCTAssertTrue(((properties["path"] as? [String: Any])?["description"] as? String)?.contains(".ico") == true)
+            for value in ["single-image ICO", "equal width and height of 16, 32, 48 or 256", "swift-ico-dib32",
+                          "ico-dib32-rgba8-srgb-v1", "bottom-up BI_RGB", "AND mask", "alpha zero"] {
+                XCTAssertTrue(definition.description.contains(value), value)
+            }
+            for key in ["width", "height"] {
+                let dimension = try XCTUnwrap(properties[key] as? [String: Any])
+                XCTAssertTrue((dimension["description"] as? String)?.contains("For ico") == true)
+                XCTAssertEqual(dimension["maximum"] as? Int, 1024)
             }
             XCTAssertNil(properties["quality"])
             XCTAssertNil(properties["idempotency_key"])

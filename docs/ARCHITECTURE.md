@@ -1,5 +1,14 @@
 # Forge Conductor architecture
 
+Version: `0.37.0`; build: `53`. `NativeRasterWriter.encodeICO` adds a bounded call-local Swift branch for square 16/32/48/256 images after the existing global dimension/pixel and canonical base64 admission. A 22-byte ICONDIR/entry precedes a 40-byte BI_RGB DIB, bottom-up straight BGRA XOR rows and DWORD-padded alpha-zero AND rows. Exact total output is preflighted before row/mask allocation; the existing Output owner checks cancellation/sticky errors on append and snapshot.
+
+The branch preserves all encoded RGBA bytes; native premultiplied rendering and wire inspection are separate. DocsToolPack retains its own grant, project context, pinned writer, modes and redacted audit; only the existing format enum/path/description and ICO engine/output contract expand. No new tool, input key, framework, dependency, graph member, service, signing policy or production interpreter is added. Matching full raster source/native selections passed **56 methods** in **13.550/24.569 s**; five separate neighbors passed in **2.201/2.504 s**, giving **61 distinct methods per route**. Focused source eight is a subset and adds no distinct methods.
+The common-writer late-cancel/revocation-before-rename E2 boundary remains unexercised, and no native call preemption is claimed. Candidate App/CLI/Qwen wire and seven native ICO/PNG consumer pairs passed in isolated contexts. Two immediate canceled calls were exercised per App/CLI route; cancellation after work has started and the common writer’s late-cancel/revocation-before-rename boundary remain unexercised. Final G3/hygiene/whitespace and exact owner source/wiki delivery outcomes are retained in external root receipts. Projects GitHub Save/reopen/stable identity and filtered Tools web rows remain blocked by the retained CUA native-pipe failure; installed/full-web/all-model/managed-adapter/other-format/Release/shipment gates remain open.
+
+Current candidate identity is the separately preserved ordinary Debug **f477a0b0…**. After the native G3 test action re-signed the prior main, the restored App passed a fresh **0.849 s** run with all **11 artifacts byte-identical** to the original App outputs; the six other compiled artifacts remain exact. Earlier CLI/Qwen and native-consumer results are reused only on the unchanged CLI/core and generated artifact inputs, with no new model or native-consumer invocation. Original candidate/signing evidence remains historical; the current transition is detailed in [the image guide](NATIVE-IMAGE-WRITING.md). Final document recheck and source/wiki delivery outcomes remain in external root receipts.
+
+## Preceding 0.36.3 (52) decoded UTF-8 web qualification
+
 Version: `0.36.3`; build: `52`. `WebToolPack.maximumUTF8ContentBytes` bounds
 text/source content and cursor validation at three times the existing 1 MiB
 receive limit. Base64 cursor validation retains the raw 1 MiB limit. The

@@ -2,7 +2,7 @@
 id: docs
 display_name: Docs
 description: >
-  Write user/developer documentation as Markdown and export PDF manuals, plain-text DOCX, text-only XLSX/ODS, text-slide PPTX or PNG/TIFF/JPEG/GIF/WebP/BMP pixel artifacts.
+  Write user/developer documentation as Markdown and export PDF manuals, plain-text DOCX, text-only XLSX/ODS, text-slide PPTX or PNG/TIFF/JPEG/GIF/WebP/BMP/ICO pixel artifacts.
   Use for README, runbooks, API docs, and PDF user guides.
 tools:
   - fs_read
@@ -38,7 +38,7 @@ when_to_use:
   - Create a text-only XLSX worksheet
   - Create a text-slide PPTX presentation
   - Create a text-only ODS worksheet
-  - Encode supplied pixels into a PNG, TIFF, JPEG, single-image GIF, lossless WebP or BMP artifact
+  - Encode supplied pixels into a PNG, TIFF, JPEG, single-image GIF, lossless WebP, BMP or standard-size ICO artifact
 when_not_to_use:
   - Pure code change with no documentation impact
   - Architecture design without doc deliverable (use plan)
@@ -58,6 +58,7 @@ first_moves:
   - For GIF goals: image_write(path=....gif, width=1, height=1, content="/wAA/w==", format="gif")
   - For WebP goals: image_write(path=....webp, width=1, height=1, content="/wAA/w==", format="webp")
   - For BMP goals: image_write(path=....bmp, width=1, height=1, content="/wAA/w==", format="bmp")
+  - For ICO goals: image_write(path=....ico, width=16, height=16, content="<canonical padded base64 of 1024 RGBA8 bytes>", format="ico")
 done_definition:
   - Requested doc artifacts exist on disk
   - Content matches verified project facts (not invented)
@@ -66,7 +67,7 @@ done_definition:
   - If XLSX was requested, report the actual .xlsx destination and tool result
   - If PPTX was requested, report the actual .pptx destination and tool result
   - If ODS was requested, report the actual .ods destination and tool result
-  - If PNG, TIFF, JPEG, GIF, WebP or BMP was requested, report the actual matching destination and tool result
+  - If PNG, TIFF, JPEG, GIF, WebP, BMP or ICO was requested, report the actual matching destination and tool result
   - files_touched lists every path created or updated
 output_schema:
   - files_touched
@@ -174,7 +175,7 @@ XML 1.0-disallowed scalars are rejected. The tool does not promise formulas,
 formatting, images or Office-suite fidelity. Report exact tool errors and inspect actual artifact
 evidence before claiming workbook completion.
 
-## PNG, TIFF, JPEG, GIF, WebP and BMP pixel workflow
+## PNG, TIFF, JPEG, GIF, WebP, BMP and ICO pixel workflow
 
 Use `image_write(path="<project>/docs/IMAGE.png", width=1, height=1, content="/wAA/w==")`
 with canonical padded base64 straight RGBA8 sRGB pixel bytes, tightly packed in
@@ -207,6 +208,13 @@ Encoded masked channels retain every supplied straight RGBA8 byte, including
 alpha and hidden RGB; native premultiplied rendering is separate. The file has
 an sRGB marker, with no embedded ICC or Windows interoperability guarantee.
 Engine is `apple-imageio`; the existing `pixel_contract` describes input bytes.
+For ICO use exact lowercase `format="ico"` and an explicit `.ico` destination.
+Width and height must be equal and one of 16, 32, 48 or 256. The native Swift
+`swift-ico-dib32` writer produces one bottom-up 32-bit BI_RGB DIB with straight
+RGBA8 channels and a DWORD-padded AND mask whose bits are 1 exactly at alpha zero.
+Encoded pixels retain alpha 0...255 and hidden RGB; native premultiplied rendering
+is separate. Its `output_contract` is `ico-dib32-rgba8-srgb-v1`. The image is
+sRGB-interpreted, without an embedded ICC or Windows interoperability guarantee.
 Destination extensions are case-insensitive.
 Use its own grant. Report the actual destination and tool result after writing;
 this tool encodes supplied pixels.

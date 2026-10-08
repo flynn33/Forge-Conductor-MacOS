@@ -1,5 +1,15 @@
 # Versioning policy
 
+Current target identity is **0.37.0 (53)**. Adding ICO to the existing `image_write` enum is an additive capability and advances the minor version; existing tool names/input keys/defaults/grants remain available. `VERSION`, `BUILD_NUMBER`, compiled constants, twelve marketing/sixteen build values and the two G3 expectations align with that root-selected identity, without graph membership or signing changes.
+
+Matching full raster source/native selections passed **56 methods** in **13.550/24.569 s**; five separate neighbors passed in **2.201/2.504 s**, giving **61 distinct methods per route**. Focused source eight is a subset and adds no distinct methods.
+Candidate build/signature/version checks passed. Candidate App/CLI/Qwen wire and seven native ICO/PNG consumer pairs passed in isolated contexts. Two immediate canceled calls were exercised per App/CLI route; cancellation after work has started and the common writer’s late-cancel/revocation-before-rename boundary remain unexercised. Final G3/hygiene/whitespace and exact owner source/wiki delivery outcomes are retained in external root receipts. Projects GitHub Save/reopen/stable identity and filtered Tools web rows remain blocked by the retained CUA native-pipe failure; installed/full-web/all-model/managed-adapter/other-format/Release/shipment gates remain open.
+Exact later source/wiki publication/readback/synchronization identities belong in external closeout receipts; no commit embeds its own identity.
+
+Current candidate identity is the separately preserved ordinary Debug **f477a0b0…**. After the native G3 test action re-signed the prior main, the restored App passed a fresh **0.849 s** run with all **11 artifacts byte-identical** to the original App outputs; the six other compiled artifacts remain exact. Earlier CLI/Qwen and native-consumer results are reused only on the unchanged CLI/core and generated artifact inputs, with no new model or native-consumer invocation. Original candidate/signing evidence remains historical; the current transition is detailed in [the image guide](NATIVE-IMAGE-WRITING.md). Final document recheck and source/wiki delivery outcomes remain in external root receipts.
+
+## Preceding 0.36.3 (52) decoded UTF-8 web qualification
+
 Current target identity is **0.36.3 (52)**. Correcting an advertised web
 continuation cursor rejected by the old receive-byte limit is a backward-compatible
 patch; it adds no tool or format. The `web.fetch` schema now advertises the
@@ -335,7 +345,7 @@ focused version test, and CI reject drift between them.
 
 ## Current identity
 
-Current source target is `0.36.3`, build `52`, for the decoded UTF-8 cursor correction; preceding phase identities remain unchanged.
+Current source target is `0.37.0`, build `53`, for additive standard-size ICO; preceding phase identities remain unchanged.
 
 Preceding .36.2 identity record (retained):
 

@@ -20,6 +20,364 @@ final class NativeRasterWriterTests: XCTestCase {
         try FileManager.default.removeItem(at: temporaryRoot)
     }
 
+    func testICOStandardSizesOpaqueNativeProfileAndPixels() async throws {
+        try await Task.detached(priority: .utility) {
+            for size in [16, 32, 48, 256] {
+                let pixels = Self.icoPixels(size: size, alphaClass: "opaque")
+                let encoded = try NativeRasterWriter.encode(width: size, height: size,
+                    content: pixels.base64EncodedString(), format: "ico")
+                XCTAssertEqual(try Self.decodedICOWire(encoded, size: size), pixels)
+                XCTAssertEqual(try Self.renderedRaster(encoded, width: size, height: size, type: "com.microsoft.ico"), pixels)
+                let source = try XCTUnwrap(CGImageSourceCreateWithData(encoded as CFData, nil))
+                XCTAssertEqual(CGImageSourceGetType(source) as String?, "com.microsoft.ico")
+                XCTAssertEqual(CGImageSourceGetCount(source), 1)
+                XCTAssertEqual(CGImageSourceGetStatus(source).rawValue, 0)
+                XCTAssertEqual(CGImageSourceGetStatusAtIndex(source, 0).rawValue, 0)
+                XCTAssertEqual(encoded.count, 62 + size * size * 4 + ((size + 31) / 32) * 4 * size)
+            }
+        }.value
+    }
+
+    func testICOWireAllAlphaHiddenRGBANDAndPNGReference() async throws {
+        try await Task.detached(priority: .utility) {
+            for size in [16, 32, 48, 256] {
+                for alphaClass in ["mixed-alpha", "zero-alpha"] {
+                    let pixels = Self.icoPixels(size: size, alphaClass: alphaClass)
+                    if alphaClass == "mixed-alpha" {
+                        XCTAssertEqual(Set(stride(from: 3, to: pixels.count, by: 4).map { pixels[$0] }), Set(UInt8.min...UInt8.max))
+                        XCTAssertEqual(pixels.subdata(in: 0..<3), pixels.subdata(in: 255 * 4..<(255 * 4 + 3)))
+                        XCTAssertEqual(pixels[3], 0); XCTAssertEqual(pixels[255 * 4 + 3], 255)
+                    }
+                    let encoded = try NativeRasterWriter.encode(width: size, height: size,
+                        content: pixels.base64EncodedString(), format: "ico")
+                    // Wire pixels and every alpha0 AND bit include hidden RGB independently of rendering.
+                    XCTAssertEqual(try Self.decodedICOWire(encoded, size: size), pixels)
+                    let png = try NativeRasterWriter.encode(width: size, height: size, content: pixels.base64EncodedString())
+                    let rendered = try Self.renderedRaster(encoded, width: size, height: size, type: "com.microsoft.ico")
+                    XCTAssertEqual(rendered, try Self.renderedRaster(png, width: size, height: size, type: "public.png"))
+                    for at in stride(from: 3, to: pixels.count, by: 4) { XCTAssertEqual(rendered[at], pixels[at]) }
+                }
+            }
+        }.value
+    }
+
+    func testICOMaximumNoisyWirePixelsAndExactOutputBound() async throws {
+        try await Task.detached(priority: .utility) {
+            var state: UInt32 = 0x2468ACE0
+            var pixels = Data(capacity: 256 * 256 * 4)
+            for index in 0..<(256 * 256) {
+                for _ in 0..<3 {
+                    state = state &* 1_664_525 &+ 1_013_904_223
+                    pixels.append(UInt8(truncatingIfNeeded: state >> 24))
+                }
+                pixels.append(UInt8(truncatingIfNeeded: index))
+            }
+            XCTAssertEqual(pixels.count, 262_144)
+            let content = pixels.base64EncodedString()
+            let encoded = try NativeRasterWriter.encode(width: 256, height: 256, content: content, format: "ico")
+            XCTAssertEqual(encoded.count, 270_398)
+            XCTAssertEqual(try Self.decodedICOWire(encoded, size: 256), pixels)
+            let exact = try NativeRasterWriter.encode(width: 256, height: 256, content: content,
+                format: "ico", outputByteLimit: encoded.count)
+            XCTAssertEqual(exact, encoded)
+            for limit in [0, 1, encoded.count - 1, NativeRasterWriter.maximumOutputBytes + 1] {
+                XCTAssertThrowsError(try NativeRasterWriter.encode(width: 256, height: 256, content: content,
+                    format: "ico", outputByteLimit: limit)) { XCTAssertEqual($0 as? NativeRasterError, .outputTooLarge) }
+            }
+            let png = try NativeRasterWriter.encode(width: 256, height: 256, content: content)
+            XCTAssertEqual(try Self.renderedRaster(encoded, width: 256, height: 256, type: "com.microsoft.ico"),
+                try Self.renderedRaster(png, width: 256, height: 256, type: "public.png"))
+        }.value
+    }
+
+    func testICOWorkerPreCancellationStrictInputsAndDimensions() async throws {
+        let content = Self.icoTestPixels.base64EncodedString()
+        try await MainActor.run {
+            XCTAssertTrue(Thread.isMainThread)
+            XCTAssertThrowsError(try NativeRasterWriter.encode(width: 16, height: 16, content: content, format: "ico")) {
+                XCTAssertEqual($0 as? NativeRasterError, .workerRequired)
+            }
+        }
+        try await Task.detached(priority: .utility) {
+            let cancelled = ToolCallCancellation(timeoutSeconds: 10); cancelled.cancel()
+            XCTAssertThrowsError(try NativeRasterWriter.encode(width: 16, height: 16, content: content,
+                format: "ico", cancellation: cancelled)) { XCTAssertTrue($0 is CancellationError) }
+            XCTAssertThrowsError(try NativeRasterWriter.encode(width: 16, height: 16, content: content,
+                format: "ico", cancellation: ToolCallCancellation(timeoutSeconds: 0))) { XCTAssertTrue($0 is ToolCallDeadlineExceeded) }
+            for (width, height) in [(0, 16), (-1, 16), (1, 1), (2, 2), (15, 15), (16, 32), (32, 16),
+                                    (64, 64), (257, 257), (1025, 16), (1024, 1024), (Int.max, Int.max)] {
+                XCTAssertThrowsError(try NativeRasterWriter.encode(width: width, height: height, content: "", format: "ico")) {
+                    XCTAssertEqual(($0 as? NativeRasterError)?.code, "invalid_image_dimensions")
+                }
+            }
+            for value in ["", "AAAAAA", "AAAAAA=", "AAAAAB==", "!!!!AA==", content + "\n", content + " ",
+                          Data(Self.icoTestPixels.dropLast()).base64EncodedString(),
+                          (Self.icoTestPixels + Data([0])).base64EncodedString(),
+                          String(repeating: "A", count: NativeRasterWriter.maximumBase64Bytes + 1)] {
+                XCTAssertThrowsError(try NativeRasterWriter.encode(width: 16, height: 16, content: value, format: "ico")) {
+                    XCTAssertEqual($0 as? NativeRasterError, .invalidContent)
+                }
+            }
+            for pixelFormat in ["bgra8", "RGBA8"] {
+                XCTAssertThrowsError(try NativeRasterWriter.encode(width: 16, height: 16, content: content,
+                    pixelFormat: pixelFormat, format: "ico")) { XCTAssertEqual($0 as? NativeRasterError, .invalidPixelFormat) }
+            }
+            for format in ["ICO", "avif"] {
+                XCTAssertThrowsError(try NativeRasterWriter.encode(width: 16, height: 16, content: content, format: format)) {
+                    XCTAssertEqual($0 as? NativeRasterError, .invalidFormat)
+                }
+            }
+        }.value
+    }
+
+    func testICOSubsetInspectorRejectsMalformedContainerMasksAndPixels() async throws {
+        try await Task.detached(priority: .utility) {
+            let pixels = Self.icoTestPixels
+            let encoded = try NativeRasterWriter.encode(width: 16, height: 16,
+                content: pixels.base64EncodedString(), format: "ico")
+            XCTAssertEqual(try Self.decodedICOWire(encoded, size: 16), pixels)
+            var invalid = [Data(encoded.dropLast()), encoded + Data([0]), Data(encoded.prefix(50))]
+            for (at, value) in [(14, UInt32(encoded.count - 23)), (18, 23), (22, 124), (26, 32),
+                                (30, UInt32(bitPattern: -32)), (38, 3), (42, 1), (46, 1), (58, 1)] {
+                var changed = encoded
+                for shift in 0..<4 { changed[at + shift] = UInt8(truncatingIfNeeded: value >> (shift * 8)) }
+                invalid.append(changed)
+            }
+            for (at, value) in [(0, UInt8(1)), (2, 2), (4, 2), (6, 32), (8, 1), (9, 1), (10, 2), (12, 24), (34, 2), (36, 24)] {
+                var changed = encoded; changed[at] = value; invalid.append(changed)
+            }
+            // Source alpha0 is top-left. Its bottom-up mask row is last, bit7.
+            let maskStart = 62 + 16 * 16 * 4, topMask = maskStart + 15 * 4
+            var missing = encoded; missing[topMask] &= 0x7f; invalid.append(missing)
+            var partial = encoded; partial[topMask] |= 0x40; invalid.append(partial)
+            var padding = encoded; padding[topMask + 2] = 1; invalid.append(padding)
+            for data in invalid { XCTAssertThrowsError(try Self.decodedICOWire(data, size: 16)) }
+            for size in [1, 2, 15, 32, 64, Int.max] { XCTAssertThrowsError(try Self.decodedICOWire(encoded, size: size)) }
+            var changed = encoded; changed[62] ^= 1
+            var expected = pixels; expected[(15 * 16) * 4 + 2] ^= 1
+            XCTAssertEqual(try Self.decodedICOWire(changed, size: 16), expected)
+            XCTAssertNotEqual(expected, pixels)
+        }.value
+    }
+
+    func testICOToolMetadataReadbackAndWriteProtections() async throws {
+        let root = try XCTUnwrap(temporaryRoot)
+        try await Task.detached(priority: .utility) { [root] in
+            try Self.withToolApp(root: root) { app, client, project in
+                let prior = Data("ICO destination sentinel".utf8)
+                let existing = project.appendingPathComponent("replace.ico")
+                try prior.write(to: existing); XCTAssertEqual(Darwin.chmod(existing.path, 0o600), 0)
+                func arguments(_ file: URL) -> [String: Any] {
+                    ["path": file.path, "width": 16, "height": 16, "content": Self.icoTestPixels.base64EncodedString(), "format": "ico"]
+                }
+                for file in [existing, project.appendingPathComponent("fresh.ico"), project.appendingPathComponent("uppercase.ICO")] {
+                    let result = try app.tools.call(name: "image_write", arguments: arguments(file), clientID: client)
+                    XCTAssertTrue(result.ok, "\(result.payload)")
+                    let bytes = try Data(contentsOf: file)
+                    XCTAssertEqual(try Self.decodedICOWire(bytes, size: 16), Self.icoTestPixels)
+                    XCTAssertEqual(result.payload["format"] as? String, "ico")
+                    XCTAssertEqual(result.payload["engine"] as? String, "swift-ico-dib32")
+                    XCTAssertEqual(result.payload["path"] as? String, file.path)
+                    XCTAssertEqual(result.payload["width"] as? Int, 16); XCTAssertEqual(result.payload["height"] as? Int, 16)
+                    XCTAssertEqual(result.payload["pixel_format"] as? String, "rgba8")
+                    XCTAssertEqual(result.payload["color_space"] as? String, "srgb")
+                    XCTAssertEqual(result.payload["pixel_bytes"] as? Int, 1024)
+                    XCTAssertEqual(result.payload["pixel_contract"] as? String, NativeRasterWriter.pixelContract)
+                    XCTAssertEqual(result.payload["output_contract"] as? String, "ico-dib32-rgba8-srgb-v1")
+                    XCTAssertEqual(result.payload["bytes_written"] as? Int, bytes.count)
+                    XCTAssertEqual(result.payload["sha256"] as? String, JSONSupport.sha256Hex(bytes))
+                    XCTAssertNil(result.payload["content"])
+                    XCTAssertEqual((try FileManager.default.attributesOfItem(atPath: file.path)[.posixPermissions] as? NSNumber)?.intValue,
+                        file == existing ? 0o600 : 0o644)
+                    let read = try app.tools.call(name: "fs_read", arguments: ["path": file.path, "encoding": "base64", "maximum_bytes": 32768], clientID: client)
+                    XCTAssertTrue(read.ok, "\(read.payload)")
+                    XCTAssertEqual(Data(base64Encoded: try XCTUnwrap(read.payload["content"] as? String)), bytes)
+                }
+                for (name, format) in [("protected.png", "ico"), ("protected.tiff", "ico"), ("protected.jpg", "ico"),
+                                       ("protected.gif", "ico"), ("protected.webp", "ico"), ("protected.bmp", "ico"),
+                                       ("protected.ico", "png"), ("protected.ico", "bmp"),
+                                       ("protected.ico", "absent"), ("no-extension", "ico")] {
+                    let file = project.appendingPathComponent(name); try prior.write(to: file)
+                    var value = arguments(file)
+                    if format == "absent" { value.removeValue(forKey: "format") } else { value["format"] = format }
+                    let result = try app.tools.call(name: "image_write", arguments: value, clientID: client)
+                    XCTAssertFalse(result.ok); XCTAssertEqual(result.payload["code"] as? String, "invalid_path")
+                    XCTAssertEqual(try Data(contentsOf: file), prior)
+                }
+                let outside = root.appendingPathComponent("ico-outside", isDirectory: true)
+                try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+                let outsideFile = outside.appendingPathComponent("target.ico"); try prior.write(to: outsideFile)
+                let link = project.appendingPathComponent("alias", isDirectory: true)
+                try FileManager.default.createSymbolicLink(at: link, withDestinationURL: outside)
+                let symlink = try XCTUnwrap(try DocsToolPack().handle(name: "image_write",
+                    arguments: arguments(link.appendingPathComponent("target.ico")), context: nil, clientID: client, app: app, cancellation: nil))
+                XCTAssertFalse(symlink.ok); XCTAssertEqual(symlink.payload["code"] as? String, "image_write_failed")
+                XCTAssertEqual(try Data(contentsOf: outsideFile), prior)
+                XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: outside.path), ["target.ico"])
+                let directory = project.appendingPathComponent("directory.ico", isDirectory: true)
+                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                try prior.write(to: directory.appendingPathComponent("keep"))
+                let rename = try XCTUnwrap(try DocsToolPack().handle(name: "image_write", arguments: arguments(directory),
+                    context: nil, clientID: client, app: app, cancellation: nil))
+                XCTAssertFalse(rename.ok); XCTAssertEqual(rename.payload["code"] as? String, "image_write_failed")
+                XCTAssertEqual(try Data(contentsOf: directory.appendingPathComponent("keep")), prior)
+                XCTAssertTrue(app.audit.flushAttempts(timeout: 2))
+                let event = try XCTUnwrap(app.audit.recent(limit: 32).first(where: { $0.tool == "image_write" && $0.status == "ok" }))
+                XCTAssertFalse(event.argsJSON?.contains(Self.icoTestPixels.base64EncodedString()) == true)
+                XCTAssertTrue(event.argsJSON?.contains("redacted") == true)
+                XCTAssertFalse(try FileManager.default.contentsOfDirectory(atPath: project.path).contains { $0.hasPrefix(".forge-") })
+            }
+        }.value
+    }
+
+    func testICOToolStrictArgumentsPreserveDestination() async throws {
+        let root = try XCTUnwrap(temporaryRoot)
+        try await Task.detached(priority: .utility) { [root] in
+            try Self.withToolApp(root: root) { app, client, project in
+                let destination = project.appendingPathComponent("strict.ico")
+                let prior = Data("preserve ICO destination".utf8); try prior.write(to: destination)
+                var valid = Self.icoArguments(path: destination.path); valid["format"] = "ico"
+                var cases: [([String: Any], String)] = []
+                for path in [7, true, NSNull(), " \n", "nul\u{0}.ico", project.appendingPathComponent("no-extension").path] as [Any] {
+                    var value = valid; value["path"] = path; cases.append((value, "invalid_path"))
+                }
+                var missingPath = valid; missingPath.removeValue(forKey: "path"); cases.append((missingPath, "invalid_path"))
+                for (key, values, code) in [
+                    ("width", [true, "16", 0, 15, 32, 1025, 2.5] as [Any], "invalid_image_dimensions"),
+                    ("height", [false, NSNull(), -1, 15, 32, 1025, 1.5] as [Any], "invalid_image_dimensions"),
+                    ("content", [7, false, NSNull(), "", "AAAAAB=="] as [Any], "invalid_content"),
+                    ("pixel_format", [7, NSNull(), "bgra8", "RGBA8"] as [Any], "invalid_pixel_format")
+                ] {
+                    for replacement in values { var value = valid; value[key] = replacement; cases.append((value, code)) }
+                }
+                var missingContent = valid; missingContent.removeValue(forKey: "content"); cases.append((missingContent, "invalid_content"))
+                for key in ["width", "height"] {
+                    var missing = valid; missing.removeValue(forKey: key); cases.append((missing, "invalid_image_dimensions"))
+                }
+                for format in [true, NSNull(), "ICO", "avif"] as [Any] {
+                    // Preserve extension-before-format validation: invalid tokens
+                    // fall back to PNG path routing before the format type check.
+                    var png = valid; png["path"] = project.appendingPathComponent("strict.png").path
+                    png["format"] = format; cases.append((png, "invalid_image_format"))
+                    var ico = valid; ico["format"] = format; cases.append((ico, "invalid_path"))
+                }
+                for (arguments, code) in cases {
+                    let result = try XCTUnwrap(try DocsToolPack().handle(name: "image_write", arguments: arguments,
+                        context: nil, clientID: client, app: app, cancellation: nil))
+                    XCTAssertFalse(result.ok, "\(arguments)"); XCTAssertEqual(result.payload["code"] as? String, code)
+                    XCTAssertEqual(try Data(contentsOf: destination), prior)
+                }
+                for control in [ToolCallCancellation(timeoutSeconds: 10), ToolCallCancellation(timeoutSeconds: 0)] {
+                    if !control.isDeadlineExceeded { control.cancel() }
+                    XCTAssertThrowsError(try DocsToolPack().handle(name: "image_write", arguments: valid,
+                        context: nil, clientID: client, app: app, cancellation: control)) {
+                        XCTAssertTrue($0 is CancellationError || $0 is ToolCallDeadlineExceeded)
+                    }
+                }
+                XCTAssertEqual(try Data(contentsOf: destination), prior)
+                XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: project.path), ["strict.ico"])
+            }
+        }.value
+    }
+
+    func testICOStaleProjectContextAndOwnGrantPreventWrites() async throws {
+        let root = try XCTUnwrap(temporaryRoot)
+        try await Task.detached(priority: .utility) { [root] in
+            try Self.withToolApp(root: root) { app, client, project in
+                let prior = Data("protected ICO".utf8)
+                let outside = root.appendingPathComponent("owner-authorized.ico")
+                XCTAssertFalse(outside.path.hasPrefix(project.path + "/"))
+                let value: [String: Any] = ["path": outside.path, "width": 16, "height": 16,
+                    "content": Self.icoTestPixels.base64EncodedString(), "format": "ico"]
+                let owner = try app.tools.call(name: "image_write", arguments: value, clientID: client)
+                XCTAssertTrue(owner.ok, "\(owner.payload)")
+                XCTAssertEqual(try Self.decodedICOWire(Data(contentsOf: outside), size: 16), Self.icoTestPixels)
+                try prior.write(to: outside)
+                let context = try app.projectContexts.invocationContext(for: client)
+                let deniedClient = ClientID("ico-denied-client")
+                _ = try app.projectContexts.bind(owner: ProjectBindingOwner(kind: .mcpClient, id: deniedClient.rawValue),
+                    projectID: context.projectID, generation: context.projectGeneration,
+                    authorizationScope: ToolAuthorizationScope(canonicalRoots: context.authorizationScope.canonicalRoots,
+                        allowedTools: ["fs_read", "fs_write"], networkAllowed: context.authorizationScope.networkAllowed,
+                        maximumInlineOutputBytes: context.authorizationScope.maximumInlineOutputBytes))
+                let denied = try app.tools.call(name: "image_write", arguments: value, clientID: deniedClient)
+                XCTAssertFalse(denied.ok); XCTAssertEqual(denied.payload["code"] as? String, "tool_not_granted")
+                XCTAssertEqual(try Data(contentsOf: outside), prior)
+                _ = try app.projectContexts.beginReset(projectID: context.projectID, expectedGeneration: context.projectGeneration)
+                _ = try app.projectContexts.completeReset(projectID: context.projectID, expectedGeneration: context.projectGeneration)
+                let stale = try XCTUnwrap(try DocsToolPack().handle(name: "image_write", arguments: value,
+                    context: context, clientID: client, app: app, cancellation: nil))
+                XCTAssertFalse(stale.ok); XCTAssertEqual(stale.payload["code"] as? String, "image_encode_failed")
+                XCTAssertEqual(try Data(contentsOf: outside), prior)
+                XCTAssertTrue(try FileManager.default.contentsOfDirectory(atPath: project.path).isEmpty)
+            }
+        }.value
+    }
+
+    private static var icoTestPixels: Data { icoPixels(size: 16, alphaClass: "mixed-alpha") }
+
+    private static func icoArguments(path: String) -> [String: Any] {
+        ["path": path, "width": 16, "height": 16, "content": icoTestPixels.base64EncodedString(), "format": "ico"]
+    }
+
+    private static func icoPixels(size: Int, alphaClass: String) -> Data {
+        var pixels = Data(capacity: size * size * 4)
+        for y in 0..<size { for x in 0..<size {
+            let index = y * size + x
+            let alpha: UInt8 = alphaClass == "opaque" ? 255 : alphaClass == "zero-alpha" ? 0 : UInt8(truncatingIfNeeded: index)
+            let rgb: [UInt8]
+            if index == 0 && alphaClass != "mixed-alpha" { rgb = [0, 0, 0] }
+            else if [0, 1, 255, 256].contains(index) { rgb = [17, 83, 191] }
+            else { rgb = [UInt8(truncatingIfNeeded: x * 17 + y * 3),
+                          UInt8(truncatingIfNeeded: x * 7 + y * 29), UInt8(truncatingIfNeeded: index * 11 + 19)] }
+            pixels.append(contentsOf: rgb); pixels.append(alpha)
+        } }
+        return pixels
+    }
+
+    // Test-only restricted single BI_RGB32 DIB reader. Native rendering is a separate oracle.
+    // Microsoft ICONDIR/BITMAPINFOHEADER: bottom-up XOR and AND rows, doubled positive height.
+    // https://learn.microsoft.com/en-us/windows/win32/api/wingdi/ns-wingdi-bitmapinfoheader
+    private static func decodedICOWire(_ data: Data, size: Int) throws -> Data {
+        guard [16, 32, 48, 256].contains(size) else { throw FixtureError.malformed }
+        let rowBytes = size * 4, maskStride = ((size + 31) / 32) * 4
+        let rawBytes = rowBytes * size, maskStart = 62 + rawBytes
+        guard data.count == maskStart + maskStride * size,
+              data.count <= NativeRasterWriter.maximumOutputBytes else { throw FixtureError.malformed }
+        func short(_ at: Int) throws -> UInt16 {
+            guard at >= 0, at <= data.count - 2 else { throw FixtureError.malformed }
+            return UInt16(data[at]) | UInt16(data[at + 1]) << 8
+        }
+        func word(_ at: Int) throws -> UInt32 {
+            guard at >= 0, at <= data.count - 4 else { throw FixtureError.malformed }
+            var value: UInt32 = 0
+            for shift in 0..<4 { value |= UInt32(data[at + shift]) << (shift * 8) }
+            return value
+        }
+        guard try short(0) == 0, try short(2) == 1, try short(4) == 1,
+              Int(data[6]) == size % 256, Int(data[7]) == size % 256, data[8] == 0, data[9] == 0,
+              try short(10) == 1, try short(12) == 32, try word(14) == UInt32(data.count - 22), try word(18) == 22,
+              try word(22) == 40, try word(26) == UInt32(size), try word(30) == UInt32(size * 2),
+              try short(34) == 1, try short(36) == 32,
+              (38..<62).allSatisfy({ data[$0] == 0 }) else { throw FixtureError.malformed }
+        var raw = Data(repeating: 0, count: rawBytes)
+        for fileRow in 0..<size {
+            let y = size - 1 - fileRow
+            let mask = data.subdata(in: (maskStart + fileRow * maskStride)..<(maskStart + (fileRow + 1) * maskStride))
+            for x in 0..<size {
+                let pixel = try word(62 + fileRow * rowBytes + x * 4)
+                let destination = (y * size + x) * 4
+                for (channel, shift) in [16, 8, 0, 24].enumerated() { raw[destination + channel] = UInt8(truncatingIfNeeded: pixel >> shift) }
+                let masked = mask[x / 8] & UInt8(0x80 >> (x % 8)) != 0
+                guard masked == (raw[destination + 3] == 0) else { throw FixtureError.malformed }
+            }
+            for bit in size..<(maskStride * 8) {
+                guard mask[bit / 8] & UInt8(0x80 >> (bit % 8)) == 0 else { throw FixtureError.malformed }
+            }
+        }
+        return raw
+    }
+
     func testBMPOnePixelProducesOneNativeReadableSRGBImage() async throws {
         try await Task.detached(priority: .utility) {
             let pixels = Data([17, 83, 191, 255])

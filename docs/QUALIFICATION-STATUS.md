@@ -1,5 +1,21 @@
 # Version and qualification status
 
+Current source target **0.37.0, build 53** adds standard-size ICO to `image_write`. Exact lowercase `format: "ico"` requires an explicit case-insensitive `.ico` destination and equal width/height of **16, 32, 48 or 256**. The call-local Swift writer preserves all supplied alpha and hidden RGB in one bottom-up 32-bit BI_RGB DIB with a padded AND mask. Native premultiplied rendering is separate; no embedded ICC or Windows interoperability is promised.
+
+Missing-feature baselines executed exactly one failed method per source/native route in **6.822/43.672 s**, normal exits **1/65**, unforced/full EOF, before production edits; both remain **NONPASS**. After admission, focused source eight passed in **13.931 s**. Matching full raster source/native selections passed **56 methods** in **13.550/24.569 s**; five separate neighbors passed in **2.201/2.504 s**, giving **61 distinct methods per route**. Focused source eight is a subset and adds no distinct methods.
+All passing post-change runs had zero failures/skips, normal 0/unforced/full EOF and unchanged 464 inputs; the 56-method selection preserves the complete prior 48 methods byte-for-byte. Five neighbors cover catalog/schema/replay and exact integral/fractional/type/range image wire admission. This is 61-method focused qualification, not a full-suite result or one 61-test invocation.
+
+CLI/app compilation passed in **0.890/0.902 s**; ordinary Debug/strict signature in **1.953/0.135 s**, and native CLI version in **0.614 s**, normal 0/unforced/full EOF. Candidate **78bfcd19…** binds seven artifacts, actual **0.37.0/53** and the unchanged **464-input 3d6f16dd… map**.
+Prior current/prior/protected artifacts stayed unchanged; workspace/memberships/signing are retained. Actual signed App/CLI wire runs passed in **0.893/0.822 s**; each exercised **23 groups, 46 responses, 44 tool frames, 17 negatives, two immediate cancellations and 11 artifacts**. Qwen completed three observed Low turns and consumed two intact actual tool results in **96.856 s**. The separate native consumer passed seven ICO/PNG pairs with 14 measured provider teardown witnesses.
+[Native image writing](NATIVE-IMAGE-WRITING.md) carries full receipt hashes and exact ICO contract/bounds.
+
+Candidate App/CLI/Qwen wire and seven native ICO/PNG consumer pairs passed in isolated contexts. Two immediate canceled calls were exercised per App/CLI route; cancellation after work has started and the common writer’s late-cancel/revocation-before-rename boundary remain unexercised. Final G3/hygiene/whitespace and exact owner source/wiki delivery outcomes are retained in external root receipts. Projects GitHub Save/reopen/stable identity and filtered Tools web rows remain blocked by the retained CUA native-pipe failure; installed/full-web/all-model/managed-adapter/other-format/Release/shipment gates remain open.
+No additional GUI pass follows the preceding .36.3 Doctor/Dashboard-only observation. Original native ICO encoder/PNG-wrapper/small-DIB NONPASSs and the separate .36.3 web/Qwen evidence remain retained. Current wire/model/native-consumer results have their own root receipts; final document/publication identities remain external and are not substituted with earlier-format results.
+
+Current candidate identity is the separately preserved ordinary Debug **f477a0b0…**. After the native G3 test action re-signed the prior main, the restored App passed a fresh **0.849 s** run with all **11 artifacts byte-identical** to the original App outputs; the six other compiled artifacts remain exact. Earlier CLI/Qwen and native-consumer results are reused only on the unchanged CLI/core and generated artifact inputs, with no new model or native-consumer invocation. Original candidate/signing evidence remains historical; the current transition is detailed in [the image guide](NATIVE-IMAGE-WRITING.md). Final document recheck and source/wiki delivery outcomes remain in external root receipts.
+
+## Preceding 0.36.3 (52) decoded UTF-8 web qualification
+
 Current source target **0.36.3, build 52** corrects `web.fetch` continuation
 for text that expands when decoded to UTF-8. HTTP receive/base64 cursor bounds
 remain **1,048,576 bytes**; decoded text/source content and cursors are bounded to
@@ -2001,7 +2017,7 @@ Dashboard geometry, minimum/normal containment of every primary view, and
 populated policy evaluation rows. Live completion of the reported owner run,
 universal policy enforcement, and distribution qualification remain open.
 
-Current source target: **0.36.3, build 52**, supporting **macOS 26+**; matching 28 web plus four neighbor methods passed and remaining gates are recorded above.
+Current source target: **0.37.0, build 53**, supporting **macOS 26+**; matching 56 raster plus five neighbor methods passed and remaining gates are recorded above.
 
 Preceding .36.2 identity record (retained):
 
@@ -2040,7 +2056,7 @@ the detailed, source-bound receipts are in the
 
 ## Version and build agreement
 
-The current target is **0.36.3, build 52** for the decoded UTF-8 cursor correction. Matching 28 web plus four neighbors and one separately run initial G3 give 33 distinct source/native methods per route. Candidate builds/signature and App/CLI public web checks passed; Qwen consumed three results, with original strict final-format NONPASS and separate correction retained. GUI v3/v4 remain NONPASS with Projects/filtered Tools gates blocked; final document check results are recorded in external root receipts and exact delivery identities remain external.
+The current target is **0.37.0, build 53** for standard-size ICO. Matching 56 raster plus five separate neighbors give 61 distinct source/native methods per route; focused eight adds no distinct coverage. Candidate build/signature/version, App/CLI/Qwen wire and separate seven-pair native consumer checks passed. Document G3 is a separately executed method, counted only in actual external union receipts. Final check/delivery outcomes remain external. GUI v3/v4 remain NONPASS with Projects/filtered Tools gates blocked; preceding web/Qwen outcomes remain separate and unchanged.
 
 Preceding .36.2 identity record (retained):
 

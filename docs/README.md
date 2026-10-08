@@ -1,5 +1,13 @@
 # Documentation guide
 
+Current source target **0.37.0 (53)** adds standard-size ICO to the existing `image_write` surface. [Native image pixel writing](NATIVE-IMAGE-WRITING.md) records the square 16/32/48/256 DIB/AND contract, exact encoded alpha/hidden RGB and separate native rendering. Matching full raster source/native selections passed **56 methods** in **13.550/24.569 s**; five separate neighbors passed in **2.201/2.504 s**, giving **61 distinct methods per route**. Focused source eight is a subset and adds no distinct methods.
+Candidate build/signature/version, App/CLI/Qwen wire and separate native consumer checks passed within the image scope. Candidate App/CLI/Qwen wire and seven native ICO/PNG consumer pairs passed in isolated contexts. Two immediate canceled calls were exercised per App/CLI route; cancellation after work has started and the common writer’s late-cancel/revocation-before-rename boundary remain unexercised. Final G3/hygiene/whitespace and exact owner source/wiki delivery outcomes are retained in external root receipts. Projects GitHub Save/reopen/stable identity and filtered Tools web rows remain blocked by the retained CUA native-pipe failure; installed/full-web/all-model/managed-adapter/other-format/Release/shipment gates remain open.
+The complete preceding web correction and [unchanged response-budget history](WEB-RESPONSE-BUDGET.md) retain their exact contracts and NONPASS/GUI boundaries.
+
+Current candidate identity is the separately preserved ordinary Debug **f477a0b0…**. After the native G3 test action re-signed the prior main, the restored App passed a fresh **0.849 s** run with all **11 artifacts byte-identical** to the original App outputs; the six other compiled artifacts remain exact. Earlier CLI/Qwen and native-consumer results are reused only on the unchanged CLI/core and generated artifact inputs, with no new model or native-consumer invocation. Original candidate/signing evidence remains historical; the current transition is detailed in [the image guide](NATIVE-IMAGE-WRITING.md). Final document recheck and source/wiki delivery outcomes remain in external root receipts.
+
+## Preceding 0.36.3 (52) decoded UTF-8 web qualification
+
 Current source target **0.36.3 (52)** corrects decoded UTF-8 continuation in
 `web.fetch`. [Web response budgets](WEB-RESPONSE-BUDGET.md) explains the 1 MiB
 raw/base64 and 3 MiB decoded text/source limits, retained baseline failures and
@@ -322,7 +330,7 @@ qualification is not promoted by this UI phase.
 | [Native XLSX writing and import](NATIVE-XLSX-WRITING.md) | Bounded text-cell worksheet creation, cell-value instruction import, retained baseline, scoped qualification and remaining gates |
 | [Native PPTX writing and import](NATIVE-PPTX-WRITING.md) | Bounded text-slide creation, slide-owned instruction import, retained baseline and scoped validation gates |
 | [Native ODS writing and import](NATIVE-ODS-WRITING.md) | Bounded ODF text-cell creation, sheet-labeled instruction import, retained baseline, scoped qualification and remaining gates |
-| [Native image pixel writing](NATIVE-IMAGE-WRITING.md) | Current bounded BMP contract/gates; retained preceding bounded lossless WebP exact file RGBA and separate native rendering; actual source/native 225 plus separate G3 one each, complete PNG/TIFF/JPEG/GIF receipts and installed/delivery boundaries |
+| [Native image pixel writing](NATIVE-IMAGE-WRITING.md) | Current standard-size ICO DIB/AND contract, exact encoded alpha/hidden RGB and separate native rendering; actual 56 raster+five neighbor source/native qualification, signed Debug/App/CLI/Qwen and native-consumer checks, GUI/global boundaries and external delivery receipts, complete preceding BMP/WebP/GIF/JPEG/TIFF/PNG histories |
 | [Native web rendering](NATIVE-WEB-RENDERING.md) | JavaScript snapshots, fixed native child ownership, actual frame budgets and qualification limits |
 | [Binary web and Qwen file workflows](BINARY-WEB-AND-QWEN-FILES.md) | Original HTTP bytes, version alignment, native/model examples and remaining format/browser gates |
 | [Project repository, web access and Qwen verification](PROJECT-WEB-QWEN.md) | GitHub project links, web/file tool additions, actual Qwen findings and current verification boundaries |

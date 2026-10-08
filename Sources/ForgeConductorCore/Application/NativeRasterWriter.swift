@@ -5,12 +5,12 @@ import UniformTypeIdentifiers
 
 enum NativeRasterError: Error, Equatable, LocalizedError {
     case workerRequired, invalidDimensions, invalidContent, invalidPixelFormat, invalidFormat
-    case invalidAlpha, invalidGIFAlpha, outputTooLarge, encoderUnavailable
+    case invalidAlpha, invalidGIFAlpha, invalidICODimensions, outputTooLarge, encoderUnavailable
 
     var code: String {
         switch self {
         case .workerRequired: "image_worker_required"
-        case .invalidDimensions: "invalid_image_dimensions"
+        case .invalidDimensions, .invalidICODimensions: "invalid_image_dimensions"
         case .invalidContent: "invalid_content"
         case .invalidPixelFormat: "invalid_pixel_format"
         case .invalidFormat: "invalid_image_format"
@@ -24,9 +24,10 @@ enum NativeRasterError: Error, Equatable, LocalizedError {
         switch self {
         case .workerRequired: "Image encoding requires a worker thread"
         case .invalidDimensions: "width and height must be integers from 1 through 1024, with at most 262144 pixels"
+        case .invalidICODimensions: "ICO requires equal width and height of 16, 32, 48 or 256"
         case .invalidContent: "content must be canonical padded base64 containing exactly width × height × 4 RGBA8 bytes, at most 1048576 bytes"
         case .invalidPixelFormat: "pixel_format must be rgba8"
-        case .invalidFormat: "format must be png, tiff, jpeg, gif, webp or bmp"
+        case .invalidFormat: "format must be png, tiff, jpeg, gif, webp, bmp or ico"
         case .invalidAlpha: "JPEG requires every RGBA8 alpha byte to be 255; use png or tiff for transparency"
         case .invalidGIFAlpha: "GIF requires every RGBA8 alpha byte to be 0 or 255; use png or tiff for partial transparency"
         case .outputTooLarge: "Encoded image is limited to 2097152 bytes"
@@ -35,7 +36,7 @@ enum NativeRasterError: Error, Equatable, LocalizedError {
     }
 }
 
-/// Call-local PNG/TIFF/WebP/BMP, opaque JPEG and palettized binary-alpha GIF encoding.
+/// Call-local PNG/TIFF/WebP/BMP/ICO, opaque JPEG and palettized binary-alpha GIF encoding.
 enum NativeRasterWriter {
     static let maximumDimension = 1024
     static let maximumPixels = 262_144
@@ -46,6 +47,7 @@ enum NativeRasterWriter {
     static let jpegOutputContract = "jpeg-opaque-lossy-srgb-v1"
     static let gifOutputContract = "gif-binary-alpha-palettized-srgb-v1"
     static let webpOutputContract = "webp-lossless-rgba8-srgb-v1"
+    static let icoOutputContract = "ico-dib32-rgba8-srgb-v1"
 
     static func integerDimension(_ value: Any?) throws -> Int {
         guard let dimension = JSONSupport.exactInteger(value), (1...maximumDimension).contains(dimension) else {
@@ -60,7 +62,7 @@ enum NativeRasterWriter {
                        outputByteLimit: Int = maximumOutputBytes) throws -> Data {
         guard !Thread.isMainThread else { throw NativeRasterError.workerRequired }
         try cancellation?.checkCancellation()
-        guard format == "png" || format == "tiff" || format == "jpeg" || format == "gif" || format == "webp" || format == "bmp" else {
+        guard format == "png" || format == "tiff" || format == "jpeg" || format == "gif" || format == "webp" || format == "bmp" || format == "ico" else {
             throw NativeRasterError.invalidFormat
         }
         guard pixelFormat == "rgba8" else { throw NativeRasterError.invalidPixelFormat }
@@ -69,6 +71,9 @@ enum NativeRasterWriter {
         }
         let (pixels, overflow) = width.multipliedReportingOverflow(by: height)
         guard !overflow, pixels <= maximumPixels else { throw NativeRasterError.invalidDimensions }
+        if format == "ico" {
+            guard width == height, [16, 32, 48, 256].contains(width) else { throw NativeRasterError.invalidICODimensions }
+        }
         let expectedBytes = pixels * 4
         guard content.utf8.prefix(maximumBase64Bytes + 1).count <= maximumBase64Bytes,
               content.utf8.count == ((expectedBytes + 2) / 3) * 4,
@@ -77,6 +82,9 @@ enum NativeRasterWriter {
         try cancellation?.checkCancellation()
         guard outputByteLimit > 0, outputByteLimit <= maximumOutputBytes else {
             throw NativeRasterError.outputTooLarge
+        }
+        if format == "ico" {
+            return try encodeICO(raw, size: width, cancellation: cancellation, outputByteLimit: outputByteLimit)
         }
         if format == "webp" {
             return try encodeWebP(raw, width: width, height: height, cancellation: cancellation, outputByteLimit: outputByteLimit)
@@ -138,6 +146,53 @@ enum NativeRasterWriter {
             encoded.replaceSubrange(3..<6, with: "89a".utf8)
             try cancellation?.checkCancellation()
         }
+        return encoded
+    }
+
+    private static func encodeICO(_ raw: Data, size: Int,
+                                  cancellation: ToolCallCancellation?, outputByteLimit: Int) throws -> Data {
+        try cancellation?.checkCancellation()
+        let rowBytes = size * 4, maskStride = ((size + 31) / 32) * 4
+        let payloadBytes = 40 + raw.count + maskStride * size
+        let totalBytes = 22 + payloadBytes
+        guard totalBytes <= outputByteLimit else { throw NativeRasterError.outputTooLarge }
+        let output = Output(maximumBytes: outputByteLimit, cancellation: cancellation)
+        func short(_ value: UInt16) throws {
+            try output.append(Data([UInt8(truncatingIfNeeded: value), UInt8(truncatingIfNeeded: value >> 8)]))
+        }
+        func word(_ value: UInt32) throws {
+            try output.append(Data((0..<4).map { UInt8(truncatingIfNeeded: value >> ($0 * 8)) }))
+        }
+        // ICONDIR/one ICONDIRENTRY; 0 dimension bytes mean 256.
+        try short(0); try short(1); try short(1)
+        try output.append(Data([UInt8(truncatingIfNeeded: size), UInt8(truncatingIfNeeded: size), 0, 0]))
+        try short(1); try short(32); try word(UInt32(payloadBytes)); try word(22)
+        // Microsoft 40-byte BI_RGB DIB: positive doubled height includes XOR+AND.
+        try word(40); try word(UInt32(size)); try word(UInt32(size * 2)); try short(1); try short(32)
+        for _ in 0..<6 { try word(0) }
+        var row = Data(repeating: 0, count: rowBytes)
+        var mask = Data(repeating: 0, count: maskStride)
+        try raw.withUnsafeBytes { bytes in
+            for y in stride(from: size - 1, through: 0, by: -1) {
+                try cancellation?.checkCancellation()
+                for x in 0..<size {
+                    let source = (y * size + x) * 4, destination = x * 4
+                    row[destination] = bytes[source + 2]; row[destination + 1] = bytes[source + 1]
+                    row[destination + 2] = bytes[source]; row[destination + 3] = bytes[source + 3]
+                }
+                try output.append(row)
+            }
+            for y in stride(from: size - 1, through: 0, by: -1) {
+                try cancellation?.checkCancellation()
+                for at in 0..<maskStride { mask[at] = 0 }
+                for x in 0..<size where bytes[(y * size + x) * 4 + 3] == 0 {
+                    mask[x / 8] |= UInt8(0x80 >> (x % 8))
+                }
+                try output.append(mask)
+            }
+        }
+        let encoded = try output.snapshot()
+        guard encoded.count == totalBytes else { throw NativeRasterError.encoderUnavailable }
         return encoded
     }
 

@@ -1,5 +1,12 @@
 # Telemetry architecture (real-time native)
 
+Current source documentation targets `0.37.0`, build `53`. ICO joins the existing `image_write` documents/tool-card classification and redacted audit surface; no gauge, producer, cadence, delivery queue, timer, telemetry schema or long-lived resource owner changes. Matching full raster source/native selections passed **56 methods** in **13.550/24.569 s**; five separate neighbors passed in **2.201/2.504 s**, giving **61 distinct methods per route**. Focused source eight is a subset and adds no distinct methods.
+Candidate build/signature checks passed; these image tests do not prove general leak freedom or installed telemetry. Candidate App/CLI/Qwen wire and seven native ICO/PNG consumer pairs passed in isolated contexts. Two immediate canceled calls were exercised per App/CLI route; cancellation after work has started and the common writer’s late-cancel/revocation-before-rename boundary remain unexercised. Final G3/hygiene/whitespace and exact owner source/wiki delivery outcomes are retained in external root receipts. Projects GitHub Save/reopen/stable identity and filtered Tools web rows remain blocked by the retained CUA native-pipe failure; installed/full-web/all-model/managed-adapter/other-format/Release/shipment gates remain open.
+
+Current candidate identity is the separately preserved ordinary Debug **f477a0b0…**. After the native G3 test action re-signed the prior main, the restored App passed a fresh **0.849 s** run with all **11 artifacts byte-identical** to the original App outputs; the six other compiled artifacts remain exact. Earlier CLI/Qwen and native-consumer results are reused only on the unchanged CLI/core and generated artifact inputs, with no new model or native-consumer invocation. Original candidate/signing evidence remains historical; the current transition is detailed in [the image guide](NATIVE-IMAGE-WRITING.md). Final document recheck and source/wiki delivery outcomes remain in external root receipts.
+
+## Preceding 0.36.3 (52) decoded UTF-8 web qualification
+
 Current source documentation targets `0.36.3`, build `52`. The correction
 changes decoded web content/cursor bounds at the existing `WebToolPack` owner.
 No telemetry producer, delivery invariant, gauge, timer, audit format or resource
@@ -510,7 +517,7 @@ representative physical-hardware qualification remain open.
 
 ## Version
 
-Current source target: `0.36.3`; build: `52`.
+Current source target: `0.37.0`; build: `53`.
 
 Preceding .36.2 identity record (retained):
 
