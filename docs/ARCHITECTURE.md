@@ -1,6 +1,15 @@
 # Forge Conductor architecture
 
-Version: `0.30.0`; build: `43`. ODS uses bounded call-local Swift encoding and
+Version: `0.31.0`; build: `44`. PNG creation uses a call-local CoreGraphics
+image, ImageIO destination and bounded native data consumer on the existing
+worker path, then the existing project-revalidated pinned writer. No new service,
+application runtime or dependency is introduced. Source/native selections each
+passed 198 distinct methods; CLI/app compilation and ordinary Debug build passed.
+Strict candidate and scoped App/CLI/artifact/Qwen API checks passed. [Contract](NATIVE-IMAGE-WRITING.md).
+
+## Preceding 0.30.0 (43) ODS qualification
+
+Preceding version: `0.30.0`; build: `43`. ODS uses bounded call-local Swift encoding and
 native XML cell extraction under existing tool and pinned-write owners. Scoped
 checks passed; saved packages require reimport. [Contract](NATIVE-ODS-WRITING.md).
 

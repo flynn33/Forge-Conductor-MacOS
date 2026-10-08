@@ -133,7 +133,7 @@ final class ToolDefinitionCatalogTests: XCTestCase {
             }
             let docsTools: Set<String> = [
                 "fs_read", "fs_write", "fs_edit", "fs_list", "fs_glob", "fs_mkdir", "search_text",
-                "shell_exec", "pdf_write", "pdf_from_file", "docx_write", "xlsx_write", "pptx_write", "ods_write", "git_status", "git_diff", "git_log",
+                "shell_exec", "pdf_write", "pdf_from_file", "docx_write", "xlsx_write", "pptx_write", "ods_write", "image_write", "git_status", "git_diff", "git_log",
                 "runtime.capabilities", "python.run",
             ]
             let auditTools: Set<String> = [
@@ -1252,7 +1252,7 @@ final class ToolDefinitionCatalogTests: XCTestCase {
             let catalog = try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames)
             XCTAssertEqual(ProjectInstructionQueueStore.ordinaryDefaultAllowedTools.filter { $0 == "pptx_write" }.count, 1)
             XCTAssertTrue(ContinuityAutomation.progressTools.contains("pptx_write"))
-            let documentTools: Set<String> = ["pdf_write", "pdf_from_file", "docx_write", "xlsx_write", "pptx_write"]
+            let documentTools: Set<String> = ["pdf_write", "pdf_from_file", "docx_write", "xlsx_write", "pptx_write", "image_write"]
             for specs in [app.catalog.all(), AgentCatalog.builtinDefaults()] {
                 let docs = try XCTUnwrap(specs.first { $0.id == "docs" })
                 XCTAssertEqual(Set(docs.tools).intersection(documentTools), documentTools)
@@ -1359,6 +1359,201 @@ final class ToolDefinitionCatalogTests: XCTestCase {
             }
             XCTAssertEqual(code, "tool_not_granted")
             XCTAssertFalse(FileManager.default.fileExists(atPath: source.appendingPathComponent("report.pptx").path))
+        }
+    }
+
+    func testImageWriteHasExactPNGSchemaReplayAndNeighboringDocumentParity() throws {
+        try withProductionApp("image-schema") { app in
+            let catalog = try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames)
+            let definition = try XCTUnwrap(catalog.definition(named: "image_write"))
+            let schema = try definition.inputSchemaObject()
+            let properties = try XCTUnwrap(schema["properties"] as? [String: Any])
+            XCTAssertEqual(Set(properties.keys), ["path", "width", "height", "content", "pixel_format", "format", "deadline_ms"])
+            XCTAssertEqual(schema["required"] as? [String], ["path", "width", "height", "content"])
+            XCTAssertEqual(schema["additionalProperties"] as? Bool, false)
+            XCTAssertTrue(definition.strict)
+            XCTAssertTrue(((properties["path"] as? [String: Any])?["description"] as? String)?.contains("explicit .png") == true)
+            for key in ["width", "height"] {
+                let dimension = try XCTUnwrap(properties[key] as? [String: Any])
+                XCTAssertEqual(dimension["type"] as? String, "integer")
+                XCTAssertEqual(dimension["minimum"] as? Int, 1)
+                XCTAssertEqual(dimension["maximum"] as? Int, 1_024)
+            }
+            let content = try XCTUnwrap(properties["content"] as? [String: Any])
+            XCTAssertEqual(content["type"] as? String, "string")
+            XCTAssertEqual(content["maxLength"] as? Int, 1_398_104)
+            for (key, value) in [("pixel_format", "rgba8"), ("format", "png")] {
+                let format = try XCTUnwrap(properties[key] as? [String: Any])
+                XCTAssertEqual(format["type"] as? String, "string")
+                XCTAssertEqual(format["enum"] as? [String], [value])
+                XCTAssertEqual(format["default"] as? String, value)
+            }
+            XCTAssertNil(properties["idempotency_key"])
+            XCTAssertFalse(ProductionToolReplayCatalog.acceptsDurableIdempotencyArgument.contains("image_write"))
+            XCTAssertEqual(ManagerToolCategory.classify("image_write"), .documents)
+            XCTAssertTrue(ToolRouter.isMutatingTool("image_write"))
+            let replay = try ProductionToolReplayCatalog.classifier(productionToolNames: app.tools.toolNames)
+            XCTAssertEqual(try replay.replayClass(for: "image_write"), .idempotent)
+            for value in ["262144", "1048576", "1398104", "2097152"] { XCTAssertTrue(definition.description.contains(value), value) }
+            let descriptor = try definition.mcpDescriptor()
+            XCTAssertEqual(try JSONSupport.data(from: try XCTUnwrap(descriptor["inputSchema"] as? [String: Any])), definition.inputSchemaJSON)
+            let providerDefinitions = try catalog.providerToolDefinitions(allowedToolNames: ["image_write"])
+            XCTAssertEqual(providerDefinitions.count, 1)
+            let provider = try XCTUnwrap(JSONSerialization.jsonObject(with: try XCTUnwrap(providerDefinitions.first)) as? [String: Any])
+            XCTAssertEqual(provider["name"] as? String, "image_write")
+            XCTAssertEqual(provider["strict"] as? Bool, true)
+            XCTAssertEqual(try JSONSupport.data(from: try XCTUnwrap(provider["parameters"] as? [String: Any])), definition.inputSchemaJSON)
+            let deadline = try XCTUnwrap(properties["deadline_ms"] as? [String: Any])
+            XCTAssertEqual(deadline["minimum"] as? Int, 1)
+            XCTAssertEqual(deadline["maximum"] as? Int, ToolRouter.maximumRequestedDeadlineMilliseconds)
+            let ods = try XCTUnwrap(catalog.definition(named: "ods_write")).inputSchemaObject()
+            XCTAssertEqual(ods["required"] as? [String], ["path", "rows"])
+            XCTAssertEqual(Set(try XCTUnwrap(ods["properties"] as? [String: Any]).keys), ["path", "rows", "deadline_ms"])
+            let docx = try XCTUnwrap(catalog.definition(named: "docx_write")).inputSchemaObject()
+            XCTAssertEqual(docx["required"] as? [String], ["path", "content"])
+            let pdf = try XCTUnwrap(catalog.definition(named: "pdf_write")).inputSchemaObject()
+            XCTAssertEqual(pdf["required"] as? [String], ["path", "content"])
+            let missing = try app.tools.call(name: "image_write", arguments: ["path": "unattached.png", "width": 1, "height": 1, "content": "/wAA/w=="], clientID: ClientID("image-unattached"))
+            XCTAssertEqual(missing.payload["code"] as? String, "project_context_required")
+        }
+    }
+
+    func testImageWriteRejectsRawInvalidPathsAndPreservesPixelsWithoutRootConfinement() throws {
+        try withProductionApp("image-path-admission") { app in
+            let project = app.paths.home.appendingPathComponent("project", isDirectory: true)
+            try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+            let client = ClientID("image-path-admission")
+            let context = ToolInvocationContext(projectID: ProjectID(), projectGeneration: .initial,
+                clientID: client, authorizationScope: ToolAuthorizationScope(canonicalRoots: [project],
+                    allowedTools: ["image_write", "docx_write", "pdf_write"], networkAllowed: false, maximumInlineOutputBytes: 65_536))
+            let authorization = ToolAuthorizationService(paths: app.paths, config: app.config)
+            let invalid: [(String, Any?)] = [("missing", nil), ("number", NSNumber(value: 3)), ("boolean", NSNumber(value: true)),
+                ("null", NSNull()), ("array", ["report.png"]), ("object", ["name": "report.png"]), ("empty", ""), ("blank", " \t\r\n"), ("NUL", "before\u{0000}after.png")]
+            for (label, path) in invalid {
+                var arguments: [String: Any] = ["width": 1, "height": 1, "content": "/wAA/w=="]
+                if let path { arguments["path"] = path }
+                let decision = try authorization.authorize(tool: "image_write", arguments: arguments,
+                    context: context, clientID: client, binding: nil, cancellation: nil)
+                guard case .denied(let code, _) = decision else { XCTFail("Raw image path accepted: \(label)"); continue }
+                XCTAssertEqual(code, "invalid_path", label)
+            }
+            let arguments: [String: Any] = ["path": "relative.png", "width": 1, "height": 1, "content": "/wAA/w==", "pixel_format": "rgba8", "format": "png"]
+            let decision = try authorization.authorize(tool: "image_write", arguments: arguments, context: context, clientID: client, binding: nil, cancellation: nil)
+            let neighbor = try authorization.authorize(tool: "docx_write", arguments: ["path": "relative.png", "content": "plain"], context: context, clientID: client, binding: nil, cancellation: nil)
+            guard case .allowed(let normalized) = decision, case .allowed(let normalizedNeighbor) = neighbor else { return XCTFail("Valid image path must use the existing write normalization") }
+            XCTAssertEqual(normalized["path"] as? String, normalizedNeighbor["path"] as? String)
+            for key in ["content", "pixel_format", "format"] { XCTAssertEqual(normalized[key] as? String, arguments[key] as? String, key) }
+            XCTAssertEqual(normalized["width"] as? Int, 1)
+            XCTAssertEqual(normalized["height"] as? Int, 1)
+            let outside = app.paths.home.appendingPathComponent("outside.png")
+            let hostWide = try authorization.authorize(tool: "image_write", arguments: ["path": outside.path, "width": 1, "height": 1, "content": "/wAA/w=="], context: context, clientID: client, binding: nil, cancellation: nil)
+            guard case .allowed(let normalizedOutside) = hostWide else { return XCTFail("Project roots must not confine owner-authorized image writes") }
+            XCTAssertEqual(normalizedOutside["path"] as? String, outside.resolvingSymlinksInPath().standardizedFileURL.path)
+            let sanitized = ToolAuditSanitizer.sanitize(arguments)
+            XCTAssertFalse(try JSONSupport.string(from: sanitized).contains("/wAA/w=="))
+            XCTAssertEqual(sanitized["path"] as? String, "relative.png")
+            XCTAssertEqual(sanitized["width"] as? Int, 1)
+            XCTAssertEqual(arguments["content"] as? String, "/wAA/w==")
+            XCTAssertFalse(FileManager.default.fileExists(atPath: outside.path))
+            XCTAssertFalse(FileManager.default.fileExists(atPath: project.appendingPathComponent("relative.png").path))
+        }
+    }
+
+    func testImageWriteDefaultEnrollmentPreservesCustomDenialsAndNarrowGrants() throws {
+        try withProductionApp("image-default-grants") { app in
+            let catalog = try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames)
+            XCTAssertEqual(ProjectInstructionQueueStore.ordinaryDefaultAllowedTools.filter { $0 == "image_write" }.count, 1)
+            XCTAssertTrue(ContinuityAutomation.progressTools.contains("image_write"))
+            let documentTools: Set<String> = ["pdf_write", "pdf_from_file", "docx_write", "xlsx_write", "pptx_write", "ods_write", "image_write"]
+            for specs in [app.catalog.all(), AgentCatalog.builtinDefaults()] {
+                let docs = try XCTUnwrap(specs.first { $0.id == "docs" })
+                XCTAssertEqual(Set(docs.tools).intersection(documentTools), documentTools)
+                XCTAssertEqual(docs.tools.filter { $0 == "image_write" }.count, 1)
+                XCTAssertTrue(docs.body.contains("image_write"))
+                for spec in specs where spec.id != "docs" { XCTAssertFalse(spec.tools.contains("image_write"), spec.id) }
+            }
+            let cards = ForgeCollector(paths: app.paths, store: app.store, catalog: app.catalog).collect().mcpTools
+            XCTAssertEqual(cards.filter { $0.name == "image_write" }.count, 1)
+            XCTAssertEqual(try XCTUnwrap(cards.first { $0.name == "image_write" }).pack, "docs")
+            let asset = try XCTUnwrap(app.telemetry.loadStatic("tools-catalog.js"))
+            XCTAssertEqual(String(decoding: asset.0, as: UTF8.self).components(separatedBy: "\"image_write\"").count - 1, 1)
+            XCTAssertEqual(try catalog.definitions(allowedToolNames: ["image_write"]).map(\.name), ["image_write"])
+            let existing = ["fs_write", "docx_write", "xlsx_write", "pptx_write", "ods_write", "pdf_write", "pdf_from_file"]
+            for name in existing {
+                XCTAssertEqual(try catalog.definitions(allowedToolNames: [name]).map(\.name), [name])
+                XCTAssertFalse(ToolGrantSemantics.grants(tool: "image_write", from: [name]))
+                XCTAssertFalse(ToolGrantSemantics.grants(tool: name, from: ["image_write"]))
+            }
+            let custom = """
+            ---
+            id: docs
+            display_name: Owner docs
+            tools:
+              - fs_write
+              - docx_write
+            tools_forbidden:
+              - image_write
+            ---
+            Owner-defined documentation grants.
+            """
+            try custom.write(to: app.paths.agentsDir.appendingPathComponent("docs.md"), atomically: true, encoding: .utf8)
+            app.catalog.reload()
+            let spec = try XCTUnwrap(app.catalog.get("docs"))
+            XCTAssertEqual(spec.source, "custom")
+            XCTAssertEqual(spec.tools, ["fs_write", "docx_write"])
+            XCTAssertEqual(spec.toolsForbidden, ["image_write"])
+            let project = app.paths.home.appendingPathComponent("project", isDirectory: true)
+            try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+            let client = ClientID("image-grant-boundary")
+            let authorization = ToolAuthorizationService(paths: app.paths, config: app.config)
+            for name in existing {
+                for (granted, requested) in [(name, "image_write"), ("image_write", name)] {
+                    let context = ToolInvocationContext(projectID: ProjectID(), projectGeneration: .initial,
+                        clientID: client, authorizationScope: ToolAuthorizationScope(canonicalRoots: [project], allowedTools: [granted], networkAllowed: false, maximumInlineOutputBytes: 65_536))
+                    let decision = try authorization.authorize(tool: requested, arguments: ["path": "report.png", "width": 1, "height": 1, "content": "/wAA/w=="], context: context, clientID: client, binding: nil, cancellation: nil)
+                    guard case .denied(let code, _) = decision else { XCTFail("Grant \(granted) expanded to \(requested)"); continue }
+                    XCTAssertEqual(code, "tool_not_granted")
+                }
+            }
+            let context = ToolInvocationContext(projectID: ProjectID(), projectGeneration: .initial,
+                clientID: client, authorizationScope: ToolAuthorizationScope(canonicalRoots: [project], allowedTools: ["*"], networkAllowed: false, maximumInlineOutputBytes: 65_536))
+            let binding = ActiveBinding(sessionID: SessionID("image-custom-binding"), agentID: spec.id, toolsPrimary: spec.tools, toolsForbidden: spec.toolsForbidden, cwd: project.path)
+            let denied = try authorization.authorize(tool: "image_write", arguments: ["path": "report.png", "width": 1, "height": 1, "content": "/wAA/w=="], context: context, clientID: client, binding: binding, cancellation: nil)
+            guard case .denied(let code, _) = denied else { return XCTFail("Wildcard project grant must preserve custom image denial") }
+            XCTAssertEqual(code, "tool_forbidden")
+            XCTAssertFalse(FileManager.default.fileExists(atPath: project.appendingPathComponent("report.png").path))
+        }
+    }
+
+    func testImageWriteDoesNotExpandImportedExplicitCapabilities() throws {
+        try withProductionApp("image-imported-grants") { app in
+            let projectID = ProjectID()
+            let source = app.paths.home.appendingPathComponent("owner-package", isDirectory: true)
+            try FileManager.default.createDirectory(at: source, withIntermediateDirectories: true)
+            try "Follow the owner's existing document grants.".write(to: source.appendingPathComponent("instructions.md"), atomically: true, encoding: .utf8)
+            let requested = ["fs_read", "docx_write", "xlsx_write", "pptx_write", "ods_write"]
+            let expected = Array(Set(requested).union(["instruction_catalog", "instruction_read"])).sorted()
+            let manifest: [String: Any] = ["schema_version": 1, "package_id": "owner-documents", "version": "1",
+                "mission": "Preserve explicit document capabilities.", "project_id": projectID.description,
+                "entry_documents": ["instructions.md"], "requested_capabilities": requested,
+                "completion_gates": [ProjectInstructionQueueStore.builtInCompletionGate], "resource_policy": ["profile": "project-default"]]
+            try JSONSupport.data(from: manifest).write(to: source.appendingPathComponent("forge-package.json"))
+            let store = try ProjectInstructionQueueStore(paths: app.paths)
+            let snapshot = try store.importPackage(sourceURL: source, projectID: projectID, generation: .initial)
+            let package = try XCTUnwrap(snapshot.packages.first)
+            XCTAssertEqual(package.allowedTools, expected)
+            XCTAssertFalse(package.allowedTools.contains("image_write"))
+            XCTAssertEqual(try XCTUnwrap(try store.snapshot(projectID: projectID, generation: .initial).packages.first).allowedTools, expected)
+            let catalog = try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames)
+            XCTAssertEqual(Set(try catalog.definitions(allowedToolNames: Set(package.allowedTools)).map(\.name)), Set(expected))
+            let client = ClientID("image-imported-grants")
+            let context = ToolInvocationContext(projectID: projectID, projectGeneration: .initial,
+                clientID: client, authorizationScope: ToolAuthorizationScope(canonicalRoots: [source], allowedTools: Set(package.allowedTools), networkAllowed: false, maximumInlineOutputBytes: 65_536))
+            let denied = try ToolAuthorizationService(paths: app.paths, config: app.config).authorize(tool: "image_write",
+                arguments: ["path": "report.png", "width": 1, "height": 1, "content": "/wAA/w=="], context: context, clientID: client, binding: nil, cancellation: nil)
+            guard case .denied(let code, _) = denied else { return XCTFail("Ordinary defaults must not expand an imported explicit image grant") }
+            XCTAssertEqual(code, "tool_not_granted")
+            XCTAssertFalse(FileManager.default.fileExists(atPath: source.appendingPathComponent("report.png").path))
         }
     }
 
@@ -1498,7 +1693,7 @@ final class ToolDefinitionCatalogTests: XCTestCase {
             let catalog = try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames)
             XCTAssertEqual(ProjectInstructionQueueStore.ordinaryDefaultAllowedTools.filter { $0 == "ods_write" }.count, 1)
             XCTAssertTrue(ContinuityAutomation.progressTools.contains("ods_write"))
-            let documentTools: Set<String> = ["pdf_write", "pdf_from_file", "docx_write", "xlsx_write", "pptx_write", "ods_write"]
+            let documentTools: Set<String> = ["pdf_write", "pdf_from_file", "docx_write", "xlsx_write", "pptx_write", "ods_write", "image_write"]
             for specs in [app.catalog.all(), AgentCatalog.builtinDefaults()] {
                 let docs = try XCTUnwrap(specs.first { $0.id == "docs" })
                 XCTAssertEqual(Set(docs.tools).intersection(documentTools), documentTools)

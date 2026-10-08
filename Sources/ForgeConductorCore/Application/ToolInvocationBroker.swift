@@ -121,6 +121,7 @@ public enum ProductionToolReplayCatalog {
         "xlsx_write": .idempotent,
         "pptx_write": .idempotent,
         "ods_write": .idempotent,
+        "image_write": .idempotent,
         "search_text": .readOnly,
         "web.fetch": .readOnly,
         "web.search": .readOnly,

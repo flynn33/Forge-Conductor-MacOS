@@ -1110,7 +1110,7 @@ public final class ProjectInstructionQueueStore: @unchecked Sendable {
         "search_text", "instruction_catalog", "instruction_read", "shell_exec",
         "web.fetch", "web.search", "web.render",
         "git_status", "git_diff", "git_log", "git_add", "git_commit",
-        "pdf_write", "pdf_from_file", "docx_write", "xlsx_write", "pptx_write", "ods_write",
+        "pdf_write", "pdf_from_file", "docx_write", "xlsx_write", "pptx_write", "ods_write", "image_write",
         "runtime.capabilities", "process.run", "shell.run", "bash.run", "python.run",
         "powershell.run", "job.status", "job.read_output", "job.cancel", "job.list",
         "xcode.discover", "xcode.run", "xcode.result", "xcode.debug", "xcode.simulator",

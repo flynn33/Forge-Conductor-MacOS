@@ -1,6 +1,17 @@
 # Project repository, web access and Qwen verification
 
-Current source targets **0.30.0 (43)**. Qwen selected `ods_write` then `fs_read`
+Current source targets **0.31.0 (44)**. PNG writing from supplied RGBA8 pixels
+passed matching 198-method source/native selections, CLI/app compilation and
+ordinary Debug/strict candidate checks. App/CLI controls and seven exact PNGs
+passed. Qwen selected `image_write` then `fs_read`, consumed both actual results
+across three normal API responses, Low 3/3, and acknowledged exact SHA/175 bytes/
+2×2 dimensions. This metadata acknowledgement adds no photographic, full-web,
+all-model or installed-GUI acceptance.
+[PNG contract and gates](NATIVE-IMAGE-WRITING.md).
+
+## Preceding 0.30.0 (43) ODS qualification
+
+The preceding source targets **0.30.0 (43)**. Qwen selected `ods_write` then `fs_read`
 and consumed both actual results, including full base64 readback, across three
 normal API responses, actual Low 3/3. Exact final SHA/2,145 bytes/two rows and
 native 6/6 correlated responses passed with normal exit/EOF. The final

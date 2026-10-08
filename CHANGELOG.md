@@ -10,6 +10,21 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### `0.31.0 (44)` bounded native PNG pixel writing
+
+- Add `image_write(path, width, height, content)` for an explicit `.png` destination
+  and canonical base64 RGBA8/sRGB pixels with straight alpha. Bound dimensions,
+  raw bytes and encoded PNG output; validate MCP dimensions from raw number tokens.
+- Reuse existing worker, grant, context, audit and pinned-write ownership. Preserve
+  filesystem windows, tool deadlines and existing document/web tools.
+- External opaque/partial-alpha 2×2 mechanism probes passed independent PNG byte
+  checks. Source/native selections passed 198 distinct methods each, including G3;
+  CLI/app compilation, ordinary Debug and strict candidate checks passed. App/CLI
+  each passed eight controls; seven exact PNG artifacts and three-response Qwen
+  API consumption passed. Final document G3 passed in source and native; publication/synchronization receipts will be retained externally. Other
+  formats and installed-GUI acceptance stay open.
+  [Contract and gates](docs/NATIVE-IMAGE-WRITING.md).
+
 ### `0.30.0 (43)` native text-cell ODS writing and import
 
 - Add bounded `ods_write(path, rows)` for one text-only ODF 1.3 worksheet and an

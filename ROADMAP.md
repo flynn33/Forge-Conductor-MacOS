@@ -1,8 +1,26 @@
 # Forge Conductor macOS — project roadmap
 
-## Native text-cell ODS writing and import
+## Bounded native PNG pixel writing
 
-Current target **0.30.0 (43)** adds bounded `ods_write` and semantic ODS import.
+Current target **0.31.0 (44)** adds `image_write` for supplied RGBA8 pixels.
+Owning source/native tests, direct builds, strict candidate checks and scoped
+App/CLI/artifact/Qwen checks passed. Final document G3 passed in source and native; publication/synchronization receipts will be retained externally.
+
+| Milestone | Observed evidence or proposed implementation | Remaining gate |
+| --- | --- | --- |
+| Mechanism | External native opaque and partial-alpha 2×2 PNG encodes passed independent signature/CRC/bounded-zlib/filter checks, preserving all sixteen straight RGBA bytes. The host destination inventory did not list WebP. | Mechanism evidence does not qualify a Forge tool, model, other image format or installed application. |
+| Tool and parity | Matching source/canonical native selections each passed 198 distinct methods, including twelve writer cases, four raw-dimension MCP cases, four image catalog cases and G3 once. Exact alpha/row-order pixels, maximum 1 MiB input, bounds, failed-write cleanup, grants/context/audit and existing ODS/PDF/queue/transport parity passed. | Focused 21 is a subset of 198. The selected cases are not full-suite, all-feature, installed-GUI or leak acceptance. |
+| Graph and builds | Existing canonical Core/test targets gained only writer/test membership and version settings. Source/native 58.841/82.947 s, CLI/app 1.015/1.204 s and ordinary Debug 25.252 s passed, exit 0/unforced, on unchanged matching 464-input maps. Package/workspace bytes are unchanged. | Strict signature/seven-binary/resource checks passed. Destination/framework diagnostics are retained; no GUI, performance or leak qualification follows. |
+| Native consumers | Signed App/CLI each passed eight controls, fifteen correlated responses, thirteen tool frames, three exact PNGs/full binary EOF, strict negatives and actual -32800 cancellation with unchanged destination. Seven produced PNGs passed independent CRC/zlib/straight-RGBA checks. Qwen consumed write/read results across three normal API responses, Low 3/3, and acknowledged exact 175-byte/2×2 metadata. | Qwen acknowledgement is metadata only. Isolated candidate/API evidence does not qualify installed GUI, production managed-adapter, photographic synthesis or other formats. |
+| Delivery | README, existing Unreleased and affected documents record the tested bounded phase and retained diagnostics. | Final document G3 passed in source and native. Source/wiki publication/readback/synchronization is recorded in external phase-closeout receipts. Installed/GUI, full web, all models, Release and shipment remain open. |
+
+[PNG contract and gates](docs/NATIVE-IMAGE-WRITING.md).
+
+<a id="native-text-cell-ods-writing-and-import"></a>
+
+## Preceding native text-cell ODS writing and import
+
+Preceding target **0.30.0 (43)** adds bounded `ods_write` and semantic ODS import.
 Final scoped source/native, build/signing, wire/artifact/Core and Qwen checks
 passed. Preceding-map passes and original failed receipts remain separate.
 

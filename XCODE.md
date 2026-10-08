@@ -1,6 +1,16 @@
 # Forge Conductor — Xcode
 
-Current source version **0.30.0**, build **43**. Final source and matching
+Current source version **0.31.0**, build **44**. Native PNG writing uses a
+call-local Apple encoder on the existing worker path. Matching source and
+canonical native selections passed 198 distinct methods each, including G3.
+CLI/app compilation and ordinary Debug build passed on unchanged 464-input maps;
+strict candidate checks and scoped App/CLI/artifact/Qwen execution passed.
+Final document G3 passed in source and native; publication receipts will be retained externally; installation acceptance remains open.
+[Contract and gates](docs/NATIVE-IMAGE-WRITING.md).
+
+## Preceding 0.30.0 (43) ODS qualification
+
+The preceding source version **0.30.0**, build **43**. Final source and matching
 canonical native selections passed 199 distinct methods each, including G3 and
 valid-list rejection, on the same 462 inputs. Final CLI/app, ordinary Debug
 (25.328 s), strict signature and seven-binary/resource checks passed. Framework
@@ -834,7 +844,7 @@ remains `22e7443d13496b3cc08b6e98366bb6d2332e3fd4`; later documentation commits
 do not change the binary identity. The set is ready for owner notarization and
 Apple upload, but is not notarized, stapled, installed, shipped, or released.
 That retained archive used Xcode `MARKETING_VERSION = 0.16.2` and
-`CURRENT_PROJECT_VERSION = 23`. Current source targets `0.30.0 (43)`; the historical build-24 app/archive use
+`CURRENT_PROJECT_VERSION = 23`. Current source targets `0.31.0 (44)`; the historical build-24 app/archive use
 `0.16.3 (24)`; notarization and shipment remain separate.
 
 Implementation revision `91ad90ee7a1e51b7289f4c531ddae4dbbc6812ec`

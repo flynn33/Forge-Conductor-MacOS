@@ -1,6 +1,6 @@
 # Native text-cell ODS writing and import
 
-Current source target is **0.30.0 (43)**. Final source and matching canonical
+Preceding source target is **0.30.0 (43)**. Final source and matching canonical
 native selections passed 199 distinct methods each, including G3 once and
 valid-list rejection. Final build/signing, App/CLI wire, seven independent
 artifacts, two public Core import cases and Qwen API consumption passed.

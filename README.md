@@ -1,6 +1,19 @@
 # Forge Conductor for macOS
 
-Current source targets **0.30.0 (43)**, adding bounded `ods_write` and ODS
+Current source targets **0.31.0 (44)**, adding bounded `image_write` for PNG
+files from supplied RGBA8 pixels. Opaque and partial-alpha 2×2 mechanism probes
+passed independent PNG CRC/zlib pixel checks; they are separate from product
+qualification. Owning source and canonical native selections passed 198 distinct
+methods each, including G3. CLI/app compilation and ordinary Debug build passed.
+Strict candidate checks, App/CLI wire controls, seven independently inspected
+PNGs and Qwen API consumption passed. Final document G3 passed in source and native. Exact source/wiki publication
+and synchronization identities will be retained in external phase receipts. [Contract and gates](docs/NATIVE-IMAGE-WRITING.md).
+Installed/GUI, other image formats, full web, all models, Release and shipment
+remain separate.
+
+## Preceding 0.30.0 (43) ODS qualification
+
+The preceding source targets **0.30.0 (43)**, adding bounded `ods_write` and ODS
 cell-text instruction import. Final source and matching canonical native
 selections passed 199 distinct methods each, including valid-list rejection.
 CLI/app, ordinary Debug and strict candidate checks passed. Final App/CLI wire,
@@ -699,8 +712,8 @@ continuity. The user does not start project work through a Forge Managed Run.
 
 | | |
 |---|---|
-| **Version** | **0.30.0** |
-| **Build** | **43** |
+| **Version** | **0.31.0** |
+| **Build** | **44** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |
@@ -817,8 +830,12 @@ was not exercised; its source selects the running app executable, so the CLI
 receipt does not qualify that path. The full scope and remaining
 distribution limits are in the [qualification record](docs/QUALIFICATION-STATUS.md).
 
-The current version authorities target `0.30.0 (43)`; source/native G3 agreement
-passed within matching 199-method selections. [Current ODS scope](docs/NATIVE-ODS-WRITING.md).
+The current version authorities target `0.31.0 (44)`; G3 passed within the
+matching 198-method source/native selections. CLI/app compilation and ordinary
+Debug build, strict candidate checks and scoped PNG tool/model checks passed.
+Final document G3 passed in source and native; publication/synchronization receipts will be retained externally. [Current PNG scope](docs/NATIVE-IMAGE-WRITING.md).
+The preceding `0.30.0 (43)` source/native G3 agreement passed within matching
+199-method selections. [Preceding ODS scope](docs/NATIVE-ODS-WRITING.md).
 The preceding `0.29.0 (42)` source/native G3 passed within matching 166-method selections.
 [Preceding PPTX qualification](docs/NATIVE-PPTX-WRITING.md).
 The preceding .27.1 source/native G3 agreement passed on its retained inputs.

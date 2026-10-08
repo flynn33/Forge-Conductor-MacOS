@@ -428,6 +428,136 @@ final class MCPProtocolAndDiagnosticsTests: XCTestCase {
         XCTAssertNil(arguments["limit"])
     }
 
+    func testImageDimensionsRejectFractionalRawTokensAcrossAllWireFramings() throws {
+        for field in ["width", "height"] {
+            for framing in ["ndjson", "content-length", "eof"] {
+                for token in ["1.00000000000000001", "1023.99999999999999999",
+                              "1.0000000000000000000000000000000000000000001"] {
+                    let other = field == "width" ? "height" : "width"
+                    let pipe = Pipe()
+                    let body = Data(("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"image_write\",\"arguments\":{\""
+                                     + field + "\":" + token + ",\"" + other + "\":1}}}").utf8)
+                    let packet = framing == "content-length" ? Data("Content-Length: \(body.count)\r\n\r\n".utf8) + body
+                        : framing == "ndjson" ? body + Data([10]) : body
+                    try pipe.fileHandleForWriting.write(contentsOf: packet)
+                    try pipe.fileHandleForWriting.close()
+                    defer { try? pipe.fileHandleForReading.close() }
+                    let reader = MCPStreamReader(handle: pipe.fileHandleForReading)
+                    defer { reader.close() }
+                    let message = try XCTUnwrap(reader.readMessage())
+                    let parameters = try XCTUnwrap(message["params"] as? [String: Any])
+                    let arguments = try XCTUnwrap(parameters["arguments"] as? [String: Any])
+                    XCTAssertEqual(message["id"] as? Int, 1)
+                    XCTAssertTrue(arguments[field] is NSNull, "\(field)/\(framing)/\(token)")
+                    XCTAssertEqual(try NativeRasterWriter.integerDimension(arguments[other]), 1)
+                    XCTAssertThrowsError(try NativeRasterWriter.integerDimension(arguments[field])) { error in
+                        guard let native = error as? NativeRasterError, case .invalidDimensions = native else {
+                            return XCTFail("unexpected error: \(error)")
+                        }
+                    }
+                    XCTAssertNil(try reader.readMessage())
+                }
+            }
+        }
+    }
+
+    func testImageDimensionsRejectTypesRangeAndMachineOverflowOnTheWire() throws {
+        for field in ["width", "height"] {
+            for framing in ["ndjson", "content-length", "eof"] {
+                for token in ["true", "false", "\"1\"", "null", "0", "-1", "1025",
+                              "9223372036854775808", "18446744073709551616"] {
+                    let other = field == "width" ? "height" : "width"
+                    let pipe = Pipe()
+                    let body = Data(("{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"image_write\",\"arguments\":{\""
+                                     + field + "\":" + token + ",\"" + other + "\":1}}}").utf8)
+                    let packet = framing == "content-length" ? Data("Content-Length: \(body.count)\r\n\r\n".utf8) + body
+                        : framing == "ndjson" ? body + Data([10]) : body
+                    try pipe.fileHandleForWriting.write(contentsOf: packet)
+                    try pipe.fileHandleForWriting.close()
+                    defer { try? pipe.fileHandleForReading.close() }
+                    let reader = MCPStreamReader(handle: pipe.fileHandleForReading)
+                    defer { reader.close() }
+                    let message = try XCTUnwrap(reader.readMessage())
+                    let parameters = try XCTUnwrap(message["params"] as? [String: Any])
+                    let arguments = try XCTUnwrap(parameters["arguments"] as? [String: Any])
+                    XCTAssertEqual(message["id"] as? Int, 2)
+                    XCTAssertEqual(try NativeRasterWriter.integerDimension(arguments[other]), 1)
+                    XCTAssertThrowsError(try NativeRasterWriter.integerDimension(arguments[field])) { error in
+                        guard let native = error as? NativeRasterError, case .invalidDimensions = native else {
+                            return XCTFail("unexpected error: \(error)")
+                        }
+                    }
+                    XCTAssertNil(try reader.readMessage())
+                }
+            }
+        }
+    }
+
+    func testImageDimensionsPreserveIntegralNotationAndUnrelatedArguments() throws {
+        for field in ["width", "height"] {
+            for framing in ["ndjson", "content-length", "eof"] {
+                for (token, expected) in [("1.0", 1), ("1e2", 100), ("1.024e3", 1024), ("1024", 1024)] {
+                    let other = field == "width" ? "height" : "width"
+                    let pipe = Pipe()
+                    let body = Data(("{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"image_write\",\"arguments\":{\""
+                                     + field + "\":" + token + ",\"" + other
+                                     + "\":1,\"content\":\"AAAA/w==\",\"measurement\":1.5,\"deadline_ms\":1.5}}}").utf8)
+                    let packet = framing == "content-length" ? Data("Content-Length: \(body.count)\r\n\r\n".utf8) + body
+                        : framing == "ndjson" ? body + Data([10]) : body
+                    try pipe.fileHandleForWriting.write(contentsOf: packet)
+                    try pipe.fileHandleForWriting.close()
+                    defer { try? pipe.fileHandleForReading.close() }
+                    let reader = MCPStreamReader(handle: pipe.fileHandleForReading)
+                    defer { reader.close() }
+                    let message = try XCTUnwrap(reader.readMessage())
+                    let parameters = try XCTUnwrap(message["params"] as? [String: Any])
+                    let arguments = try XCTUnwrap(parameters["arguments"] as? [String: Any])
+                    XCTAssertEqual(message["id"] as? Int, 3)
+                    XCTAssertEqual(try NativeRasterWriter.integerDimension(arguments[field]), expected)
+                    XCTAssertEqual(try NativeRasterWriter.integerDimension(arguments[other]), 1)
+                    XCTAssertEqual(arguments["content"] as? String, "AAAA/w==")
+                    XCTAssertEqual((arguments["measurement"] as? NSNumber)?.doubleValue, 1.5)
+                    XCTAssertEqual((arguments["deadline_ms"] as? NSNumber)?.doubleValue, 1.5)
+                    XCTAssertNil(try reader.readMessage())
+                }
+            }
+        }
+    }
+
+    func testImageDimensionWireRejectionKeepsCorrelationServerAndDestinationIntact() throws {
+        let fixture = try MCPWireFixture(maximumConcurrentRequests: 1)
+        fixture.start()
+        var stopped = false
+        defer { if !stopped { _ = fixture.stop() } }
+        let destination = fixture.projectRoot.appendingPathComponent("invalid-dimension.png")
+        let prior = Data("preserve existing destination".utf8)
+        try prior.write(to: destination)
+        for field in ["width", "height"] {
+            let other = field == "width" ? "height" : "width"
+            let id = "invalid-image-\(field)"
+            let path = try XCTUnwrap(String(data: JSONSerialization.data(withJSONObject: destination.path, options: [.fragmentsAllowed]), encoding: .utf8))
+            try fixture.sendRaw(Data(("{\"jsonrpc\":\"2.0\",\"id\":\"" + id + "\",\"method\":\"tools/call\",\"params\":{\"name\":\"image_write\",\"arguments\":{\"path\":"
+                                     + path + ",\"content\":\"AAAA/w==\",\"" + other + "\":1,\""
+                                     + field + "\":1.0000000000000000000000000000000000000000001}}}\n").utf8))
+            let rejected = try fixture.responses.read(timeout: 3)
+            XCTAssertEqual(rejected["id"] as? String, id)
+            XCTAssertNil(rejected["error"])
+            let result = try XCTUnwrap(rejected["result"] as? [String: Any])
+            let payload = try XCTUnwrap(result["structuredContent"] as? [String: Any])
+            XCTAssertEqual(payload["code"] as? String, "invalid_image_dimensions", field)
+            XCTAssertEqual(result["isError"] as? Bool, true)
+            XCTAssertNil(payload["bytes_written"])
+            XCTAssertEqual(try Data(contentsOf: destination), prior)
+            try fixture.send(["jsonrpc": "2.0", "id": "after-" + id, "method": "ping"])
+            let ping = try fixture.responses.read(timeout: 3)
+            XCTAssertEqual(ping["id"] as? String, "after-" + id)
+            XCTAssertNotNil(ping["result"])
+        }
+        let error = fixture.stop()
+        stopped = true
+        XCTAssertNil(error)
+    }
+
     func testAlreadyExpiredPagedListingResponseHonorsRequestDeadlineDuringProjectContention() async throws {
         try await checkRendererDeadlineDuringProjectContention(timeoutSeconds: 0, toolName: "fs_list")
     }

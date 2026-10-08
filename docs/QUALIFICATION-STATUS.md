@@ -1,6 +1,17 @@
 # Version and qualification status
 
-Current source target **0.30.0, build 43** adds bounded ODS writing and semantic
+Current source target **0.31.0, build 44** adds bounded PNG writing from supplied
+pixels. External opaque/partial-alpha 2×2 probes and independent PNG byte checks
+passed. Matching source/canonical native selections passed 198 distinct methods
+each, including G3; CLI/app compilation, ordinary Debug and strict candidate
+checks passed. App/CLI controls, seven exact PNGs and Qwen API consumption passed.
+Final document G3 passed in source and native; publication/synchronization receipts will be retained externally. Other formats,
+installed/GUI, full web, all models,
+Release and shipment remain open. [Contract](NATIVE-IMAGE-WRITING.md).
+
+## Preceding 0.30.0 (43) ODS qualification
+
+The preceding source target **0.30.0, build 43** adds bounded ODS writing and semantic
 cell import. Final source/native 199 each, canonical build/signing and scoped
 wire/artifact/Core/Qwen checks passed. Original failures and preceding-map passes
 remain separate; broader gates stay open. [Contract](NATIVE-ODS-WRITING.md).
@@ -1659,7 +1670,7 @@ Dashboard geometry, minimum/normal containment of every primary view, and
 populated policy evaluation rows. Live completion of the reported owner run,
 universal policy enforcement, and distribution qualification remain open.
 
-Current source target: **0.30.0, build 43**, supporting **macOS 26+**. The earlier
+Current source target: **0.31.0, build 44**, supporting **macOS 26+**. The earlier
 0.16.3 Developer ID app and archive are recorded in the historical build-24 section;
 that workflow staged the CLI under `~/.forge-conductor` and manually copied the
 app to `/Applications`. It did not exercise a `.pkg` installation, notarization,
@@ -1671,9 +1682,14 @@ the detailed, source-bound receipts are in the
 
 ## Version and build agreement
 
-The current Swift, CLI, Xcode and documentation target is **0.30.0, build 43**.
-Final source/native G3 passed within matching 199-method selections; canonical
-build/signing and scoped ODS runtime checks passed. [Scope](NATIVE-ODS-WRITING.md).
+The current Swift, CLI, Xcode and documentation target is **0.31.0, build 44**.
+G3 passed within matching 198-method source/native selections; CLI/app
+compilation, ordinary Debug/strict candidate and scoped PNG runtime/model checks
+passed. Final document G3 passed in source and native; publication/synchronization receipts will be retained externally.
+[Current PNG scope](NATIVE-IMAGE-WRITING.md).
+
+The preceding .30 source/native G3 passed within matching 199-method selections;
+canonical build/signing and scoped ODS runtime checks passed. [Scope](NATIVE-ODS-WRITING.md).
 
 The preceding .29 source/native G3 passed within matching 166-method selections
 on 458 inputs; canonical build/signing and scoped PPTX runtime gates passed.

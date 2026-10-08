@@ -1,5 +1,5 @@
 // DocsToolPack.swift
-// What: Provides native PDF, plain-text DOCX, text-cell XLSX/ODS, and text-slide PPTX tools to external MCP clients.
+// What: Provides native PDF, plain-text DOCX, text-cell XLSX/ODS, text-slide PPTX, and PNG tools to external MCP clients.
 // How: It translates validated tool arguments into PDFWriter operations and returns
 // bounded, structured success or error payloads.
 // Why: Document capability is an optional module rather than a responsibility of Core routing.
@@ -9,7 +9,7 @@ import Darwin
 import AppKit
 import CryptoKit
 
-/// Documentation tools: PDF write / PDF from file / plain-text DOCX / text-cell XLSX/ODS / text-slide PPTX.
+/// Documentation tools: PDF write / PDF from file / plain-text DOCX / text-cell XLSX/ODS / text-slide PPTX / PNG.
 public struct DocsToolPack: ToolPackHandling {
     private static let maximumSourceBytes = 4 * 1024 * 1024
     private let exporter: NativeDOCXExporter?
@@ -17,7 +17,7 @@ public struct DocsToolPack: ToolPackHandling {
     public init() { exporter = nil }
     init(exporter: NativeDOCXExporter) { self.exporter = exporter }
 
-    public var toolNames: [String] { ["pdf_write", "pdf_from_file", "docx_write", "xlsx_write", "pptx_write", "ods_write"] }
+    public var toolNames: [String] { ["pdf_write", "pdf_from_file", "docx_write", "xlsx_write", "pptx_write", "ods_write", "image_write"] }
 
     public func handle(
         name: String,
@@ -42,9 +42,74 @@ public struct DocsToolPack: ToolPackHandling {
             return try pptxWrite(arguments, context: context, app: app, cancellation: cancellation)
         case "ods_write":
             return try odsWrite(arguments, context: context, app: app, cancellation: cancellation)
+        case "image_write":
+            return try imageWrite(arguments, context: context, app: app, cancellation: cancellation)
         default:
             return nil
         }
+    }
+
+    private func imageWrite(_ args: [String: Any], context: ToolInvocationContext?,
+                            app: ForgeApp, cancellation: ToolCallCancellation?) throws -> ToolResult {
+        guard let path = args["path"] as? String,
+              !path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              !path.utf8.contains(0) else {
+            return .failure(code: "invalid_path", message: "PNG path must be a nonblank string without NUL bytes")
+        }
+        let url = ToolArgHelpers.resolvePath(path)
+        guard url.pathExtension.lowercased() == "png" else {
+            return .failure(code: "invalid_path", message: "An explicit .png destination is required")
+        }
+        guard let content = args["content"] as? String else {
+            return .failure(code: "invalid_content", message: "content must be a base64 string")
+        }
+        let pixelFormat: String
+        if let value = args["pixel_format"] {
+            guard let string = value as? String else {
+                return .failure(code: "invalid_pixel_format", message: "pixel_format must be a string")
+            }
+            pixelFormat = string
+        } else { pixelFormat = "rgba8" }
+        let format: String
+        if let value = args["format"] {
+            guard let string = value as? String else {
+                return .failure(code: "invalid_image_format", message: "format must be a string")
+            }
+            format = string
+        } else { format = "png" }
+        let width: Int
+        let height: Int
+        let encoded: Data
+        do {
+            width = try NativeRasterWriter.integerDimension(args["width"])
+            height = try NativeRasterWriter.integerDimension(args["height"])
+            if let context { try app.projectContexts.validate(context, cancellation: cancellation) }
+            encoded = try NativeRasterWriter.encode(width: width, height: height, content: content,
+                pixelFormat: pixelFormat, format: format, cancellation: cancellation)
+            try cancellation?.checkCancellation()
+            if let context { try app.projectContexts.validate(context, cancellation: cancellation) }
+        } catch is CancellationError { throw CancellationError() }
+        catch let error as ToolCallDeadlineExceeded { throw error }
+        catch let error as NativeRasterError {
+            return .failure(code: error.code, message: error.localizedDescription)
+        } catch {
+            return .failure(code: "image_encode_failed", message: "Native encoding or project authorization failed")
+        }
+        try cancellation?.checkCancellation()
+        do {
+            try FilesystemToolPack.writePinnedText(encoded, to: url, cancellation: cancellation)
+        } catch is CancellationError { throw CancellationError() }
+        catch let error as ToolCallDeadlineExceeded { throw error }
+        catch {
+            return .failure(code: "image_write_failed", message: "Destination write or durability confirmation failed; inspect the destination before retrying")
+        }
+        return .success([
+            "path": url.path, "format": "png", "engine": "apple-imageio",
+            "width": width, "height": height, "pixel_format": "rgba8", "color_space": "srgb",
+            "bytes_written": encoded.count,
+            "sha256": SHA256.hash(data: encoded).map { String(format: "%02x", $0) }.joined(),
+            "pixel_bytes": width * height * 4, "pixel_contract": NativeRasterWriter.pixelContract,
+        ])
     }
 
     private func odsWrite(_ args: [String: Any], context: ToolInvocationContext?,

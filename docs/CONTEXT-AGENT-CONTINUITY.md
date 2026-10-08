@@ -1,6 +1,16 @@
-# Context and agent continuity (v0.30.0)
+# Context and agent continuity (v0.31.0)
 
-Current source documentation targets 0.30.0 (43). `ods_write` joins existing
+Current source documentation targets 0.31.0 (44). `image_write` joins existing
+progress classification without changing handoff, job-reference, ACK, seal or
+successor formats. Owning source/native selections each passed 198 methods,
+including queue/catalog parity; scoped App/CLI and Qwen API checks passed.
+These checks do not qualify automatic rollover. [Contract](NATIVE-IMAGE-WRITING.md).
+
+<a id="context-and-agent-continuity-v0300"></a>
+
+## Preceding 0.30.0 (43) ODS qualification
+
+The preceding source documentation targets 0.30.0 (43). `ods_write` joins existing
 progress classification; handoff, ACK, seal and successor contracts remain.
 Scoped checks passed without qualifying rollover. [Contract](NATIVE-ODS-WRITING.md).
 

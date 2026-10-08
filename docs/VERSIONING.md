@@ -11,7 +11,12 @@ readbacks and ordinary observations retain their explicit limits; no
 installation, notarization, App Store upload or distribution was performed.
 Exact owner publication/readback/synchronization refs are retained externally.
 
-Current target identity is **0.30.0 (43)**. Additive `ods_write` advances the
+Current target identity is **0.31.0 (44)**. Additive `image_write` advances the
+feature component and build. G3 passed within matching 198-method source/native
+selections; CLI/app compilation, ordinary Debug/strict candidate and scoped
+runtime/model checks passed. Final document G3 passed in source and native; publication/synchronization receipts will be retained externally. [Contract and gates](NATIVE-IMAGE-WRITING.md).
+
+The preceding target identity is **0.30.0 (43)**. Additive `ods_write` advances the
 feature component and build; source/native authority and G3 agreement passed.
 [Contract and remaining gates](NATIVE-ODS-WRITING.md).
 
@@ -169,9 +174,16 @@ focused version test, and CI reject drift between them.
 
 ## Current identity
 
-Current source target is `0.30.0`, build `43`. Final source/native G3 passed
-within matching 199-method selections; build/signing and scoped ODS runtime
-checks passed. [Scope](NATIVE-ODS-WRITING.md).
+Current source target is `0.31.0`, build `44`. G3 passed within matching
+198-method source/native selections; CLI/app compilation and ordinary Debug build
+and strict candidate/scoped PNG runtime-model checks passed. Final document G3
+passed in source and native; publication/synchronization receipts will be retained externally. [Scope](NATIVE-IMAGE-WRITING.md).
+
+### Preceding 0.30.0 version agreement
+
+The preceding `0.30.0`, build `43` source/native G3 passed within matching
+199-method selections; build/signing and scoped ODS runtime checks passed.
+[Preceding scope](NATIVE-ODS-WRITING.md).
 
 ### Preceding 0.29.0 version agreement
 

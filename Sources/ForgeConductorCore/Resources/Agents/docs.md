@@ -2,7 +2,7 @@
 id: docs
 display_name: Docs
 description: >
-  Write user/developer documentation as Markdown and export PDF manuals, plain-text DOCX, text-only XLSX/ODS or text-slide PPTX.
+  Write user/developer documentation as Markdown and export PDF manuals, plain-text DOCX, text-only XLSX/ODS, text-slide PPTX or PNG pixel artifacts.
   Use for README, runbooks, API docs, and PDF user guides.
 tools:
   - fs_read
@@ -28,6 +28,7 @@ tools:
   - xlsx_write
   - pptx_write
   - ods_write
+  - image_write
 when_to_use:
   - README, API docs, or runbooks need writing or updates
   - User/developer manual (Markdown and/or PDF)
@@ -37,6 +38,7 @@ when_to_use:
   - Create a text-only XLSX worksheet
   - Create a text-slide PPTX presentation
   - Create a text-only ODS worksheet
+  - Encode supplied pixels into a PNG artifact
 when_not_to_use:
   - Pure code change with no documentation impact
   - Architecture design without doc deliverable (use plan)
@@ -50,6 +52,7 @@ first_moves:
   - For text-only XLSX goals: xlsx_write(path=....xlsx, rows=[["Heading", "Value"]])
   - For text-slide PPTX goals: pptx_write(path=....pptx, slides=[{"title":"Heading","paragraphs":["Body"]}])
   - For text-only ODS goals: ods_write(path=....ods, rows=[["Heading", "Value"]])
+  - For PNG goals: image_write(path=....png, width=1, height=1, content="/wAA/w==")
 done_definition:
   - Requested doc artifacts exist on disk
   - Content matches verified project facts (not invented)
@@ -58,6 +61,7 @@ done_definition:
   - If XLSX was requested, report the actual .xlsx destination and tool result
   - If PPTX was requested, report the actual .pptx destination and tool result
   - If ODS was requested, report the actual .ods destination and tool result
+  - If PNG was requested, report the actual .png destination and tool result
   - files_touched lists every path created or updated
 output_schema:
   - files_touched
@@ -164,6 +168,18 @@ text is preserved without line normalization, including formula-like strings.
 XML 1.0-disallowed scalars are rejected. The tool does not promise formulas,
 formatting, images or Office-suite fidelity. Report exact tool errors and inspect actual artifact
 evidence before claiming workbook completion.
+
+## PNG pixel workflow
+
+Use `image_write(path="<project>/docs/IMAGE.png", width=1, height=1, content="/wAA/w==")`
+with canonical padded base64 straight RGBA8 sRGB pixel bytes, tightly packed in
+top-to-bottom row-major order, and an explicit `.png` path.
+Width and height must be integers from 1 to 1024, at most 262144 total pixels.
+Content must decode to exactly `width * height * 4` bytes, at most 1048576 bytes;
+base64 is limited to 1398104 characters and PNG output to 2097152 bytes.
+Optional `pixel_format` accepts only `rgba8` and `format` only `png`, defaulting
+only when absent. Use its own grant. Report the actual destination and tool
+result after writing; this tool encodes supplied pixels.
 
 ## Text-only ODS workflow
 

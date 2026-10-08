@@ -1031,6 +1031,27 @@ public final class MCPStreamReader {
 
     private func decodeMessage(_ data: Data) throws -> [String: Any] {
         var message = try JSONSupport.object(from: data)
+        if message["method"] as? String == "tools/call",
+           var parameters = message["params"] as? [String: Any],
+           parameters["name"] as? String == "image_write",
+           var arguments = parameters["arguments"] as? [String: Any] {
+            do {
+                let checked = try JSONSupport.validatingIntegerFields(in: data, maximumBytes: maximumMessageBytes) { path in
+                    path == ["params", "arguments", "width"] || path == ["params", "arguments", "height"]
+                        ? .required : nil
+                }
+                return try JSONSupport.object(from: checked)
+            } catch {
+                // Keep the request correlated and the stream usable. The image
+                // writer rejects this dimension before encoding or path writes.
+                let field = (error as? ManagerSettingsValidationError)?.field == "params.arguments.height"
+                    ? "height" : "width"
+                arguments[field] = NSNull()
+                parameters["arguments"] = arguments
+                message["params"] = parameters
+                return message
+            }
+        }
         guard message["method"] as? String == "tools/call",
               var parameters = message["params"] as? [String: Any],
               parameters["name"] as? String == "fs_list",

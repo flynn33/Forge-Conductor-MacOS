@@ -1,6 +1,13 @@
 # Telemetry architecture (real-time native)
 
-Current source documentation targets `0.30.0`, build `43`. `ods_write` joins
+Current source documentation targets `0.31.0`, build `44`. `image_write` joins
+existing tool-card/docs classification. Source/native catalog parity passed
+within matching 198-method selections; signed App/CLI tool checks passed;
+no producer, timer or performance repair is claimed. [Contract](NATIVE-IMAGE-WRITING.md).
+
+## Preceding 0.30.0 (43) ODS qualification
+
+The preceding source documentation targets `0.30.0`, build `43`. `ods_write` joins
 existing tool-card/docs classification. Scoped checks passed, with no producer,
 timer or performance repair claimed. [Contract](NATIVE-ODS-WRITING.md).
 
