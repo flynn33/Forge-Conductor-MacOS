@@ -1,5 +1,172 @@
 # Native image pixel writing
 
+## Additive GIF phase — 0.34.0 (47), bounded source/candidate qualification
+
+Current source target is **0.34.0 (47)**. Bounded GIF source/native, direct builds,
+strict candidate, signed App/CLI controls, seven independent production artifacts
+and actual Qwen write/read consumption passed. Final-document checks and delivery
+use external closeout receipts; they do not widen the runtime scope. Complete
+JPEG/TIFF/PNG sections below retain their original evidence and NONPASS records.
+
+### Tested GIF contract
+
+Existing `image_write` keeps required `path`, `width`, `height`, `content`, optional
+`pixel_format: "rgba8"`, own grant, replay behavior and absent-format default PNG.
+Explicit `format: "gif"` requires a case-insensitive `.gif` extension; append none.
+TIFF/JPEG contracts remain. No new input field, tool, service, dependency,
+production runtime, graph membership or signing protection is introduced.
+
+Input remains canonical padded base64 of tightly packed top-to-bottom straight
+RGBA8/sRGB with `pixel_contract: "rgba8-straight-srgb-v1"`. GIF accepts alpha
+**0 or 255**. Alpha **1...254** returns `invalid_image_alpha` with exact message
+`GIF requires every RGBA8 alpha byte to be 0 or 255; use png or tiff for partial transparency`
+before ImageIO encoding or destination writing. Partial alpha is not flattened.
+
+GIF returns `output_contract: "gif-binary-alpha-palettized-srgb-v1"` and
+`engine: "apple-imageio"`. ImageIO palette RGB can change even with at most
+256 colors; exact decoded RGB and hidden RGB under alpha zero are unpromised.
+sRGB interpretation carries no raw embedded ICC promise. Output contains one
+image, without animation. The observed ImageIO encoder emitted GIF87a with a
+graphic control extension (GCE249). Production normalizes only the finalized
+signature to GIF89a. The owning source/native header method compared every
+subsequent byte and native provider pixels before/after normalization; all seven
+production runtime artifacts independently inspected as GIF89a/full EOF.
+
+Dimensions remain 1...1024, at most 262144 pixels, exactly width×height×4 decoded
+bytes (at most 1048576), canonical base64 at most 1398104 UTF-8 bytes and encoded
+output at most 2097152 bytes. Worker enforcement, bounded first-error output,
+cooperative cancellation, project-context revalidation, pinned write, mode
+preservation, audit redaction and grant isolation passed in the selected scope.
+Native-call preemption remains unexercised. Late-cancel-before-rename/revocation
+also remains unexercised, common-writer source E2 only; this phase does not close it.
+
+### Observed mechanism and source checkpoints
+
+The revised external native mechanism and independent review passed **35**
+encodes (**26 GIF plus three PNG, three JPEG and three TIFF**) and **five
+controls**, including independent GIF
+structure/LZW and native pixel comparisons. Examined binary-alpha cases preserved
+alpha; palette color loss was observed. Same-run repeat equality is not cross-OS
+determinism; probe release callbacks are not product leak proof. Decoded native
+sRGB profile equality does not prove raw ICC embedding. Mechanism signatures
+remain the observed GIF87a/GCE combination; normalization was not executed there.
+
+Root review `native-gif-root-mechanism-review-0340-v2.json`, SHA
+`9f8a95935a8d87ea2467dbba5cc8738f96dbab55073b555ba70b18efb85c6d96`;
+independent review `native-gif-independent-review-0340-v2.json`, SHA
+`f6ffd6950fa199db10b513f21a0520d9fc0a29e8eb67468f3b59736e44d7ed25`.
+The absent-feature source baseline executed one method and failed with
+`format must be png, tiff or jpeg`; retain that NONPASS on its original inputs.
+The first focused raster source checkpoint passed **32 methods** in **16.716 s**
+(exit 0, unforced; log SHA
+`92d57669c644b78c8ca2c4b959dc20aa9c4ef6e60f2b472fea1cdda413c6402d`).
+It preceded the ninth GIF header-audit addition. That one source method passed
+in **8.667 s** before version advancement (log SHA
+`cf3831d30989b55a76aa9e08ec12609c555e1a9132db692d4f7ff4b91ff7db79`).
+Neither checkpoint substitutes for current owning source/native selections;
+focused methods are subsets and repeated methods add no distinct coverage.
+
+### Current owning source/native and build evidence
+
+The current source selection passed **218 methods** in **72.701 s**, excluding
+document-dependent G3. The separate initial-document G3 passed **one method**
+in **1.526 s**. Their union is **219 distinct methods**, matching the canonical
+native selection, which passed **219** in **72.081 s**. All had zero failures/skips,
+exit 0, unforced completion and unchanged matching **464 source inputs**. This
+is a selected owning scope, not a full-suite or installed-product pass. Repeating
+G3/focused methods does not increase the 219 distinct count.
+
+| Owning class | Distinct methods |
+| --- | ---: |
+| NativeRasterWriterTests | 33 (12 PNG, five TIFF, seven JPEG, nine GIF) |
+| MCPProtocolAndDiagnosticsTests | 44 |
+| ToolDefinitionCatalogTests | 35 |
+| ProjectInstructionQueueTests | 40 |
+| NativeODSReaderTests / NativeODSWriterTests | 13 / 15 |
+| PDFWriterTests | 35 |
+| Core audit / G3 | 3 / 1 |
+
+The nine GIF methods cover one-pixel/native-readable GIF89a, header/body and
+native-provider equivalence, palette/binary-alpha row order, dimensions and
+maximum noisy input, first/middle/last partial-alpha rejection, worker/cancel/
+bounds, metadata/full readback/mode/protections, stale context/own grant and
+malformed-container inspection. Retained PNG/TIFF/JPEG methods passed separately.
+
+Source log SHA `c7a1ac97187289c2d0ef643794d356af2b01c66a5d2b21156faef57ef87fe1e8`;
+initial G3 log SHA `c78b12e044daf01f75c623eec7d255804a317f6975b0890d27ac6d71366a1663`;
+native log SHA `d8ffc642897bc980aa36f165306ef889926686493ade3c573a29099eacb141d0`.
+
+CLI compilation **0.899 s**, app compilation **0.895 s**, ordinary canonical
+Debug build **27.360 s** and strict signature **0.129 s** passed, exit 0,
+unforced and same 464-input map. Existing canonical source/resource/test
+memberships and signing protections remain; the project changes only twelve
+marketing/sixteen build-version values. Source-map SHA is
+`6a55d5bc1c82c705be2113057ce732e15e5754ce4f979c1b43575ad5d44ec9c8`.
+Destination/DVT launch diagnostics, `nw_path_necp` 22 and linkd `NSCocoaErrorDomain`
+4097 remain in native logs. No compiler warning/error was observed in ordinary
+Debug; this is not diagnostic-free, performance or lifetime qualification.
+
+Strict candidate `native-gif-native-candidate-0340.json`, SHA
+`f8ed4def7fde8b575aac5b70780c3e76c91c8d272c678eee0a743cf645c2f5b4`, binds the
+current seven binaries, packaged source/version inputs and three protected
+installed/registration inputs. Current seven/protected three and prior .33
+candidate seven remained unchanged across exercised App/CLI/Qwen modes.
+
+### Signed App/CLI, production artifact and actual Qwen evidence
+
+Revision-two signed App and packaged CLI each passed **ten logical groups**:
+three positive fixtures, six negative groups (**nine actual calls**) and one
+actual **32×64 cancellation**. Each consumed **twenty correlated responses**
+and **eighteen tool frames**, with normal exit 0 and full stdout/stderr EOF.
+Negative cases cover typed path, extension/default-format pairing, format type/
+token, dimensions, base64 and partial alpha. Cancellation returned the actual
+cancelled result and preserved the destination. Outer durations were **1.192 s**
+(App) and **0.866 s** (CLI), without deadline, output cap or forced cleanup.
+
+All **seven actual production GIFs** (three App, three CLI, one Qwen) passed the
+independent bounded GIF89a structure, single-image/trailer/full EOF, LZW,
+palette and exact binary-alpha oracle. Opaque, all-transparent and mixed-alpha
+App/CLI outputs were 62/49/62 bytes. Opaque RGB maximum difference was zero only
+for these examined fixtures; the external mechanism observed palette loss.
+No general exact-RGB, hidden transparent RGB or raw embedded ICC promise follows.
+Runtime artifact inspection is separate from source/native ImageIO decode tests.
+
+Actual `qwen/qwen3.8-27b` completed **three normal API responses** in **33.875 s**;
+Low was observed in all three template events. Two actual `image_write`/`fs_read`
+results were selected, attempted, fully written, correlated, verified, delivered
+and consumed by later completed turns. Actual MCP text, structured result and
+follow-up API tool content agreed. Native transport consumed **six responses**
+and **four tool frames**, exit 0/full EOF. Final acknowledgement matched the
+strict four scalar fields: **62 bytes**, **2×2**, SHA
+`dabdcab74e352ac7c76018c363f4f6819607ca39abf7d1a4f6e9bb79a4581f17`.
+This is metadata acknowledgement, not image understanding or photographic synthesis.
+All source/current candidate/protected/harness/owned-artifact guards remained true.
+
+Root qualification `native-gif-root-qualification-0340.json`, SHA
+`a46adb4acd70ad28d78fd654ae49b2314fa67038c9657c7c5a6f990340677c98`, binds actual
+method sets, terminal receipts, candidate and revision-two runtime summaries.
+
+The separate **105 external parser/LZW and synthetic failed-native owner controls**
+passed: `native-gif-parser-owner-controls-0340.json`, SHA
+`e63abb38a3a619e5f6ce2b0f4e117ca2f844983831550c2dc78e601bc7da589c`.
+They exercise the frozen independent parser and synthetic gate fixtures; they
+are not product XCTest methods, 35 mechanism encodes or additional real runtime
+runs. Original absent-feature NONPASS and earlier checkpoints retain their scope.
+
+### Delivery and retained host boundary
+
+Final-document G3 and exact source/wiki publication, readback and synchronization are tracked in external closeout receipts.
+No source/wiki commit identity is inserted into its own documents. These scoped
+source/candidate/API results do not qualify an installation or shipment.
+
+The retained fresh installed status/catalog diagnostic is **0.18.0**, with build
+**28** independently read from installed Info.plist and **76 actual tools**;
+`web_search`, `web_fetch`, `web_render` were absent. Qwen's count of 66 was wrong.
+That status observation qualifies no installation or web request.
+Installed GUI, production managed-adapter, full web, all models, other formats, Release and shipment remain open.
+Pixels are supplied by the caller; palette conversion and model metadata
+acknowledgement establish no photographic synthesis or image understanding.
+
 ## Additive JPEG phase — 0.33.0 (46)
 
 Current source target is **0.33.0 (46)**. Bounded opaque JPEG and preserved

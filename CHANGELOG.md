@@ -10,6 +10,28 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### `0.34.0 (47)` additive native single-image GIF pixel writing
+
+- Add explicit `format: "gif"` and case-insensitive `.gif` to existing
+  `image_write`, preserving absent-format PNG and explicit TIFF/JPEG.
+- GIF accepts alpha 0/255; alpha 1...254 returns `invalid_image_alpha` before
+  writing. Palette RGB can change even with at most 256 colors; hidden RGB is
+  unpromised. GIF-only output contract is `gif-binary-alpha-palettized-srgb-v1`;
+  retained `rgba8-straight-srgb-v1` describes supplied input.
+- Interpret sRGB without an embedded ICC promise; one image only. Normalize
+  the finalized GIF87a signature to GIF89a without changing subsequent bytes;
+  source/native header-equivalence and native consumer pixel checks passed.
+- Source 218 plus separate G3 one and canonical native 219 distinct methods
+  passed; CLI/app/ordinary Debug and strict candidate passed. Signed App/CLI
+  negative/cancellation controls, seven independent production GIF checks and
+  actual Qwen write/read consumption passed. Qwen acknowledged metadata only.
+  External 35 native mechanism encodes/five controls and 105 parser/synthetic
+  owner controls retain separate scopes; earlier focused passes are subsets.
+- Final-document G3 and exact source/wiki publication, readback and synchronization are tracked in external closeout receipts.
+  Native-call preemption and common-writer late-cancel/revocation E2 remain open.
+  Installed GUI, production managed-adapter, full web, all models, other formats, Release and shipment remain open.
+  [GIF contract and receipts](docs/NATIVE-IMAGE-WRITING.md).
+
 ### `0.33.0 (46)` additive native opaque JPEG pixel writing
 
 - Extend existing `image_write` with explicit `format: "jpeg"` and case-insensitive

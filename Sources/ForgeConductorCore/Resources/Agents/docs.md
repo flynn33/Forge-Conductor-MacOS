@@ -2,7 +2,7 @@
 id: docs
 display_name: Docs
 description: >
-  Write user/developer documentation as Markdown and export PDF manuals, plain-text DOCX, text-only XLSX/ODS, text-slide PPTX or PNG/TIFF/JPEG pixel artifacts.
+  Write user/developer documentation as Markdown and export PDF manuals, plain-text DOCX, text-only XLSX/ODS, text-slide PPTX or PNG/TIFF/JPEG/GIF pixel artifacts.
   Use for README, runbooks, API docs, and PDF user guides.
 tools:
   - fs_read
@@ -38,7 +38,7 @@ when_to_use:
   - Create a text-only XLSX worksheet
   - Create a text-slide PPTX presentation
   - Create a text-only ODS worksheet
-  - Encode supplied pixels into a PNG or TIFF artifact
+  - Encode supplied pixels into a PNG, TIFF, JPEG or single-image GIF artifact
 when_not_to_use:
   - Pure code change with no documentation impact
   - Architecture design without doc deliverable (use plan)
@@ -55,6 +55,7 @@ first_moves:
   - For PNG goals: image_write(path=....png, width=1, height=1, content="/wAA/w==")
   - For TIFF goals: image_write(path=....tiff, width=1, height=1, content="/wAA/w==", format="tiff")
   - For JPEG goals: image_write(path=....jpg, width=1, height=1, content="/wAA/w==", format="jpeg")
+  - For GIF goals: image_write(path=....gif, width=1, height=1, content="/wAA/w==", format="gif")
 done_definition:
   - Requested doc artifacts exist on disk
   - Content matches verified project facts (not invented)
@@ -63,7 +64,7 @@ done_definition:
   - If XLSX was requested, report the actual .xlsx destination and tool result
   - If PPTX was requested, report the actual .pptx destination and tool result
   - If ODS was requested, report the actual .ods destination and tool result
-  - If PNG or TIFF was requested, report the actual matching destination and tool result
+  - If PNG, TIFF, JPEG or GIF was requested, report the actual matching destination and tool result
   - files_touched lists every path created or updated
 output_schema:
   - files_touched
@@ -171,7 +172,7 @@ XML 1.0-disallowed scalars are rejected. The tool does not promise formulas,
 formatting, images or Office-suite fidelity. Report exact tool errors and inspect actual artifact
 evidence before claiming workbook completion.
 
-## PNG, TIFF and JPEG pixel workflow
+## PNG, TIFF, JPEG and GIF pixel workflow
 
 Use `image_write(path="<project>/docs/IMAGE.png", width=1, height=1, content="/wAA/w==")`
 with canonical padded base64 straight RGBA8 sRGB pixel bytes, tightly packed in
@@ -186,6 +187,12 @@ TIFF preserves the same straight RGBA8 sRGB pixel contract. For JPEG supply
 must be 255; use PNG/TIFF for transparency. JPEG uses fixed quality 1.0 and lossy
 output, so decoded RGB may differ. Its `output_contract` is
 `jpeg-opaque-lossy-srgb-v1`; `pixel_contract` describes the supplied RGBA8 bytes.
+For GIF use `format="gif"` and an explicit `.gif` destination. Every alpha byte
+must be 0 or 255; partial alpha is rejected before writing. GIF palette encoding
+may change RGB even with 256 or fewer source colors, and transparent hidden RGB
+is not preserved. Its `output_contract` is `gif-binary-alpha-palettized-srgb-v1`;
+`pixel_contract` describes supplied bytes, not exact decoded GIF pixels.
+The output is one GIF89a image; animation and embedded ICC are not promised.
 Use its own grant. Report the actual destination and tool result after writing;
 this tool encodes supplied pixels.
 

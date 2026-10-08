@@ -160,7 +160,7 @@ public final class AgentCatalog: AgentCatalogProviding, @unchecked Sendable {
             AgentSpec(
                 id: "docs",
                 displayName: "Docs",
-                description: "Write Markdown documentation and export PDF manuals, plain-text DOCX, text-only XLSX/ODS, text-slide PPTX or PNG/TIFF/JPEG pixel artifacts via native tools.",
+                description: "Write Markdown documentation and export PDF manuals, plain-text DOCX, text-only XLSX/ODS, text-slide PPTX or PNG/TIFF/JPEG/GIF pixel artifacts via native tools.",
                 tools: ["fs_read", "fs_write", "fs_edit", "fs_list", "fs_glob", "fs_mkdir", "search_text", "shell_exec", "pdf_write", "pdf_from_file", "docx_write", "xlsx_write", "pptx_write", "ods_write", "image_write", "git_status", "git_diff", "git_log", "runtime.capabilities", "python.run", "job.status", "job.read_output", "job.cancel", "job.list"],
                 toolsForbidden: ["git_push", "git_commit"],
                 whenToUse: ["README", "PDF manual", "plain-text DOCX", "text-only XLSX", "text-only ODS", "text-slide PPTX", "PNG pixel artifact", "TIFF pixel artifact", "runbook", "API docs"],
@@ -210,7 +210,12 @@ public final class AgentCatalog: AgentCatalogProviding, @unchecked Sendable {
                 and an explicit .jpg or .jpeg path; every alpha byte must be 255.
                 JPEG uses fixed quality 1.0 with lossy output; decoded RGB may differ.
                 Its output_contract is jpeg-opaque-lossy-srgb-v1, while pixel_contract
-                describes the supplied bytes. Report the actual destination and result;
+                describes the supplied bytes. For GIF use format="gif" and an explicit
+                .gif path; every alpha byte must be 0 or 255. Partial alpha is rejected.
+                GIF palette encoding may change RGB; hidden transparent RGB is not
+                preserved. Its output_contract is gif-binary-alpha-palettized-srgb-v1.
+                GIF is one image, with no animation or embedded ICC guarantee.
+                Report the actual destination and result;
                 this tool encodes supplied pixels.
                 For PDF use pdf_write / pdf_from_file (no pandoc). Always fill files_touched
                 and call agent_run_complete. Never claim PDF done without a file on disk.

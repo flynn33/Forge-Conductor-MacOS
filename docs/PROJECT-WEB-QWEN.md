@@ -1,5 +1,21 @@
 # Project repository, web access and Qwen verification
 
+Current source target **0.34.0 (47)** adds bounded GIF to supplied-pixel
+`image_write`, preserving PNG/TIFF/JPEG. Signed App/CLI controls and Qwen API
+consumption passed. Actual `qwen/qwen3.8-27b` completed three normal responses,
+Low observed 3/3, with two actual write/read results delivered and consumed.
+Its final acknowledgement matched 62-byte/2×2 metadata; this is no image-understanding
+claim. Source 218 plus separate G3 one and matching canonical native 219 passed;
+direct builds and strict candidate passed. The project GitHub-linking and full-web
+goals remain in force. The retained installed .18.0/build-28 diagnostic observed
+76 actual tools with all three web tools absent; it qualifies no new installation
+or web request.
+Final-document G3 and exact source/wiki publication, readback and synchronization are tracked in external closeout receipts.
+Installed GUI, production managed-adapter, full web, all models, other formats, Release and shipment remain open.
+[GIF contract and receipts](NATIVE-IMAGE-WRITING.md).
+
+## Preceding 0.33.0 (46) JPEG qualification
+
 Current source targets **0.33.0 (46)** for opaque lossy JPEG support in
 `image_write`. Matching source/native passed 210 methods each; direct CLI/app
 and ordinary Debug builds passed.

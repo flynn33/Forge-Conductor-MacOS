@@ -1,5 +1,21 @@
 # Forge Conductor architecture
 
+Version: `0.34.0`; build: `47`. GIF extends the call-local ImageIO path,
+rejecting alpha 1...254 before encoding/writing and normalizing only a finalized
+GIF87a signature to GIF89a. The source/native header method verified identical
+subsequent bytes and native consumer pixels. Palette RGB and hidden transparent
+RGB have no exact-output promise; sRGB interpretation has no embedded ICC promise.
+Existing bounded output, worker, context and pinned-write owners remain, with
+PNG/TIFF/JPEG and graph membership preserved.
+Source **218 methods plus one separate G3** and canonical native **219 distinct methods** passed with matching method sets and zero failures/skips. Direct builds, strict candidate, signed App/CLI controls and actual Qwen consumption passed within the bounded GIF scope.
+Native-call preemption and late-cancel-before-rename/revocation remain unexercised;
+the latter remains common-writer source E2.
+Final-document G3 and exact source/wiki publication, readback and synchronization are tracked in external closeout receipts.
+Installed GUI, production managed-adapter, full web, all models, other formats, Release and shipment remain open.
+[Contract](NATIVE-IMAGE-WRITING.md).
+
+## Preceding 0.33.0 (46) JPEG qualification
+
 Version: `0.33.0`; build: `46`. JPEG extends the call-local ImageIO path
 with fixed quality 1.0 and no thumbnail, remaining lossy. The worker validates
 canonical straight RGBA8/sRGB and rejects any alpha byte below 255 before native

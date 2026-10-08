@@ -1,5 +1,17 @@
 # Forge Conductor for macOS
 
+Current source target **0.34.0 (47)** adds bounded single-image GIF to
+`image_write`, preserving PNG/TIFF/JPEG. Explicit `format: "gif"` requires a
+case-insensitive `.gif` destination and binary alpha (0 or 255). Palette RGB
+can change even with at most 256 colors; hidden transparent RGB is unpromised.
+Source **218 methods plus one separate G3** and canonical native **219 distinct methods** passed with matching method sets and zero failures/skips. Direct builds, strict candidate, signed App/CLI controls and actual Qwen consumption passed within the bounded GIF scope.
+Qwen acknowledged artifact metadata; image understanding is unqualified.
+Final-document G3 and exact source/wiki publication, readback and synchronization are tracked in external closeout receipts.
+Installed GUI, production managed-adapter, full web, all models, other formats, Release and shipment remain open.
+[GIF contract and receipts](docs/NATIVE-IMAGE-WRITING.md).
+
+## Preceding 0.33.0 (46) JPEG qualification
+
 Current source targets **0.33.0 (46)**, adding bounded opaque JPEG to
 `image_write` while preserving PNG/TIFF. Explicit `format: "jpeg"` requires
 `.jpg`/`.jpeg`; fixed ImageIO quality 1.0 remains lossy and nonopaque input
@@ -736,8 +748,8 @@ continuity. The user does not start project work through a Forge Managed Run.
 
 | | |
 |---|---|
-| **Version** | **0.33.0** |
-| **Build** | **46** |
+| **Version** | **0.34.0** |
+| **Build** | **47** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |
@@ -853,6 +865,12 @@ attached context; `fs_list`, `git_status`, `instruction_catalog`, and
 was not exercised; its source selects the running app executable, so the CLI
 receipt does not qualify that path. The full scope and remaining
 distribution limits are in the [qualification record](docs/QUALIFICATION-STATUS.md).
+
+The current target is `0.34.0 (47)` for bounded GIF. Matching 219 distinct
+source/native methods, direct builds, strict candidate and scoped App/CLI/Qwen
+checks passed. Final-document G3 and exact source/wiki publication, readback and synchronization are tracked in external closeout receipts. [GIF scope](docs/NATIVE-IMAGE-WRITING.md).
+
+Preceding .33 identity and qualification record (retained):
 
 The current target is `0.33.0 (46)` for opaque lossy JPEG. Matching 210-method
 source/native selections and CLI/app/ordinary Debug passed. Strict candidate, signed App/CLI controls, independent raw JPEG inspection and Qwen API consumption passed.

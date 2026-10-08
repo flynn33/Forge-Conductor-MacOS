@@ -20,6 +20,282 @@ final class NativeRasterWriterTests: XCTestCase {
         try FileManager.default.removeItem(at: temporaryRoot)
     }
 
+    func testGIFOnePixelProducesOneNativeReadableGIF89aImage() async throws {
+        try await Task.detached(priority: .utility) {
+            let encoded = try NativeRasterWriter.encode(width: 1, height: 1,
+                content: "/wAA/w==", format: "gif")
+            try Self.inspectGIF(encoded, width: 1, height: 1)
+            XCTAssertEqual(encoded.prefix(6), Data("GIF89a".utf8))
+            XCTAssertLessThanOrEqual(encoded.count, NativeRasterWriter.maximumOutputBytes)
+            let source = try XCTUnwrap(CGImageSourceCreateWithData(encoded as CFData, nil))
+            XCTAssertEqual(CGImageSourceGetType(source) as String?, "com.compuserve.gif")
+            XCTAssertEqual(CGImageSourceGetCount(source), 1)
+            let image = try XCTUnwrap(CGImageSourceCreateImageAtIndex(source, 0, nil))
+            XCTAssertEqual(image.width, 1); XCTAssertEqual(image.height, 1)
+        }.value
+    }
+
+    func testGIFHeaderNormalizationPreservesNativeBodyAndConsumerPixels() async throws {
+        try await Task.detached(priority: .utility) {
+            let pixels = Self.binaryPixels
+            let space = try XCTUnwrap(CGColorSpace(name: CGColorSpace.sRGB))
+            let provider = try XCTUnwrap(CGDataProvider(data: pixels as CFData))
+            let image = try XCTUnwrap(CGImage(width: 2, height: 2, bitsPerComponent: 8, bitsPerPixel: 32,
+                bytesPerRow: 8, space: space,
+                bitmapInfo: [.byteOrder32Big, CGBitmapInfo(rawValue: CGImageAlphaInfo.last.rawValue)],
+                provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent))
+            // A separately owned native CFData destination supplies the body oracle.
+            let buffer = try XCTUnwrap(CFDataCreateMutable(nil, 0))
+            let destination = try XCTUnwrap(CGImageDestinationCreateWithData(buffer, "com.compuserve.gif" as CFString, 1, nil))
+            CGImageDestinationAddImage(destination, image, nil)
+            XCTAssertTrue(CGImageDestinationFinalize(destination))
+            let original = buffer as Data
+            XCTAssertTrue([Data("GIF87a".utf8), Data("GIF89a".utf8)].contains(Data(original.prefix(6))))
+            let encoded = try NativeRasterWriter.encode(width: 2, height: 2,
+                content: pixels.base64EncodedString(), format: "gif")
+            XCTAssertEqual(encoded.prefix(6), Data("GIF89a".utf8))
+            XCTAssertEqual(encoded.count, original.count)
+            XCTAssertEqual(encoded.dropFirst(6), original.dropFirst(6))
+            let originalSource = try XCTUnwrap(CGImageSourceCreateWithData(original as CFData, nil))
+            XCTAssertEqual(CGImageSourceGetCount(originalSource), 1)
+            let originalImage = try XCTUnwrap(CGImageSourceCreateImageAtIndex(originalSource, 0, nil))
+            let normalizedSource = try XCTUnwrap(CGImageSourceCreateWithData(encoded as CFData, nil))
+            let normalizedImage = try XCTUnwrap(CGImageSourceCreateImageAtIndex(normalizedSource, 0, nil))
+            XCTAssertEqual(originalImage.width, normalizedImage.width)
+            XCTAssertEqual(originalImage.height, normalizedImage.height)
+            XCTAssertEqual(try XCTUnwrap(originalImage.dataProvider?.data) as Data,
+                try XCTUnwrap(normalizedImage.dataProvider?.data) as Data)
+            _ = try Self.decodedGIF(encoded, width: 2, height: 2)
+        }.value
+    }
+
+    func testGIFNativePaletteAndBinaryAlphaPreserveRowsAndTransparency() async throws {
+        try await Task.detached(priority: .utility) {
+            var fixtures: [(Int, Int, Data, Bool)] = [
+                (2, 2, Self.opaquePixels, true), (2, 2, Self.binaryPixels, true),
+                (1, 1, Data([29, 61, 127, 0]), true),
+                (2, 1, Data([83, 137, 19, 0, 83, 137, 19, 255]), true),
+                (16, 16, Data(repeating: 0, count: 16 * 16 * 4), true)]
+            for count in [255, 256] {
+                var pixels = Data()
+                for i in 0..<count { pixels.append(contentsOf: [UInt8(i), 0, UInt8(truncatingIfNeeded: i * 67), 255]) }
+                pixels.append(contentsOf: [29, 61, 127, 0])
+                fixtures.append((count + 1, 1, pixels, false))
+            }
+            for (width, height, pixels, exactVisibleRGB) in fixtures {
+                let encoded = try NativeRasterWriter.encode(width: width, height: height,
+                    content: pixels.base64EncodedString(), format: "gif")
+                let decoded = try Self.decodedGIF(encoded, width: width, height: height)
+                for offset in stride(from: 0, to: pixels.count, by: 4) {
+                    XCTAssertEqual(decoded[offset + 3], pixels[offset + 3])
+                    if pixels[offset + 3] == 0 {
+                        XCTAssertEqual(decoded.subdata(in: offset..<(offset + 4)), Data(repeating: 0, count: 4))
+                    } else if exactVisibleRGB {
+                        XCTAssertEqual(decoded.subdata(in: offset..<(offset + 4)), pixels.subdata(in: offset..<(offset + 4)))
+                    }
+                }
+            }
+        }.value
+    }
+
+    func testGIFDimensionEdgesAndMaximumNoisyInputProduceOneBoundedImage() async throws {
+        try await Task.detached(priority: .utility) {
+            for (width, height) in [(1024, 1), (1, 1024), (17, 33), (1024, 256)] {
+                var state: UInt32 = 0x13579BDF
+                var pixels = Data(capacity: width * height * 4)
+                for _ in 0..<(width * height) {
+                    for _ in 0..<3 {
+                        state = state &* 1_664_525 &+ 1_013_904_223
+                        pixels.append(UInt8(truncatingIfNeeded: state >> 24))
+                    }
+                    pixels.append(255)
+                }
+                let encoded = try NativeRasterWriter.encode(width: width, height: height,
+                    content: pixels.base64EncodedString(), format: "gif")
+                let decoded = try Self.decodedGIF(encoded, width: width, height: height)
+                XCTAssertEqual(decoded.count, pixels.count)
+                XCTAssertTrue(stride(from: 3, to: decoded.count, by: 4).allSatisfy { decoded[$0] == 255 })
+                XCTAssertLessThanOrEqual(encoded.count, NativeRasterWriter.maximumOutputBytes)
+                if width * height == NativeRasterWriter.maximumPixels {
+                    XCTAssertEqual(pixels.count, NativeRasterWriter.maximumInputBytes)
+                    XCTAssertEqual(pixels.base64EncodedString().utf8.count, NativeRasterWriter.maximumBase64Bytes)
+                }
+            }
+        }.value
+    }
+
+    func testGIFRejectsPartialAlphaAtFirstMiddleAndLastPixels() async throws {
+        try await Task.detached(priority: .utility) {
+            for alpha in [UInt8(1), 127, 254] {
+                for offset in [3, 7, 15] {
+                    var pixels = Self.binaryPixels; pixels[offset] = alpha
+                    XCTAssertThrowsError(try NativeRasterWriter.encode(width: 2, height: 2,
+                        content: pixels.base64EncodedString(), format: "gif")) {
+                        XCTAssertEqual($0 as? NativeRasterError, .invalidGIFAlpha)
+                        XCTAssertEqual(($0 as? NativeRasterError)?.code, "invalid_image_alpha")
+                        XCTAssertEqual($0.localizedDescription,
+                            "GIF requires every RGBA8 alpha byte to be 0 or 255; use png or tiff for partial transparency")
+                    }
+                }
+            }
+            var maximum = Data(repeating: 255, count: NativeRasterWriter.maximumInputBytes)
+            maximum[maximum.count - 1] = 254
+            XCTAssertThrowsError(try NativeRasterWriter.encode(width: 1024, height: 256,
+                content: maximum.base64EncodedString(), format: "gif")) {
+                XCTAssertEqual($0 as? NativeRasterError, .invalidGIFAlpha)
+            }
+        }.value
+    }
+
+    func testGIFWorkerCancellationAndStrictBoundsRemainEnforced() async throws {
+        let content = Self.binaryPixels.base64EncodedString()
+        try await MainActor.run {
+            XCTAssertThrowsError(try NativeRasterWriter.encode(width: 2, height: 2, content: content, format: "gif")) {
+                XCTAssertEqual($0 as? NativeRasterError, .workerRequired)
+            }
+        }
+        try await Task.detached(priority: .utility) {
+            let cancelled = ToolCallCancellation(timeoutSeconds: 10); cancelled.cancel()
+            XCTAssertThrowsError(try NativeRasterWriter.encode(width: 2, height: 2, content: content,
+                format: "gif", cancellation: cancelled)) { XCTAssertTrue($0 is CancellationError) }
+            XCTAssertThrowsError(try NativeRasterWriter.encode(width: 2, height: 2, content: content,
+                format: "gif", cancellation: ToolCallCancellation(timeoutSeconds: 0))) {
+                XCTAssertTrue($0 is ToolCallDeadlineExceeded)
+            }
+            for limit in [0, 1, NativeRasterWriter.maximumOutputBytes + 1] {
+                XCTAssertThrowsError(try NativeRasterWriter.encode(width: 2, height: 2, content: content,
+                    format: "gif", outputByteLimit: limit)) { XCTAssertEqual($0 as? NativeRasterError, .outputTooLarge) }
+            }
+            for (width, height) in [(0, 1), (1, 1025), (512, 513), (Int.max, Int.max)] {
+                XCTAssertThrowsError(try NativeRasterWriter.encode(width: width, height: height, content: "", format: "gif")) {
+                    XCTAssertEqual($0 as? NativeRasterError, .invalidDimensions)
+                }
+            }
+            for invalid in ["AAAAAB==", "/wAA/w==\n", "", "!!!!AA=="] {
+                XCTAssertThrowsError(try NativeRasterWriter.encode(width: 1, height: 1, content: invalid, format: "gif")) {
+                    XCTAssertEqual($0 as? NativeRasterError, .invalidContent)
+                }
+            }
+            XCTAssertThrowsError(try NativeRasterWriter.encode(width: 2, height: 2, content: content,
+                pixelFormat: "bgra8", format: "gif")) { XCTAssertEqual($0 as? NativeRasterError, .invalidPixelFormat) }
+            for invalid in ["GIF", "webp"] {
+                XCTAssertThrowsError(try NativeRasterWriter.encode(width: 2, height: 2, content: content, format: invalid)) {
+                    XCTAssertEqual($0 as? NativeRasterError, .invalidFormat)
+                }
+            }
+        }.value
+    }
+
+    func testGIFToolMetadataReadbackAndWriteProtections() async throws {
+        let root = try XCTUnwrap(temporaryRoot)
+        try await Task.detached(priority: .utility) { [root] in
+            try Self.withToolApp(root: root) { app, client, project in
+                let prior = Data("GIF destination sentinel".utf8)
+                let existing = project.appendingPathComponent("replace.gif")
+                try prior.write(to: existing); XCTAssertEqual(Darwin.chmod(existing.path, 0o600), 0)
+                func arguments(_ file: URL) -> [String: Any] {
+                    ["path": file.path, "width": 2, "height": 2, "content": Self.binaryPixels.base64EncodedString(), "format": "gif"]
+                }
+                for file in [existing, project.appendingPathComponent("fresh.gif"), project.appendingPathComponent("uppercase.GIF")] {
+                    let result = try app.tools.call(name: "image_write", arguments: arguments(file), clientID: client)
+                    XCTAssertTrue(result.ok, "\(result.payload)")
+                    let bytes = try Data(contentsOf: file)
+                    _ = try Self.inspectGIF(bytes, width: 2, height: 2)
+                    _ = try Self.decodedGIF(bytes, width: 2, height: 2)
+                    XCTAssertEqual(result.payload["format"] as? String, "gif")
+                    XCTAssertEqual(result.payload["engine"] as? String, "apple-imageio")
+                    XCTAssertEqual(result.payload["path"] as? String, file.path)
+                    XCTAssertEqual(result.payload["width"] as? Int, 2); XCTAssertEqual(result.payload["height"] as? Int, 2)
+                    XCTAssertEqual(result.payload["pixel_format"] as? String, "rgba8")
+                    XCTAssertEqual(result.payload["color_space"] as? String, "srgb")
+                    XCTAssertEqual(result.payload["pixel_bytes"] as? Int, 16)
+                    XCTAssertEqual(result.payload["pixel_contract"] as? String, NativeRasterWriter.pixelContract)
+                    XCTAssertEqual(result.payload["output_contract"] as? String, "gif-binary-alpha-palettized-srgb-v1")
+                    XCTAssertEqual(result.payload["bytes_written"] as? Int, bytes.count)
+                    XCTAssertEqual(result.payload["sha256"] as? String, JSONSupport.sha256Hex(bytes))
+                    XCTAssertNil(result.payload["content"])
+                    XCTAssertEqual((try FileManager.default.attributesOfItem(atPath: file.path)[.posixPermissions] as? NSNumber)?.intValue,
+                        file == existing ? 0o600 : 0o644)
+                    let read = try app.tools.call(name: "fs_read", arguments: ["path": file.path, "encoding": "base64", "maximum_bytes": 32768], clientID: client)
+                    XCTAssertTrue(read.ok, "\(read.payload)")
+                    XCTAssertEqual(Data(base64Encoded: try XCTUnwrap(read.payload["content"] as? String)), bytes)
+                }
+                for (name, format) in [("protected.png", "tiff"), ("protected.tiff", "gif"), ("protected.gif", "png"),
+                                       ("protected.gif", "absent"), ("no-extension", "gif")] {
+                    let file = project.appendingPathComponent(name); try prior.write(to: file)
+                    var value = arguments(file)
+                    if format == "absent" { value.removeValue(forKey: "format") } else { value["format"] = format }
+                    let result = try app.tools.call(name: "image_write", arguments: value, clientID: client)
+                    XCTAssertFalse(result.ok); XCTAssertEqual(result.payload["code"] as? String, "invalid_path")
+                    XCTAssertEqual(try Data(contentsOf: file), prior)
+                }
+                let sentinel = project.appendingPathComponent("alpha.gif"); try prior.write(to: sentinel)
+                var value = arguments(sentinel); value["content"] = Self.controlPixels.base64EncodedString()
+                let alpha = try app.tools.call(name: "image_write", arguments: value, clientID: client)
+                XCTAssertFalse(alpha.ok); XCTAssertEqual(alpha.payload["code"] as? String, "invalid_image_alpha")
+                XCTAssertEqual(try Data(contentsOf: sentinel), prior)
+                for control in [ToolCallCancellation(timeoutSeconds: 10), ToolCallCancellation(timeoutSeconds: 0)] {
+                    if !control.isDeadlineExceeded { control.cancel() }
+                    XCTAssertThrowsError(try DocsToolPack().handle(name: "image_write", arguments: arguments(sentinel),
+                        context: nil, clientID: client, app: app, cancellation: control)) {
+                        XCTAssertTrue($0 is CancellationError || $0 is ToolCallDeadlineExceeded)
+                    }
+                }
+                XCTAssertEqual(try Data(contentsOf: sentinel), prior)
+                let outside = root.appendingPathComponent("gif-outside", isDirectory: true)
+                try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+                let outsideFile = outside.appendingPathComponent("target.gif"); try prior.write(to: outsideFile)
+                let link = project.appendingPathComponent("alias", isDirectory: true)
+                try FileManager.default.createSymbolicLink(at: link, withDestinationURL: outside)
+                let symlink = try XCTUnwrap(try DocsToolPack().handle(name: "image_write",
+                    arguments: arguments(link.appendingPathComponent("target.gif")), context: nil, clientID: client, app: app, cancellation: nil))
+                XCTAssertFalse(symlink.ok); XCTAssertEqual(symlink.payload["code"] as? String, "image_write_failed")
+                XCTAssertEqual(try Data(contentsOf: outsideFile), prior)
+                XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: outside.path), ["target.gif"])
+                let directory = project.appendingPathComponent("directory.gif", isDirectory: true)
+                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                try prior.write(to: directory.appendingPathComponent("keep"))
+                let rename = try XCTUnwrap(try DocsToolPack().handle(name: "image_write", arguments: arguments(directory),
+                    context: nil, clientID: client, app: app, cancellation: nil))
+                XCTAssertFalse(rename.ok); XCTAssertEqual(rename.payload["code"] as? String, "image_write_failed")
+                XCTAssertEqual(try Data(contentsOf: directory.appendingPathComponent("keep")), prior)
+                XCTAssertTrue(app.audit.flushAttempts(timeout: 2))
+                let event = try XCTUnwrap(app.audit.recent(limit: 32).first(where: { $0.tool == "image_write" && $0.status == "ok" }))
+                XCTAssertFalse(event.argsJSON?.contains(Self.binaryPixels.base64EncodedString()) == true)
+                XCTAssertTrue(event.argsJSON?.contains("redacted") == true)
+                XCTAssertFalse(try FileManager.default.contentsOfDirectory(atPath: project.path).contains { $0.hasPrefix(".forge-") })
+            }
+        }.value
+    }
+
+    func testGIFStaleProjectContextAndOwnGrantPreventWrites() async throws {
+        let root = try XCTUnwrap(temporaryRoot)
+        try await Task.detached(priority: .utility) { [root] in
+            try Self.withToolApp(root: root) { app, client, project in
+                let file = project.appendingPathComponent("protected.gif")
+                let prior = Data("protected GIF".utf8); try prior.write(to: file)
+                let value: [String: Any] = ["path": file.path, "width": 2, "height": 2,
+                    "content": Self.binaryPixels.base64EncodedString(), "format": "gif"]
+                let context = try app.projectContexts.invocationContext(for: client)
+                let deniedClient = ClientID("gif-denied-client")
+                _ = try app.projectContexts.bind(owner: ProjectBindingOwner(kind: .mcpClient, id: deniedClient.rawValue),
+                    projectID: context.projectID, generation: context.projectGeneration,
+                    authorizationScope: ToolAuthorizationScope(canonicalRoots: context.authorizationScope.canonicalRoots,
+                        allowedTools: ["fs_read"], networkAllowed: context.authorizationScope.networkAllowed,
+                        maximumInlineOutputBytes: context.authorizationScope.maximumInlineOutputBytes))
+                let denied = try app.tools.call(name: "image_write", arguments: value, clientID: deniedClient)
+                XCTAssertFalse(denied.ok); XCTAssertEqual(denied.payload["code"] as? String, "tool_not_granted")
+                _ = try app.projectContexts.beginReset(projectID: context.projectID, expectedGeneration: context.projectGeneration)
+                _ = try app.projectContexts.completeReset(projectID: context.projectID, expectedGeneration: context.projectGeneration)
+                let stale = try XCTUnwrap(try DocsToolPack().handle(name: "image_write", arguments: value,
+                    context: context, clientID: client, app: app, cancellation: nil))
+                XCTAssertFalse(stale.ok); XCTAssertEqual(stale.payload["code"] as? String, "image_encode_failed")
+                XCTAssertEqual(try Data(contentsOf: file), prior)
+                XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: project.path), ["protected.gif"])
+            }
+        }.value
+    }
+
     func testJPEGOpaquePixelsPreserveNativeSRGBColorAndRowOrder() async throws {
         try await Task.detached(priority: .utility) {
             let colors: [[UInt8]] = [[245, 37, 11, 255], [19, 213, 71, 255],
@@ -716,6 +992,39 @@ final class NativeRasterWriterTests: XCTestCase {
         }.value
     }
 
+    func testGIFInspectorRejectsTruncationTrailingImagesAndInvalidDescriptors() async throws {
+        try await Task.detached(priority: .utility) {
+            let encoded = try NativeRasterWriter.encode(width: 2, height: 2,
+                content: Self.binaryPixels.base64EncodedString(), format: "gif")
+            try Self.inspectGIF(encoded, width: 2, height: 2)
+            for size in 0..<encoded.count {
+                XCTAssertThrowsError(try Self.inspectGIF(Data(encoded.prefix(size)), width: 2, height: 2))
+            }
+            for bytes in [encoded + Data([0]), encoded + encoded] {
+                XCTAssertThrowsError(try Self.inspectGIF(bytes, width: 2, height: 2))
+            }
+            var wrongVersion = encoded; wrongVersion.replaceSubrange(3..<6, with: "87a".utf8)
+            XCTAssertThrowsError(try Self.inspectGIF(wrongVersion, width: 2, height: 2))
+            var wrongDimensions = encoded; wrongDimensions[6] = 3
+            XCTAssertThrowsError(try Self.inspectGIF(wrongDimensions, width: 2, height: 2))
+            // The fixture has a global table followed by one eight-byte GCE.
+            let tableBytes = 3 * (1 << (Int(encoded[10] & 7) + 1))
+            let graphicControl = 13 + tableBytes
+            XCTAssertEqual(encoded[graphicControl], 0x21)
+            XCTAssertEqual(encoded[graphicControl + 1], 0xF9)
+            var badControl = encoded; badControl[graphicControl + 2] = 3
+            XCTAssertThrowsError(try Self.inspectGIF(badControl, width: 2, height: 2))
+            let image = graphicControl + 8
+            XCTAssertEqual(encoded[image], 0x2C)
+            var outside = encoded; outside[image + 1] = 1
+            XCTAssertThrowsError(try Self.inspectGIF(outside, width: 2, height: 2))
+        }.value
+    }
+
+    private static var binaryPixels: Data {
+        Data([245, 37, 11, 255, 19, 213, 71, 0, 23, 61, 237, 0, 191, 113, 43, 255])
+    }
+
     private static var controlPixels: Data {
         Data([255, 0, 0, 255, 17, 34, 51, 128, 10, 20, 30, 0, 60, 120, 180, 64])
     }
@@ -1011,6 +1320,95 @@ final class NativeRasterWriterTests: XCTestCase {
             }
         }
         throw FixtureError.malformed
+    }
+
+    // Bounded GIF89a container inspection, separate from ImageIO decoding and
+    // the external raw LZW oracle. This does not decode compressed indices.
+    private static func inspectGIF(_ data: Data, width: Int, height: Int) throws {
+        guard data.count >= 14, data.count <= NativeRasterWriter.maximumOutputBytes,
+              (1...1024).contains(width), (1...1024).contains(height), width * height <= 262_144,
+              data.prefix(6) == Data("GIF89a".utf8) else { throw FixtureError.malformed }
+        var offset = 6, blocks = 0, subblocks = 0, imageCount = 0
+        var pendingTransparency: Int?
+        var pendingControl = false
+        func take(_ count: Int) throws -> Data {
+            guard count >= 0, count <= data.count - offset else { throw FixtureError.malformed }
+            defer { offset += count }
+            return data.subdata(in: offset..<(offset + count))
+        }
+        func byte() throws -> Int { Int(try take(1)[0]) }
+        func word() throws -> Int { let bytes = try take(2); return Int(bytes[0]) | Int(bytes[1]) << 8 }
+        func skipSubblocks() throws -> Int {
+            var total = 0
+            while true {
+                subblocks += 1
+                guard subblocks <= 16_384 else { throw FixtureError.malformed }
+                let count = try byte()
+                if count == 0 { return total }
+                _ = try take(count); total += count
+            }
+        }
+        guard try word() == width, try word() == height else { throw FixtureError.malformed }
+        let screenFlags = try byte(), background = try byte(); _ = try byte()
+        let globalEntries = screenFlags & 128 == 0 ? 0 : 1 << ((screenFlags & 7) + 1)
+        guard globalEntries == 0 ? background == 0 : background < globalEntries else { throw FixtureError.malformed }
+        _ = try take(globalEntries * 3)
+        while offset < data.count {
+            blocks += 1; guard blocks <= 4096 else { throw FixtureError.malformed }
+            switch try byte() {
+            case 0x3B:
+                guard imageCount == 1, !pendingControl, offset == data.count else { throw FixtureError.malformed }
+                return
+            case 0x21:
+                switch try byte() {
+                case 0xF9:
+                    guard !pendingControl, try byte() == 4 else { throw FixtureError.malformed }
+                    let flags = try byte(); _ = try word(); let index = try byte()
+                    guard flags & 0xE0 == 0, ((flags >> 2) & 7) <= 3, try byte() == 0 else { throw FixtureError.malformed }
+                    pendingControl = true; pendingTransparency = flags & 1 == 0 ? nil : index
+                case 0xFF:
+                    guard try byte() == 11 else { throw FixtureError.malformed }
+                    _ = try take(11); _ = try skipSubblocks()
+                case 0xFE: _ = try skipSubblocks()
+                default: throw FixtureError.malformed
+                }
+            case 0x2C:
+                guard imageCount == 0, try word() == 0, try word() == 0,
+                      try word() == width, try word() == height else { throw FixtureError.malformed }
+                let flags = try byte()
+                guard flags & 0x18 == 0 else { throw FixtureError.malformed }
+                let localEntries = flags & 128 == 0 ? 0 : 1 << ((flags & 7) + 1)
+                _ = try take(localEntries * 3)
+                let entries = localEntries == 0 ? globalEntries : localEntries
+                guard entries > 0, pendingTransparency.map({ $0 < entries }) ?? true,
+                      (2...8).contains(try byte()), try skipSubblocks() > 0 else { throw FixtureError.malformed }
+                imageCount += 1; pendingControl = false; pendingTransparency = nil
+            default: throw FixtureError.malformed
+            }
+        }
+        throw FixtureError.malformed
+    }
+
+    private static func decodedGIF(_ data: Data, width: Int, height: Int) throws -> Data {
+        try inspectGIF(data, width: width, height: height)
+        let source = try XCTUnwrap(CGImageSourceCreateWithData(data as CFData, nil))
+        XCTAssertEqual(CGImageSourceGetType(source) as String?, "com.compuserve.gif")
+        XCTAssertEqual(CGImageSourceGetCount(source), 1)
+        let image = try XCTUnwrap(CGImageSourceCreateImageAtIndex(source, 0, nil))
+        guard image.width == width, image.height == height, image.bitsPerComponent == 8,
+              image.colorSpace?.model == .rgb else { throw FixtureError.malformed }
+        XCTAssertEqual(try XCTUnwrap(image.colorSpace?.copyICCData()) as Data,
+            try XCTUnwrap(NSColorSpace.sRGB.iccProfileData))
+        let space = try XCTUnwrap(CGColorSpace(name: CGColorSpace.sRGB))
+        var pixels = Data(repeating: 0, count: width * height * 4)
+        try pixels.withUnsafeMutableBytes { bytes in
+            let context = try XCTUnwrap(CGContext(data: bytes.baseAddress, width: width, height: height,
+                bitsPerComponent: 8, bytesPerRow: width * 4, space: space,
+                bitmapInfo: CGBitmapInfo.byteOrder32Big.rawValue | CGImageAlphaInfo.premultipliedLast.rawValue))
+            context.interpolationQuality = .none; context.setBlendMode(.copy)
+            context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        }
+        return pixels
     }
 
     private static func decodedJPEG(_ data: Data, width: Int, height: Int) throws -> Data {

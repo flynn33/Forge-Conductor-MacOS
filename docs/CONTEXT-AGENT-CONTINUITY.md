@@ -1,4 +1,19 @@
-# Context and agent continuity (v0.33.0)
+# Context and agent continuity (v0.34.0)
+
+Current source documentation targets 0.34.0 (47). GIF extends existing
+`image_write`; handoff, job-reference, ACK, seal, successor, progress, grant and
+replay contracts retain their interfaces. Queue/catalog parity passed within
+source 218 plus separate G3 one and matching canonical native 219 distinct
+methods. Isolated signed App/CLI and actual Qwen write/read consumption passed;
+raster metadata acknowledgement does not qualify automatic rollover.
+Native-call preemption and common-writer late-cancel/revocation E2 remain open.
+Final-document G3 and exact source/wiki publication, readback and synchronization are tracked in external closeout receipts.
+Installed GUI, production managed-adapter, full web, all models, other formats, Release and shipment remain open.
+[GIF contract](NATIVE-IMAGE-WRITING.md).
+
+<a id="context-and-agent-continuity-v0330"></a>
+
+## Preceding 0.33.0 (46) JPEG qualification
 
 Current source documentation targets 0.33.0 (46). JPEG extends existing
 `image_write`; handoff, job-reference, ACK, seal, successor, progress and replay

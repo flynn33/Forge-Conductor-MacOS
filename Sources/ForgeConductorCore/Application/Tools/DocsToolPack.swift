@@ -1,5 +1,5 @@
 // DocsToolPack.swift
-// What: Provides native PDF, plain-text DOCX, text-cell XLSX/ODS, text-slide PPTX, and PNG/TIFF/JPEG tools to external MCP clients.
+// What: Provides native PDF, plain-text DOCX, text-cell XLSX/ODS, text-slide PPTX, and PNG/TIFF/JPEG/GIF tools to external MCP clients.
 // How: It translates validated tool arguments into PDFWriter operations and returns
 // bounded, structured success or error payloads.
 // Why: Document capability is an optional module rather than a responsibility of Core routing.
@@ -9,7 +9,7 @@ import Darwin
 import AppKit
 import CryptoKit
 
-/// Documentation tools: PDF write / PDF from file / plain-text DOCX / text-cell XLSX/ODS / text-slide PPTX / PNG/TIFF/JPEG.
+/// Documentation tools: PDF write / PDF from file / plain-text DOCX / text-cell XLSX/ODS / text-slide PPTX / PNG/TIFF/JPEG/GIF.
 public struct DocsToolPack: ToolPackHandling {
     private static let maximumSourceBytes = 4 * 1024 * 1024
     private let exporter: NativeDOCXExporter?
@@ -59,11 +59,13 @@ public struct DocsToolPack: ToolPackHandling {
         let url = ToolArgHelpers.resolvePath(path)
         let isTIFF = (args["format"] as? String) == "tiff"
         let isJPEG = (args["format"] as? String) == "jpeg"
-        let extensions = isTIFF ? ["tif", "tiff"] : isJPEG ? ["jpg", "jpeg"] : ["png"]
+        let isGIF = (args["format"] as? String) == "gif"
+        let extensions = isTIFF ? ["tif", "tiff"] : isJPEG ? ["jpg", "jpeg"] : isGIF ? ["gif"] : ["png"]
         guard extensions.contains(url.pathExtension.lowercased()) else {
             return .failure(code: "invalid_path", message: isTIFF
                 ? "An explicit .tif or .tiff destination is required for format=tiff"
                 : isJPEG ? "An explicit .jpg or .jpeg destination is required for format=jpeg"
+                : isGIF ? "An explicit .gif destination is required for format=gif"
                 : "An explicit .png destination is required")
         }
         guard let content = args["content"] as? String else {
@@ -117,6 +119,7 @@ public struct DocsToolPack: ToolPackHandling {
             "pixel_bytes": width * height * 4, "pixel_contract": NativeRasterWriter.pixelContract,
         ])
         if isJPEG { result.payload["output_contract"] = NativeRasterWriter.jpegOutputContract }
+        if isGIF { result.payload["output_contract"] = NativeRasterWriter.gifOutputContract }
         return result
     }
 

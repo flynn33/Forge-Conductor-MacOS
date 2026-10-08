@@ -1,5 +1,17 @@
 # Versioning policy
 
+Current target identity is **0.34.0 (47)** for additive GIF support. Root source,
+compiled and canonical-project authorities agree; the project changes only
+twelve marketing and sixteen build-version values. Source 218 plus separate
+initial-document G3 one and matching canonical native 219 distinct methods
+passed. Direct builds, strict candidate, signed App/CLI and actual Qwen checks
+passed within the bounded GIF scope. The existing Unreleased entry records this
+phase while complete JPEG/TIFF/PNG records preserve their tested identities.
+Repeated G3 is an existing method, not additional distinct owning coverage.
+Final-document G3 and exact source/wiki publication, readback and synchronization are tracked in external closeout receipts.
+Installed GUI, production managed-adapter, full web, all models, other formats, Release and shipment remain open.
+[GIF contract and receipts](NATIVE-IMAGE-WRITING.md).
+
 **Preceding UI implementation and QA complete.** The
 0.17.0 (27) source manifest 28548a73… passed **116 distinct production tests in 140
 successful executions**, with zero failures/skips. The separate native view
@@ -10,6 +22,8 @@ failures and superseded inputs remain separate. Native caches, genuine Metal
 readbacks and ordinary observations retain their explicit limits; no
 installation, notarization, App Store upload or distribution was performed.
 Exact owner publication/readback/synchronization refs are retained externally.
+
+## Preceding 0.33.0 (46) JPEG qualification
 
 Current target identity is **0.33.0 (46)**. Additive opaque JPEG support
 advances the feature component/build while preserving PNG/TIFF and their receipts.
@@ -188,6 +202,13 @@ Update all four surfaces together. `script/check_repository_hygiene.sh`, the
 focused version test, and CI reject drift between them.
 
 ## Current identity
+
+Current source target is `0.34.0`, build `47`. Matching 219 distinct source/native
+methods, direct builds and scoped candidate/App/CLI/Qwen checks passed.
+Final-document G3 and exact source/wiki publication, readback and synchronization are tracked in external closeout receipts.
+[GIF scope](NATIVE-IMAGE-WRITING.md).
+
+Preceding .33 identity and qualification record (retained):
 
 Current source target is `0.33.0`, build `46`. Authority/G3 passed within
 matching 210-method source/native selections; CLI/app/ordinary Debug passed.

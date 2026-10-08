@@ -1,5 +1,31 @@
 # Version and qualification status
 
+Current source target **0.34.0, build 47** adds bounded binary-alpha single-image
+GIF, preserving PNG/TIFF/JPEG. Source 218 (72.701 s) plus separate initial-document
+G3 one (1.526 s) and canonical native 219 (72.081 s) passed with matching **219
+distinct methods**, zero failures/skips. Raster 33 contains nine GIF methods;
+focused 32/header-one checkpoints are earlier subsets, not additional coverage.
+CLI/app 0.899/0.895 s, ordinary Debug 27.360 s and strict signature 0.129 s passed.
+Signed App/CLI each passed ten groups, twenty responses/eighteen tool frames,
+including nine negative calls and actual 32×64 cancellation. All seven production
+GIFs passed independent GIF89a/LZW/full-EOF/exact-binary-alpha checks. Zero opaque
+RGB difference applies only to the examined fixtures; general palette loss and
+hidden RGB limits remain. Qwen completed three normal Low responses, consumed two
+actual write/read results and acknowledged exact 62-byte/2×2 metadata.
+The 105 external parser/synthetic-owner controls are separate from the 219 methods
+and 35 external mechanism encodes. The same 464 source inputs, seven current
+candidate binaries, three protected inputs and preceding .33 candidate seven
+remained unchanged. Destination/DVT, NECP and linkd diagnostics are retained;
+no diagnostic-free, performance or lifetime claim follows.
+Root qualification `native-gif-root-qualification-0340.json`, SHA
+`a46adb4acd70ad28d78fd654ae49b2314fa67038c9657c7c5a6f990340677c98`.
+Final-document G3 and exact source/wiki publication, readback and synchronization are tracked in external closeout receipts.
+Native-call preemption and common-writer late-cancel/revocation E2 remain open.
+Installed GUI, production managed-adapter, full web, all models, other formats, Release and shipment remain open.
+[GIF contract and receipts](NATIVE-IMAGE-WRITING.md).
+
+## Preceding 0.33.0 (46) JPEG qualification
+
 Current source target **0.33.0, build 46** adds opaque lossy JPEG to
 `image_write`, preserving PNG/TIFF. Native mechanism controls, matching owning
 source/canonical native 210-method selections and direct CLI/app/ordinary Debug
@@ -1708,6 +1734,12 @@ Dashboard geometry, minimum/normal containment of every primary view, and
 populated policy evaluation rows. Live completion of the reported owner run,
 universal policy enforcement, and distribution qualification remain open.
 
+Current source target: **0.34.0, build 47**, supporting **macOS 26+**; bounded GIF
+source/native/candidate/App/CLI/Qwen checks passed as recorded above. Exact delivery
+identities are retained externally; preceding .33 tested inputs retain their identity.
+
+Preceding .33 status sentence (retained):
+
 Current source target: **0.33.0, build 46**, supporting **macOS 26+**; scoped JPEG qualification and remaining document/delivery/installed gates are recorded above. The preceding published source is .32.0/build 45. The earlier
 0.16.3 Developer ID app and archive are recorded in the historical build-24 section;
 that workflow staged the CLI under `~/.forge-conductor` and manually copied the
@@ -1719,6 +1751,13 @@ the detailed, source-bound receipts are in the
 [roadmap](../ROADMAP.md).
 
 ## Version and build agreement
+
+The current target is **0.34.0, build 47** for bounded GIF. Authority agreement
+and matching 219 distinct source/native methods passed, including G3 once.
+Final-document G3 and exact source/wiki publication, readback and synchronization are tracked in external closeout receipts.
+[GIF scope](NATIVE-IMAGE-WRITING.md).
+
+Preceding .33 agreement and qualification record (retained):
 
 The current target is **0.33.0, build 46** for opaque lossy JPEG. Authority/G3
 and matching 210-method source/native selections, CLI/app/ordinary Debug passed.

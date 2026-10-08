@@ -1,5 +1,17 @@
 # Telemetry architecture (real-time native)
 
+Current source documentation targets `0.34.0`, build `47`. GIF stays within the
+existing `image_write` documents/tool-card surface. Catalog, queue and audit
+parity passed within source 218 plus separate G3 one and matching canonical
+native 219 distinct methods; signed App/CLI and Qwen consumption passed.
+No producer, timer, delivery queue, performance or lifetime repair is claimed.
+Mechanism callback release observations are not product leak proof.
+Final-document G3 and exact source/wiki publication, readback and synchronization are tracked in external closeout receipts.
+Installed GUI, production managed-adapter, full web, all models, other formats, Release and shipment remain open.
+[GIF contract and receipts](NATIVE-IMAGE-WRITING.md).
+
+## Preceding 0.33.0 (46) JPEG qualification
+
 Current source documentation targets `0.33.0`, build `46`. JPEG extends
 existing `image_write` docs/tool-card classification; catalog, queue and audit
 parity passed within matching 210-method source/native selections.

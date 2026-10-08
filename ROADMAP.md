@@ -1,6 +1,25 @@
 # Forge Conductor macOS — project roadmap
 
-## Additive native JPEG pixel writing
+## Additive native GIF pixel writing
+
+Current target **0.34.0 (47)** extends `image_write` with bounded single-image
+GIF, preserving PNG/TIFF/JPEG. Binary alpha is accepted; partial alpha is rejected.
+Palette RGB and hidden transparent RGB carry no exact-output promise.
+
+| Milestone | Observed evidence or implementation | Remaining gate |
+| --- | --- | --- |
+| Mechanism | 35 external native encodes: 26 GIF plus three PNG, three JPEG and three TIFF; five controls and independent structure/LZW/native comparisons passed. Binary alpha preserved in examined cases; palette loss observed. | Mechanism is separate from product/runtime/leak qualification; no embedded ICC or general exact-RGB promise. |
+| Tool and parity | Matching source 218 plus separate G3 one and canonical native 219 distinct methods passed, zero failures/skips; raster 33 includes nine GIF methods. Header/body equivalence, native consumer pixels, alpha rejection, dimensions/noise/bounds, metadata/readback/mode, grants/context and retained PNG/TIFF/JPEG passed. | Earlier focused 32/header-one are subsets on earlier inputs. Selected methods are not full-suite/installed/leak acceptance. Native-call preemption and common-writer late-cancel/revocation E2 remain unexercised. |
+| Graph and builds | Existing memberships/signing preserved; only twelve marketing/sixteen build values changed. Source 72.701 s plus G3 1.526 s; native 72.081 s; CLI/app 0.899/0.895 s; ordinary Debug 27.360 s; strict signature 0.129 s passed, exit 0/unforced, same 464 inputs/current seven candidate/protected three/prior .33 seven. | Destination/DVT, NECP and linkd diagnostics retained; no diagnostic-free, GUI, performance or lifetime claim. |
+| Native consumers | Signed App/CLI each ten groups/twenty responses/eighteen tool frames, nine actual negative calls and actual 32×64 cancellation passed. Seven GIFs passed independent GIF89a/LZW/full-EOF/exact-binary-alpha checks. Actual Qwen completed three normal Low responses, consumed write/read results and acknowledged 62-byte/2×2 metadata. | Zero opaque RGB difference is scoped to examined fixtures. Qwen acknowledgement is metadata only; installed GUI, production managed-adapter, full web/all models and image understanding remain open. External 105 parser/synthetic-owner controls are not owning/runtime counts. |
+| Delivery | README, existing Unreleased and current documents record bounded GIF and preserve full JPEG/TIFF/PNG/ODS histories and original NONPASS receipts. | Final-document G3 and exact source/wiki publication, readback and synchronization are tracked in external closeout receipts. Installed GUI, production managed-adapter, full web, all models, other formats, Release and shipment remain open. |
+
+Native-call preemption and late-cancel-before-rename/revocation remain unexercised
+(the latter common-writer source E2). [GIF contract and receipts](docs/NATIVE-IMAGE-WRITING.md).
+
+<a id="additive-native-jpeg-pixel-writing"></a>
+
+## Preceding additive native JPEG pixel writing
 
 Current target **0.33.0 (46)** extends `image_write` with bounded opaque JPEG
 while preserving PNG/TIFF. Native mechanism, source/native and direct builds
