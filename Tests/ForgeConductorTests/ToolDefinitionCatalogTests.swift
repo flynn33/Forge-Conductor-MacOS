@@ -1385,10 +1385,15 @@ final class ToolDefinitionCatalogTests: XCTestCase {
             for (key, value) in [("pixel_format", "rgba8"), ("format", "png")] {
                 let format = try XCTUnwrap(properties[key] as? [String: Any])
                 XCTAssertEqual(format["type"] as? String, "string")
-                XCTAssertEqual(format["enum"] as? [String], key == "format" ? ["png", "tiff"] : [value])
+                XCTAssertEqual(format["enum"] as? [String], key == "format" ? ["png", "tiff", "jpeg"] : [value])
                 XCTAssertEqual(format["default"] as? String, value)
             }
             XCTAssertTrue(((properties["path"] as? [String: Any])?["description"] as? String)?.contains(".tif/.tiff") == true)
+            XCTAssertTrue(((properties["path"] as? [String: Any])?["description"] as? String)?.contains(".jpg/.jpeg") == true)
+            for value in ["lossy JPEG", "alpha byte to be 255", "fixed quality 1.0", "jpeg-opaque-lossy-srgb-v1"] {
+                XCTAssertTrue(definition.description.contains(value), value)
+            }
+            XCTAssertNil(properties["quality"])
             XCTAssertNil(properties["idempotency_key"])
             XCTAssertFalse(ProductionToolReplayCatalog.acceptsDurableIdempotencyArgument.contains("image_write"))
             XCTAssertEqual(ManagerToolCategory.classify("image_write"), .documents)

@@ -1,5 +1,14 @@
 # Telemetry architecture (real-time native)
 
+Current source documentation targets `0.33.0`, build `46`. JPEG extends
+existing `image_write` docs/tool-card classification; catalog, queue and audit
+parity passed within matching 210-method source/native selections.
+Strict candidate, signed App/CLI controls, independent raw JPEG inspection and Qwen API consumption passed.
+No producer, timer, delivery queue, performance or lifetime repair is claimed.
+Final-document G3 passed in source and native. Source/wiki publication, readback and synchronization are tracked in external closeout receipts. [Contract](NATIVE-IMAGE-WRITING.md).
+
+## Preceding 0.32.0 (45) TIFF qualification
+
 Current source documentation targets `0.32.0`, build `45`. TIFF extends
 `image_write` under existing docs/tool-card classification. Source/native
 catalog parity passed within matching 203-method selections; signed App/CLI

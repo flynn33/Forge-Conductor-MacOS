@@ -11,6 +11,14 @@ readbacks and ordinary observations retain their explicit limits; no
 installation, notarization, App Store upload or distribution was performed.
 Exact owner publication/readback/synchronization refs are retained externally.
 
+Current target identity is **0.33.0 (46)**. Additive opaque JPEG support
+advances the feature component/build while preserving PNG/TIFF and their receipts.
+Authority agreement/G3 passed within matching 210-method source/native selections;
+CLI/app compilation and ordinary Debug passed. Strict candidate, signed App/CLI controls, independent raw JPEG inspection and Qwen API consumption passed.
+Final-document G3 passed in source and native. Source/wiki publication, readback and synchronization are tracked in external closeout receipts. [Contract and gates](NATIVE-IMAGE-WRITING.md).
+
+## Preceding 0.32.0 (45) TIFF qualification
+
 Current target identity is **0.32.0 (45)**. Additive TIFF support advances the
 feature component and build while preserving PNG defaults and prior receipts.
 Authority/G3 agreement passed within matching 203-method source/native selections;
@@ -180,6 +188,14 @@ Update all four surfaces together. `script/check_repository_hygiene.sh`, the
 focused version test, and CI reject drift between them.
 
 ## Current identity
+
+Current source target is `0.33.0`, build `46`. Authority/G3 passed within
+matching 210-method source/native selections; CLI/app/ordinary Debug passed.
+Strict candidate, signed App/CLI controls, independent raw JPEG inspection and Qwen API consumption passed.
+Final-document G3 passed in source and native. Source/wiki publication, readback and synchronization are tracked in external closeout receipts. Repeated G3 does not increase the 210 distinct methods.
+[Scope](NATIVE-IMAGE-WRITING.md).
+
+Preceding .32 identity and qualification record (retained):
 
 Current source target is `0.32.0`, build `45`. Authority agreement/G3 passed
 within matching 203-method source/native selections; direct builds, strict

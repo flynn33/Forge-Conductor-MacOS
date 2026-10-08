@@ -1,5 +1,5 @@
 // DocsToolPack.swift
-// What: Provides native PDF, plain-text DOCX, text-cell XLSX/ODS, text-slide PPTX, and PNG/TIFF tools to external MCP clients.
+// What: Provides native PDF, plain-text DOCX, text-cell XLSX/ODS, text-slide PPTX, and PNG/TIFF/JPEG tools to external MCP clients.
 // How: It translates validated tool arguments into PDFWriter operations and returns
 // bounded, structured success or error payloads.
 // Why: Document capability is an optional module rather than a responsibility of Core routing.
@@ -9,7 +9,7 @@ import Darwin
 import AppKit
 import CryptoKit
 
-/// Documentation tools: PDF write / PDF from file / plain-text DOCX / text-cell XLSX/ODS / text-slide PPTX / PNG/TIFF.
+/// Documentation tools: PDF write / PDF from file / plain-text DOCX / text-cell XLSX/ODS / text-slide PPTX / PNG/TIFF/JPEG.
 public struct DocsToolPack: ToolPackHandling {
     private static let maximumSourceBytes = 4 * 1024 * 1024
     private let exporter: NativeDOCXExporter?
@@ -58,10 +58,12 @@ public struct DocsToolPack: ToolPackHandling {
         }
         let url = ToolArgHelpers.resolvePath(path)
         let isTIFF = (args["format"] as? String) == "tiff"
-        let extensions = isTIFF ? ["tif", "tiff"] : ["png"]
+        let isJPEG = (args["format"] as? String) == "jpeg"
+        let extensions = isTIFF ? ["tif", "tiff"] : isJPEG ? ["jpg", "jpeg"] : ["png"]
         guard extensions.contains(url.pathExtension.lowercased()) else {
             return .failure(code: "invalid_path", message: isTIFF
                 ? "An explicit .tif or .tiff destination is required for format=tiff"
+                : isJPEG ? "An explicit .jpg or .jpeg destination is required for format=jpeg"
                 : "An explicit .png destination is required")
         }
         guard let content = args["content"] as? String else {
@@ -107,13 +109,15 @@ public struct DocsToolPack: ToolPackHandling {
         catch {
             return .failure(code: "image_write_failed", message: "Destination write or durability confirmation failed; inspect the destination before retrying")
         }
-        return .success([
+        var result = ToolResult.success([
             "path": url.path, "format": format, "engine": format == "tiff" ? "swift-tiff-rgba8" : "apple-imageio",
             "width": width, "height": height, "pixel_format": "rgba8", "color_space": "srgb",
             "bytes_written": encoded.count,
             "sha256": SHA256.hash(data: encoded).map { String(format: "%02x", $0) }.joined(),
             "pixel_bytes": width * height * 4, "pixel_contract": NativeRasterWriter.pixelContract,
         ])
+        if isJPEG { result.payload["output_contract"] = NativeRasterWriter.jpegOutputContract }
+        return result
     }
 
     private func odsWrite(_ args: [String: Any], context: ToolInvocationContext?,

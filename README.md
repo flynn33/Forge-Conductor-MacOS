@@ -1,5 +1,17 @@
 # Forge Conductor for macOS
 
+Current source targets **0.33.0 (46)**, adding bounded opaque JPEG to
+`image_write` while preserving PNG/TIFF. Explicit `format: "jpeg"` requires
+`.jpg`/`.jpeg`; fixed ImageIO quality 1.0 remains lossy and nonopaque input
+returns `invalid_image_alpha` before destination writing.
+Matching owning source/canonical native selections passed **210 distinct methods** each, zero failures/skips; CLI/app compilation and ordinary Debug passed.
+Strict candidate, signed App/CLI controls, independent raw JPEG inspection and Qwen API consumption passed.
+Final-document G3 passed in source and native. Source/wiki publication, readback and synchronization are tracked in external closeout receipts. [Contract and gates](docs/NATIVE-IMAGE-WRITING.md).
+The .32 TIFF/.31 PNG/.30 ODS receipts below retain their original identities.
+Installed GUI, production managed-adapter, full web, all models, other formats, Release and shipment remain open.
+
+## Preceding 0.32.0 (45) TIFF qualification
+
 Current source targets **0.32.0 (45)**, adding bounded TIFF support to `image_write`
 while preserving PNG defaults. Matching owning source and canonical native
 selections passed 203 distinct methods each, including G3. CLI/app compilation,
@@ -724,8 +736,8 @@ continuity. The user does not start project work through a Forge Managed Run.
 
 | | |
 |---|---|
-| **Version** | **0.32.0** |
-| **Build** | **45** |
+| **Version** | **0.33.0** |
+| **Build** | **46** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |
@@ -841,6 +853,13 @@ attached context; `fs_list`, `git_status`, `instruction_catalog`, and
 was not exercised; its source selects the running app executable, so the CLI
 receipt does not qualify that path. The full scope and remaining
 distribution limits are in the [qualification record](docs/QUALIFICATION-STATUS.md).
+
+The current target is `0.33.0 (46)` for opaque lossy JPEG. Matching 210-method
+source/native selections and CLI/app/ordinary Debug passed. Strict candidate, signed App/CLI controls, independent raw JPEG inspection and Qwen API consumption passed.
+Final-document G3 passed in source and native. Source/wiki publication, readback and synchronization are tracked in external closeout receipts.
+[Current image scope](docs/NATIVE-IMAGE-WRITING.md).
+
+Preceding .32 identity and qualification record (retained):
 
 The current target is `0.32.0 (45)` for additive TIFF writing. Matching
 source/native selections passed 203 distinct methods each, including G3; direct

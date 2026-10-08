@@ -20,6 +20,242 @@ final class NativeRasterWriterTests: XCTestCase {
         try FileManager.default.removeItem(at: temporaryRoot)
     }
 
+    func testJPEGOpaquePixelsPreserveNativeSRGBColorAndRowOrder() async throws {
+        try await Task.detached(priority: .utility) {
+            let colors: [[UInt8]] = [[245, 37, 11, 255], [19, 213, 71, 255],
+                                    [23, 61, 237, 255], [191, 113, 43, 255]]
+            var pixels = Data(capacity: 128 * 128 * 4)
+            for y in 0..<128 { for x in 0..<128 {
+                pixels.append(contentsOf: colors[(y < 64 ? 0 : 2) + (x < 64 ? 0 : 1)])
+            } }
+            let encoded = try NativeRasterWriter.encode(width: 128, height: 128,
+                content: pixels.base64EncodedString(), format: "jpeg")
+            let decoded = try Self.decodedJPEG(encoded, width: 128, height: 128)
+            // The pre-edit native probe measured at most one level of error in
+            // these flat interiors. Two levels still detect row/channel swaps.
+            for y in (16..<48).map({ $0 }) + (80..<112).map({ $0 }) {
+                for x in (16..<48).map({ $0 }) + (80..<112).map({ $0 }) {
+                    let offset = (y * 128 + x) * 4
+                    for channel in 0..<3 {
+                        XCTAssertLessThanOrEqual(abs(Int(decoded[offset + channel]) - Int(pixels[offset + channel])), 2)
+                    }
+                    XCTAssertEqual(decoded[offset + 3], 255)
+                }
+            }
+        }.value
+    }
+
+    func testJPEGDimensionEdgesAndMaximumNoisyInputProduceOneBoundedImage() async throws {
+        try await Task.detached(priority: .utility) {
+            for (width, height) in [(1, 1), (1024, 1), (1, 1024), (1024, 256)] {
+                var state: UInt32 = 0x76543210
+                var pixels = Data(capacity: width * height * 4)
+                for _ in 0..<(width * height) {
+                    for _ in 0..<3 {
+                        state = state &* 1_664_525 &+ 1_013_904_223
+                        pixels.append(UInt8(truncatingIfNeeded: state >> 24))
+                    }
+                    pixels.append(255)
+                }
+                let encoded = try NativeRasterWriter.encode(width: width, height: height,
+                    content: pixels.base64EncodedString(), format: "jpeg")
+                _ = try Self.inspectJPEG(encoded, width: width, height: height)
+                let decoded = try Self.decodedJPEG(encoded, width: width, height: height)
+                XCTAssertEqual(decoded.count, pixels.count)
+                XCTAssertTrue(stride(from: 3, to: decoded.count, by: 4).allSatisfy { decoded[$0] == 255 })
+                if width * height == NativeRasterWriter.maximumPixels {
+                    XCTAssertEqual(pixels.count, NativeRasterWriter.maximumInputBytes)
+                    XCTAssertEqual(pixels.base64EncodedString().utf8.count, NativeRasterWriter.maximumBase64Bytes)
+                }
+            }
+        }.value
+    }
+
+    func testJPEGRejectsNonopaqueAlphaAtFirstMiddleAndLastPixels() async throws {
+        try await Task.detached(priority: .utility) {
+            for alpha in [UInt8(0), 1, 254] {
+                for offset in [3, 7, 15] {
+                    var pixels = Self.opaquePixels; pixels[offset] = alpha
+                    XCTAssertThrowsError(try NativeRasterWriter.encode(width: 2, height: 2,
+                        content: pixels.base64EncodedString(), format: "jpeg")) {
+                        XCTAssertEqual($0 as? NativeRasterError, .invalidAlpha)
+                        XCTAssertEqual(($0 as? NativeRasterError)?.code, "invalid_image_alpha")
+                    }
+                }
+            }
+            var maximum = Data(repeating: 255, count: NativeRasterWriter.maximumInputBytes)
+            maximum[maximum.count - 1] = 254
+            XCTAssertThrowsError(try NativeRasterWriter.encode(width: 1024, height: 256,
+                content: maximum.base64EncodedString(), format: "jpeg")) {
+                XCTAssertEqual($0 as? NativeRasterError, .invalidAlpha)
+            }
+        }.value
+    }
+
+    func testJPEGWorkerCancellationAndStrictBoundsRemainEnforced() async throws {
+        let content = Self.opaquePixels.base64EncodedString()
+        try await MainActor.run {
+            XCTAssertThrowsError(try NativeRasterWriter.encode(width: 2, height: 2, content: content, format: "jpeg")) {
+                XCTAssertEqual($0 as? NativeRasterError, .workerRequired)
+            }
+        }
+        try await Task.detached(priority: .utility) {
+            let cancelled = ToolCallCancellation(timeoutSeconds: 10); cancelled.cancel()
+            XCTAssertThrowsError(try NativeRasterWriter.encode(width: 2, height: 2, content: content,
+                format: "jpeg", cancellation: cancelled)) { XCTAssertTrue($0 is CancellationError) }
+            XCTAssertThrowsError(try NativeRasterWriter.encode(width: 2, height: 2, content: content,
+                format: "jpeg", cancellation: ToolCallCancellation(timeoutSeconds: 0))) {
+                XCTAssertTrue($0 is ToolCallDeadlineExceeded)
+            }
+            for limit in [0, 1, NativeRasterWriter.maximumOutputBytes + 1] {
+                XCTAssertThrowsError(try NativeRasterWriter.encode(width: 2, height: 2, content: content,
+                    format: "jpeg", outputByteLimit: limit)) { XCTAssertEqual($0 as? NativeRasterError, .outputTooLarge) }
+            }
+            for (width, height) in [(0, 1), (1, 1025), (512, 513), (Int.max, Int.max)] {
+                XCTAssertThrowsError(try NativeRasterWriter.encode(width: width, height: height, content: "", format: "jpeg")) {
+                    XCTAssertEqual($0 as? NativeRasterError, .invalidDimensions)
+                }
+            }
+            for invalid in ["AAAAAB==", "/wAA/w==\n", "", "!!!!AA=="] {
+                XCTAssertThrowsError(try NativeRasterWriter.encode(width: 1, height: 1, content: invalid, format: "jpeg")) {
+                    XCTAssertEqual($0 as? NativeRasterError, .invalidContent)
+                }
+            }
+            XCTAssertThrowsError(try NativeRasterWriter.encode(width: 2, height: 2, content: content,
+                pixelFormat: "bgra8", format: "jpeg")) { XCTAssertEqual($0 as? NativeRasterError, .invalidPixelFormat) }
+            for invalid in ["jpg", "JPEG", "webp"] {
+                XCTAssertThrowsError(try NativeRasterWriter.encode(width: 2, height: 2, content: content, format: invalid)) {
+                    XCTAssertEqual($0 as? NativeRasterError, .invalidFormat)
+                }
+            }
+        }.value
+    }
+
+    func testJPEGToolAliasesMetadataReadbackAndWriteProtections() async throws {
+        let root = try XCTUnwrap(temporaryRoot)
+        try await Task.detached(priority: .utility) { [root] in
+            try Self.withToolApp(root: root) { app, client, project in
+                let prior = Data("JPEG destination sentinel".utf8)
+                let existing = project.appendingPathComponent("replace.jpeg")
+                try prior.write(to: existing); XCTAssertEqual(Darwin.chmod(existing.path, 0o600), 0)
+                func arguments(_ file: URL) -> [String: Any] {
+                    ["path": file.path, "width": 2, "height": 2, "content": Self.opaquePixels.base64EncodedString(), "format": "jpeg"]
+                }
+                for file in [existing, project.appendingPathComponent("fresh.jpg"), project.appendingPathComponent("uppercase.JPEG")] {
+                    let result = try app.tools.call(name: "image_write", arguments: arguments(file), clientID: client)
+                    XCTAssertTrue(result.ok, "\(result.payload)")
+                    let bytes = try Data(contentsOf: file)
+                    _ = try Self.inspectJPEG(bytes, width: 2, height: 2)
+                    _ = try Self.decodedJPEG(bytes, width: 2, height: 2)
+                    XCTAssertEqual(result.payload["format"] as? String, "jpeg")
+                    XCTAssertEqual(result.payload["engine"] as? String, "apple-imageio")
+                    XCTAssertEqual(result.payload["path"] as? String, file.path)
+                    XCTAssertEqual(result.payload["width"] as? Int, 2); XCTAssertEqual(result.payload["height"] as? Int, 2)
+                    XCTAssertEqual(result.payload["pixel_format"] as? String, "rgba8")
+                    XCTAssertEqual(result.payload["color_space"] as? String, "srgb")
+                    XCTAssertEqual(result.payload["pixel_bytes"] as? Int, 16)
+                    XCTAssertEqual(result.payload["pixel_contract"] as? String, NativeRasterWriter.pixelContract)
+                    XCTAssertEqual(result.payload["output_contract"] as? String, "jpeg-opaque-lossy-srgb-v1")
+                    XCTAssertEqual(result.payload["bytes_written"] as? Int, bytes.count)
+                    XCTAssertEqual(result.payload["sha256"] as? String, JSONSupport.sha256Hex(bytes))
+                    XCTAssertNil(result.payload["content"])
+                    XCTAssertEqual((try FileManager.default.attributesOfItem(atPath: file.path)[.posixPermissions] as? NSNumber)?.intValue,
+                        file == existing ? 0o600 : 0o644)
+                    let read = try app.tools.call(name: "fs_read", arguments: ["path": file.path, "encoding": "base64", "maximum_bytes": 32768], clientID: client)
+                    XCTAssertTrue(read.ok, "\(read.payload)")
+                    XCTAssertEqual(Data(base64Encoded: try XCTUnwrap(read.payload["content"] as? String)), bytes)
+                }
+                for (name, format) in [("protected.png", "tiff"), ("protected.tiff", "jpeg"), ("protected.jpeg", "png"),
+                                       ("protected.jpg", "absent"), ("no-extension", "jpeg")] {
+                    let file = project.appendingPathComponent(name); try prior.write(to: file)
+                    var value = arguments(file)
+                    if format == "absent" { value.removeValue(forKey: "format") } else { value["format"] = format }
+                    let result = try app.tools.call(name: "image_write", arguments: value, clientID: client)
+                    XCTAssertFalse(result.ok); XCTAssertEqual(result.payload["code"] as? String, "invalid_path")
+                    XCTAssertEqual(try Data(contentsOf: file), prior)
+                }
+                let sentinel = project.appendingPathComponent("alpha.jpg"); try prior.write(to: sentinel)
+                var value = arguments(sentinel); value["content"] = Self.controlPixels.base64EncodedString()
+                let alpha = try app.tools.call(name: "image_write", arguments: value, clientID: client)
+                XCTAssertFalse(alpha.ok); XCTAssertEqual(alpha.payload["code"] as? String, "invalid_image_alpha")
+                XCTAssertEqual(try Data(contentsOf: sentinel), prior)
+                for control in [ToolCallCancellation(timeoutSeconds: 10), ToolCallCancellation(timeoutSeconds: 0)] {
+                    if !control.isDeadlineExceeded { control.cancel() }
+                    XCTAssertThrowsError(try DocsToolPack().handle(name: "image_write", arguments: arguments(sentinel),
+                        context: nil, clientID: client, app: app, cancellation: control)) {
+                        XCTAssertTrue($0 is CancellationError || $0 is ToolCallDeadlineExceeded)
+                    }
+                }
+                XCTAssertEqual(try Data(contentsOf: sentinel), prior)
+                let outside = root.appendingPathComponent("jpeg-outside", isDirectory: true)
+                try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+                let outsideFile = outside.appendingPathComponent("target.jpg"); try prior.write(to: outsideFile)
+                let link = project.appendingPathComponent("alias", isDirectory: true)
+                try FileManager.default.createSymbolicLink(at: link, withDestinationURL: outside)
+                let symlink = try XCTUnwrap(try DocsToolPack().handle(name: "image_write",
+                    arguments: arguments(link.appendingPathComponent("target.jpg")), context: nil, clientID: client, app: app, cancellation: nil))
+                XCTAssertFalse(symlink.ok); XCTAssertEqual(symlink.payload["code"] as? String, "image_write_failed")
+                XCTAssertEqual(try Data(contentsOf: outsideFile), prior)
+                XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: outside.path), ["target.jpg"])
+                let directory = project.appendingPathComponent("directory.jpeg", isDirectory: true)
+                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                try prior.write(to: directory.appendingPathComponent("keep"))
+                let rename = try XCTUnwrap(try DocsToolPack().handle(name: "image_write", arguments: arguments(directory),
+                    context: nil, clientID: client, app: app, cancellation: nil))
+                XCTAssertFalse(rename.ok); XCTAssertEqual(rename.payload["code"] as? String, "image_write_failed")
+                XCTAssertEqual(try Data(contentsOf: directory.appendingPathComponent("keep")), prior)
+                XCTAssertTrue(app.audit.flushAttempts(timeout: 2))
+                let event = try XCTUnwrap(app.audit.recent(limit: 32).first(where: { $0.tool == "image_write" && $0.status == "ok" }))
+                XCTAssertFalse(event.argsJSON?.contains(Self.opaquePixels.base64EncodedString()) == true)
+                XCTAssertTrue(event.argsJSON?.contains("redacted") == true)
+                XCTAssertFalse(try FileManager.default.contentsOfDirectory(atPath: project.path).contains { $0.hasPrefix(".forge-") })
+            }
+        }.value
+    }
+
+    func testJPEGStaleProjectContextAndOwnGrantPreventWrites() async throws {
+        let root = try XCTUnwrap(temporaryRoot)
+        try await Task.detached(priority: .utility) { [root] in
+            try Self.withToolApp(root: root) { app, client, project in
+                let file = project.appendingPathComponent("protected.jpg")
+                let prior = Data("protected JPEG".utf8); try prior.write(to: file)
+                let value: [String: Any] = ["path": file.path, "width": 2, "height": 2,
+                    "content": Self.opaquePixels.base64EncodedString(), "format": "jpeg"]
+                let context = try app.projectContexts.invocationContext(for: client)
+                let deniedClient = ClientID("jpeg-denied-client")
+                _ = try app.projectContexts.bind(owner: ProjectBindingOwner(kind: .mcpClient, id: deniedClient.rawValue),
+                    projectID: context.projectID, generation: context.projectGeneration,
+                    authorizationScope: ToolAuthorizationScope(canonicalRoots: context.authorizationScope.canonicalRoots,
+                        allowedTools: ["fs_read"], networkAllowed: context.authorizationScope.networkAllowed,
+                        maximumInlineOutputBytes: context.authorizationScope.maximumInlineOutputBytes))
+                let denied = try app.tools.call(name: "image_write", arguments: value, clientID: deniedClient)
+                XCTAssertFalse(denied.ok); XCTAssertEqual(denied.payload["code"] as? String, "tool_not_granted")
+                _ = try app.projectContexts.beginReset(projectID: context.projectID, expectedGeneration: context.projectGeneration)
+                _ = try app.projectContexts.completeReset(projectID: context.projectID, expectedGeneration: context.projectGeneration)
+                let stale = try XCTUnwrap(try DocsToolPack().handle(name: "image_write", arguments: value,
+                    context: context, clientID: client, app: app, cancellation: nil))
+                XCTAssertFalse(stale.ok); XCTAssertEqual(stale.payload["code"] as? String, "image_encode_failed")
+                XCTAssertEqual(try Data(contentsOf: file), prior)
+                XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: project.path), ["protected.jpg"])
+            }
+        }.value
+    }
+
+    func testJPEGInspectorRejectsTruncationTrailingImagesAndWrongColorMetadata() async throws {
+        try await Task.detached(priority: .utility) {
+            let encoded = try NativeRasterWriter.encode(width: 2, height: 2,
+                content: Self.opaquePixels.base64EncodedString(), format: "jpeg")
+            let locations = try Self.inspectJPEG(encoded, width: 2, height: 2)
+            var wrongColor = encoded; wrongColor[locations.color] = 0xFF; wrongColor[locations.color + 1] = 0xFF
+            var wrongWidth = encoded; wrongWidth[locations.width] = 0; wrongWidth[locations.width + 1] = 3
+            var wrongLength = encoded; wrongLength[4] = 0xFF; wrongLength[5] = 0xFF
+            for invalid in [Data(encoded.dropLast(2)), Data(encoded.prefix(30)), encoded + encoded,
+                            encoded + Data([0]), wrongColor, wrongWidth, wrongLength] {
+                XCTAssertThrowsError(try Self.inspectJPEG(invalid, width: 2, height: 2))
+            }
+        }.value
+    }
+
     func testTIFFAlphaAndDimensionEdgesPreserveStraightRGBA() async throws {
         try await Task.detached(priority: .utility) {
             let control = Self.controlPixels
@@ -169,7 +405,7 @@ final class NativeRasterWriterTests: XCTestCase {
             XCTAssertThrowsError(try NativeRasterWriter.encode(width: 2, height: 2, content: content, pixelFormat: "bgra8")) {
                 XCTAssertEqual($0 as? NativeRasterError, .invalidPixelFormat)
             }
-            XCTAssertThrowsError(try NativeRasterWriter.encode(width: 2, height: 2, content: content, format: "jpeg")) {
+            XCTAssertThrowsError(try NativeRasterWriter.encode(width: 2, height: 2, content: content, format: "webp")) {
                 XCTAssertEqual($0 as? NativeRasterError, .invalidFormat)
             }
         }.value
@@ -193,7 +429,7 @@ final class NativeRasterWriterTests: XCTestCase {
                     ("height", [false, NSNull(), -1, 1025, 1.5] as [Any], "invalid_image_dimensions"),
                     ("content", [7, false, NSNull(), "", "AAAAAB=="] as [Any], "invalid_content"),
                     ("pixel_format", [7, NSNull(), "bgra8", "RGBA8"] as [Any], "invalid_pixel_format"),
-                    ("format", [true, NSNull(), "jpeg", "PNG"] as [Any], "invalid_image_format")
+                    ("format", [true, NSNull(), "webp", "PNG"] as [Any], "invalid_image_format")
                 ] {
                     for replacement in values { var value = valid; value[key] = replacement; cases.append((value, code)) }
                 }
@@ -243,6 +479,7 @@ final class NativeRasterWriterTests: XCTestCase {
                     XCTAssertEqual(result.payload["color_space"] as? String, "srgb")
                     XCTAssertEqual(result.payload["pixel_bytes"] as? Int, 16)
                     XCTAssertEqual(result.payload["pixel_contract"] as? String, "rgba8-straight-srgb-v1")
+                    XCTAssertNil(result.payload["output_contract"])
                     XCTAssertEqual(result.payload["bytes_written"] as? Int, bytes.count)
                     XCTAssertEqual(result.payload["sha256"] as? String, JSONSupport.sha256Hex(bytes))
                     XCTAssertNil(result.payload["content"])
@@ -417,6 +654,7 @@ final class NativeRasterWriterTests: XCTestCase {
                     let bytes = try Data(contentsOf: file)
                     XCTAssertEqual(result.payload["format"] as? String, "tiff")
                     XCTAssertEqual(result.payload["engine"] as? String, "swift-tiff-rgba8")
+                    XCTAssertNil(result.payload["output_contract"])
                     XCTAssertEqual(result.payload["path"] as? String, file.path)
                     XCTAssertEqual(result.payload["pixel_contract"] as? String, NativeRasterWriter.pixelContract)
                     XCTAssertEqual(result.payload["bytes_written"] as? Int, bytes.count)
@@ -480,6 +718,10 @@ final class NativeRasterWriterTests: XCTestCase {
 
     private static var controlPixels: Data {
         Data([255, 0, 0, 255, 17, 34, 51, 128, 10, 20, 30, 0, 60, 120, 180, 64])
+    }
+
+    private static var opaquePixels: Data {
+        Data([245, 37, 11, 255, 19, 213, 71, 255, 23, 61, 237, 255, 191, 113, 43, 255])
     }
 
     private static func arguments(path: String) -> [String: Any] {
@@ -675,4 +917,123 @@ final class NativeRasterWriterTests: XCTestCase {
     }
 
     private enum FixtureError: Error { case malformed }
+
+    // Bounded inspection of this writer's JPEG container, not an entropy decoder
+    // or general Exif conformance test. T.81 Annex B describes markers/scans:
+    // https://www.w3.org/Graphics/JPEG/itu-t81.pdf. CIPA Exif ColorSpace A001
+    // is SHORT/count 1; value 1 declares sRGB. Decoded ICC is checked separately.
+    private static func inspectJPEG(_ data: Data, width: Int, height: Int) throws -> (width: Int, color: Int) {
+        func require(_ condition: Bool) throws { guard condition else { throw FixtureError.malformed } }
+        try require((1...1024).contains(width) && (1...1024).contains(height) && width * height <= 262_144)
+        try require(data.count >= 4 && data.count <= NativeRasterWriter.maximumOutputBytes)
+        try require(data.prefix(2) == Data([0xFF, 0xD8]))
+        func word(_ offset: Int) throws -> Int {
+            try require(offset >= 0 && offset <= data.count - 2)
+            return Int(data[offset]) * 256 + Int(data[offset + 1])
+        }
+        var offset = 2, markers = 0, scans = 0
+        var frameWidth: Int?, colorPosition: Int?
+        while offset < data.count {
+            try require(markers < 1024 && data[offset] == 0xFF)
+            while offset < data.count && data[offset] == 0xFF { offset += 1 }
+            try require(offset < data.count)
+            let marker = data[offset]; offset += 1; markers += 1
+            if marker == 0xD9 {
+                try require(offset == data.count && scans > 0)
+                guard let frameWidth, let colorPosition else { throw FixtureError.malformed }
+                return (frameWidth, colorPosition)
+            }
+            try require(marker != 0 && marker != 0xD8 && marker != 1 && !(0xD0...0xD7).contains(marker))
+            let length = try word(offset)
+            try require(length >= 2 && length <= data.count - offset)
+            let start = offset + 2, end = offset + length
+            if [UInt8(0xC0), 0xC1, 0xC2].contains(marker) {
+                try require(frameWidth == nil && scans == 0 && length == 17)
+                try require(data[start] == 8 && (try word(start + 1)) == height &&
+                    (try word(start + 3)) == width && data[start + 5] == 3)
+                frameWidth = start + 3
+            }
+            if marker == 0xE1 && end - start >= 6 && data.subdata(in: start..<(start + 6)) == Data("Exif\0\0".utf8) {
+                try require(colorPosition == nil)
+                let base = start + 6, count = end - base
+                try require(count >= 8)
+                let order = data.subdata(in: base..<(base + 2))
+                try require(order == Data([73, 73]) || order == Data([77, 77]))
+                let little = order == Data([73, 73])
+                func integer(_ relative: Int, bytes: Int) throws -> Int {
+                    try require(relative >= 0 && relative <= count - bytes)
+                    var value: UInt32 = 0
+                    for index in 0..<bytes {
+                        let position = little ? relative + bytes - 1 - index : relative + index
+                        value = (value << 8) | UInt32(data[base + position])
+                    }
+                    return Int(value)
+                }
+                func fields(_ position: Int) throws -> [Int: (type: Int, count: Int, value: Int)] {
+                    try require(position >= 8)
+                    let entries = try integer(position, bytes: 2)
+                    try require((1...128).contains(entries) && position <= count - 2 - entries * 12 - 4)
+                    try require(try integer(position + 2 + entries * 12, bytes: 4) == 0)
+                    var result: [Int: (type: Int, count: Int, value: Int)] = [:]
+                    for index in 0..<entries {
+                        let entry = position + 2 + index * 12
+                        let tag = try integer(entry, bytes: 2)
+                        try require(result[tag] == nil)
+                        result[tag] = (try integer(entry + 2, bytes: 2), try integer(entry + 4, bytes: 4), entry + 8)
+                    }
+                    return result
+                }
+                try require(try integer(2, bytes: 2) == 42)
+                let root = try fields(integer(4, bytes: 4))
+                guard let pointer = root[0x8769], pointer.type == 4, pointer.count == 1 else { throw FixtureError.malformed }
+                let exif = try fields(integer(pointer.value, bytes: 4))
+                for (tag, expected) in [(0xA001, 1), (0xA002, width), (0xA003, height)] {
+                    guard let field = exif[tag], field.count == 1,
+                          (tag == 0xA001 ? field.type == 3 : [3, 4].contains(field.type)) else { throw FixtureError.malformed }
+                    try require(try integer(field.value, bytes: field.type == 3 ? 2 : 4) == expected)
+                    if tag == 0xA001 { colorPosition = base + field.value }
+                }
+            }
+            offset = end
+            if marker == 0xDA {
+                scans += 1
+                try require(frameWidth != nil && scans <= 32 && length >= 6)
+                let components = Int(data[start])
+                try require((1...3).contains(components) && length == 6 + components * 2)
+                while offset < data.count {
+                    if data[offset] != 0xFF { offset += 1; continue }
+                    let markerStart = offset
+                    while offset < data.count && data[offset] == 0xFF { offset += 1 }
+                    try require(offset < data.count)
+                    if data[offset] == 0 || (0xD0...0xD7).contains(data[offset]) { offset += 1; continue }
+                    offset = markerStart; break
+                }
+            }
+        }
+        throw FixtureError.malformed
+    }
+
+    private static func decodedJPEG(_ data: Data, width: Int, height: Int) throws -> Data {
+        guard (1...1024).contains(width), (1...1024).contains(height), width * height <= 262_144,
+              data.count <= NativeRasterWriter.maximumOutputBytes else { throw FixtureError.malformed }
+        _ = try inspectJPEG(data, width: width, height: height)
+        let source = try XCTUnwrap(CGImageSourceCreateWithData(data as CFData, nil))
+        XCTAssertEqual(CGImageSourceGetType(source) as String?, "public.jpeg")
+        XCTAssertEqual(CGImageSourceGetCount(source), 1)
+        let image = try XCTUnwrap(CGImageSourceCreateImageAtIndex(source, 0, nil))
+        guard image.width == width, image.height == height, image.bitsPerComponent == 8,
+              image.colorSpace?.model == .rgb else { throw FixtureError.malformed }
+        XCTAssertEqual(try XCTUnwrap(image.colorSpace?.copyICCData()) as Data,
+            try XCTUnwrap(NSColorSpace.sRGB.iccProfileData))
+        let space = try XCTUnwrap(CGColorSpace(name: CGColorSpace.sRGB))
+        var pixels = Data(repeating: 0, count: width * height * 4)
+        try pixels.withUnsafeMutableBytes { bytes in
+            let context = try XCTUnwrap(CGContext(data: bytes.baseAddress, width: width, height: height,
+                bitsPerComponent: 8, bytesPerRow: width * 4, space: space,
+                bitmapInfo: CGBitmapInfo.byteOrder32Big.rawValue | CGImageAlphaInfo.premultipliedLast.rawValue))
+            context.interpolationQuality = .none; context.setBlendMode(.copy)
+            context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        }
+        return pixels
+    }
 }

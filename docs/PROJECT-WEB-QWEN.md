@@ -1,5 +1,27 @@
 # Project repository, web access and Qwen verification
 
+Current source targets **0.33.0 (46)** for opaque lossy JPEG support in
+`image_write`. Matching source/native passed 210 methods each; direct CLI/app
+and ordinary Debug builds passed.
+Strict candidate, signed App/CLI controls, independent raw JPEG inspection and Qwen API consumption passed.
+Final-document G3 passed in source and native. Source/wiki publication, readback and synchronization are tracked in external closeout receipts.
+Image writing consumes supplied pixels; metadata acknowledgement does not
+establish image understanding or photographic synthesis. Installed GUI, production managed-adapter, full web, all models, other formats, Release and shipment remain open.
+[Image contract and gates](NATIVE-IMAGE-WRITING.md).
+
+A fresh October 8 installed LM Studio GUI status diagnostic used
+`qwen/qwen3.8-27b`. The returned status and both actual model-generation
+catalogs contained **76 tools**, with `web_search`, `web_fetch` and `web_render`
+absent. Qwen's final count of 66 is a counting error; its absence-of-web statement
+is supported. The returned version was `0.18.0`; build `28` was independently
+read from the unchanged installed Info.plist, not returned by `get_forge_status`.
+No web request was dispatched. This is a scoped status/catalog observation,
+not new-candidate, full-web, all-model or installation acceptance. Receipt:
+`installed-web-catalog-fresh-status-readonly-0320.json`, SHA
+`c863cab657c0cd33bbc278a7f6719ddef54472022e439117aaf8bec3d90e89db`.
+
+## Preceding 0.32.0 (45) TIFF qualification
+
 Current source targets **0.32.0 (45)** for additive TIFF support in `image_write`.
 Matching source/native selections passed 203 methods each; direct builds,
 strict candidate and scoped App/CLI/artifact checks passed. Qwen selected TIFF

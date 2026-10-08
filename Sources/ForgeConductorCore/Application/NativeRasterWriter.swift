@@ -5,7 +5,7 @@ import UniformTypeIdentifiers
 
 enum NativeRasterError: Error, Equatable, LocalizedError {
     case workerRequired, invalidDimensions, invalidContent, invalidPixelFormat, invalidFormat
-    case outputTooLarge, encoderUnavailable
+    case invalidAlpha, outputTooLarge, encoderUnavailable
 
     var code: String {
         switch self {
@@ -14,6 +14,7 @@ enum NativeRasterError: Error, Equatable, LocalizedError {
         case .invalidContent: "invalid_content"
         case .invalidPixelFormat: "invalid_pixel_format"
         case .invalidFormat: "invalid_image_format"
+        case .invalidAlpha: "invalid_image_alpha"
         case .outputTooLarge: "image_output_too_large"
         case .encoderUnavailable: "image_encoder_unavailable"
         }
@@ -25,14 +26,15 @@ enum NativeRasterError: Error, Equatable, LocalizedError {
         case .invalidDimensions: "width and height must be integers from 1 through 1024, with at most 262144 pixels"
         case .invalidContent: "content must be canonical padded base64 containing exactly width × height × 4 RGBA8 bytes, at most 1048576 bytes"
         case .invalidPixelFormat: "pixel_format must be rgba8"
-        case .invalidFormat: "format must be png or tiff"
+        case .invalidFormat: "format must be png, tiff or jpeg"
+        case .invalidAlpha: "JPEG requires every RGBA8 alpha byte to be 255; use png or tiff for transparency"
         case .outputTooLarge: "Encoded image is limited to 2097152 bytes"
         case .encoderUnavailable: "The native image encoder could not complete the image"
         }
     }
 }
 
-/// Call-local PNG/TIFF encoding of straight-alpha sRGB RGBA8 pixels.
+/// Call-local PNG/TIFF and opaque lossy JPEG encoding of sRGB RGBA8 pixels.
 enum NativeRasterWriter {
     static let maximumDimension = 1024
     static let maximumPixels = 262_144
@@ -40,6 +42,7 @@ enum NativeRasterWriter {
     static let maximumBase64Bytes = ((maximumInputBytes + 2) / 3) * 4
     static let maximumOutputBytes = 2_097_152
     static let pixelContract = "rgba8-straight-srgb-v1"
+    static let jpegOutputContract = "jpeg-opaque-lossy-srgb-v1"
 
     static func integerDimension(_ value: Any?) throws -> Int {
         guard let dimension = JSONSupport.exactInteger(value), (1...maximumDimension).contains(dimension) else {
@@ -54,7 +57,7 @@ enum NativeRasterWriter {
                        outputByteLimit: Int = maximumOutputBytes) throws -> Data {
         guard !Thread.isMainThread else { throw NativeRasterError.workerRequired }
         try cancellation?.checkCancellation()
-        guard format == "png" || format == "tiff" else { throw NativeRasterError.invalidFormat }
+        guard format == "png" || format == "tiff" || format == "jpeg" else { throw NativeRasterError.invalidFormat }
         guard pixelFormat == "rgba8" else { throw NativeRasterError.invalidPixelFormat }
         guard (1...maximumDimension).contains(width), (1...maximumDimension).contains(height) else {
             throw NativeRasterError.invalidDimensions
@@ -72,6 +75,14 @@ enum NativeRasterWriter {
         }
         if format == "tiff" {
             return try encodeTIFF(raw, width: width, height: height, cancellation: cancellation, outputByteLimit: outputByteLimit)
+        }
+        if format == "jpeg" {
+            try raw.withUnsafeBytes { bytes in
+                for offset in stride(from: 3, to: bytes.count, by: 4) {
+                    if offset % 8192 == 3 { try cancellation?.checkCancellation() }
+                    guard bytes[offset] == 255 else { throw NativeRasterError.invalidAlpha }
+                }
+            }
         }
         guard let space = CGColorSpace(name: CGColorSpace.sRGB),
               let provider = CGDataProvider(data: raw as CFData),
@@ -97,9 +108,11 @@ enum NativeRasterWriter {
             throw NativeRasterError.encoderUnavailable
         }
         guard let destination = CGImageDestinationCreateWithDataConsumer(
-            consumer, UTType.png.identifier as CFString, 1, nil
+            consumer, (format == "jpeg" ? UTType.jpeg.identifier : UTType.png.identifier) as CFString, 1, nil
         ) else { throw NativeRasterError.encoderUnavailable }
-        CGImageDestinationAddImage(destination, image, nil)
+        let properties: CFDictionary? = format == "jpeg"
+            ? [kCGImageDestinationLossyCompressionQuality: 1.0, kCGImageDestinationEmbedThumbnail: false] as CFDictionary : nil
+        CGImageDestinationAddImage(destination, image, properties)
         try output.check()
         let finalized = CGImageDestinationFinalize(destination)
         let encoded = try withExtendedLifetime((raw, provider, image, consumer, destination)) { try output.snapshot() }

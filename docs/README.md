@@ -1,5 +1,16 @@
 # Documentation guide
 
+Current source targets **0.33.0 (46)** for opaque lossy JPEG writing.
+[Image contract](NATIVE-IMAGE-WRITING.md) records the native mechanism,
+`invalid_image_alpha`, JPEG-only output contract and preserved PNG/TIFF scope.
+Matching owning source/canonical native selections passed **210 distinct methods** each, zero failures/skips; CLI/app compilation and ordinary Debug passed.
+Strict candidate, signed App/CLI controls, independent raw JPEG inspection and Qwen API consumption passed.
+Final-document G3 passed in source and native. Source/wiki publication, readback and synchronization are tracked in external closeout receipts.
+Published .32 TIFF and .31 PNG receipts retain their original scope.
+Installed GUI, production managed-adapter, full web, all models, other formats, Release and shipment remain open.
+
+## Preceding 0.32.0 (45) TIFF qualification
+
 Current source targets **0.32.0 (45)** for additive TIFF writing.
 [Image contract](NATIVE-IMAGE-WRITING.md) records matching 203-method source/native
 passes, direct builds and strict candidate checks, plus scoped App/CLI,
@@ -195,7 +206,7 @@ qualification is not promoted by this UI phase.
 | [Native XLSX writing and import](NATIVE-XLSX-WRITING.md) | Bounded text-cell worksheet creation, cell-value instruction import, retained baseline, scoped qualification and remaining gates |
 | [Native PPTX writing and import](NATIVE-PPTX-WRITING.md) | Bounded text-slide creation, slide-owned instruction import, retained baseline and scoped validation gates |
 | [Native ODS writing and import](NATIVE-ODS-WRITING.md) | Bounded ODF text-cell creation, sheet-labeled instruction import, retained baseline, scoped qualification and remaining gates |
-| [Native image pixel writing](NATIVE-IMAGE-WRITING.md) | Bounded straight RGBA8 PNG/TIFF contracts, current TIFF source/native/build/signing/App/CLI/artifact/Qwen API checks, retained PNG receipts and remaining product/delivery gates |
+| [Native image pixel writing](NATIVE-IMAGE-WRITING.md) | Bounded PNG/TIFF and opaque lossy JPEG contracts, current scoped qualification, retained historical receipts and installed/delivery boundaries |
 | [Native web rendering](NATIVE-WEB-RENDERING.md) | JavaScript snapshots, fixed native child ownership, actual frame budgets and qualification limits |
 | [Binary web and Qwen file workflows](BINARY-WEB-AND-QWEN-FILES.md) | Original HTTP bytes, version alignment, native/model examples and remaining format/browser gates |
 | [Project repository, web access and Qwen verification](PROJECT-WEB-QWEN.md) | GitHub project links, web/file tool additions, actual Qwen findings and current verification boundaries |

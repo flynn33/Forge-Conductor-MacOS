@@ -1,6 +1,24 @@
 # Forge Conductor macOS — project roadmap
 
-## Additive native TIFF pixel writing
+## Additive native JPEG pixel writing
+
+Current target **0.33.0 (46)** extends `image_write` with bounded opaque JPEG
+while preserving PNG/TIFF. Native mechanism, source/native and direct builds
+passed. Strict candidate, signed App/CLI controls, independent raw JPEG inspection and Qwen API consumption passed. Final-document G3 passed in source and native. Source/wiki publication, readback and synchronization are tracked in external closeout receipts.
+
+| Milestone | Observed evidence or implementation | Remaining gate |
+| --- | --- | --- |
+| Mechanism | Fourteen native JPEG/PNG outputs decoded, eleven JPEG raw Exif sRGB/dimension checks, three exact PNG controls and five first-error/cancellation controls matched. JPEG quality 1.0 remains lossy; decoded sRGB ICC equality is not raw embedding proof. | Mechanism controls remain separate from product/runtime/leak qualification; no ICC embedding promise. |
+| Tool and parity | Matching source/native passed 210 distinct methods each, including 24 raster, 44 MCP, 35 catalog, forty queue, retained ODS/PDF/audit and G3. JPEG aliases, metadata/readback/mode, alpha rejection, strict bounds, grants/context and retained PNG/TIFF passed. | Focused 24 is a subset; selected methods are not full-suite/installed/leak acceptance. Native-call preemption and late-cancel-before-rename/revocation common-writer behavior UNEXERCISED (latter source E2 only). |
+| Graph and builds | Ten affected memberships remain in existing targets; only twelve marketing/sixteen build declarations change. Source/native 71.764/71.688 s, CLI/app 0.898/0.901 s and ordinary Debug 26.165 s passed, exit 0/unforced, unchanged 464-input map. | Strict candidate, signed App/CLI controls, independent raw JPEG inspection and Qwen API consumption passed. Retained diagnostics establish no GUI/performance/lifetime claim. |
+| Native consumers | Strict candidate, signed App/CLI controls, independent raw JPEG inspection and Qwen API consumption passed. | Lossy output does not promise exact decoded RGBA; metadata acknowledgement does not establish image understanding, installed GUI, production managed-adapter, full web or all models. |
+| Delivery | README, existing Unreleased and affected documents record bounded JPEG and preserve complete .32/.31/.30 historical records. | Final-document G3 passed in source and native. Source/wiki publication, readback and synchronization are tracked in external closeout receipts. Installed GUI, production managed-adapter, full web, all models, other formats, Release and shipment remain open. |
+
+[Image contract and gates](docs/NATIVE-IMAGE-WRITING.md).
+
+<a id="additive-native-tiff-pixel-writing"></a>
+
+## Preceding additive native TIFF pixel writing
 
 Current target **0.32.0 (45)** extends `image_write` with bounded TIFF while
 preserving PNG defaults. Matching source/native, direct builds, strict candidate

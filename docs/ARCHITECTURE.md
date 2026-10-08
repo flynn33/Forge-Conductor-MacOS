@@ -1,5 +1,20 @@
 # Forge Conductor architecture
 
+Version: `0.33.0`; build: `46`. JPEG extends the call-local ImageIO path
+with fixed quality 1.0 and no thumbnail, remaining lossy. The worker validates
+canonical straight RGBA8/sRGB and rejects any alpha byte below 255 before native
+encoding or destination writing. The existing bounded first-error output owner,
+project revalidation and pinned writer remain; PNG/Swift TIFF paths are preserved.
+No new service, runtime, dependency or graph membership is introduced.
+Matching owning source/canonical native selections passed **210 distinct methods** each, zero failures/skips; CLI/app compilation and ordinary Debug passed.
+Strict candidate, signed App/CLI controls, independent raw JPEG inspection and Qwen API consumption passed.
+Final-document G3 passed in source and native. Source/wiki publication, readback and synchronization are tracked in external closeout receipts. [Contract](NATIVE-IMAGE-WRITING.md).
+Native-call preemption and late-cancel-before-rename/revocation common-writer
+behavior remain unexercised; the latter is a source E2 boundary, not a runtime
+failure or completion claim.
+
+## Preceding 0.32.0 (45) TIFF qualification
+
 Version: `0.32.0`; build: `45`. TIFF uses a call-local native Swift classic
 writer with uncompressed straight RGBA8, top-left chunky strips, unassociated
 alpha and native CoreGraphics sRGB ICC data. Total output is preflighted; the

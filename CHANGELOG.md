@@ -10,6 +10,22 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### `0.33.0 (46)` additive native opaque JPEG pixel writing
+
+- Extend existing `image_write` with explicit `format: "jpeg"` and case-insensitive
+  `.jpg`/`.jpeg` destinations. Preserve absent-format PNG and explicit TIFF.
+- Encode supplied opaque RGBA8/sRGB through ImageIO at fixed quality 1.0 without
+  a thumbnail; JPEG remains lossy. Reject nonopaque input with
+  `invalid_image_alpha` before writing. JPEG alone returns
+  `output_contract: "jpeg-opaque-lossy-srgb-v1"`; `pixel_contract` describes input.
+  Bounds, worker/cancellation, grant/context, pinned-write mode, audit and replay remain.
+- Native mechanism and matching 210-method source/native selections passed;
+  CLI/app compilation and ordinary Debug passed. Strict candidate, signed App/CLI controls, independent raw JPEG inspection and Qwen API consumption passed.
+  Final-document G3 passed in source and native. Source/wiki publication, readback and synchronization are tracked in external closeout receipts.
+  Native-call preemption and late-cancel-before-rename/revocation common-writer
+  behavior remain unexercised. Installed GUI, production managed-adapter, full web, all models, other formats, Release and shipment remain open.
+  [Contract and gates](docs/NATIVE-IMAGE-WRITING.md).
+
 ### `0.32.0 (45)` additive native TIFF pixel writing
 
 - Extend `image_write` with explicit `format: "tiff"` and `.tif`/`.tiff` paths,

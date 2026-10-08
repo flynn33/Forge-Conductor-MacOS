@@ -2,7 +2,7 @@
 id: docs
 display_name: Docs
 description: >
-  Write user/developer documentation as Markdown and export PDF manuals, plain-text DOCX, text-only XLSX/ODS, text-slide PPTX or PNG/TIFF pixel artifacts.
+  Write user/developer documentation as Markdown and export PDF manuals, plain-text DOCX, text-only XLSX/ODS, text-slide PPTX or PNG/TIFF/JPEG pixel artifacts.
   Use for README, runbooks, API docs, and PDF user guides.
 tools:
   - fs_read
@@ -54,6 +54,7 @@ first_moves:
   - For text-only ODS goals: ods_write(path=....ods, rows=[["Heading", "Value"]])
   - For PNG goals: image_write(path=....png, width=1, height=1, content="/wAA/w==")
   - For TIFF goals: image_write(path=....tiff, width=1, height=1, content="/wAA/w==", format="tiff")
+  - For JPEG goals: image_write(path=....jpg, width=1, height=1, content="/wAA/w==", format="jpeg")
 done_definition:
   - Requested doc artifacts exist on disk
   - Content matches verified project facts (not invented)
@@ -170,7 +171,7 @@ XML 1.0-disallowed scalars are rejected. The tool does not promise formulas,
 formatting, images or Office-suite fidelity. Report exact tool errors and inspect actual artifact
 evidence before claiming workbook completion.
 
-## PNG and TIFF pixel workflow
+## PNG, TIFF and JPEG pixel workflow
 
 Use `image_write(path="<project>/docs/IMAGE.png", width=1, height=1, content="/wAA/w==")`
 with canonical padded base64 straight RGBA8 sRGB pixel bytes, tightly packed in
@@ -180,8 +181,13 @@ Content must decode to exactly `width * height * 4` bytes, at most 1048576 bytes
 base64 is limited to 1398104 characters and encoded output to 2097152 bytes.
 Optional `pixel_format` accepts only `rgba8`; absent `format` defaults to `png`.
 For TIFF supply `format="tiff"` and an explicit `.tif` or `.tiff` destination.
-TIFF preserves the same straight RGBA8 sRGB pixel contract. Use its own grant. Report the actual destination and tool
-result after writing; this tool encodes supplied pixels.
+TIFF preserves the same straight RGBA8 sRGB pixel contract. For JPEG supply
+`format="jpeg"` and an explicit `.jpg` or `.jpeg` destination. Every alpha byte
+must be 255; use PNG/TIFF for transparency. JPEG uses fixed quality 1.0 and lossy
+output, so decoded RGB may differ. Its `output_contract` is
+`jpeg-opaque-lossy-srgb-v1`; `pixel_contract` describes the supplied RGBA8 bytes.
+Use its own grant. Report the actual destination and tool result after writing;
+this tool encodes supplied pixels.
 
 ## Text-only ODS workflow
 

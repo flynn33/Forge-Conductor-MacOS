@@ -1,5 +1,207 @@
 # Native image pixel writing
 
+## Additive JPEG phase — 0.33.0 (46)
+
+Current source target is **0.33.0 (46)**. Bounded opaque JPEG and preserved
+PNG/TIFF passed matching 210-method source/native selections, CLI/app compilation
+and ordinary Debug. Strict candidate, signed App/CLI controls, independent raw JPEG inspection and Qwen API consumption passed.
+Final-document G3 passed in source and native. Source/wiki publication, readback and synchronization are tracked in external closeout receipts.
+The complete .32 TIFF/.31 PNG sections below retain their tested identities.
+
+### JPEG tool contract
+
+`image_write` retains required `path`, `width`, `height`, `content` and its own
+grant. The existing `format` enum adds `jpeg`; JPEG requires explicit
+`format: "jpeg"` and `.jpg`/`.jpeg`, accepting extension case-insensitively and
+appending none. Absent format still selects PNG with `.png`; explicit TIFF and
+`.tif`/`.tiff` retain their contracts. No new schema input/tool, dependency,
+service, application runtime or source/resource/test membership is introduced.
+
+All branches take canonical padded base64 of tightly packed, top-to-bottom
+straight RGBA8/sRGB pixels with optional `pixel_format: "rgba8"`. JPEG requires
+every alpha byte to be 255. Otherwise it returns `invalid_image_alpha` with
+`JPEG requires every RGBA8 alpha byte to be 255; use png or tiff for transparency`
+before ImageIO encoding or destination writing; it does not flatten transparency.
+
+JPEG uses the call-local named-sRGB CoreGraphics/ImageIO path, fixed quality
+**1.0**, no thumbnail and `engine: "apple-imageio"`; output remains **lossy**.
+`pixel_contract: "rgba8-straight-srgb-v1"` describes supplied input, not exact
+decoded JPEG pixels. JPEG alone adds
+`output_contract: "jpeg-opaque-lossy-srgb-v1"`; PNG/TIFF output fields remain.
+Observed raw JPEG tagging is Exif sRGB (`ColorSpace=1`) and matching dimensions;
+no APP2 ICC profile is promised. Native-decoded sRGB profile equality is a
+separate consumer observation, not evidence of raw file embedding. Native
+decoding supplements bounded independent marker/Exif inspection; it is not an
+independently implemented entropy decoder or general JPEG acceptance.
+
+Each dimension remains 1–1,024, total pixels at most 262,144, decoded bytes
+exactly width × height × 4 and at most 1,048,576; base64 UTF-8 at most 1,398,104;
+encoded output at most 2,097,152. Existing transport/managed-run argument caps
+remain, including durable broker complete arguments at the smaller of the
+project allowance and 65,536 bytes. Worker ownership, bounded first-error output,
+cancellation/deadlines, project revalidation, pinned-write mode/durability, audit
+redaction, idempotent replay and PNG/TIFF defaults remain under their existing
+owners. Alpha scanning checks cancellation every 8,192 bytes; surrounding checks
+do not establish preemption of an ImageIO call in progress.
+
+The common `FilesystemToolPack.writePinnedText` checks cancellation before its
+`fsync`/rename sequence. Late cancellation or revocation in the interval before
+rename has **not been exercised** in this phase; this remains a source **E2**
+boundary, not observed runtime failure, proven atomic revocation or completed
+coverage. Preserved-destination cancellation controls do not close that boundary.
+
+### JPEG mechanism and source/native evidence
+
+Root-owned external mechanism compilation/run returned 0/unforced in
+0.682/0.678 s. All fourteen JPEG/PNG outputs decoded; eleven raw JPEGs had one
+8-bit three-component SOF0/C0 image, Exif `ColorSpace` tag `0xA001` SHORT count1/value1
+and matching `0xA002`/`0xA003` LONG count1 dimensions, with no APP2 segment. Three PNG
+controls preserved exact orientation/pixels. Five bounded output-limit,
+pre-cancel, expired, callback-cancel and limit-before-cancel controls matched
+expected first-error/ownership observations. Flat/quadrant JPEG interiors
+observed at most one RGB level of error; noisy and alpha diagnostics do not
+promise exact recovery or authorize nonopaque production JPEG. Call-local
+release observations are not product leak proof. Root review:
+`native-jpeg-root-mechanism-review-0330.json`, SHA
+`cc283292f6f90ea02d36d35e41ac5e22ecca9d9cedddefe9886923580fbb912d`.
+
+The absent-feature baseline executed one method and failed with
+`format must be png or tiff`; retain its NONPASS receipt
+`native-jpeg-absent-feature-baseline-source-0330-terminal.json`. The later
+focused raster selection passed 24 methods, 9.970 s, exit 0/unforced; it is a
+subset of the owning selection, not additional distinct coverage.
+
+Owning source and canonical native passed the same **210 distinct methods**,
+zero failures/skips: 24 raster, 44 MCP, 35 catalog, thirteen ODS reader, fifteen
+ODS writer, 35 PDF, forty queue, three audit and one G3. New JPEG cases verify
+lossy low-frequency interior tolerance (two RGB levels), native opaque decoding,
+raw Exif/structure, dimensions/max noisy input, first/middle/last alpha rejection,
+strict bounds/worker/cancel/deadline, aliases/metadata/full binary readback/mode,
+failed-write/symlink cleanup, grants/context/audit and malformed inspector
+fixtures. Existing twelve PNG/five TIFF cases retain exact-pixel contracts.
+The maximum 1 MiB direct-encoder test is separate from inline MCP argument limits.
+
+| Executed .33 check | Terminal result and retained receipt |
+| --- | --- |
+| Owning source | 210 passed, exit 0/unforced, 71.764 s; `native-jpeg-owning-source-0330-terminal.json` |
+| Canonical native | Same 210 under existing `ForgeConductorTests` workspace/scheme, exit 0/unforced, 71.688 s; `native-jpeg-owning-native-0330-terminal.json`, `native-jpeg-native-0330.xcresult` |
+| CLI/app compilation | Exit 0/unforced, 0.898/0.901 s; `native-jpeg-{cli-build,app-compilation}-0330-terminal.json` |
+| Ordinary Debug | Exit 0/unforced, 26.165 s; `native-jpeg-ordinary-debug-0330-terminal.json` |
+
+All owning/build checks retained the same unchanged **464-input** map, SHA
+`9e692840ed751d4d1c1b1a278e7ea6cf00c31ec985ff75afb8b4f3f90c3ff18f`.
+Method-set SHA is
+`8baec427a0ef792a9b8c6a5ba555d2f633aaec64f8a6b2c58b7b50cad862567e`;
+accounting receipt SHA
+`29febfbb989daf42081315f213c382dba1217ce885a389b97336c4c92074bcd6`.
+Source/native logs:
+`47af487bdcbd58e1b1f2ac72b569ff3333b181b11bca33235c48e2b1b53007df` /
+`86d027eab9f469bfb96052a4f26494bb0de738b4fe66753d93e5aca8309533e1`.
+Ten affected memberships remain in existing targets; the canonical project
+changes only twelve marketing/sixteen build declarations. Package/workspace
+bytes are unchanged. Authority/graph review is
+`native-jpeg-authority-graph-and-inputs-0330.json`.
+
+Owning-native and ordinary Debug logs retained matching-destination warnings;
+the owning-native log also retained a DVT `setRunnablePIDWithDiagnostics`
+launch warning. No compiler warning or QoS marker was found in those reviewed
+logs. These selected log observations do not establish diagnostic-free, GUI,
+performance/lifetime or leak qualification.
+
+### Candidate identity and delivery boundary
+
+The ordinary Debug candidate passed strict deep signature verification,
+0.129 s, exit 0/unforced; log SHA
+`403879d502c464cdc520ee331b182bd59b844ea0a32f26cbac580f2d7adb04f2`.
+Exact seven-binary/resource binding and three protected installed-app/LM Studio
+registration hashes stayed unchanged, as did the preceding .32 candidate.
+Candidate manifest SHA is
+`32c7a7c855cff5981fa6c3d79c7053bd5887c1c6ba2bfbcdeeef0b05fa536edf`;
+packaged docs source SHA is
+`e89c818fba57dafb36cb26116cd7d48cee0d09ae3a09e17030d9a00456c44809`.
+Candidate path is `native-debug-jpeg-0330/Build/Products/Debug/Forge Conductor.app`
+under the retained evidence directory; it was not installed.
+
+Actual signed .32/.33 App `tools/list` catalogs each contained 84 unchanged
+names; the sole changed descriptor was `image_write`'s JPEG enum/path/description.
+Receipt: `native-jpeg-actual-catalog-parity-0330.json`, SHA
+`8301f2fe14f45bbfd85269410ceca128584b6229fc293d6fb1eaa10af108e055`.
+This candidate catalog is separate from the installed .18 76-tool observation below.
+
+### Signed JPEG tool and Qwen scope
+
+Signed App and embedded CLI each passed ten logical groups: three positive
+JPEG writes, six negative groups with nine actual calls and one actual
+cancellation. Each consumed twenty correlated native responses/eighteen tool
+frames and then exited normally with full stdout/stderr EOF. Each produced a
+2×2 opaque `.jpg` (987 bytes), 1×1 `.jpeg` (775 bytes) and 32×32 flat `.JPEG`
+(821 bytes), with full base64 `fs_read` matching the file. Number paths,
+wrong-extension/missing-format pairs, boolean/unsupported format, invalid
+dimensions/base64 and nonopaque alpha preserved destinations. Actual bounded
+32×64 cancellation returned `-32800`, preserved its destination and left no
+residual file; it does not establish interruption at a particular encoding point
+or late-cancel-before-rename/revocation acceptance.
+
+All seven actual JPEGs (three App, three CLI, one Qwen) passed independent
+bounded baseline marker/scan/Exif inspection with complete EOI/file EOF,
+`ColorSpace=1`, matching dimensions and no APP2 ICC. The runtime oracle inspects
+raw structure/tagging; these seven artifacts were not separately native-decoded
+or checked for fidelity. Production native decoding and low-frequency tolerance
+are separate source/canonical-native writer cases. Six malformed parser controls
+rejected missing EOI, truncated/oversized segment ranges, a second image,
+trailing bytes and wrong Exif color. Root App/CLI artifact review is
+`native-jpeg-app-cli-root-artifact-review-0330.json`, SHA
+`c02e7be9d530349c488f94e27996e6b56af896d083d52b17297d488ebc55f132`.
+
+Qwen `qwen/qwen3.8-27b` selected JPEG `image_write` then `fs_read` through the
+supported isolated API workflow. Two actual results were attempted, fully
+written, correlated, verified, delivered and consumed across three normal API
+responses, actual Low 3/3. Actual MCP text, structured payload and completed
+follow-up request input matched; full readback equaled the produced file.
+Native transport consumed six correlated responses/four tool frames and exited
+normally with full EOF. The final acknowledgement contained exactly `sha256`,
+`bytes_written`, `width` and `height`, matching 987 bytes/2×2 and SHA
+`ec63a6671870e40790b6812ef2abd2d2c3e3aac332f340bb0b16da73a15eb01b`.
+This is metadata acknowledgement, not image understanding or photographic synthesis.
+
+Root consumer review is `native-jpeg-root-consumer-review-0330.json`, SHA
+`081636d2d4c43e326c23b4b43013d9b77db07f7708f7fc237ef44c1e9fd3acc5`.
+App/CLI/Qwen outer terminal times were 1.141/0.666/34.576 s, exit 0/unforced,
+full EOF, no deadline/output-cap hit. Current source 464, candidate seven,
+protected three, harness and owned artifacts remained unchanged in all modes.
+These checks do not establish general JPEG decoding, exact lossy RGB, installed
+GUI, production managed-adapter, full web, all models, Release or shipment.
+
+Final-document G3 passed in source and native. Source/wiki publication, readback and synchronization are tracked in external closeout receipts. Repeated document G3 does not increase the 210 distinct method count.
+
+Final-document source G3 executed one method and passed in 1.407 s; corrected
+canonical native G3 executed the same one method and passed in 2.071 s. Both
+exited 0, unforced, with the 464 source inputs unchanged. Retained receipts:
+`native-jpeg-final-document-g3-source-0330-terminal.json` and
+`native-jpeg-final-document-g3-native-retry-0330-terminal.json`. The first native
+invocation selected `ForgeConductorAppTests` outside the chosen scheme; it exited
+70 without running tests and remains a NONPASS. The corrected selector was
+`ForgeConductorTests/G1G10AcceptanceTests/testG3_VersionAndReleaseDocumentsAreAligned`.
+The native matching-destination and DVT launch warnings remain in the log.
+
+Installed GUI, production managed-adapter, full web, all models, other formats, Release and shipment remain open.
+
+### Separate installed status/catalog observation
+
+A fresh October 8 installed LM Studio GUI status diagnostic used
+`qwen/qwen3.8-27b`. The returned status and both actual model-generation
+catalogs contained **76 tools**, with `web_search`, `web_fetch` and `web_render`
+absent. Qwen's final count of 66 is a counting error; its absence-of-web statement
+is supported. The returned version was `0.18.0`; build `28` was independently
+read from the unchanged installed Info.plist, not returned by `get_forge_status`.
+No web request was dispatched. This is a scoped status/catalog observation,
+not new-candidate, full-web, all-model or installation acceptance. Receipt:
+`installed-web-catalog-fresh-status-readonly-0320.json`, SHA
+`c863cab657c0cd33bbc278a7f6719ddef54472022e439117aaf8bec3d90e89db`.
+
+Performance/lifetime/leak, automatic rollover and photographic synthesis remain
+separate gates. The following TIFF/PNG records retain their historical scope.
+
 ## Additive TIFF phase — 0.32.0 (45)
 
 Current source target is **0.32.0 (45)**. Bounded native Swift TIFF writing and

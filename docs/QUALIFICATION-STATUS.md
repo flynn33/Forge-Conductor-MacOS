@@ -1,5 +1,31 @@
 # Version and qualification status
 
+Current source target **0.33.0, build 46** adds opaque lossy JPEG to
+`image_write`, preserving PNG/TIFF. Native mechanism controls, matching owning
+source/canonical native 210-method selections and direct CLI/app/ordinary Debug
+builds passed on the same 464-input map. The one-method absent-feature baseline
+remains NONPASS; focused 24 is a subset of 210, not additional distinct coverage.
+Strict candidate, signed App/CLI controls, independent raw JPEG inspection and Qwen API consumption passed.
+Actual signed .32/.33 App catalogs each preserve 84 tool names; only the
+`image_write` JPEG descriptor changed. This is separate from installed .18/76 below.
+Final-document G3 passed in source and native. Source/wiki publication, readback and synchronization are tracked in external closeout receipts.
+Native-call preemption and late-cancel-before-rename/revocation common-writer
+behavior remain unexercised (the latter source E2 only). Installed GUI, production managed-adapter, full web, all models, other formats, Release and shipment remain open.
+[Contract](NATIVE-IMAGE-WRITING.md).
+
+A fresh October 8 installed LM Studio GUI status diagnostic used
+`qwen/qwen3.8-27b`. The returned status and both actual model-generation
+catalogs contained **76 tools**, with `web_search`, `web_fetch` and `web_render`
+absent. Qwen's final count of 66 is a counting error; its absence-of-web statement
+is supported. The returned version was `0.18.0`; build `28` was independently
+read from the unchanged installed Info.plist, not returned by `get_forge_status`.
+No web request was dispatched. This is a scoped status/catalog observation,
+not new-candidate, full-web, all-model or installation acceptance. Receipt:
+`installed-web-catalog-fresh-status-readonly-0320.json`, SHA
+`c863cab657c0cd33bbc278a7f6719ddef54472022e439117aaf8bec3d90e89db`.
+
+## Preceding 0.32.0 (45) TIFF qualification
+
 Current source target **0.32.0, build 45** adds bounded TIFF to `image_write`
 while preserving PNG defaults. Matching owning source/canonical native selections
 passed 203 distinct methods each, zero failures/skips; direct builds and strict
@@ -1682,7 +1708,7 @@ Dashboard geometry, minimum/normal containment of every primary view, and
 populated policy evaluation rows. Live completion of the reported owner run,
 universal policy enforcement, and distribution qualification remain open.
 
-Current source target: **0.32.0, build 45**, supporting **macOS 26+**. The earlier
+Current source target: **0.33.0, build 46**, supporting **macOS 26+**; scoped JPEG qualification and remaining document/delivery/installed gates are recorded above. The preceding published source is .32.0/build 45. The earlier
 0.16.3 Developer ID app and archive are recorded in the historical build-24 section;
 that workflow staged the CLI under `~/.forge-conductor` and manually copied the
 app to `/Applications`. It did not exercise a `.pkg` installation, notarization,
@@ -1693,6 +1719,13 @@ the detailed, source-bound receipts are in the
 [roadmap](../ROADMAP.md).
 
 ## Version and build agreement
+
+The current target is **0.33.0, build 46** for opaque lossy JPEG. Authority/G3
+and matching 210-method source/native selections, CLI/app/ordinary Debug passed.
+Strict candidate, signed App/CLI controls, independent raw JPEG inspection and Qwen API consumption passed.
+Final-document G3 passed in source and native. Source/wiki publication, readback and synchronization are tracked in external closeout receipts. [Current image scope](NATIVE-IMAGE-WRITING.md).
+
+Preceding .32 agreement and qualification record (retained):
 
 The current target is **0.32.0, build 45**. Authority agreement and G3 passed
 within matching 203-method source/native selections. Direct builds, strict
