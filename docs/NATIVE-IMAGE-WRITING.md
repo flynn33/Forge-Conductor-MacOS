@@ -1,5 +1,281 @@
 # Native image pixel writing
 
+<a id="additive-bmp-phase--0360-49-sourcecandidate-qualification-and-pending-final-gates"></a>
+
+## Additive BMP phase — 0.36.0 (49), source/candidate qualification and external closeout receipts
+
+Current source target is **0.36.0 (49)**. BMP extends the existing supplied-pixel
+tool while complete .35 WebP and older format histories below retain their
+original inputs, receipts, failures and qualification boundaries.
+
+### BMP tool contract
+
+Existing `image_write` accepts exact lowercase `format: "bmp"` with an
+explicit case-insensitive `.bmp` destination. Absent format remains PNG;
+PNG/TIFF/JPEG/GIF/WebP retain their existing contracts. Required arguments,
+own grant, replay/context checks, pinned atomic writer, modes, audit redaction,
+settings, tool names and schema identities remain the existing interfaces.
+
+Input is canonical padded base64 of tightly packed top-to-bottom straight
+RGBA8/sRGB bytes. Dimensions remain 1…1024 with at most 262144 pixels,
+1048576 decoded bytes, 1398104 base64 bytes and 2097152 encoded output bytes.
+BMP is one 32-bit top-down V5/BITFIELDS image with an sRGB marker. Independent
+masked-channel checks preserve supplied straight RGBA, including all alpha
+values and hidden RGB at alpha zero; native premultiplied rendering is compared
+separately to PNG. The marker and native decoded sRGB interpretation are not an
+embedded ICC or Windows interoperability claim.
+
+BMP returns `engine: "apple-imageio"`, `format: "bmp"` and the existing input
+`pixel_contract: "rgba8-straight-srgb-v1"`; like PNG/TIFF it adds no
+`output_contract` key. JPEG/GIF/WebP output fields and alpha restrictions remain.
+BMP reuses the call-local native provider/image/destination and bounded output
+consumer, its first-error checks and retained-consumer rollback/release.
+No framework, dependency, tool, grant, production script, graph member or
+signing protection is added or replaced.
+
+### BMP mechanism and source checkpoints
+
+The separate external ImageIO collection completed 31 encoding attempts:
+eleven PNG references and twenty BMP/ICO attempts. It exited normally 1,
+unforced, in .354 s; the overall native BMP/ICO gate remains NONPASS. Six opaque
+BMP attempts passed native comparisons and four BMP alpha diagnostics matched
+PNG rendering/alpha. All 84 constructed probe owners had exact release/deinit
+checks; this is neither Forge product leak proof nor failed-ICO acceptance.
+Root runtime readback SHA
+`de49b7a5b4aa2d9fffd61b43acaae73480c2212ec998b1b4bbdb59a1a20f597c`.
+
+Independent wire review then passed, normal exit 0/unforced in .242 s. All ten
+BMPs and eleven PNG references matched independently constructed source pixels,
+including four BMP alpha/hidden-RGB diagnostics. One 256×256 whole-PNG ICO payload
+passed separately. Seven positive and twenty-four negative parser controls are
+separate from those 31 encoding attempts and from product XCTest methods.
+Independent report SHA
+`a5087147afaa15df4db841c799722e3bbf86c0bca951708c8acacc6e38d6c026`.
+The later whole-PNG-wrapper native readback SHA
+`3cfda88ccba58340a6bfb1f00b19ece9a0f12d21f29fe873bd164e094c82eb75`
+retains its separate nine failures, normal exit 1/unforced in .351 s.
+
+A separate independent whole-PNG-wrapper wire-only review passed, normal exit
+0/unforced in .137 s: ten wrappers matched exact whole-PNG pixels/EOF, with
+four positive/sixteen negative directory controls. Both native NONPASS gates
+and the earlier v2 report-cap NONPASS remain retained; this reader performed
+no new native encode/decode and establishes no product ICO or Windows acceptance.
+Root readback SHA
+`8f151077eac27ef0623eb872ce21d318a755a4e6d760568b6a51a3e4fa3f71d1`.
+
+The third DIB+AND probe separately remained NONPASS, normal exit 1/unforced in
+.352 s: nine of ten DIB cases failed and two public type-hint controls retained
+the 1×1 failure/256×256 pass; no decoder dimension/length cause was established.
+Root readback SHA
+`cad4356b26731547392e3589ce7d37bcb3c13abc2acaaf24a5a7d4819c792b92`.
+
+The product missing-feature method was inserted without changing any of the
+original forty raster methods; its expected unsupported-BMP failure remains
+NONPASS (log SHA
+`5f55d579323211280acb2c5b2b99bd56809958bf8858607b14450549445fe5d1`).
+After the minimal BMP implementation, the eight new BMP methods and existing
+catalog method passed; focused log SHA
+`2baed7132321640ea7db0948d61bcf0358cae408d7bfb5cb2d9a8cbdb6970777`.
+The separate implementation-contingent delta changed only five unsupported
+`bmp` fixture values to still-unsupported `avif`, preserving their assertions,
+uppercase/alias rejection and all existing format methods. Support-bundle
+zero-selected output supplies no coverage; the owning bundle executed nine.
+Baseline/focused root readback SHA
+`dac2ebe1aba87bfc2b2bb1cdd36c92874a1ce711ada8f579ebb0acb257cdfcce`.
+The focused snapshots remain immutable and are not rebound to later inputs.
+
+### BMP owning source and native selection
+
+The missing-feature baseline executed one BMP method and failed normally in
+**5.746 s** with `invalidFormat`; that original failure remains **NONPASS**.
+The eight new BMP methods and one existing catalog method then passed in
+**13.457 s**, normal exit 0/unforced, zero failures/skips. Focused nine is a
+subset of the owning selection and adds no distinct coverage.
+Owning source **233 distinct methods** passed in **77.769 s**; canonical native
+passed the exact same **233** in **76.830 s**, zero failures/skips, normal exit
+0/unforced. Both exclude G3 and bind the same **464-input 0f204bd3… map**.
+CLI/app compilation passed in **0.894/0.894 s**. Ordinary Debug and strict
+candidate signature passed in **26.025/0.140 s**, normal exit 0/unforced, on
+the same source map. Signed App/CLI wire controls passed in **1.264/0.799 s**,
+normal exit 0/unforced: **34 native responses/32 tool frames/10 artifacts**
+per route. Qwen passed in **32.566 s**, normal exit 0/unforced: three actual
+Low-mode API responses consumed two selected native write/read results,
+**8 native responses/6 tool frames/2 artifacts**, with a strict four-scalar
+metadata ACK. The separate external native candidate-artifact consumer compiled
+in **1.969 s** and passed in **0.364 s**, normal exit 0/unforced: **seven
+BMP/PNG pairs/fourteen native images**, matching sRGB profiles/premultiplied
+renders and one release callback per provider.
+Initial-document G3 passed once in source/native (**1.439/1.767 s**), normal
+exit 0/unforced, zero failures/skips, on the same **464-input 0f204bd3… map**.
+The exact owning 233-plus-one G3 unions match at **234 distinct methods per
+route**; this was not one 234-test invocation. Initial hygiene/whitespace
+passed (**0.679/0.136 s**), normal exit 0/unforced. Repeated focused/G3
+checks add no distinct coverage.
+The native owning run retains eight linkd NSCocoaErrorDomain4097 diagnostics;
+the native G3 run retains DVTAssertionsWarning IDELaunchSession.m:395.
+Final-document G3 source/native one each passed (**1.535/1.748 s**);
+hygiene/whitespace passed (**0.672/0.132 s**), normal exit 0/unforced, on the
+same 464-input map. These repeated G3 checks add no distinct methods.
+No diagnostic-free claim follows. Later document rechecks and exact source/wiki
+publication, readback and synchronization require separate external receipts;
+this checkpoint claims no unrun result.
+
+| Owning class | Distinct methods per matching source/native route |
+| --- | ---: |
+| NativeRasterWriterTests | 48: retained 40 plus eight BMP |
+| MCPProtocolAndDiagnosticsTests, including its extensions | 44 |
+| ToolDefinitionCatalogTests | 35 |
+| ProjectInstructionQueueTests | 40 |
+| NativeODSReaderTests / NativeODSWriterTests | 13 / 15 |
+| PDFWriterTests | 35 |
+| Core tool audit | 3 |
+| G3 | Separate one-method gate passed in source/native; excluded from owning 233, giving matching union 234 |
+
+### BMP initial-document G3 and hygiene checkpoint
+
+The source and canonical native commands each executed
+`G1G10AcceptanceTests/testG3_VersionAndReleaseDocumentsAreAligned` exactly once
+and passed, normal exit 0/unforced, in **1.439/1.767 s**. Initial hygiene and
+whitespace passed in **0.679/0.136 s**, normal exit 0/unforced. Initial G3 uses
+the same unchanged 464-input map as the earlier owning selections/candidate;
+no source/test transition separates these checkpoints. Exact unique 233-plus-one
+unions match at **234 distinct methods per route**, not one 234-test invocation.
+The native G3 DVTAssertionsWarning at IDELaunchSession.m:395 is retained.
+The earlier zero-selected support bundle contributes no coverage.
+
+Initial G3 source/native logs have SHA
+`630c2863602bd1cc20f7b1f2f8fd00fbab7789635a06df612e255b403a51c838` /
+`4755f53e7b94fb456dfa7c159e6b883abd9ceea7495e3d4b4e2a02efe2a2b84a`.
+Corrected root readback SHA
+`a90f3370e7756f77379ea2cd78f3e06c725042ebee7a9794ec58d9e1ea55269d`
+retains the original receipt and explicitly distinguishes default/compact JSON
+hashes of the same source map; no test, result or binding changed or reran.
+Later document G3/hygiene/whitespace rechecks and exact source/wiki publication,
+readback and synchronization require separate external receipts. No unrun result
+is claimed; repeated checks add no distinct methods. Installed GUI, managed
+adapter, full web/all models and shipment stay open.
+
+The adjacent `DesktopProviderMCPAttachmentTests` class has three different
+methods and was not selected merely because it shares the MCP test file.
+Actual owning source readback SHA
+`e163920f531878f74539c6fc0192c561e8616a82d702490e0bd46d753054c88d`;
+native readback SHA
+`23668977aa179050924ee5540c03477190c561d315e1280f4911495c10f90e0f`.
+Both bind source map
+`0f204bd31c1292c6b930252fc4097c75272cd29b691dbb1b8b3de8f401eecc20`.
+
+The eight BMP methods exercise one native-readable sRGB image, independent
+V5/BITFIELDS channel extraction, all 256 alpha values and hidden RGB,
+asymmetric rows, 1024×1/1×1024/1024×256/256×1024 and full 1 MiB noisy input,
+strict inputs/output caps, main-thread/pre-cancel/deadline errors, malformed
+test-inspector inputs, owning tool metadata/readback/modes/protections/audit,
+uppercase destination extension, stale generation and own-grant denial.
+Extension validation remains before nonstring format validation. These tests
+do not prove deterministic in-native-call cancellation or a general BMP reader.
+Retained PNG/TIFF/JPEG/GIF/WebP methods passed in both owning selections.
+
+### BMP candidate, model, documentation and delivery boundaries
+
+Only existing source/resource/test memberships are used. Product authorities
+advance to .36/49 with twelve marketing and sixteen build values; G3 changes
+only its two expected identity literals. Existing workspace, target and signing
+protections remain. Actual strict Debug candidate
+`native-bmp-native-candidate-0360.json`, SHA
+`de889ca469e3c2e24b51eeb62b29b1181847919003a457ee453646829b7c5112`,
+binds .36/49, all 464 current inputs on the owning map, seven binaries, three
+protected inputs and unchanged prior .35 candidate seven. Signature/build
+identity qualifies no installation. Compiled wire/model gates have their own
+actual receipts below; no previous .35 artifact or Qwen receipt qualifies the
+new BMP candidate. The separate external native candidate-artifact consumer
+qualified seven BMP/PNG pairs across App/CLI/Qwen as recorded below.
+Initial document checks have their own actual receipts above; later document
+rechecks and publication require separate external receipts. Repeated focused/G3
+executions never add distinct methods. Do not insert self-referential publication
+commits into these documents.
+
+### BMP compiled wire and Qwen consumption
+
+Signed App and CLI passed in **1.264/0.799 s**, normal exit 0/unforced,
+sixteen case groups each: **34 native responses/32 tool frames/10 artifacts**
+per route, including three BMP/PNG-reference pairs. PNG default/reference,
+TIFF, JPEG, GIF and WebP parity retain each format's bounded inspection scope;
+JPEG marker/Exif checks do not decode its entropy stream, and GIF's palette
+RGB loss remains allowed. Nine negative calls in five groups passed: nonstring
+path, extension/default-format pairing, nonstring/unsupported/uppercase format,
+dimensions and base64. Each 32×64 explicit cancellation returned `-32800` and
+preserved the existing target. This observed protocol cancellation does not
+identify an in-native-call cancellation point or resolve the common-writer E2.
+Independent masked BMP channels and PNG reference bytes matched supplied pixels,
+including zero-alpha hidden RGB. Native profile/render comparisons have their
+separate external gate below; no raw ICC embedding or native hidden-RGB claim follows.
+
+Actual App summary SHA
+`4a27fd3a8f1dc18e0f4747c6c8f131c4c91865841c4b042b2e972261f5a0a01e`;
+CLI summary SHA
+`c457122de284c3aabdfc6f9b54ca518416237a24fae8dd8e1730d2d26a9fe86d`.
+Both observed normal native shutdown/EOF, no forced termination, no unconsumed
+responses and unchanged source 464/current candidate seven/protected three/
+prior .35 candidate seven inputs.
+
+Actual Qwen `qwen/qwen3.8-27b` passed in **32.566 s**, normal exit 0/unforced.
+Three normal API responses each had an observed Low-mode template; two selected
+`image_write`/`fs_read` results were fully correlated, delivered and consumed by
+completed subsequent turns. Preflight candidate PNG-reference write/read plus
+actual model-selected BMP write/read produced **8 native responses/6 tool
+frames/2 artifacts**, one BMP/PNG pair. The complete base64 read reached EOF.
+Its final strict four-scalar metadata ACK matched a **154-byte 2×2** BMP, SHA
+`fee27af20bc290ea826e4b8f224f1f0112811c5801b8ad52890e21c7e72f45aa`.
+Qwen summary SHA
+`74e5e1e249b14d6bb991af599093452f0c65d7eb69406d95e78a040a0e902c3e`.
+This proves consumption of these actual results and their metadata, not image
+understanding, photographic synthesis, production managed-adapter acceptance,
+full web access or all-model functionality. The public observer's startup banner
+is not a subscription acknowledgement; all three required own events and their
+Low-mode templates were observed separately.
+
+### BMP native candidate-artifact consumer
+
+The external native ImageIO helper compiled in **1.969 s** and ran in
+**0.364 s**, normal exit 0/unforced. Seven actual BMP/PNG pairs (App three,
+CLI three, Qwen one), fourteen images, decoded with the expected single-image
+count, BMP/PNG type and dimensions. Both members of every pair matched the
+same native **3144-byte sRGB profile**, SHA
+`2b3aa1645779a9e634744faf9b01e9102b0c9b88fd6deced7934df86b949af7e`.
+All premultiplied render pairs matched; opaque native rendered RGBA matched
+the supplied bytes exactly. Native zero-alpha hidden RGB was not claimed.
+
+All fourteen provider observations recorded first error `none`, no invalid
+counts or counter saturation, and exactly one release callback after native
+scope teardown. These are external helper callback observations, not an owner
+deinit or product leak proof. The helper accounted **44 reads/433776 bytes**,
+including all final input rereads, and retained sixteen output files including
+the summary. Current source 464/candidate seven/protected three/prior .35 seven
+remained unchanged. Native interpretation does not imply raw BMP ICC embedding,
+Windows interoperability, installed GUI or production reader acceptance.
+Actual native summary SHA
+`515a89e02202e3c070fd747f1a16520c892f9f3189d83e66a172b654d2ee0395`;
+root readback SHA
+`b966af0b1a9e66490fdfe68e351924643d26d9e87e5bdc8f67d74e8e23c100be`.
+The earlier App/CLI/Qwen wire root readback SHA
+`cdfbb0682f6c9528e65bbd03786284e3b5034bc17136a17f1b8e4522d12fda1a`
+retains its native-consumer-pending checkpoint; the later separate receipt
+supplies the actual consumer result without rewriting that history.
+
+The original ImageIO BMP/ICO collection remains NONPASS because nine ICO
+encodes failed. A separate whole-PNG ICO-wrapper native collection also remains
+NONPASS because nine decodes returned no detected ICO type/count zero; only the
+examined 256×256 case passed. These are separate attempts, not a diagnosed
+dimension rule. A third DIB+AND native probe also remains NONPASS: nine of ten
+DIB cases failed, only opaque 256×256 passed, and two public type-hint controls
+preserved the 1×1 failure/256×256 pass; no dimension/length cause is established.
+ICO, audio, archive/SQLite and other requested formats remain
+open. Pre-cancel tests do not prove native-call preemption; common-writer
+late-cancel-before-rename/revocation remains unexercised source E2.
+The installed .18.0/build-28 application and registrations remain unchanged.
+Installed GUI, production managed-adapter, full web, all models, Windows
+interoperability, Release and shipment remain open.
+
+
 ## Additive WebP phase — 0.35.0 (48), bounded source/candidate qualification
 
 Current source target is **0.35.0 (48)**. Owning source and direct builds/strict

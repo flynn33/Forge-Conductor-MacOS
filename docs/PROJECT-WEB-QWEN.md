@@ -1,5 +1,67 @@
 # Project repository, web access and Qwen verification
 
+Current source target **0.36.0 (49)** adds bounded BMP to supplied-pixel
+`image_write`, preserving PNG/TIFF/JPEG/GIF/WebP. New-candidate Qwen BMP
+write/read consumption passed in 32.566 s, normal exit 0/unforced, with three
+observed Low-mode responses, two actual selected results consumed and a strict
+four-scalar metadata ACK for the 154-byte 2×2 artifact. Earlier .35 WebP
+acknowledgement qualifies only its own actual artifacts and model turns. Image understanding
+and photographic synthesis are unqualified. Project GitHub-linking and full-web
+goals remain in force; the unchanged installed .18/28 diagnostic advertised
+76 tools with all three web tools absent and dispatched no web request.
+
+The missing-feature baseline executed one BMP method and failed normally in
+**5.746 s** with `invalidFormat`; that original failure remains **NONPASS**.
+The eight new BMP methods and one existing catalog method then passed in
+**13.457 s**, normal exit 0/unforced, zero failures/skips. Focused nine is a
+subset of the owning selection and adds no distinct coverage.
+Owning source **233 distinct methods** passed in **77.769 s**; canonical native
+passed the exact same **233** in **76.830 s**, zero failures/skips, normal exit
+0/unforced. Both exclude G3 and bind the same **464-input 0f204bd3… map**.
+CLI/app compilation passed in **0.894/0.894 s**. Ordinary Debug and strict
+candidate signature passed in **26.025/0.140 s**, normal exit 0/unforced, on
+the same source map. Signed App/CLI wire controls passed in **1.264/0.799 s**,
+normal exit 0/unforced: **34 native responses/32 tool frames/10 artifacts**
+per route. Qwen passed in **32.566 s**, normal exit 0/unforced: three actual
+Low-mode API responses consumed two selected native write/read results,
+**8 native responses/6 tool frames/2 artifacts**, with a strict four-scalar
+metadata ACK. The separate external native candidate-artifact consumer compiled
+in **1.969 s** and passed in **0.364 s**, normal exit 0/unforced: **seven
+BMP/PNG pairs/fourteen native images**, matching sRGB profiles/premultiplied
+renders and one release callback per provider.
+Initial-document G3 passed once in source/native (**1.439/1.767 s**), normal
+exit 0/unforced, zero failures/skips, on the same **464-input 0f204bd3… map**.
+The exact owning 233-plus-one G3 unions match at **234 distinct methods per
+route**; this was not one 234-test invocation. Initial hygiene/whitespace
+passed (**0.679/0.136 s**), normal exit 0/unforced. Repeated focused/G3
+checks add no distinct coverage.
+The native owning run retains eight linkd NSCocoaErrorDomain4097 diagnostics;
+the native G3 run retains DVTAssertionsWarning IDELaunchSession.m:395.
+Final-document G3 source/native one each passed (**1.535/1.748 s**);
+hygiene/whitespace passed (**0.672/0.132 s**), normal exit 0/unforced, on the
+same 464-input map. These repeated G3 checks add no distinct methods.
+No diagnostic-free claim follows. Later document rechecks and exact source/wiki
+publication, readback and synchronization require separate external receipts;
+this checkpoint claims no unrun result.
+
+The original ImageIO BMP/ICO collection remains NONPASS because nine ICO
+encodes failed. A separate whole-PNG ICO-wrapper native collection also remains
+NONPASS because nine decodes returned no detected ICO type/count zero; only the
+examined 256×256 case passed. These are separate attempts, not a diagnosed
+dimension rule. A third DIB+AND native probe also remains NONPASS: nine of ten
+DIB cases failed, only opaque 256×256 passed, and two public type-hint controls
+preserved the 1×1 failure/256×256 pass; no dimension/length cause is established.
+ICO, audio, archive/SQLite and other requested formats remain
+open. Pre-cancel tests do not prove native-call preemption; common-writer
+late-cancel-before-rename/revocation remains unexercised source E2.
+The installed .18.0/build-28 application and registrations remain unchanged.
+Installed GUI, production managed-adapter, full web, all models, Windows
+interoperability, Release and shipment remain open.
+
+[BMP contract and gates](NATIVE-IMAGE-WRITING.md).
+
+## Preceding 0.35.0 (48) WebP qualification
+
 Current source target **0.35.0 (48)** adds bounded WebP to supplied-pixel
 `image_write`, preserving PNG/TIFF/JPEG/GIF. Actual new-candidate Qwen completed
 three normal Low public API responses, consumed two selected write/read results

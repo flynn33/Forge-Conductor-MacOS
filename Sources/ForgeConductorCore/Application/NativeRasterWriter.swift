@@ -26,7 +26,7 @@ enum NativeRasterError: Error, Equatable, LocalizedError {
         case .invalidDimensions: "width and height must be integers from 1 through 1024, with at most 262144 pixels"
         case .invalidContent: "content must be canonical padded base64 containing exactly width × height × 4 RGBA8 bytes, at most 1048576 bytes"
         case .invalidPixelFormat: "pixel_format must be rgba8"
-        case .invalidFormat: "format must be png, tiff, jpeg, gif or webp"
+        case .invalidFormat: "format must be png, tiff, jpeg, gif, webp or bmp"
         case .invalidAlpha: "JPEG requires every RGBA8 alpha byte to be 255; use png or tiff for transparency"
         case .invalidGIFAlpha: "GIF requires every RGBA8 alpha byte to be 0 or 255; use png or tiff for partial transparency"
         case .outputTooLarge: "Encoded image is limited to 2097152 bytes"
@@ -35,7 +35,7 @@ enum NativeRasterError: Error, Equatable, LocalizedError {
     }
 }
 
-/// Call-local PNG/TIFF/WebP, opaque JPEG and palettized binary-alpha GIF encoding.
+/// Call-local PNG/TIFF/WebP/BMP, opaque JPEG and palettized binary-alpha GIF encoding.
 enum NativeRasterWriter {
     static let maximumDimension = 1024
     static let maximumPixels = 262_144
@@ -60,7 +60,7 @@ enum NativeRasterWriter {
                        outputByteLimit: Int = maximumOutputBytes) throws -> Data {
         guard !Thread.isMainThread else { throw NativeRasterError.workerRequired }
         try cancellation?.checkCancellation()
-        guard format == "png" || format == "tiff" || format == "jpeg" || format == "gif" || format == "webp" else {
+        guard format == "png" || format == "tiff" || format == "jpeg" || format == "gif" || format == "webp" || format == "bmp" else {
             throw NativeRasterError.invalidFormat
         }
         guard pixelFormat == "rgba8" else { throw NativeRasterError.invalidPixelFormat }
@@ -119,7 +119,7 @@ enum NativeRasterWriter {
             retainedOutput.release()
             throw NativeRasterError.encoderUnavailable
         }
-        let type = format == "jpeg" ? UTType.jpeg : format == "gif" ? UTType.gif : UTType.png
+        let type = format == "jpeg" ? UTType.jpeg : format == "gif" ? UTType.gif : format == "bmp" ? UTType.bmp : UTType.png
         guard let destination = CGImageDestinationCreateWithDataConsumer(
             consumer, type.identifier as CFString, 1, nil
         ) else { throw NativeRasterError.encoderUnavailable }

@@ -61,13 +61,15 @@ public struct DocsToolPack: ToolPackHandling {
         let isJPEG = (args["format"] as? String) == "jpeg"
         let isGIF = (args["format"] as? String) == "gif"
         let isWebP = (args["format"] as? String) == "webp"
-        let extensions = isTIFF ? ["tif", "tiff"] : isJPEG ? ["jpg", "jpeg"] : isGIF ? ["gif"] : isWebP ? ["webp"] : ["png"]
+        let isBMP = (args["format"] as? String) == "bmp"
+        let extensions = isTIFF ? ["tif", "tiff"] : isJPEG ? ["jpg", "jpeg"] : isGIF ? ["gif"] : isWebP ? ["webp"] : isBMP ? ["bmp"] : ["png"]
         guard extensions.contains(url.pathExtension.lowercased()) else {
             return .failure(code: "invalid_path", message: isTIFF
                 ? "An explicit .tif or .tiff destination is required for format=tiff"
                 : isJPEG ? "An explicit .jpg or .jpeg destination is required for format=jpeg"
                 : isGIF ? "An explicit .gif destination is required for format=gif"
                 : isWebP ? "An explicit .webp destination is required for format=webp"
+                : isBMP ? "An explicit .bmp destination is required for format=bmp"
                 : "An explicit .png destination is required")
         }
         guard let content = args["content"] as? String else {

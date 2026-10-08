@@ -1,6 +1,24 @@
 # Forge Conductor macOS — project roadmap
 
-## Additive native WebP pixel writing
+## Additive native BMP pixel writing
+
+Current target **0.36.0 (49)** adds bounded BMP to `image_write`, preserving
+PNG/TIFF/JPEG/GIF/WebP. Exact encoded straight RGBA and native premultiplied
+rendering have separate checks. This checkpoint claims no unrun document or delivery result.
+
+| Milestone | Observed evidence or implementation | Remaining gate |
+| --- | --- | --- |
+| Mechanism | External collection completed 31 encodes; all ten BMPs and eleven PNG references matched independent source pixels; seven positive/twenty-four negative parser controls passed separately. | Overall BMP/ICO collection stays NONPASS: nine native ICO encode failures, separate nine PNG-wrapper decode failures and third DIB+AND ten-case/nine-failure probe remain; its two public type-hint controls did not change the 1×1 failure/256×256 pass. Mechanism owner observations do not establish product leak freedom or Windows acceptance. |
+| Tool and parity | Minimal BMP branch reuses ImageIO/output ownership; focused eight BMP plus catalog one passed in 13.457 s. Owning source/native 233 exact matching methods passed in 77.769/76.830 s, zero failures/skips; raster 48 preserves prior 40 and adds eight. Separate initial-document G3 passed once in source/native (1.439/1.767 s), giving exact matching 233-plus-one unions of 234 distinct methods per route, not one 234-test invocation. | Focused nine and repeated G3 checks add no distinct coverage. Pre-cancel and common-writer late-cancel/revocation E2 remain open. |
+| Graph and builds | Existing memberships/signing preserved; only twelve marketing/sixteen build values and two G3 expectations advance. Owning routes bind 464 map 0f204bd3…. CLI/app compilation passed in 0.894/0.894 s; ordinary Debug/strict signature passed in 26.025/0.140 s, normal exit 0/unforced. Debug candidate de889ca4… binds seven current binaries/three protected/prior .35 seven. | Native eight linkd NSCocoa4097 diagnostics are retained. No full-suite/GUI/performance/lifetime claim; later document/delivery results require separate external receipts. Native G3 DVTAssertionsWarning IDELaunchSession.m:395 is retained. |
+| Native consumers and Qwen | Signed App/CLI passed in 1.264/0.799 s: sixteen groups, 34 responses/32 frames/10 artifacts each, three BMP/PNG pairs, five preserved formats in bounded parity scope, nine negative calls/five groups and explicit cancel -32800 with target preserved. Qwen passed in 32.566 s: three observed Low-mode responses, two actual selected results consumed, 8 native responses/6 frames/2 artifacts and strict 154-byte 2×2 metadata ACK. Independent encoded-channel/reference checks passed. Separate external native consumer compiled/ran in 1.969/0.364 s, normal exit 0/unforced: seven BMP/PNG pairs/fourteen images, count/type/dimensions, 3144-byte sRGB profile, premultiplied rendering, opaque equality, all fourteen provider release callbacks one/no first error/saturation. Its 44 reads/433776 bytes/sixteen output files and all current 464/candidate/protected/prior .35 guards passed. | External callback release is not owner deinit or product leak proof; native rendering does not claim hidden RGB/raw ICC/Windows. Actual BMP metadata ACK does not prove image understanding, full web, all models or installed/managed-adapter acceptance. Complete .35 histories retain their own evidence. |
+| Documentation and delivery | Initial 13-document update was applied under existing Unreleased, with full .35/prior bodies and original NONPASS receipts preserved. Initial G3 source/native one each passed (1.439/1.767 s), with exact matching 234 unions; initial hygiene/whitespace passed (0.679/0.136 s), normal exit 0/unforced. Final-document G3 source/native one each passed (1.535/1.748 s); hygiene/whitespace passed (0.672/0.132 s), normal exit 0/unforced, on the same 464-input map. These repeated G3 checks add no distinct methods. | Later document G3/hygiene/whitespace rechecks and exact source/wiki publication/readback/synchronization require separate external receipts; no unrun result is claimed. Installed GUI/managed adapter/full web/all models/ICO/audio/archive/SQLite/other formats/Release/shipment remain open. |
+
+[BMP contract and gates](docs/NATIVE-IMAGE-WRITING.md).
+
+<a id="additive-native-webp-pixel-writing"></a>
+
+## Preceding additive native WebP pixel writing
 
 Current target **0.35.0 (48)** extends `image_write` with bounded lossless WebP,
 preserving PNG/TIFF/JPEG/GIF. Explicit lowercase `webp` accepts all RGBA alpha

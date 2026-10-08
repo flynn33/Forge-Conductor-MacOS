@@ -1385,7 +1385,7 @@ final class ToolDefinitionCatalogTests: XCTestCase {
             for (key, value) in [("pixel_format", "rgba8"), ("format", "png")] {
                 let format = try XCTUnwrap(properties[key] as? [String: Any])
                 XCTAssertEqual(format["type"] as? String, "string")
-                XCTAssertEqual(format["enum"] as? [String], key == "format" ? ["png", "tiff", "jpeg", "gif", "webp"] : [value])
+                XCTAssertEqual(format["enum"] as? [String], key == "format" ? ["png", "tiff", "jpeg", "gif", "webp", "bmp"] : [value])
                 XCTAssertEqual(format["default"] as? String, value)
             }
             XCTAssertTrue(((properties["path"] as? [String: Any])?["description"] as? String)?.contains(".tif/.tiff") == true)
@@ -1400,6 +1400,10 @@ final class ToolDefinitionCatalogTests: XCTestCase {
             }
             XCTAssertTrue(((properties["path"] as? [String: Any])?["description"] as? String)?.contains(".webp") == true)
             for value in ["lossless WebP", "swift-webp-vp8l", "webp-lossless-rgba8-srgb-v1", "hidden RGB", "premultiplied rendering"] {
+                XCTAssertTrue(definition.description.contains(value), value)
+            }
+            XCTAssertTrue(((properties["path"] as? [String: Any])?["description"] as? String)?.contains(".bmp") == true)
+            for value in ["BMP", "32-bit top-down V5/BITFIELDS", "sRGB marker", "straight RGBA8 bytes"] {
                 XCTAssertTrue(definition.description.contains(value), value)
             }
             XCTAssertNil(properties["quality"])

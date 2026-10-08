@@ -10,6 +10,44 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### `0.36.0 (49)` additive native BMP pixel writing
+
+- Add exact lowercase `format: "bmp"` with an explicit case-insensitive `.bmp`
+  destination to existing `image_write`; preserve absent-format PNG and explicit
+  TIFF/JPEG/GIF/WebP, common limits, own grant and existing write/context/audit.
+- Reuse bounded call-local Apple ImageIO ownership. One 32-bit top-down
+  V5/BITFIELDS image retains supplied straight RGBA channels, including all
+  alpha values/hidden RGB. Native premultiplied rendering is separate. BMP has
+  an sRGB marker, no embedded ICC or Windows interoperability promise, engine
+  `apple-imageio`, retained input pixel contract and no new output_contract key.
+- Expected missing-feature baseline remains NONPASS. Eight new BMP methods and
+  existing catalog one passed in 13.457 s; matching owning source/native 233 passed in
+  77.769/76.830 s. Focused repeats add no distinct coverage. CLI/app compilation
+  passed in 0.894/0.894 s; ordinary Debug/strict signature passed in 26.025/0.140 s.
+  Signed App/CLI wire passed in 1.264/0.799 s, 34 responses/32 frames/10 artifacts
+  each; Qwen passed in 32.566 s, three observed Low-mode responses/two selected
+  results consumed, 8 responses/6 frames/2 artifacts and strict metadata ACK.
+  Separate external native consumer passed seven BMP/PNG pairs/fourteen native
+  images, profile/render/provider checks in 0.364 s after 1.969 s compile.
+  Initial-document G3 passed once in source/native (1.439/1.767 s); exact
+  owning 233-plus-one unions match at 234 distinct methods per route, not one
+  234-test invocation. Initial hygiene/whitespace passed (0.679/0.136 s),
+  normal exit 0/unforced. Final-document G3 source/native one each passed
+  (1.535/1.748 s); hygiene/whitespace passed (0.672/0.132 s), normal exit
+  0/unforced, on the same 464-input map. These repeated G3 checks add no
+  distinct methods. Later document rechecks and exact source/wiki
+  publication, readback and synchronization require separate external receipts;
+  no unrun result is claimed.
+- Preserve all forty old raster methods/assertions; five unsupported `bmp` fixtures
+  become still-unsupported `avif` only with the implementation. No graph member,
+  dependency, settings, project-format, grant or signing change is introduced.
+- Nine native ICO encode failures and separate nine whole-PNG-wrapper decode
+  failures and third DIB+AND ten-case/nine-failure probe remain NONPASS; its two
+  public type-hint controls did not change the 1×1 failure/256×256 pass.
+  Native-call preemption/common-writer late-cancel E2,
+  installed GUI/managed adapter/full web/all models/ICO/audio/archive/SQLite/
+  other formats/Release/shipment remain open. [BMP contract](docs/NATIVE-IMAGE-WRITING.md).
+
 ### `0.35.0 (48)` additive native lossless WebP pixel writing
 
 - Add explicit lowercase `format: "webp"` with case-insensitive `.webp` to

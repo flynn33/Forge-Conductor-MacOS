@@ -20,6 +20,350 @@ final class NativeRasterWriterTests: XCTestCase {
         try FileManager.default.removeItem(at: temporaryRoot)
     }
 
+    func testBMPOnePixelProducesOneNativeReadableSRGBImage() async throws {
+        try await Task.detached(priority: .utility) {
+            let pixels = Data([17, 83, 191, 255])
+            let encoded = try NativeRasterWriter.encode(width: 1, height: 1,
+                content: pixels.base64EncodedString(), format: "bmp")
+            XCTAssertEqual(try Self.decodedBMPWire(encoded, width: 1, height: 1), pixels)
+            let source = try XCTUnwrap(CGImageSourceCreateWithData(encoded as CFData, nil))
+            XCTAssertEqual(CGImageSourceGetType(source) as String?, "com.microsoft.bmp")
+            XCTAssertEqual(CGImageSourceGetCount(source), 1)
+            let image = try XCTUnwrap(CGImageSourceCreateImageAtIndex(source, 0, nil))
+            XCTAssertEqual(image.width, 1); XCTAssertEqual(image.height, 1)
+            // A native sRGB interpretation is separate from ICC embedding in the file.
+            XCTAssertEqual(try XCTUnwrap(image.colorSpace?.copyICCData()) as Data,
+                try XCTUnwrap(NSColorSpace.sRGB.iccProfileData))
+            XCTAssertLessThanOrEqual(encoded.count, NativeRasterWriter.maximumOutputBytes)
+        }.value
+    }
+
+    func testBMPWireChannelsAlphaAndNativeRenderingMatchPNGReference() async throws {
+        try await Task.detached(priority: .utility) {
+            var allAlpha = Data(capacity: 256 * 4)
+            for alpha in 0...255 { allAlpha.append(contentsOf: [17, 83, 191, UInt8(alpha)]) }
+            let fixtures: [(Int, Int, Data)] = [
+                (1, 1, Data([0, 0, 0, 0])), (1, 1, Data([17, 83, 191, 0])),
+                (1, 1, Data([211, 37, 109, 128])), (2, 2, Self.binaryPixels),
+                (3, 2, Data([255, 0, 0, 255, 17, 34, 51, 0, 7, 83, 191, 1,
+                             31, 157, 63, 64, 211, 37, 109, 128, 19, 71, 233, 254])),
+                (256, 1, allAlpha)]
+            for (width, height, pixels) in fixtures {
+                let encoded = try NativeRasterWriter.encode(width: width, height: height,
+                    content: pixels.base64EncodedString(), format: "bmp")
+                // Raw masked channels establish straight alpha/hidden RGB independently
+                // of native premultiplied rendering. This contract requires both checks.
+                XCTAssertEqual(try Self.decodedBMPWire(encoded, width: width, height: height), pixels)
+                let png = try NativeRasterWriter.encode(width: width, height: height,
+                    content: pixels.base64EncodedString())
+                XCTAssertEqual(try Self.renderedRaster(encoded, width: width, height: height, type: "com.microsoft.bmp"),
+                    try Self.renderedRaster(png, width: width, height: height, type: "public.png"))
+            }
+        }.value
+    }
+
+    func testBMPDimensionEdgesAndMaximumNoisyWirePixels() async throws {
+        try await Task.detached(priority: .utility) {
+            for (width, height) in [(1, 1), (1024, 1), (1, 1024), (17, 33), (1024, 256), (256, 1024)] {
+                var state: UInt32 = 0x2468ACE0
+                var pixels = Data(capacity: width * height * 4)
+                for index in 0..<(width * height) {
+                    for _ in 0..<3 {
+                        state = state &* 1_664_525 &+ 1_013_904_223
+                        pixels.append(UInt8(truncatingIfNeeded: state >> 24))
+                    }
+                    pixels.append(UInt8(truncatingIfNeeded: index))
+                }
+                let content = pixels.base64EncodedString()
+                if width * height == NativeRasterWriter.maximumPixels {
+                    XCTAssertEqual(pixels.count, NativeRasterWriter.maximumInputBytes)
+                    XCTAssertEqual(content.utf8.count, NativeRasterWriter.maximumBase64Bytes)
+                }
+                let encoded = try NativeRasterWriter.encode(width: width, height: height,
+                    content: content, format: "bmp")
+                XCTAssertEqual(try Self.decodedBMPWire(encoded, width: width, height: height), pixels)
+                XCTAssertLessThanOrEqual(encoded.count, NativeRasterWriter.maximumOutputBytes)
+                let source = try XCTUnwrap(CGImageSourceCreateWithData(encoded as CFData, nil))
+                XCTAssertEqual(CGImageSourceGetType(source) as String?, "com.microsoft.bmp")
+                XCTAssertEqual(CGImageSourceGetCount(source), 1)
+                let image = try XCTUnwrap(CGImageSourceCreateImageAtIndex(source, 0, nil))
+                XCTAssertEqual(image.width, width); XCTAssertEqual(image.height, height)
+            }
+        }.value
+    }
+
+    func testBMPWorkerCancellationStrictInputsAndOutputLimitRemainEnforced() async throws {
+        let content = Self.controlPixels.base64EncodedString()
+        try await MainActor.run {
+            XCTAssertTrue(Thread.isMainThread)
+            XCTAssertThrowsError(try NativeRasterWriter.encode(width: 2, height: 2, content: content, format: "bmp")) {
+                XCTAssertEqual($0 as? NativeRasterError, .workerRequired)
+            }
+        }
+        try await Task.detached(priority: .utility) {
+            let cancelled = ToolCallCancellation(timeoutSeconds: 10); cancelled.cancel()
+            XCTAssertThrowsError(try NativeRasterWriter.encode(width: 2, height: 2, content: content,
+                format: "bmp", cancellation: cancelled)) { XCTAssertTrue($0 is CancellationError) }
+            XCTAssertThrowsError(try NativeRasterWriter.encode(width: 2, height: 2, content: content,
+                format: "bmp", cancellation: ToolCallCancellation(timeoutSeconds: 0))) {
+                XCTAssertTrue($0 is ToolCallDeadlineExceeded)
+            }
+            let encoded = try NativeRasterWriter.encode(width: 2, height: 2, content: content, format: "bmp")
+            let exactLimit = try NativeRasterWriter.encode(width: 2, height: 2, content: content,
+                format: "bmp", outputByteLimit: encoded.count)
+            XCTAssertEqual(exactLimit.count, encoded.count)
+            XCTAssertEqual(try Self.decodedBMPWire(exactLimit, width: 2, height: 2), Self.controlPixels)
+            for limit in [0, 1, encoded.count - 1, NativeRasterWriter.maximumOutputBytes + 1] {
+                XCTAssertThrowsError(try NativeRasterWriter.encode(width: 2, height: 2, content: content,
+                    format: "bmp", outputByteLimit: limit)) { XCTAssertEqual($0 as? NativeRasterError, .outputTooLarge) }
+            }
+            for (width, height) in [(0, 1), (1, 0), (-1, 1), (1025, 1), (1, 1025),
+                                    (512, 513), (1024, 1024), (Int.max, Int.max)] {
+                XCTAssertThrowsError(try NativeRasterWriter.encode(width: width, height: height, content: "", format: "bmp")) {
+                    XCTAssertEqual($0 as? NativeRasterError, .invalidDimensions)
+                }
+            }
+            let invalid = ["", "AAAAAA", "AAAAAA=", "AAAAAB==", "AAAAAA==\n", "AAAA AA==", "!!!!AA==",
+                Data([0, 0, 0]).base64EncodedString(), Data([0, 0, 0, 0, 0]).base64EncodedString(),
+                String(repeating: "A", count: NativeRasterWriter.maximumBase64Bytes + 1)]
+            for value in invalid {
+                XCTAssertThrowsError(try NativeRasterWriter.encode(width: 1, height: 1, content: value, format: "bmp")) {
+                    XCTAssertEqual($0 as? NativeRasterError, .invalidContent)
+                }
+            }
+            for pixelFormat in ["bgra8", "RGBA8"] {
+                XCTAssertThrowsError(try NativeRasterWriter.encode(width: 2, height: 2, content: content,
+                    pixelFormat: pixelFormat, format: "bmp")) { XCTAssertEqual($0 as? NativeRasterError, .invalidPixelFormat) }
+            }
+            for format in ["BMP", "avif"] {
+                XCTAssertThrowsError(try NativeRasterWriter.encode(width: 2, height: 2, content: content, format: format)) {
+                    XCTAssertEqual($0 as? NativeRasterError, .invalidFormat)
+                }
+            }
+        }.value
+    }
+
+    func testBMPSubsetInspectorRejectsMalformedHeadersAndPixels() async throws {
+        try await Task.detached(priority: .utility) {
+            let encoded = try NativeRasterWriter.encode(width: 2, height: 2,
+                content: Self.controlPixels.base64EncodedString(), format: "bmp")
+            XCTAssertEqual(try Self.decodedBMPWire(encoded, width: 2, height: 2), Self.controlPixels)
+            var invalid = [Data(encoded.dropLast()), encoded + Data([0]), Data(encoded.prefix(50))]
+            for (offset, value) in [(2, UInt32(encoded.count - 1)), (10, 139), (14, 40), (18, 3), (22, 2),
+                                    (30, 0), (34, 15), (54, 0), (58, 0), (62, 0), (66, 0),
+                                    (70, 0), (126, 138), (130, 1), (134, 1)] {
+                var changed = encoded
+                for shift in 0..<4 { changed[offset + shift] = UInt8(truncatingIfNeeded: value >> (shift * 8)) }
+                invalid.append(changed)
+            }
+            for (offset, value) in [(0, UInt8(0)), (6, 1), (26, 2), (28, 24)] {
+                var changed = encoded; changed[offset] = value; invalid.append(changed)
+            }
+            for bytes in invalid { XCTAssertThrowsError(try Self.decodedBMPWire(bytes, width: 2, height: 2)) }
+            for (width, height) in [(1, 2), (2, 1), (0, 2), (Int.max, Int.max)] {
+                XCTAssertThrowsError(try Self.decodedBMPWire(encoded, width: width, height: height))
+            }
+            var changed = encoded; changed[138] ^= 1
+            var expected = Self.controlPixels; expected[2] ^= 1
+            XCTAssertEqual(try Self.decodedBMPWire(changed, width: 2, height: 2), expected)
+            XCTAssertNotEqual(expected, Self.controlPixels)
+        }.value
+    }
+
+    func testBMPToolMetadataReadbackAndWriteProtections() async throws {
+        let root = try XCTUnwrap(temporaryRoot)
+        try await Task.detached(priority: .utility) { [root] in
+            try Self.withToolApp(root: root) { app, client, project in
+                let prior = Data("BMP destination sentinel".utf8)
+                let existing = project.appendingPathComponent("replace.bmp")
+                try prior.write(to: existing); XCTAssertEqual(Darwin.chmod(existing.path, 0o600), 0)
+                func arguments(_ file: URL) -> [String: Any] {
+                    ["path": file.path, "width": 2, "height": 2, "content": Self.controlPixels.base64EncodedString(), "format": "bmp"]
+                }
+                for file in [existing, project.appendingPathComponent("fresh.bmp"), project.appendingPathComponent("uppercase.BMP")] {
+                    let result = try app.tools.call(name: "image_write", arguments: arguments(file), clientID: client)
+                    XCTAssertTrue(result.ok, "\(result.payload)")
+                    let bytes = try Data(contentsOf: file)
+                    XCTAssertEqual(try Self.decodedBMPWire(bytes, width: 2, height: 2), Self.controlPixels)
+                    XCTAssertEqual(result.payload["format"] as? String, "bmp")
+                    XCTAssertEqual(result.payload["engine"] as? String, "apple-imageio")
+                    XCTAssertEqual(result.payload["path"] as? String, file.path)
+                    XCTAssertEqual(result.payload["width"] as? Int, 2); XCTAssertEqual(result.payload["height"] as? Int, 2)
+                    XCTAssertEqual(result.payload["pixel_format"] as? String, "rgba8")
+                    XCTAssertEqual(result.payload["color_space"] as? String, "srgb")
+                    XCTAssertEqual(result.payload["pixel_bytes"] as? Int, 16)
+                    XCTAssertEqual(result.payload["pixel_contract"] as? String, NativeRasterWriter.pixelContract)
+                    XCTAssertNil(result.payload["output_contract"])
+                    XCTAssertEqual(result.payload["bytes_written"] as? Int, bytes.count)
+                    XCTAssertEqual(result.payload["sha256"] as? String, JSONSupport.sha256Hex(bytes))
+                    XCTAssertNil(result.payload["content"])
+                    XCTAssertEqual((try FileManager.default.attributesOfItem(atPath: file.path)[.posixPermissions] as? NSNumber)?.intValue,
+                        file == existing ? 0o600 : 0o644)
+                    let read = try app.tools.call(name: "fs_read", arguments: ["path": file.path, "encoding": "base64", "maximum_bytes": 32768], clientID: client)
+                    XCTAssertTrue(read.ok, "\(read.payload)")
+                    XCTAssertEqual(Data(base64Encoded: try XCTUnwrap(read.payload["content"] as? String)), bytes)
+                }
+                for (name, format) in [("protected.png", "bmp"), ("protected.tiff", "bmp"), ("protected.jpg", "bmp"),
+                                       ("protected.gif", "bmp"), ("protected.webp", "bmp"), ("protected.bmp", "png"),
+                                       ("protected.bmp", "absent"), ("no-extension", "bmp")] {
+                    let file = project.appendingPathComponent(name); try prior.write(to: file)
+                    var value = arguments(file)
+                    if format == "absent" { value.removeValue(forKey: "format") } else { value["format"] = format }
+                    let result = try app.tools.call(name: "image_write", arguments: value, clientID: client)
+                    XCTAssertFalse(result.ok); XCTAssertEqual(result.payload["code"] as? String, "invalid_path")
+                    XCTAssertEqual(try Data(contentsOf: file), prior)
+                }
+                let outside = root.appendingPathComponent("bmp-outside", isDirectory: true)
+                try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+                let outsideFile = outside.appendingPathComponent("target.bmp"); try prior.write(to: outsideFile)
+                let link = project.appendingPathComponent("alias", isDirectory: true)
+                try FileManager.default.createSymbolicLink(at: link, withDestinationURL: outside)
+                let symlink = try XCTUnwrap(try DocsToolPack().handle(name: "image_write",
+                    arguments: arguments(link.appendingPathComponent("target.bmp")), context: nil, clientID: client, app: app, cancellation: nil))
+                XCTAssertFalse(symlink.ok); XCTAssertEqual(symlink.payload["code"] as? String, "image_write_failed")
+                XCTAssertEqual(try Data(contentsOf: outsideFile), prior)
+                XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: outside.path), ["target.bmp"])
+                let directory = project.appendingPathComponent("directory.bmp", isDirectory: true)
+                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                try prior.write(to: directory.appendingPathComponent("keep"))
+                let rename = try XCTUnwrap(try DocsToolPack().handle(name: "image_write", arguments: arguments(directory),
+                    context: nil, clientID: client, app: app, cancellation: nil))
+                XCTAssertFalse(rename.ok); XCTAssertEqual(rename.payload["code"] as? String, "image_write_failed")
+                XCTAssertEqual(try Data(contentsOf: directory.appendingPathComponent("keep")), prior)
+                XCTAssertTrue(app.audit.flushAttempts(timeout: 2))
+                let event = try XCTUnwrap(app.audit.recent(limit: 32).first(where: { $0.tool == "image_write" && $0.status == "ok" }))
+                XCTAssertFalse(event.argsJSON?.contains(Self.controlPixels.base64EncodedString()) == true)
+                XCTAssertTrue(event.argsJSON?.contains("redacted") == true)
+                XCTAssertFalse(try FileManager.default.contentsOfDirectory(atPath: project.path).contains { $0.hasPrefix(".forge-") })
+            }
+        }.value
+    }
+
+    func testBMPToolStrictArgumentsPreserveDestination() async throws {
+        let root = try XCTUnwrap(temporaryRoot)
+        try await Task.detached(priority: .utility) { [root] in
+            try Self.withToolApp(root: root) { app, client, project in
+                let destination = project.appendingPathComponent("strict.bmp")
+                let prior = Data("preserve BMP destination".utf8); try prior.write(to: destination)
+                var valid = Self.arguments(path: destination.path); valid["format"] = "bmp"
+                var cases: [([String: Any], String)] = []
+                for path in [7, true, NSNull(), " \n", "nul\u{0}.bmp", project.appendingPathComponent("no-extension").path] as [Any] {
+                    var value = valid; value["path"] = path; cases.append((value, "invalid_path"))
+                }
+                var missingPath = valid; missingPath.removeValue(forKey: "path"); cases.append((missingPath, "invalid_path"))
+                for (key, values, code) in [
+                    ("width", [true, "2", 0, 1025, 2.5] as [Any], "invalid_image_dimensions"),
+                    ("height", [false, NSNull(), -1, 1025, 1.5] as [Any], "invalid_image_dimensions"),
+                    ("content", [7, false, NSNull(), "", "AAAAAB=="] as [Any], "invalid_content"),
+                    ("pixel_format", [7, NSNull(), "bgra8", "RGBA8"] as [Any], "invalid_pixel_format")
+                ] {
+                    for replacement in values { var value = valid; value[key] = replacement; cases.append((value, code)) }
+                }
+                var missingContent = valid; missingContent.removeValue(forKey: "content"); cases.append((missingContent, "invalid_content"))
+                for key in ["width", "height"] {
+                    var missing = valid; missing.removeValue(forKey: key); cases.append((missing, "invalid_image_dimensions"))
+                }
+                for format in [true, NSNull(), "BMP", "avif"] as [Any] {
+                    // Preserve extension-before-format validation: invalid tokens
+                    // fall back to PNG path routing before the format type check.
+                    var png = valid; png["path"] = project.appendingPathComponent("strict.png").path
+                    png["format"] = format; cases.append((png, "invalid_image_format"))
+                    var bmp = valid; bmp["format"] = format; cases.append((bmp, "invalid_path"))
+                }
+                for (arguments, code) in cases {
+                    let result = try XCTUnwrap(try DocsToolPack().handle(name: "image_write", arguments: arguments,
+                        context: nil, clientID: client, app: app, cancellation: nil))
+                    XCTAssertFalse(result.ok, "\(arguments)"); XCTAssertEqual(result.payload["code"] as? String, code)
+                    XCTAssertEqual(try Data(contentsOf: destination), prior)
+                }
+                for control in [ToolCallCancellation(timeoutSeconds: 10), ToolCallCancellation(timeoutSeconds: 0)] {
+                    if !control.isDeadlineExceeded { control.cancel() }
+                    XCTAssertThrowsError(try DocsToolPack().handle(name: "image_write", arguments: valid,
+                        context: nil, clientID: client, app: app, cancellation: control)) {
+                        XCTAssertTrue($0 is CancellationError || $0 is ToolCallDeadlineExceeded)
+                    }
+                }
+                XCTAssertEqual(try Data(contentsOf: destination), prior)
+                XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: project.path), ["strict.bmp"])
+            }
+        }.value
+    }
+
+    func testBMPStaleProjectContextAndOwnGrantPreventWrites() async throws {
+        let root = try XCTUnwrap(temporaryRoot)
+        try await Task.detached(priority: .utility) { [root] in
+            try Self.withToolApp(root: root) { app, client, project in
+                let prior = Data("protected BMP".utf8)
+                let outside = root.appendingPathComponent("owner-authorized.bmp")
+                XCTAssertFalse(outside.path.hasPrefix(project.path + "/"))
+                let value: [String: Any] = ["path": outside.path, "width": 2, "height": 2,
+                    "content": Self.controlPixels.base64EncodedString(), "format": "bmp"]
+                let owner = try app.tools.call(name: "image_write", arguments: value, clientID: client)
+                XCTAssertTrue(owner.ok, "\(owner.payload)")
+                XCTAssertEqual(try Self.decodedBMPWire(Data(contentsOf: outside), width: 2, height: 2), Self.controlPixels)
+                try prior.write(to: outside)
+                let context = try app.projectContexts.invocationContext(for: client)
+                let deniedClient = ClientID("bmp-denied-client")
+                _ = try app.projectContexts.bind(owner: ProjectBindingOwner(kind: .mcpClient, id: deniedClient.rawValue),
+                    projectID: context.projectID, generation: context.projectGeneration,
+                    authorizationScope: ToolAuthorizationScope(canonicalRoots: context.authorizationScope.canonicalRoots,
+                        allowedTools: ["fs_read", "fs_write"], networkAllowed: context.authorizationScope.networkAllowed,
+                        maximumInlineOutputBytes: context.authorizationScope.maximumInlineOutputBytes))
+                let denied = try app.tools.call(name: "image_write", arguments: value, clientID: deniedClient)
+                XCTAssertFalse(denied.ok); XCTAssertEqual(denied.payload["code"] as? String, "tool_not_granted")
+                XCTAssertEqual(try Data(contentsOf: outside), prior)
+                _ = try app.projectContexts.beginReset(projectID: context.projectID, expectedGeneration: context.projectGeneration)
+                _ = try app.projectContexts.completeReset(projectID: context.projectID, expectedGeneration: context.projectGeneration)
+                let stale = try XCTUnwrap(try DocsToolPack().handle(name: "image_write", arguments: value,
+                    context: context, clientID: client, app: app, cancellation: nil))
+                XCTAssertFalse(stale.ok); XCTAssertEqual(stale.payload["code"] as? String, "image_encode_failed")
+                XCTAssertEqual(try Data(contentsOf: outside), prior)
+                XCTAssertTrue(try FileManager.default.contentsOfDirectory(atPath: project.path).isEmpty)
+            }
+        }.value
+    }
+
+    // Test-only observed top-down 32-bit V5/BITFIELDS subset. No ImageIO decoder.
+    // Microsoft BITMAPFILEHEADER / BITMAPV5HEADER references define little-endian
+    // fields, masks and sRGB/profile distinction; linked profiles are not followed:
+    // https://learn.microsoft.com/en-us/windows/win32/api/wingdi/ns-wingdi-bitmapv5header
+    private static func decodedBMPWire(_ data: Data, width: Int, height: Int) throws -> Data {
+        guard (1...NativeRasterWriter.maximumDimension).contains(width),
+              (1...NativeRasterWriter.maximumDimension).contains(height) else { throw FixtureError.malformed }
+        let (pixels, overflow) = width.multipliedReportingOverflow(by: height)
+        guard !overflow, pixels <= NativeRasterWriter.maximumPixels else { throw FixtureError.malformed }
+        let rawBytes = pixels * 4
+        guard data.count >= 138, data.count <= NativeRasterWriter.maximumOutputBytes,
+              data.count == 138 + rawBytes else { throw FixtureError.malformed }
+        func short(_ at: Int) throws -> UInt16 {
+            guard at >= 0, at <= data.count - 2 else { throw FixtureError.malformed }
+            return UInt16(data[at]) | UInt16(data[at + 1]) << 8
+        }
+        func word(_ at: Int) throws -> UInt32 {
+            guard at >= 0, at <= data.count - 4 else { throw FixtureError.malformed }
+            var value: UInt32 = 0
+            for shift in 0..<4 { value |= UInt32(data[at + shift]) << (shift * 8) }
+            return value
+        }
+        guard data.prefix(2) == Data("BM".utf8), try word(2) == UInt32(data.count),
+              try short(6) == 0, try short(8) == 0, try word(10) == 138, try word(14) == 124,
+              try word(18) == UInt32(width), try word(22) == UInt32(bitPattern: -Int32(height)),
+              try short(26) == 1, try short(28) == 32, try word(30) == 3,
+              try word(34) == UInt32(rawBytes), try word(46) == 0, try word(50) == 0,
+              try word(54) == 0x00ff0000, try word(58) == 0x0000ff00,
+              try word(62) == 0x000000ff, try word(66) == 0xff000000,
+              try word(70) == 0x73524742,
+              try word(126) == 0, try word(130) == 0, try word(134) == 0 else { throw FixtureError.malformed }
+        // DWORD-aligned rows are width*4 for this depth, and negative height
+        // stores the first input row first. The strict masks choose RGBA bytes.
+        var rgba = Data(capacity: rawBytes)
+        for index in 0..<pixels {
+            let pixel = try word(138 + index * 4)
+            for shift in [16, 8, 0, 24] { rgba.append(UInt8(truncatingIfNeeded: pixel >> shift)) }
+        }
+        return rgba
+    }
+
     func testWebPOnePixelProducesOneNativeReadableSRGBImage() async throws {
         try await Task.detached(priority: .utility) {
             let encoded = try NativeRasterWriter.encode(width: 1, height: 1,
@@ -115,7 +459,7 @@ final class NativeRasterWriterTests: XCTestCase {
             }
             XCTAssertThrowsError(try NativeRasterWriter.encode(width: 2, height: 2, content: content,
                 pixelFormat: "bgra8", format: "webp")) { XCTAssertEqual($0 as? NativeRasterError, .invalidPixelFormat) }
-            for invalid in ["WEBP", "bmp"] {
+            for invalid in ["WEBP", "avif"] {
                 XCTAssertThrowsError(try NativeRasterWriter.encode(width: 2, height: 2, content: content, format: invalid)) {
                     XCTAssertEqual($0 as? NativeRasterError, .invalidFormat)
                 }
@@ -400,7 +744,7 @@ final class NativeRasterWriterTests: XCTestCase {
             }
             XCTAssertThrowsError(try NativeRasterWriter.encode(width: 2, height: 2, content: content,
                 pixelFormat: "bgra8", format: "gif")) { XCTAssertEqual($0 as? NativeRasterError, .invalidPixelFormat) }
-            for invalid in ["GIF", "bmp"] {
+            for invalid in ["GIF", "avif"] {
                 XCTAssertThrowsError(try NativeRasterWriter.encode(width: 2, height: 2, content: content, format: invalid)) {
                     XCTAssertEqual($0 as? NativeRasterError, .invalidFormat)
                 }
@@ -621,7 +965,7 @@ final class NativeRasterWriterTests: XCTestCase {
             }
             XCTAssertThrowsError(try NativeRasterWriter.encode(width: 2, height: 2, content: content,
                 pixelFormat: "bgra8", format: "jpeg")) { XCTAssertEqual($0 as? NativeRasterError, .invalidPixelFormat) }
-            for invalid in ["jpg", "JPEG", "bmp"] {
+            for invalid in ["jpg", "JPEG", "avif"] {
                 XCTAssertThrowsError(try NativeRasterWriter.encode(width: 2, height: 2, content: content, format: invalid)) {
                     XCTAssertEqual($0 as? NativeRasterError, .invalidFormat)
                 }
@@ -903,7 +1247,7 @@ final class NativeRasterWriterTests: XCTestCase {
             XCTAssertThrowsError(try NativeRasterWriter.encode(width: 2, height: 2, content: content, pixelFormat: "bgra8")) {
                 XCTAssertEqual($0 as? NativeRasterError, .invalidPixelFormat)
             }
-            XCTAssertThrowsError(try NativeRasterWriter.encode(width: 2, height: 2, content: content, format: "bmp")) {
+            XCTAssertThrowsError(try NativeRasterWriter.encode(width: 2, height: 2, content: content, format: "avif")) {
                 XCTAssertEqual($0 as? NativeRasterError, .invalidFormat)
             }
         }.value
@@ -927,7 +1271,7 @@ final class NativeRasterWriterTests: XCTestCase {
                     ("height", [false, NSNull(), -1, 1025, 1.5] as [Any], "invalid_image_dimensions"),
                     ("content", [7, false, NSNull(), "", "AAAAAB=="] as [Any], "invalid_content"),
                     ("pixel_format", [7, NSNull(), "bgra8", "RGBA8"] as [Any], "invalid_pixel_format"),
-                    ("format", [true, NSNull(), "bmp", "PNG"] as [Any], "invalid_image_format")
+                    ("format", [true, NSNull(), "avif", "PNG"] as [Any], "invalid_image_format")
                 ] {
                     for replacement in values { var value = valid; value[key] = replacement; cases.append((value, code)) }
                 }

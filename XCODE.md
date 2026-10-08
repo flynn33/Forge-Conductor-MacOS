@@ -1,5 +1,64 @@
 # Forge Conductor — Xcode
 
+Current source version **0.36.0**, build **49** adds BMP through existing
+native raster/provider/output code. Canonical workspace/target memberships and
+signing are preserved; twelve marketing and sixteen build values advance,
+with only two G3 identity expectations changed. Source tests, canonical native
+tests, compilation, signature, candidate/runtime and installed gates remain
+separate evidence classes.
+
+The missing-feature baseline executed one BMP method and failed normally in
+**5.746 s** with `invalidFormat`; that original failure remains **NONPASS**.
+The eight new BMP methods and one existing catalog method then passed in
+**13.457 s**, normal exit 0/unforced, zero failures/skips. Focused nine is a
+subset of the owning selection and adds no distinct coverage.
+Owning source **233 distinct methods** passed in **77.769 s**; canonical native
+passed the exact same **233** in **76.830 s**, zero failures/skips, normal exit
+0/unforced. Both exclude G3 and bind the same **464-input 0f204bd3… map**.
+CLI/app compilation passed in **0.894/0.894 s**. Ordinary Debug and strict
+candidate signature passed in **26.025/0.140 s**, normal exit 0/unforced, on
+the same source map. Signed App/CLI wire controls passed in **1.264/0.799 s**,
+normal exit 0/unforced: **34 native responses/32 tool frames/10 artifacts**
+per route. Qwen passed in **32.566 s**, normal exit 0/unforced: three actual
+Low-mode API responses consumed two selected native write/read results,
+**8 native responses/6 tool frames/2 artifacts**, with a strict four-scalar
+metadata ACK. The separate external native candidate-artifact consumer compiled
+in **1.969 s** and passed in **0.364 s**, normal exit 0/unforced: **seven
+BMP/PNG pairs/fourteen native images**, matching sRGB profiles/premultiplied
+renders and one release callback per provider.
+Initial-document G3 passed once in source/native (**1.439/1.767 s**), normal
+exit 0/unforced, zero failures/skips, on the same **464-input 0f204bd3… map**.
+The exact owning 233-plus-one G3 unions match at **234 distinct methods per
+route**; this was not one 234-test invocation. Initial hygiene/whitespace
+passed (**0.679/0.136 s**), normal exit 0/unforced. Repeated focused/G3
+checks add no distinct coverage.
+The native owning run retains eight linkd NSCocoaErrorDomain4097 diagnostics;
+the native G3 run retains DVTAssertionsWarning IDELaunchSession.m:395.
+Final-document G3 source/native one each passed (**1.535/1.748 s**);
+hygiene/whitespace passed (**0.672/0.132 s**), normal exit 0/unforced, on the
+same 464-input map. These repeated G3 checks add no distinct methods.
+No diagnostic-free claim follows. Later document rechecks and exact source/wiki
+publication, readback and synchronization require separate external receipts;
+this checkpoint claims no unrun result.
+
+The original ImageIO BMP/ICO collection remains NONPASS because nine ICO
+encodes failed. A separate whole-PNG ICO-wrapper native collection also remains
+NONPASS because nine decodes returned no detected ICO type/count zero; only the
+examined 256×256 case passed. These are separate attempts, not a diagnosed
+dimension rule. A third DIB+AND native probe also remains NONPASS: nine of ten
+DIB cases failed, only opaque 256×256 passed, and two public type-hint controls
+preserved the 1×1 failure/256×256 pass; no dimension/length cause is established.
+ICO, audio, archive/SQLite and other requested formats remain
+open. Pre-cancel tests do not prove native-call preemption; common-writer
+late-cancel-before-rename/revocation remains unexercised source E2.
+The installed .18.0/build-28 application and registrations remain unchanged.
+Installed GUI, production managed-adapter, full web, all models, Windows
+interoperability, Release and shipment remain open.
+
+[BMP contract and gates](docs/NATIVE-IMAGE-WRITING.md).
+
+## Preceding 0.35.0 (48) WebP qualification
+
 Current source version **0.35.0**, build **48** includes bounded Swift VP8L WebP.
 Owning source **225 distinct methods** passed in **75.739 s**; canonical native
 passed the exact same **225** in **75.173 s**, zero failures/skips; those owning selections exclude G3.
@@ -919,7 +978,7 @@ remains `22e7443d13496b3cc08b6e98366bb6d2332e3fd4`; later documentation commits
 do not change the binary identity. The set is ready for owner notarization and
 Apple upload, but is not notarized, stapled, installed, shipped, or released.
 That retained archive used Xcode `MARKETING_VERSION = 0.16.2` and
-`CURRENT_PROJECT_VERSION = 23`. Current source targets `0.35.0 (48)` for bounded WebP; native Debug build and strict signature passed; separate initial-document G3 one each establishes matching 226-method unions. Final-document G3 source/native one each and hygiene/whitespace passed, adding no distinct methods. Exact source/wiki publication, readback and synchronization outcomes are retained in external closeout receipts. Preceding .34 target record (retained): Current source targets `0.34.0 (47)` for bounded GIF; native Debug build and strict candidate signature passed. Preceding source targeted `0.33.0 (46)` for opaque lossy JPEG; the preceding .32 TIFF source and historical build-24 app/archive keep their identities. The historical build-24 app/archive use
+`CURRENT_PROJECT_VERSION = 23`. Current source targets `0.36.0 (49)` for bounded BMP; see the latest phase above. Preceding .35 target record (retained): Current source targets `0.35.0 (48)` for bounded WebP; native Debug build and strict signature passed; separate initial-document G3 one each establishes matching 226-method unions. Final-document G3 source/native one each and hygiene/whitespace passed, adding no distinct methods. Exact source/wiki publication, readback and synchronization outcomes are retained in external closeout receipts. Preceding .34 target record (retained): Current source targets `0.34.0 (47)` for bounded GIF; native Debug build and strict candidate signature passed. Preceding source targeted `0.33.0 (46)` for opaque lossy JPEG; the preceding .32 TIFF source and historical build-24 app/archive keep their identities. The historical build-24 app/archive use
 `0.16.3 (24)`; notarization and shipment remain separate.
 
 Implementation revision `91ad90ee7a1e51b7289f4c531ddae4dbbc6812ec`
