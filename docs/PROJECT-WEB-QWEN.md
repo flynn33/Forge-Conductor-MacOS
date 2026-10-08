@@ -8,6 +8,51 @@ App/CLI wire and reference/Core consumers also passed. This isolated candidate/A
 workflow does not qualify installed GUI, full Office/full web or all models.
 [Contract and retained evidence](NATIVE-PPTX-WRITING.md).
 
+## October 8 web and qualification follow-up
+
+The isolated signed **0.29.0 (42)** candidate completed a fresh ordinary Qwen
+public-web task: `web.search`, `web.fetch`, then `web.render` against Apple's
+URLSession documentation. All four model API responses stopped normally with
+actual Low reasoning; all three actual selected tool results were consumed.
+The native process returned seven correlated responses, exit 0 and both EOF,
+with no forced cleanup. Search and fetch returned HTTP 200; the JavaScript
+render returned 7,219 UTF-8 bytes with `truncated=true`. Root review found the two
+requested factual sentences and Apple source link supported by the returned text.
+Qwen additionally claimed the whole Overview was captured; that completeness
+claim remains unverified. This does not qualify every model/site, authenticated
+browser actions, the installed GUI or the production managed adapter.
+
+The active installed LM Studio Qwen chat reported missing search/fetch tools.
+Host readback found the installed app at **0.18.0 (28)** and the primary, CLU and
+fallback MCP registrations pointing to that installed executable. The candidate
+remains separate. The chat's actual `runtime.capabilities` response was observed;
+it is not a complete `tools/list` snapshot. No installed app, credential or MCP
+registration was replaced.
+
+The full `swift test` attempt reached its 900-second deadline: 2,635 methods
+passed, one H0 method failed and twelve explicitly skipped; one Xcode CLI method
+started without a complete terminal. This original run remains **NONPASS**.
+The failed H0 assertion hard-coded 0.18/28 despite the current 0.29/42 authorities.
+It now reads `VERSION` and `BUILD_NUMBER`, preserving exact twelve/sixteen Xcode
+assignment counts. `swift test --filter H0IsolationTests` passed seven methods;
+`swift test --filter XcodeCLIIntegrationTests` separately passed 41. These focused
+results do not constitute a completed full-suite run or native Xcode qualification.
+
+Only the existing SwiftPM qualification test changed among 458 product/test
+inputs. It has no canonical Xcode test membership; no membership was invented.
+App/native source, resources, project/workspace, product identity and the tested
+candidate remain unchanged. Retained receipts under the external evidence
+directory `2026-10-07-project-web-qwen` are:
+
+- `ordinary-web-qwen-final-0290/summary.json` and
+  `ordinary-web-qwen-root-review-0290.json`;
+- `live-installed-qwen-web-0290.json`;
+- `current-source-full-regression-0290-terminal.json` and its event readback;
+- `h0-current-version-repair-owning-0290-terminal.json`;
+- `source-regression-xcode-tail-0290-terminal.json`.
+
+Earlier failed provider and web receipts retain their original status below.
+
 ## Preceding 0.28.0 (41) XLSX qualification
 
 The preceding source targets **0.28.0 (41)**, adding bounded `xlsx_write` and repairing

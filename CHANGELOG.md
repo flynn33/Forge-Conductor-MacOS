@@ -10,6 +10,17 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### `0.29.0 (42)` web verification and qualification-test follow-up
+
+- Correct a stale qualification assertion to use `VERSION` and `BUILD_NUMBER`,
+  retaining the exact twelve marketing-version and sixteen build-number checks.
+  The owning seven-test class and separate 41-test Xcode CLI class passed; the
+  original 900-second full-suite timeout remains NONPASS.
+- Verify Qwen consuming public search, fetch and JavaScript-render results through
+  the isolated candidate. The installed LM Studio registration still targets 0.18
+  (28); no installation or registration was replaced. Product and canonical graph
+  inputs are unchanged. [Scope and evidence](docs/PROJECT-WEB-QWEN.md#october-8-web-and-qualification-follow-up).
+
 ### `0.29.0 (42)` native text-slide PPTX writing and import
 
 - Add `pptx_write(path, slides)` for bounded plain-text slides and an explicit

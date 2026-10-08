@@ -1,5 +1,20 @@
 # Forge Conductor macOS — project roadmap
 
+## October 8 web and qualification follow-up
+
+Product target remains **0.29.0 (42)**. This follow-up changes one existing
+SwiftPM qualification assertion and records fresh public-web evidence.
+
+| Milestone | Actual evidence | Remaining gate |
+| --- | --- | --- |
+| Full source regression | The 900-second run completed 2,648 method terminals: 2,635 passed, one H0 method failed and twelve explicitly skipped. One Xcode CLI method started without a complete terminal before forced timeout. | Original run remains NONPASS; no full-suite completion or test-hang cause is claimed. |
+| Qualification repair | H0 reads current `VERSION`/`BUILD_NUMBER`, keeping exact 12/16 assignment counts. Its seven-test class passed; the separate Xcode CLI class passed all 41 methods. | Xcode CLI tests exercise argument builders and fixtures, not actual native Xcode workflows. Focused results do not turn the interrupted full run into a pass. |
+| Qwen public web | Four normal API responses, actual Low 4/4; three actual search/fetch/render results consumed. Native seven correlated requests exited normally with both EOF. Root review confirmed two Apple URLSession facts and their source link. | Render was truncated; Qwen's additional claim that the whole Overview was captured is unverified. Candidate/API scope does not qualify all sites, all models, authenticated actions or installed GUI. |
+| Installed integration | The active Qwen chat reported no web tools; actual installed executable and all three LM Studio registrations target 0.18 (28), separately from the 0.29 candidate. | Installation/registration replacement was not performed. A runtime-capabilities response is not a complete tools/list snapshot. |
+| Graph and delivery | Existing SwiftPM H0 target membership is retained; app/native sources, canonical project/workspace, version/build and candidate binaries are unchanged. README, existing Unreleased and affected web document record this scope. | Exact source/wiki publication and synchronization identities are retained externally after readback. ODS, broader feature acceptance, Release and shipment remain open. |
+
+[Detailed scope and receipts](docs/PROJECT-WEB-QWEN.md#october-8-web-and-qualification-follow-up).
+
 ## Native text-slide PPTX writing and import
 
 Current target **0.29.0 (42)**. Bounded implementation and runtime gates passed;

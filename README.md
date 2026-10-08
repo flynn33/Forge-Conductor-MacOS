@@ -7,6 +7,13 @@ reference artifacts, both original Core import cases and Qwen consumption passed
 [Contract and retained evidence](docs/NATIVE-PPTX-WRITING.md).
 Installed/GUI, full Office/full web, all models, Release and shipment remain open.
 
+An October 8 follow-up verified Qwen's public web search, fetch and JavaScript
+rendering through the isolated 0.29 candidate. The installed LM Studio registration
+still points to 0.18 (28), where the active Qwen chat reported missing web tools.
+A package-only qualification assertion now reads the current version authorities;
+its seven-test class passed. The interrupted full-suite run remains NONPASS.
+[Follow-up scope and evidence](docs/PROJECT-WEB-QWEN.md#october-8-web-and-qualification-follow-up).
+
 ## Preceding 0.28.0 (41) XLSX qualification
 
 The preceding source targets **0.28.0 (41)**, adding `xlsx_write` for bounded text-only
