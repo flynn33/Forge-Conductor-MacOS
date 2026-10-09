@@ -1,6 +1,6 @@
 # Native JavaScript web snapshots
 
-Current source documentation targets **0.43.0 (59)**. The AAC increment does not change the complete captured-text paging contract. The .42 source/native/App/CLI/Qwen and delivery evidence below retains its tested identity; it is not .43 product requalification or full-web/all-model/installed proof. AAC App/CLI wire and separate native consumer gates passed their bounded matrices; Qwen and delivery remain [pending](QUALIFICATION-STATUS.md).
+Current source documentation targets **0.43.0 (59)**. The AAC increment does not change the complete captured-text paging contract. The .42 source/native/App/CLI/Qwen and delivery evidence below retains its tested identity; it is not .43 product requalification or full-web/all-model/installed proof. AAC App/CLI wire/native consumers and scoped Qwen/exact-artifact gates passed; initial document checks and first source publication/synchronization passed. Final result-document/wiki checks and delivery closeout remain [pending](QUALIFICATION-STATUS.md).
 
 <a id="current-0420-58-complete-captured-text-paging"></a>
 

@@ -2,14 +2,14 @@
 
 ## Supplied PCM16 AAC-LC M4A format extension
 
-Current target **0.43.0 (59)** extends existing audio_write with exact optional m4a and matching .m4a; omission remains WAV. This row records work, not dispatch. Product source is applied; qualification and delivery remain open.
+Current target **0.43.0 (59)** extends existing audio_write with exact optional m4a and matching .m4a; omission remains WAV. This row records work, not dispatch. Product source and the scoped source/native/build/App/CLI/Qwen/consumer gates passed; final documentation/wiki/delivery closeout remains open.
 
 | Milestone | Actual evidence or preparation | Remaining gate |
 | --- | --- | --- |
-| Source and preservation | Applied native owned-worker integration and explicit format/path contract. Matching source/native 139 passed in 76.318/108.450 s on the same 475 inputs, zero failures/skips; WAV/FLAC, grant/context/replay and 85-neighbor source preservation are included. Warnings retained. | Source preservation PASS; actual native/wire scopes below are separate from durable broker replay and general shutdown. |
+| Source and preservation | Applied native owned-worker integration and explicit format/path contract. Matching source/native 139 passed in 76.318/108.450 s on the same 475 inputs, zero failures/skips; WAV/FLAC, grant/context/replay and 85-neighbor source preservation are included. Warnings retained. | Durable broker replay and shared late-cancel/revocation-before-rename runtime reachability remain separate. |
 | Native candidate and protocol | Signed current-self worker and measured valid-frame accounting are implemented in source. CLI/app builds (1.013/1.006 s), ordinary Debug (24.067 s) and strict signature (0.134 s) passed, normal exit 0/unforced. C1 readback passed with seven artifacts/Info, 475 inputs and 80 preceding guards exact. Six App/CLI rate cohorts passed 24 real M4A files, 112 pages/364 responses, four explicit EOF reads per cohort and observed-child cancellation/destination preservation. All 24 files passed separate native valid-frame/true+extra EOF decode (12,583,488 bytes). | Failed/unresolved native-owner reachability, general shutdown and quality/lossless/installed claims remain unqualified. |
-| Qwen | Complete product model verification remains pending. | Completed later turns, actual Low inputs and scoped ACK PENDING. |
-| Documents and delivery | Current .43 proposal records pending gates; .42 delivery and histories remain separate. | Source/native G3, hygiene, source/wiki parity, publication and synchronization PENDING. |
+| Qwen | V3 passed six actual Low turns, five native results consumed later, three contiguous pages plus empty EOF, whole 57,482-byte M4A readback and exact four-scalar ACK. The sole model-created file separately passed native decoding to 16 valid frames/32 PCM bytes, true plus extra EOF and known success-owner closure. V2 test-only 32,768-byte artifact-cap NONPASS retained. | Selected qwen/qwen3.8-27b API flow only; no understanding, listening-quality/all-model/GUI/installed claim. |
+| Documents and delivery | Initial source/native G3 each passed one method in 2.279/2.855 s; the 139 owning methods plus a separate G3 give a 140-method union per route. Hygiene passed in 0.671 s. First owner 35-path source publication/readback/synchronization passed at ba5a4ad1e78988efe19a922a5b0297676ac2eca6; the graph and 475 compiled inputs unchanged. | Final result-document/wiki checks and delivery closeout PENDING; .42 histories remain separate. |
 
 [Audio contract](docs/NATIVE-AUDIO-WRITING.md). Raw ADTS .aac, remaining formats, full web/all models, installed operation, general lifetime, Release and shipment remain unqualified.
 

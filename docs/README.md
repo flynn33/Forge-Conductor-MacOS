@@ -1,6 +1,6 @@
 # Documentation guide
 
-Current source target **0.43.0 (59)** adds optional AAC-LC M4A to [supplied PCM16 audio writing](NATIVE-AUDIO-WRITING.md), retaining WAV defaults and FLAC. The product source is applied. Matching 139-method source/native owning checks, CLI/app compilation and ordinary Debug/strict signature passed. Six App/CLI rate cohorts and separate native decode/valid-frame/EOF checks passed for 24 actual M4A outputs. Qwen and delivery remain pending. The completed .42 web record and previous audio/archive/image records retain their tested identities and scopes. [Current qualification](QUALIFICATION-STATUS.md).
+Current source target **0.43.0 (59)** adds optional AAC-LC M4A to [supplied PCM16 audio writing](NATIVE-AUDIO-WRITING.md), retaining WAV defaults and FLAC. The product source is applied. Matching 139-method source/native owning checks, CLI/app compilation and ordinary Debug/strict signature passed. Six App/CLI rate cohorts and separate native decode/valid-frame/EOF checks passed for 24 actual M4A outputs. Scoped Qwen v3 and its exact-artifact native consumer passed. Initial document checks and first source publication/synchronization passed; final result-document/wiki checks and delivery closeout remain pending. The completed .42 web record and previous audio/archive/image records retain their tested identities and scopes. [Current qualification](QUALIFICATION-STATUS.md).
 
 ## Preceding 0.41.0 (57) qualification
 
