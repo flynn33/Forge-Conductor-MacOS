@@ -1,4 +1,35 @@
-# Native supplied-entry ZIP writing
+# Native supplied-entry archive writing
+
+Current source target: **0.40.0 (56)**. `archive_write` now accepts optional exact `format: "zip"`, `"tar"` or `"tar.gz"`; omitted format remains stored ZIP. Explicit case-insensitive .zip/.tar/.tar.gz paths must match the selected format. Supplied virtual NFC names, canonical padded-base64 content, entry order/bytes, 0–32 entries, 1 MiB aggregate raw and 2 MiB complete output remain bounded. The separate managed canonical JSON argument limit remains 65,536 bytes. Standalone raw-file GZIP, host member sources and extraction are not added.
+
+| format | Explicit destination | engine | output_contract |
+| --- | --- | --- | --- |
+| absent or zip | .zip | swift-stored-zip | zip-stored-supplied-files-v1 |
+| tar | .tar | swift-pax-tar | tar-pax-supplied-files-v1 |
+| tar.gz | .tar.gz | system-zlib-gzip-pax-tar | tar-gzip-pax-supplied-files-v1 |
+
+Shared name/base64/grant/context/overwrite/replay/pinned publication rules remain those in the retained ZIP contract below. Format is optional; unknown/null/non-string/uppercase/alias values refuse as invalid_archive_format, and mismatched extensions refuse as invalid_path. Returned success keys are unchanged. One UTF-8 length-counted PAX path record precedes each regular USTAR member; metadata is fixed mode 0644/uid 0/gid 0/mtime 0, with deterministic internal names, zero record padding and exactly 1,024 zero EOF bytes. Empty TAR is those 1,024 bytes. tar.gz is one GZIP member with time 0/OS 255/no optional fields containing the complete TAR; same-runtime byte determinism is distinct from universal compressor identity. No links, sparse members, append/update or directory entries are generated.
+
+Source checks passed 11 owning and 14 preservation methods across eight invocations; the matching .40/56 canonical native selection passed the same 25 distinct methods in 22.035 s. CLI/app compilation passed in 5.849/2.297 s; ordinary Debug/strict signature passed in 25.674/0.138 s on 471 inputs. The first test-helper type-checking NONPASS and its explicit UInt32 CRC correction remain recorded.
+
+Direct candidate App and CLI MCP checks each passed 32 responses, 30 tool frames, seven base64 pages and five complete EOF readbacks, ten refusals, immediate cancellation with target preservation, deterministic TAR repeat and 22-byte default/explicit ZIP parity. The catalog retained 86 definitions with all 85 neighboring descriptors exact.
+
+Qwen TAR and tar.gz each passed nine native responses/seven tool frames, three observed Low inputs, two actual archive_write/fs_read results consumed by completed turns 1/2 and an exact four-scalar ACK (`sha256`, `bytes_written`, `entry_count`, `input_bytes`) after whole-file EOF readback. All routes closed normally without forced cleanup; the 471 source inputs, seven candidate artifacts, 59 prior guarded paths and fixture configurations remained unchanged.
+
+| Product format | Complete bytes | SHA-256, identical across App, CLI and Qwen |
+| --- | --- | --- |
+| TAR | 4,608 | `3f1d702d295391714cb6713495d23b341caaae5fb1e5269a220c196fb363d3db` |
+| tar.gz | 482 | `320d403c37025369150b175d581555cd23dd06d3e6c1b56b9e3c92201d61d787` |
+
+Each archive contains ordered `données/日本語.bin` with exact bytes 00…ff and `empty.bin`; independent whole-container readback retained both member lengths and hashes. The product wire/model closure is `native-tar-gzip-app-cli-qwen-wire-root-readback-0400-v1.json`, SHA-256 `8d25de90e8953c94f544886eba4a07dbc39fe2e495f0b2b78037409ec8beac3d`.
+
+Product BSD checks passed fifteen stdout-only commands over the six App/CLI/Qwen TAR/tar.gz archives: six ordered logical-name listings, six complete 256-byte payloads (00…ff) and three gzip integrity checks. Every command exited normally at zero with both EOFs, owned-group absence and no forced cleanup. All six retained raw listings are 34 bytes, SHA-256 `8b374d7ecb2c69168794aa1449acaa23a27b91737d8861329f41fe6692d73c5a`, with NFD spelling against archive NFC names; the cause remains unknown. The source 471/current 7/prior 59, packet, native consumer and interpreter guards were unchanged. No filesystem extraction or physical-spelling guarantee is established.
+
+The product BSD closure is `native-tar-gzip-product-bsd-runtime-root-readback-0400-v1.json` (182,738 bytes), SHA-256 `22a6afc3605d32709fa2c0b9fc1f4c99c740deac101fc2f78176125bacbe1e7b`. Separate source/native G3 checks passed one actual method each in 7.174/14.946 s, giving 26 distinct methods per route with the prior 25-method selections; these are separate invocations. The initial native AppTests zero-selection attempt remains NONPASS. Hygiene/whitespace passed in 0.668/0.140 s, normal exit 0/unforced. The final C2 passed a reread of the same seven immutable C1 binaries, with no rebuild: the current 471-input map differs only in two G3 identity assertions; all other 470 inputs, including production, resources, authorities and graph, remain exact. Owner source/wiki delivery remains pending.
+
+Separate mechanism proof passed six recipes/twelve archives and 31 controls. Corrected independent v2 passed ten positive/45 negative controls and all twelve archives; thirty BSD stdout checks passed twelve canonical NFC listings, twelve complete payloads and six gzip integrity commands. The two mixed listings had raw NFD spellings, retained with cause unknown; no filesystem extraction or physical-spelling guarantee follows. Original generator NONPASS remains retained. The mechanism instrumentation observed tracked allocation/free/End/deinit/weak-owner release and cancellation after returned deflate on selected test-only paths; unchanged product copies were checked separately. Product pre-cancel/deadline checks do not establish in-work or late-write cancellation. These are scoped source/native/Debug, product wire/model and mechanism results; installed operation, general interoperability/lifetime, product in-work/late-rename cancellation, standalone GZIP, every page/model, Release and shipment remain separate.
+
+## Preceding stored ZIP contract and qualification — .38.0 (54)
 
 Current source target: **0.38.0 (54)**.
 

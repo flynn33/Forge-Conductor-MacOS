@@ -1,5 +1,9 @@
 # Documentation guide
 
+Current source target **0.40.0 (56)** extends [supplied-entry archive writing](NATIVE-ARCHIVE-WRITING.md) to optional PAX TAR and GZIP-wrapped PAX TAR while preserving ZIP default, exact virtual names/bytes and distinct writer/broker bounds. Matching source/native 25-method, ordinary Debug/signature and separate mechanism/container/BSD gates passed; App/CLI full-byte wire and Qwen TAR/tar.gz consumption/ACK passed; fifteen product BSD checks passed. Separate G3 source/native checks passed once each, giving 26 distinct methods per route with the prior 25; hygiene/whitespace passed. The initial zero-selection native attempt remains NONPASS. Final C2 passed as a reread of unchanged C1 binaries with only two G3 assertions changed in the source map; source/wiki delivery remains pending. Previous histories retain their identities.
+
+## Preceding 0.39.0 (55) qualification
+
 Current source target **0.39.0 (55)** adds [supplied PCM16 WAV writing](NATIVE-AUDIO-WRITING.md), documenting strict input, writer versus broker bounds, own grants and separate consumer gates. Existing archive/image/web contracts retain their histories.
 
 The original absent-definition NONPASS remains. Actual source 48 owning plus 24 separate preservation methods match 72 passed canonical native methods; build/signature, App/CLI wire and Qwen write/read consumption also passed. Both public native URL consumers passed seven small product WAVs with exact PCM/EOF and successful handle closure. Initial G3 and final prose hygiene/whitespace passed; source/wiki delivery remains pending. [Qualification](QUALIFICATION-STATUS.md).
@@ -345,7 +349,7 @@ qualification is not promoted by this UI phase.
 | [Native PPTX writing and import](NATIVE-PPTX-WRITING.md) | Bounded text-slide creation, slide-owned instruction import, retained baseline and scoped validation gates |
 | [Native ODS writing and import](NATIVE-ODS-WRITING.md) | Bounded ODF text-cell creation, sheet-labeled instruction import, retained baseline, scoped qualification and remaining gates |
 | [Native image pixel writing](NATIVE-IMAGE-WRITING.md) | Current standard-size ICO DIB/AND contract, exact encoded alpha/hidden RGB and separate native rendering; actual 56 raster+five neighbor source/native qualification, signed Debug/App/CLI/Qwen and native-consumer checks, GUI/global boundaries and external delivery receipts, complete preceding BMP/WebP/GIF/JPEG/TIFF/PNG histories |
-| [Native supplied-entry ZIP writing](NATIVE-ARCHIVE-WRITING.md) | Virtual names/bytes, grants, limits and qualification |
+| [Native supplied-entry archive writing](NATIVE-ARCHIVE-WRITING.md) | ZIP/PAX TAR/tar.gz virtual names/bytes, grants, bounds and scoped qualification |
 | [Native web rendering](NATIVE-WEB-RENDERING.md) | JavaScript snapshots, fixed native child ownership, actual frame budgets and qualification limits |
 | [Binary web and Qwen file workflows](BINARY-WEB-AND-QWEN-FILES.md) | Original HTTP bytes, version alignment, native/model examples and remaining format/browser gates |
 | [Project repository, web access and Qwen verification](PROJECT-WEB-QWEN.md) | GitHub project links, web/file tool additions, actual Qwen findings and current verification boundaries |

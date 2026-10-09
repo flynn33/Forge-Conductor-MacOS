@@ -1,5 +1,5 @@
 // DocsToolPack.swift
-// What: Provides native PDF, plain-text DOCX, text-cell XLSX/ODS, text-slide PPTX, and PNG/TIFF/JPEG/GIF/WebP/BMP/ICO and supplied-entry ZIP/PCM16 WAV tools to external MCP clients.
+// What: Provides native PDF, plain-text DOCX, text-cell XLSX/ODS, text-slide PPTX, and PNG/TIFF/JPEG/GIF/WebP/BMP/ICO and supplied-entry ZIP/TAR/tar.gz/PCM16 WAV tools to external MCP clients.
 // How: It translates validated tool arguments into PDFWriter operations and returns
 // bounded, structured success or error payloads.
 // Why: Document capability is an optional module rather than a responsibility of Core routing.
@@ -9,7 +9,7 @@ import Darwin
 import AppKit
 import CryptoKit
 
-/// Documentation tools: PDF write / PDF from file / plain-text DOCX / text-cell XLSX/ODS / text-slide PPTX / PNG/TIFF/JPEG/GIF/WebP/BMP/ICO / supplied-entry ZIP / supplied PCM16 WAV.
+/// Documentation tools: PDF write / PDF from file / plain-text DOCX / text-cell XLSX/ODS / text-slide PPTX / PNG/TIFF/JPEG/GIF/WebP/BMP/ICO / supplied-entry ZIP/TAR/tar.gz / supplied PCM16 WAV.
 public struct DocsToolPack: ToolPackHandling {
     private static let maximumSourceBytes = 4 * 1024 * 1024
     private let exporter: NativeDOCXExporter?
@@ -107,27 +107,51 @@ public struct DocsToolPack: ToolPackHandling {
 
     private func archiveWrite(_ args: [String: Any], context: ToolInvocationContext?,
                               app: ForgeApp, cancellation: ToolCallCancellation?) throws -> ToolResult {
-        guard Set(args.keys).isSubset(of: ["path", "entries", "deadline_ms"]) else {
-            return .failure(code: "invalid_archive_arguments", message: "Only path, entries and the shared deadline_ms field are accepted")
+        guard Set(args.keys).isSubset(of: ["path", "entries", "format", "deadline_ms"]) else {
+            return .failure(code: "invalid_archive_arguments", message: "Only path, entries, format and the shared deadline_ms field are accepted")
         }
+        let format: String
+        if let supplied = args["format"] {
+            guard let value = supplied as? String, ["zip", "tar", "tar.gz"].contains(value) else {
+                return .failure(code: "invalid_archive_format", message: "format must be exactly zip, tar or tar.gz")
+            }
+            format = value
+        } else { format = "zip" }
         guard let path = args["path"] as? String,
               !path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               !path.utf8.contains(0) else {
-            return .failure(code: "invalid_path", message: "ZIP path must be a nonblank string without NUL bytes")
+            return .failure(code: "invalid_path", message: format == "zip" ? "ZIP path must be a nonblank string without NUL bytes" : "Archive path must be a nonblank string without NUL bytes")
         }
         let url = ToolArgHelpers.resolvePath(path)
-        guard url.pathExtension.lowercased() == "zip" else {
-            return .failure(code: "invalid_path", message: "An explicit .zip destination is required")
+        let matchesExtension = format == "tar.gz" ? url.lastPathComponent.lowercased().hasSuffix(".tar.gz")
+            : url.pathExtension.lowercased() == format
+        guard matchesExtension else {
+            return .failure(code: "invalid_path", message: "An explicit .\(format) destination is required")
         }
         let encoded: NativeStoredZIPWriter.EncodedArchive
+        let engine: String, outputContract: String
         do {
             if let context { try app.projectContexts.validate(context, cancellation: cancellation) }
-            encoded = try NativeStoredZIPWriter.encode(entries: args["entries"], cancellation: cancellation)
+            switch format {
+            case "tar":
+                encoded = try NativePAXTARWriter.encode(entries: args["entries"], cancellation: cancellation)
+                engine = "swift-pax-tar"; outputContract = NativePAXTARWriter.outputContract
+            case "tar.gz":
+                encoded = try NativeGZIPArchiveWriter.encode(entries: args["entries"], cancellation: cancellation)
+                engine = "system-zlib-gzip-pax-tar"; outputContract = NativeGZIPArchiveWriter.outputContract
+            default:
+                encoded = try NativeStoredZIPWriter.encode(entries: args["entries"], cancellation: cancellation)
+                engine = "swift-stored-zip"; outputContract = NativeStoredZIPWriter.outputContract
+            }
             try cancellation?.checkCancellation()
             if let context { try app.projectContexts.validate(context, cancellation: cancellation) }
         } catch is CancellationError { throw CancellationError() }
         catch let error as ToolCallDeadlineExceeded { throw error }
         catch let error as NativeStoredZIPError {
+            return .failure(code: error.code, message: error.localizedDescription)
+        } catch let error as NativePAXTARError {
+            return .failure(code: error.code, message: error.localizedDescription)
+        } catch let error as NativeGZIPArchiveError {
             return .failure(code: error.code, message: error.localizedDescription)
         } catch {
             return .failure(code: "archive_encode_failed", message: "Native encoding or project authorization failed")
@@ -141,11 +165,11 @@ public struct DocsToolPack: ToolPackHandling {
             return .failure(code: "archive_write_failed", message: "Destination write or durability confirmation failed; inspect the destination before retrying")
         }
         return .success([
-            "path": url.path, "format": "zip", "engine": "swift-stored-zip",
+            "path": url.path, "format": format, "engine": engine,
             "bytes_written": encoded.data.count,
             "sha256": SHA256.hash(data: encoded.data).map { String(format: "%02x", $0) }.joined(),
             "entry_count": encoded.entryCount, "input_bytes": encoded.inputBytes,
-            "output_contract": NativeStoredZIPWriter.outputContract,
+            "output_contract": outputContract,
         ])
     }
 

@@ -10,6 +10,11 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### `0.40.0 (56)` supplied-entry TAR/GZIP writing
+
+- Extend archive_write with exact optional zip/default, tar and tar.gz and matching explicit paths. Preserve virtual NFC names/order/bytes, canonical base64, 32 members, 1 MiB raw/2 MiB output, own grant/context/pinned writer and separate 65,536-byte managed JSON bound. Standalone GZIP/source-file members/extraction are not added. [Contract](docs/NATIVE-ARCHIVE-WRITING.md).
+- Matching source/native 25 distinct methods, .40/56 ordinary Debug/signature and separate six-recipe mechanism, independent 55-control/twelve-artifact and thirty BSD stdout checks passed; original compiler/generator NONPASSs remain. App/CLI full-byte wire and Qwen TAR/tar.gz consumption/ACK passed on unchanged inputs. All fifteen product BSD listing/payload/gzip commands passed; raw NFD listings and unknown cause remain recorded. Separate G3 source/native checks passed once each, giving 26 distinct methods per route with the prior 25; hygiene/whitespace passed. The initial zero-selection native attempt remains NONPASS. Final C2 passed as a reread of unchanged C1 binaries with only two G3 assertions changed in the source map; source/wiki delivery remains pending. No installed/full-lifetime/general-interoperability/shipment claim.
+
 ### `0.39.0 (55)` supplied PCM16 WAV writing
 
 - Add `audio_write(path, content, sample_rate, channels)` with shared deadline_ms: explicit case-insensitive .wav, canonical padded-base64 signed PCM16LE, rates 8000/44100/48000, mono/stereo, nonempty complete frames and 1 MiB raw maximum. Output is one 44-byte PCM RIFF header plus unchanged supplied bytes. [Contract](docs/NATIVE-AUDIO-WRITING.md).

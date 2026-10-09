@@ -1,5 +1,26 @@
 # Version and qualification status
 
+Current source target **0.40.0, build 56** extends archive_write with exact optional tar/tar.gz and retained default ZIP. Source checks passed 11 owning and 14 preservation methods across eight invocations; the matching .40/56 canonical native selection passed the same 25 distinct methods in 22.035 s. CLI/app compilation passed in 5.849/2.297 s; ordinary Debug/strict signature passed in 25.674/0.138 s on 471 inputs. The first test-helper type-checking NONPASS and its explicit UInt32 CRC correction remain recorded.
+
+Direct candidate App and CLI MCP checks each passed 32 responses, 30 tool frames, seven base64 pages and five complete EOF readbacks, ten refusals, immediate cancellation with target preservation, deterministic TAR repeat and 22-byte default/explicit ZIP parity. The catalog retained 86 definitions with all 85 neighboring descriptors exact.
+
+Qwen TAR and tar.gz each passed nine native responses/seven tool frames, three observed Low inputs, two actual archive_write/fs_read results consumed by completed turns 1/2 and an exact four-scalar ACK (`sha256`, `bytes_written`, `entry_count`, `input_bytes`) after whole-file EOF readback. All routes closed normally without forced cleanup; the 471 source inputs, seven candidate artifacts, 59 prior guarded paths and fixture configurations remained unchanged.
+
+| Product format | Complete bytes | SHA-256, identical across App, CLI and Qwen |
+| --- | --- | --- |
+| TAR | 4,608 | `3f1d702d295391714cb6713495d23b341caaae5fb1e5269a220c196fb363d3db` |
+| tar.gz | 482 | `320d403c37025369150b175d581555cd23dd06d3e6c1b56b9e3c92201d61d787` |
+
+The exact product wire/model closure is `native-tar-gzip-app-cli-qwen-wire-root-readback-0400-v1.json` (236,528 bytes), SHA-256 `8d25de90e8953c94f544886eba4a07dbc39fe2e495f0b2b78037409ec8beac3d`.
+
+Product BSD checks passed fifteen stdout-only commands over the six App/CLI/Qwen TAR/tar.gz archives: six ordered logical-name listings, six complete 256-byte payloads (00…ff) and three gzip integrity checks. Every command exited normally at zero with both EOFs, owned-group absence and no forced cleanup. All six retained raw listings are 34 bytes, SHA-256 `8b374d7ecb2c69168794aa1449acaa23a27b91737d8861329f41fe6692d73c5a`, with NFD spelling against archive NFC names; the cause remains unknown. The source 471/current 7/prior 59, packet, native consumer and interpreter guards were unchanged. No filesystem extraction or physical-spelling guarantee is established.
+
+The product BSD closure is `native-tar-gzip-product-bsd-runtime-root-readback-0400-v1.json` (182,738 bytes), SHA-256 `22a6afc3605d32709fa2c0b9fc1f4c99c740deac101fc2f78176125bacbe1e7b`. Separate source/native G3 checks passed one actual method each in 7.174/14.946 s, giving 26 distinct methods per route with the prior 25-method selections; these are separate invocations. The initial native AppTests zero-selection attempt remains NONPASS. Hygiene/whitespace passed in 0.668/0.140 s, normal exit 0/unforced. The final C2 passed a reread of the same seven immutable C1 binaries, with no rebuild: the current 471-input map differs only in two G3 identity assertions; all other 470 inputs, including production, resources, authorities and graph, remain exact. Owner source/wiki delivery remains pending.
+
+Separate mechanism proof passed six recipes/twelve archives and 31 controls. Corrected independent v2 passed ten positive/45 negative controls and all twelve archives; thirty BSD stdout checks passed twelve canonical NFC listings, twelve complete payloads and six gzip integrity commands. The two mixed listings had raw NFD spellings, retained with cause unknown; no filesystem extraction or physical-spelling guarantee follows. Original generator NONPASS remains retained. Mechanism test-only cleanup/cancellation witnesses do not prove actual product in-work cancellation or the shared pinned-write late boundary. These are scoped source/native/Debug, product wire/model and mechanism results; installed operation, general interoperability/lifetime, product in-work/late-rename cancellation, standalone GZIP, every page/model, Release and shipment remain separate.
+
+## Preceding 0.39.0 (55) qualification
+
 Current source target **0.39.0, build 55** adds supplied PCM16 WAV writing. The missing-feature catalog method failed at the absent audio_write definition in 7.325 s (one failure, normal exit 1). After integration, that same single method passed in 19.268 s (normal exit 0); this is a subset, not the owning selection. Actual source selections passed 48 owning methods (9 writer, 37 catalog, 2 audio broker) in 31.228 s and 24 separate preservation methods in 13.654 s; the matching 72 canonical native methods passed in 67.506 s. All three selections exited 0 without forced cleanup or failed/skipped tests on the same 468 inputs. Swift CLI/app compilation passed in 1.106/1.276 s; ordinary Debug/strict signature passed in 24.825/0.139 s, normal exit 0/unforced, for the separate .39/55 seven-artifact candidate.
 
 Candidate App/CLI wire checks passed in 1.558/1.098 s: 33 correlated responses/31 complete tool frames, three exact 46/52/60-byte WAVs, 11 refusals and immediate -32800 cancellation with the original target preserved per route. All 85 prior descriptors, packaged Docs bytes, ZIP/PNG parity, config, 468 inputs, candidate seven and historical 52 guards stayed exact. A Docs session exercised the own grant; a separate read-only session denied audio_write.
@@ -2051,7 +2072,7 @@ Dashboard geometry, minimum/normal containment of every primary view, and
 populated policy evaluation rows. Live completion of the reported owner run,
 universal policy enforcement, and distribution qualification remain open.
 
-Current source target: **0.39.0, build 55**, supporting **macOS 26+**; tested candidate evidence and remaining phase gates are above.
+Current source target: **0.40.0, build 56**, supporting **macOS 26+**; scoped source/native/build/App/CLI/Qwen evidence and remaining consumer/document/delivery gates are above.
 
 Preceding .38 identity record (retained):
 
@@ -2098,7 +2119,7 @@ the detailed, source-bound receipts are in the
 
 ## Version and build agreement
 
-The current target is **0.39.0, build 55** for supplied PCM16 WAV. Source/native/build/App/CLI/Qwen gates passed on matching inputs; separate consumers, G3/document checks and delivery remain pending. Prior scoped evidence remains historical.
+The current target is **0.40.0, build 56** for TAR/GZIP archive formats. Matching source/native 25-method, ordinary Debug/signature, App/CLI full-byte wire, Qwen TAR/tar.gz consumption/ACK and separate mechanism/container/BSD gates passed; fifteen product BSD commands also passed. G3/document/hygiene, final C2 and source/wiki delivery remain pending. Prior scoped evidence remains historical.
 
 Preceding .37 identity record (retained):
 

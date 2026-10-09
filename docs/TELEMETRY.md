@@ -1,5 +1,11 @@
 # Telemetry architecture (real-time native)
 
+Current source documentation targets `0.40.0`, build `56`. TAR/tar.gz stay within existing archive_write document/tool-card/content-redaction owners; no telemetry schema, gauge, timer, producer or delivery queue is added. Selected mechanism allocation/free/End/deinit/weak observations are test-only call-local evidence, not general leak freedom or product telemetry qualification. [Scope](NATIVE-ARCHIVE-WRITING.md).
+
+Separate G3 source/native checks passed once each, giving 26 distinct methods per route with the prior 25; hygiene/whitespace passed. The initial zero-selection native attempt remains NONPASS. Final C2 passed as a reread of unchanged C1 binaries with only two G3 assertions changed in the source map; source/wiki delivery remains pending.
+
+## Preceding 0.39.0 (55) qualification
+
 Current source documentation targets `0.39.0`, build `55`. `audio_write` joins existing documents/tool-card classification and content audit redaction. It adds no gauge, timer, producer or GUI delivery queue. Source enrollment is separate from exercised telemetry or general leak freedom. [Audio contract](NATIVE-AUDIO-WRITING.md).
 
 The original absent-definition NONPASS remains. Actual source 48 owning plus 24 separate preservation methods match 72 passed canonical native methods; build/signature, App/CLI wire and Qwen write/read consumption also passed. Both public native URL consumers passed seven small product WAVs with exact PCM/EOF and successful handle closure. Initial G3 and final prose hygiene/whitespace passed; source/wiki delivery remains pending. [Qualification](QUALIFICATION-STATUS.md).

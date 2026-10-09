@@ -160,10 +160,10 @@ public final class AgentCatalog: AgentCatalogProviding, @unchecked Sendable {
             AgentSpec(
                 id: "docs",
                 displayName: "Docs",
-                description: "Write Markdown documentation and export PDF manuals, plain-text DOCX, text-only XLSX/ODS, text-slide PPTX or PNG/TIFF/JPEG/GIF/WebP/BMP/ICO pixel artifacts and supplied-entry ZIP archives and supplied PCM16 WAV audio via native tools.",
+                description: "Write Markdown documentation and export PDF manuals, plain-text DOCX, text-only XLSX/ODS, text-slide PPTX or PNG/TIFF/JPEG/GIF/WebP/BMP/ICO pixel artifacts and supplied-entry ZIP/TAR/tar.gz archives and supplied PCM16 WAV audio via native tools.",
                 tools: ["fs_read", "fs_write", "fs_edit", "fs_list", "fs_glob", "fs_mkdir", "search_text", "shell_exec", "pdf_write", "pdf_from_file", "docx_write", "xlsx_write", "pptx_write", "ods_write", "image_write", "archive_write", "audio_write", "git_status", "git_diff", "git_log", "runtime.capabilities", "python.run", "job.status", "job.read_output", "job.cancel", "job.list"],
                 toolsForbidden: ["git_push", "git_commit"],
-                whenToUse: ["README", "PDF manual", "plain-text DOCX", "text-only XLSX", "text-only ODS", "text-slide PPTX", "PNG pixel artifact", "TIFF pixel artifact", "WebP pixel artifact", "BMP pixel artifact", "ICO pixel artifact", "supplied-entry ZIP", "PCM16 WAV audio", "runbook", "API docs"],
+                whenToUse: ["README", "PDF manual", "plain-text DOCX", "text-only XLSX", "text-only ODS", "text-slide PPTX", "PNG pixel artifact", "TIFF pixel artifact", "WebP pixel artifact", "BMP pixel artifact", "ICO pixel artifact", "supplied-entry ZIP/TAR/tar.gz", "PCM16 WAV audio", "runbook", "API docs"],
                 firstMoves: ["fs_glob docs/README", "fs_read sources", "fs_write markdown", "pdf_from_file if needed", "agent_run_complete"],
                 doneDefinition: ["Artifacts on disk", "files_touched filled", "agent_run_complete"],
                 outputSchema: ["files_touched", "summary", "formats", "how_to_open"],
@@ -216,7 +216,10 @@ public final class AgentCatalog: AgentCatalogProviding, @unchecked Sendable {
                 complete output bytes. These writer ceilings do not raise managed
                 calls' existing 65536-byte canonical JSON argument bound. Duplicate,
                 case-insensitive and ancestor-file conflicts are rejected. Output
-                is stored method 0 with fixed timestamps; no compression/extraction
+                defaults to stored method 0 ZIP with fixed timestamps. Use format="tar"
+                with an explicit .tar path for deterministic PAX TAR, or format="tar.gz"
+                with an explicit .tar.gz path for one GZIP-wrapped PAX TAR. No format
+                is inferred from the extension. No standalone raw-file GZIP, extraction
                 or portable filesystem collision guarantee. Use its own grant.
                 For PNG pixels use image_write(path="<project>/docs/IMAGE.png", width=1,
                 height=1, content="/wAA/w=="). Supply canonical padded base64 straight

@@ -1,5 +1,17 @@
 # Project repository, web access and Qwen verification
 
+Current source target **0.40.0 (56)** extends archive_write to TAR/tar.gz while preserving default ZIP and all 85 neighboring definitions. Matching source/native 25-method and ordinary Debug/signature gates passed.
+
+Direct App/CLI MCP each passed 32 responses/30 tool frames, seven base64 pages, five complete EOF readbacks, ten refusals, immediate cancellation and ZIP parity.
+
+Qwen `qwen/qwen3.8-27b` each TAR/tar.gz passed nine native responses/seven frames, three observed Low inputs, two actual archive_write/fs_read results consumed by turns 1/2 and an exact four-scalar ACK (`sha256`, `bytes_written`, `entry_count`, `input_bytes`) after whole-file EOF.
+
+Fifteen product BSD stdout commands passed six logical listings, six exact payloads and three gzip integrity checks. All six raw listings retain NFD spelling/cause unknown; no filesystem extraction/physical spelling claim. Separate G3 source/native checks passed once each, giving 26 distinct methods per route with the prior 25; hygiene/whitespace passed. The initial zero-selection native attempt remains NONPASS. Final C2 passed as a reread of unchanged C1 binaries with only two G3 assertions changed in the source map; source/wiki delivery remains pending.
+
+Earlier .39 audio/LM Studio GUI and .38 ZIP results retain their own inputs; archive ACK proof is limited to those exact fixtures and calls; installed-chat, full-web and all-model proof remain separate. [Contract](NATIVE-ARCHIVE-WRITING.md).
+
+## Preceding 0.39.0 (55) qualification
+
 Current source target **0.39.0 (55)** adds `audio_write`. Product App/CLI wire checks passed in 1.558/1.098 s, each 33 responses/31 frames/three exact WAVs, 11 refusals and immediate cancellation with target preservation. Qwen passed in 38.544 s with three completed observed Low responses, two selected audio_write/fs_read results consumed by turns 1/2, nine native responses/seven frames and exact six-field ACK of its 52-byte WAV. Both public native URL consumers passed the seven small App/CLI/Qwen WAVs with exact PCM/EOF and successful closure; initial G3 and final prose hygiene/whitespace passed, and the original .39 source/wiki delivery completed; exact delivered revisions are in [qualification status](QUALIFICATION-STATUS.md). This audio result has its own receipts. Earlier archive/web/model transcripts retain their own source/candidate identities and add no audio, full-web or all-model proof. [Audio contract](NATIVE-AUDIO-WRITING.md).
 
 The separately preserved .38/54 candidate passed the typed Projects GitHub flow: registration, canonical Save, ordinary quit/reopen, invalid-host rejection preserving the saved bytes, Clear and a second ordinary quit. Six semantic phases and five durable checkpoints passed in 11.452 s; both Apps exited 0 without forced cleanup. Project identity/generation, 52 guards and shared preferences stayed unchanged. The saved 377-byte metadata reopened byte-exact; Clear left 309 bytes without a repository URL. Earlier driver NONPASSs remain retained. This proves the isolated candidate semantic flow; pixels, external browser opening, Tools, installed GUI, full web and all models remain unqualified.

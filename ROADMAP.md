@@ -1,5 +1,22 @@
 # Forge Conductor macOS — project roadmap
 
+## Supplied-entry TAR/GZIP formats
+
+Current target **0.40.0 (56)** extends existing archive_write; this affected row records work, not dispatch.
+
+| Milestone | Actual evidence | Remaining gate |
+| --- | --- | --- |
+| Contract/source | Default ZIP byte contract retained; optional exact tar/tar.gz, virtual names/base64 and writer/broker/grant bounds. Source 11 owning + 14 preservation = 25 distinct methods across eight invocations before identity advance; matching current 25 native methods and ordinary Debug/signature passed. Compile correction/NONPASS retained. | Product in-work/late-rename cancellation remains separate. |
+| Product wire/model | App and CLI each 32 responses/30 frames/seven pages/five full EOF readbacks/ten refusals plus immediate cancellation and 22-byte ZIP parity. Qwen each TAR/tar.gz nine native responses/seven frames/three observed Low inputs/two consumed results/four-scalar ACK after whole EOF. Catalog 86/other 85 exact; source 471/candidate 7/prior 59 unchanged. | No installed/GUI/all-model claim. |
+| Product BSD | Fifteen normal-zero/unforced stdout-only commands: six logical listings, six exact whole 256-byte payloads and three gzip integrity checks, both EOFs and owned-group absence. Source 471/current 7/prior 59 and packet/native/interpreter guards unchanged. | All six raw listings are NFD against archive NFC; cause unknown, no filesystem extraction/physical spelling claim. |
+| Mechanism/container/BSD | Six recipes/twelve files/31 mechanism controls, independent ten-positive/45-negative/full-twelve gate and thirty normal BSD stdout commands passed. | Raw NFD mixed listings/cause unknown retained; no physical extraction/spelling/general compatibility claim. |
+| Identity/documents | Root selected .40.0/56; current docs retain full .39/history. G3 source/native one actual method each passed in 7.174/14.946 s, giving 26 distinct methods per route with the prior 25; initial native zero-selection remains NONPASS. Hygiene/whitespace passed in 0.668/0.140 s. Only two G3 assertions differ from C1; all other 470 inputs and seven binaries remain exact. | Final C2 reread the same C1 binaries without rebuilding and passed; owner source/wiki readback/clean sync pending. |
+| Whole goal | Prior Projects and one .39 LM Studio GUI public-page proof retain their exact scopes. | Product in-work/late-rename, installed/all-model/host-adapter/general-lifetime/Release/shipment remain separate. |
+
+[Archive contract](docs/NATIVE-ARCHIVE-WRITING.md).
+
+## Preceding 0.39.0 (55) qualification
+
 ## Supplied PCM16 WAV writing
 
 Current target **0.39.0 (55)** adds `audio_write`; its scoped source/wiki delivery is complete, while broader completion gates remain open.

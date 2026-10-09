@@ -1,5 +1,11 @@
 # Forge Conductor architecture
 
+Version: `0.40.0`; build: `56`. NativePAXTARWriter preflights complete per-file PAX/USTAR extents before payload/output allocation. NativeGZIPArchiveWriter wraps that bounded TAR in one system-zlib member with pinned call-local storage, bounded allocation and row/chunk/native-call cancellation checks. Existing ZIP/Office bytes, Docs context-before/after checks and the pinned publication owner stay intact. Native mechanism cleanup witnesses do not qualify product in-work or shared late-cancel/revocation-before-rename paths. [Contract](NATIVE-ARCHIVE-WRITING.md).
+
+Separate G3 source/native checks passed once each, giving 26 distinct methods per route with the prior 25; hygiene/whitespace passed. The initial zero-selection native attempt remains NONPASS. Final C2 passed as a reread of unchanged C1 binaries with only two G3 assertions changed in the source map; source/wiki delivery remains pending.
+
+## Preceding 0.39.0 (55) qualification
+
 Version: `0.39.0`; build: `55`. NativePCM16WAVWriter preflights strict scalars, canonical base64, complete PCM16LE frames and the exact 44+raw output extent. A call-local worker appends explicit RIFF/WAVE bytes and bounded PCM chunks with existing cancellation checks. DocsToolPack.audioWrite validates project context before/after encoding and publishes through the existing pinned Data writer. Own grants, mutation/context, replay, defaults and document telemetry remain in their existing owners; no AudioFile handle, codec service or dependency is added. [Audio contract](NATIVE-AUDIO-WRITING.md).
 
 The original absent-definition NONPASS remains. Actual source 48 owning plus 24 separate preservation methods match 72 passed canonical native methods; build/signature, App/CLI wire and Qwen write/read consumption also passed. Both public native URL consumers passed seven small product WAVs with exact PCM/EOF and successful handle closure. Initial G3 and final prose hygiene/whitespace passed; source/wiki delivery remains pending. [Qualification](QUALIFICATION-STATUS.md).

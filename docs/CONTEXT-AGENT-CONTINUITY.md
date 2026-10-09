@@ -1,4 +1,10 @@
-# Context and agent continuity (v0.39.0)
+# Context and agent continuity (v0.40.0)
+
+Current source documentation targets 0.40.0 (56). TAR/tar.gz remain values of existing archive_write: own grant, project context, idempotent replay, ordinary defaults/custom denials/imported capabilities and progress ownership are retained. The broker still refuses canonical arguments above 65,536 bytes before intent/dispatch. Source and canonical native replay/over-bound checks passed. Direct App/CLI MCP and Qwen TAR/tar.gz result consumption/ACK passed; direct MCP has no broker replay claim. Checkpoint/successor/ACK/seal and project formats are unchanged. [Archive contract](NATIVE-ARCHIVE-WRITING.md).
+
+Separate G3 source/native checks passed once each, giving 26 distinct methods per route with the prior 25; hygiene/whitespace passed. The initial zero-selection native attempt remains NONPASS. Final C2 passed as a reread of unchanged C1 binaries with only two G3 assertions changed in the source map; source/wiki delivery remains pending.
+
+## Preceding 0.39.0 (55) qualification
 
 Current source documentation targets 0.39.0 (55). `audio_write` uses its own exact grant, project context, idempotent broker classification, ordinary default enrollment and progress tools. Custom denials and imported explicit capabilities stay narrow. The broker retains its 65,536-byte canonical JSON argument/result bound; raw PCM writer capacity does not expand that call bound. Checkpoint/successor/ACK/seal are unchanged. [Audio contract](NATIVE-AUDIO-WRITING.md).
 

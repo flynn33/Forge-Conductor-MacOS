@@ -2,7 +2,7 @@
 id: docs
 display_name: Docs
 description: >
-  Write user/developer documentation as Markdown and export PDF manuals, plain-text DOCX, text-only XLSX/ODS, text-slide PPTX or PNG/TIFF/JPEG/GIF/WebP/BMP/ICO pixel artifacts and supplied-entry ZIP archives and supplied PCM16 WAV audio.
+  Write user/developer documentation as Markdown and export PDF manuals, plain-text DOCX, text-only XLSX/ODS, text-slide PPTX or PNG/TIFF/JPEG/GIF/WebP/BMP/ICO pixel artifacts and supplied-entry ZIP/TAR/tar.gz archives and supplied PCM16 WAV audio.
   Use for README, runbooks, API docs, and PDF user guides.
 tools:
   - fs_read
@@ -40,7 +40,7 @@ when_to_use:
   - Create a text-only XLSX worksheet
   - Create a text-slide PPTX presentation
   - Create a text-only ODS worksheet
-  - Archive supplied virtual files as a stored ZIP
+  - Archive supplied virtual files as a stored ZIP, PAX TAR or gzip-wrapped PAX TAR
   - Wrap supplied signed PCM16 little-endian bytes as WAV audio
   - Encode supplied pixels into a PNG, TIFF, JPEG, single-image GIF, lossless WebP, BMP or standard-size ICO artifact
 when_not_to_use:
@@ -57,7 +57,7 @@ first_moves:
   - For text-slide PPTX goals: pptx_write(path=....pptx, slides=[{"title":"Heading","paragraphs":["Body"]}])
   - For text-only ODS goals: ods_write(path=....ods, rows=[["Heading", "Value"]])
   - For WAV goals: audio_write(path=....wav, content="AAA=", sample_rate=8000, channels=1)
-  - For ZIP goals: archive_write(path=....zip, entries=[{"name":"notes.txt","content":"SGVsbG8="}])
+  - For ZIP goals: archive_write(path=....zip, entries=[{"name":"notes.txt","content":"SGVsbG8="}]); for TAR or tar.gz use the matching extension and explicit format="tar" or "tar.gz"
   - For PNG goals: image_write(path=....png, width=1, height=1, content="/wAA/w==")
   - For TIFF goals: image_write(path=....tiff, width=1, height=1, content="/wAA/w==", format="tiff")
   - For JPEG goals: image_write(path=....jpg, width=1, height=1, content="/wAA/w==", format="jpeg")
@@ -73,7 +73,7 @@ done_definition:
   - If XLSX was requested, report the actual .xlsx destination and tool result
   - If PPTX was requested, report the actual .pptx destination and tool result
   - If ODS was requested, report the actual .ods destination and tool result
-  - If ZIP was requested, report the actual .zip destination, member count and tool result
+  - If ZIP, TAR or tar.gz was requested, report the actual matching destination, member count and tool result
   - If PNG, TIFF, JPEG, GIF, WebP, BMP or ICO was requested, report the actual matching destination and tool result
   - files_touched lists every path created or updated
 output_schema:
@@ -254,7 +254,7 @@ Tabs, whitespace and literal `_x0041_` text are preserved. XML 1.0-disallowed
 scalars are rejected. The tool does not promise images, visual fit or Office-suite
 fidelity. Report actual artifact evidence and exact tool errors.
 
-## Supplied-entry ZIP workflow
+## Supplied-entry ZIP, TAR and tar.gz workflow
 
 Use `archive_write(path="<project>/docs/FILES.zip", entries=[{"name":"notes.txt","content":"SGVsbG8="}])`
 at an explicit `.zip` destination (case-insensitive extension). Supply 0 to 32
@@ -269,9 +269,15 @@ order and bytes are preserved. Writer limits are 1048576 aggregate decoded bytes
 and 2097152 complete output bytes. Managed calls retain their existing 65536-byte
 canonical JSON argument limit and may admit less; do not promise every caller can
 submit 1 MiB. The native `swift-stored-zip` engine uses method 0, UTF-8 names and
-fixed timestamps with `zip-stored-supplied-files-v1`. No compression, extraction
-or archive-consumer interoperability is promised. Use its own `archive_write`
-grant and inspect the actual result/file before claiming completion.
+fixed timestamps with `zip-stored-supplied-files-v1`; absent format defaults to ZIP.
+Use `format="tar"` with an explicit `.tar` path for deterministic PAX/USTAR,
+or `format="tar.gz"` with an explicit `.tar.gz` path for one system-zlib GZIP
+member containing that TAR. Format is exact lowercase and never inferred from
+an extension; `.tgz` and standalone raw-file `.gz` are not accepted here.
+TAR preserves supplied UTF-8 names through per-file PAX path records and fixes
+mode/uid/gid/mtime metadata. No extraction or portable consumer/filesystem
+interoperability is promised. Use its own `archive_write` grant and inspect the
+actual result/file before claiming completion.
 
 ## Quality bar
 

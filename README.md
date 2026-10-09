@@ -1,5 +1,17 @@
 # Forge Conductor for macOS
 
+Current source target **0.40.0 (56)** extends supplied-entry archive writing. `archive_write` now accepts optional exact `format: "zip"`, `"tar"` or `"tar.gz"`; omitted format remains stored ZIP. Explicit case-insensitive .zip/.tar/.tar.gz paths must match the selected format. Supplied virtual NFC names, canonical padded-base64 content, entry order/bytes, 0–32 entries, 1 MiB aggregate raw and 2 MiB complete output remain bounded. The separate managed canonical JSON argument limit remains 65,536 bytes. Standalone raw-file GZIP, host member sources and extraction are not added. [Contract](docs/NATIVE-ARCHIVE-WRITING.md).
+
+Source checks passed 11 owning and 14 preservation methods across eight invocations; the matching .40/56 canonical native selection passed the same 25 distinct methods in 22.035 s. CLI/app compilation passed in 5.849/2.297 s; ordinary Debug/strict signature passed in 25.674/0.138 s on 471 inputs. The first test-helper type-checking NONPASS and its explicit UInt32 CRC correction remain recorded.
+
+App/CLI full-byte wire and Qwen TAR/tar.gz write/read/ACK checks passed on unchanged source/candidate inputs. Each App/CLI route returned 32 responses/30 tool frames; each Qwen format consumed two actual tool results across three observed Low inputs. TAR is 4,608 bytes and tar.gz 482 bytes, identical across the three producers.
+
+Fifteen product BSD commands passed all six logical listings, six exact payloads and three gzip integrity checks; raw NFD listing spelling and its unknown cause remain recorded. Separate source/native G3 checks passed one actual method each in 7.174/14.946 s, giving 26 distinct methods per route with the prior 25-method selections; these are separate invocations. The initial native AppTests zero-selection attempt remains NONPASS. Hygiene/whitespace passed in 0.668/0.140 s, normal exit 0/unforced. The final C2 passed a reread of the same seven immutable C1 binaries, with no rebuild: the current 471-input map differs only in two G3 identity assertions; all other 470 inputs, including production, resources, authorities and graph, remain exact. Owner source/wiki delivery remains pending.
+
+These are scoped source/native/Debug, product wire/model and mechanism results; installed operation, general interoperability/lifetime, product in-work/late-rename cancellation, standalone GZIP, every page/model, Release and shipment remain separate. [Qualification](docs/QUALIFICATION-STATUS.md).
+
+## Preceding 0.39.0 (55) qualification
+
 Current source target **0.39.0 (55)** adds supplied PCM16 WAV through `audio_write`. `audio_write` wraps supplied canonical padded-base64 signed PCM16 little-endian bytes in WAV. An explicit case-insensitive .wav path, integer sample_rate of 8000/44100/48000 and integer channels of 1/2 are required. Nonempty PCM must contain complete interleaved frames and fit 1 MiB; complete output is 44 bytes plus PCM. Managed broker calls retain their separate 65,536-byte canonical JSON bound and require the exact audio_write grant. [Audio writing](docs/NATIVE-AUDIO-WRITING.md) records the contract.
 
 The missing-feature catalog method failed at the absent audio_write definition in 7.325 s (one failure, normal exit 1). After integration, that same single method passed in 19.268 s (normal exit 0); this is a subset, not the owning selection. Actual source selections passed 48 owning methods (9 writer, 37 catalog, 2 audio broker) in 31.228 s and 24 separate preservation methods in 13.654 s; the matching 72 canonical native methods passed in 67.506 s. All three selections exited 0 without forced cleanup or failed/skipped tests on the same 468 inputs. Swift CLI/app compilation passed in 1.106/1.276 s; ordinary Debug/strict signature passed in 24.825/0.139 s, normal exit 0/unforced, for the separate .39/55 seven-artifact candidate.
@@ -917,8 +929,8 @@ continuity. The user does not start project work through a Forge Managed Run.
 
 | | |
 |---|---|
-| **Version** | **0.39.0** |
-| **Build** | **55** |
+| **Version** | **0.40.0** |
+| **Build** | **56** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |
@@ -1035,7 +1047,7 @@ was not exercised; its source selects the running app executable, so the CLI
 receipt does not qualify that path. The full scope and remaining
 distribution limits are in the [qualification record](docs/QUALIFICATION-STATUS.md).
 
-The current target is `0.39.0 (55)` for supplied PCM16 WAV; tested candidate evidence and remaining phase gates are recorded above.
+The current target is `0.40.0 (56)` for additive TAR/GZIP archive formats; scoped source/native/build/App/CLI/Qwen evidence and remaining consumer/document/delivery gates are recorded above.
 
 Preceding .37 identity record (retained):
 

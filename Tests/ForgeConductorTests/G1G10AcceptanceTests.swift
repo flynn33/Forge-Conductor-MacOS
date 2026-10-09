@@ -384,8 +384,8 @@ final class G1G10AcceptanceTests: XCTestCase {
     func testG3_VersionAndReleaseDocumentsAreAligned() throws {
         let version = ForgeApp.version
         let buildVersion = ForgeApp.buildVersion
-        XCTAssertEqual(version, "0.39.0")
-        XCTAssertEqual(buildVersion, "55")
+        XCTAssertEqual(version, "0.40.0")
+        XCTAssertEqual(buildVersion, "56")
 
         let repository = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
