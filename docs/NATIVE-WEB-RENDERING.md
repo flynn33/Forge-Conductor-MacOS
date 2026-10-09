@@ -1,5 +1,13 @@
 # Native JavaScript web snapshots
 
+## .39 candidate LM Studio GUI follow-up
+
+In one actual LM Studio 0.4.25+1 GUI chat, Qwen used the existing search/fetch/render tools through a temporary ordinary signed .39/55 candidate integration. A 16,384-byte response budget returned 7,219 bytes of the public URLSession page, and the completed answer used a body statement absent from the earlier search/fetch/8,192-budget snapshot. Both snapshots were truncated and reported JavaScript execution, Lockdown and `boundedStability`; whole-network, DOM and JavaScript-heap limits remained unenforced. The original MCP configuration and chat were restored. [Exact host scope and cleanup](PROJECT-WEB-QWEN.md#qwen-in-lm-studio-gui-public-page-workflow).
+
+This verifies one candidate public-page workflow. Installed operation, all models, authenticated browsing and Forge Tools GUI remain unqualified. The original .23/.24 checkpoint and ownership/runtime records follow unchanged.
+
+## Preceding .23/.24 checkpoint
+
 This checkpoint's source identity is **0.23.0 (33)**, based on synchronized owner-signed
 `c391285b00fa4af03eb5210f42f67c3f57e0ffde`. Debug native and Qwen acceptance
 passed; Release compilation, signing and the same runtime matrix passed.

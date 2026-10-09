@@ -1,5 +1,11 @@
 # Web response budgets
 
+## .39 candidate GUI snapshot observation
+
+One actual Qwen LM Studio GUI workflow used the existing response budgets on the same public URLSession page. Fetch returned 42 text bytes from 18,408 raw bytes. Render with `maximum_bytes: 8192` returned a 3,125-byte navigation prefix; a separate render with `maximum_bytes: 16384` returned 7,219 bytes including the body. Qwen's final answer identified a body statement absent from the earlier results. Both renders remained truncated. Their internal 8,192-byte extraction/4,096-node maxima stayed unchanged; raising the caller response budget did not enlarge those extraction limits or qualify a complete page. [Host result and restoration](PROJECT-WEB-QWEN.md#qwen-in-lm-studio-gui-public-page-workflow).
+
+The retained decoded UTF-8 and notice histories below keep their original tested identities, counts and NONPASSs. This GUI observation adds no source method, new decoder, receive cap or pagination contract.
+
 <a id="decoded-utf8-continuation-correction"></a>
 
 ## Decoded UTF-8 continuation correction
