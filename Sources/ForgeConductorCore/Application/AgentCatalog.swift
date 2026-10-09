@@ -160,10 +160,10 @@ public final class AgentCatalog: AgentCatalogProviding, @unchecked Sendable {
             AgentSpec(
                 id: "docs",
                 displayName: "Docs",
-                description: "Write Markdown documentation and export PDF manuals, plain-text DOCX, text-only XLSX/ODS, text-slide PPTX or PNG/TIFF/JPEG/GIF/WebP/BMP/ICO pixel artifacts and supplied-entry ZIP archives via native tools.",
-                tools: ["fs_read", "fs_write", "fs_edit", "fs_list", "fs_glob", "fs_mkdir", "search_text", "shell_exec", "pdf_write", "pdf_from_file", "docx_write", "xlsx_write", "pptx_write", "ods_write", "image_write", "archive_write", "git_status", "git_diff", "git_log", "runtime.capabilities", "python.run", "job.status", "job.read_output", "job.cancel", "job.list"],
+                description: "Write Markdown documentation and export PDF manuals, plain-text DOCX, text-only XLSX/ODS, text-slide PPTX or PNG/TIFF/JPEG/GIF/WebP/BMP/ICO pixel artifacts and supplied-entry ZIP archives and supplied PCM16 WAV audio via native tools.",
+                tools: ["fs_read", "fs_write", "fs_edit", "fs_list", "fs_glob", "fs_mkdir", "search_text", "shell_exec", "pdf_write", "pdf_from_file", "docx_write", "xlsx_write", "pptx_write", "ods_write", "image_write", "archive_write", "audio_write", "git_status", "git_diff", "git_log", "runtime.capabilities", "python.run", "job.status", "job.read_output", "job.cancel", "job.list"],
                 toolsForbidden: ["git_push", "git_commit"],
-                whenToUse: ["README", "PDF manual", "plain-text DOCX", "text-only XLSX", "text-only ODS", "text-slide PPTX", "PNG pixel artifact", "TIFF pixel artifact", "WebP pixel artifact", "BMP pixel artifact", "ICO pixel artifact", "supplied-entry ZIP", "runbook", "API docs"],
+                whenToUse: ["README", "PDF manual", "plain-text DOCX", "text-only XLSX", "text-only ODS", "text-slide PPTX", "PNG pixel artifact", "TIFF pixel artifact", "WebP pixel artifact", "BMP pixel artifact", "ICO pixel artifact", "supplied-entry ZIP", "PCM16 WAV audio", "runbook", "API docs"],
                 firstMoves: ["fs_glob docs/README", "fs_read sources", "fs_write markdown", "pdf_from_file if needed", "agent_run_complete"],
                 doneDefinition: ["Artifacts on disk", "files_touched filled", "agent_run_complete"],
                 outputSchema: ["files_touched", "summary", "formats", "how_to_open"],
@@ -199,6 +199,14 @@ public final class AgentCatalog: AgentCatalogProviding, @unchecked Sendable {
                 to 1048576 bytes. CRLF and CR normalize to LF; embedded LF is a soft
                 break. Literal _x0041_ text is preserved. Do not promise images,
                 visual fit or Office-suite fidelity.
+                For PCM16 WAV use audio_write(path="<project>/docs/AUDIO.wav", content="AAA=",
+                sample_rate=8000, channels=1). Supply signed little-endian PCM16 samples,
+                frame-major with left/right interleaving for stereo. Rates are 8000,
+                44100 or 48000; channels are 1 or 2. Nonempty complete frames are required.
+                The writer admits at most 1048576 decoded PCM bytes and emits exactly
+                44 + PCM bytes; managed calls retain their 65536-byte canonical JSON
+                argument bound. Use its own audio_write grant. No codec conversion,
+                source-file reads, synthesis or playback is provided.
                 For supplied files use archive_write(path="<project>/docs/FILES.zip",
                 entries=[{"name":"notes.txt","content":"SGVsbG8="}]). Use 0 to 32
                 virtual file entries with exact NFC relative UTF-8 names, at most 1024

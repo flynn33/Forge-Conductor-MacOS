@@ -1,5 +1,11 @@
 # Telemetry architecture (real-time native)
 
+Current source documentation targets `0.39.0`, build `55`. `audio_write` joins existing documents/tool-card classification and content audit redaction. It adds no gauge, timer, producer or GUI delivery queue. Source enrollment is separate from exercised telemetry or general leak freedom. [Audio contract](NATIVE-AUDIO-WRITING.md).
+
+The original absent-definition NONPASS remains. Actual source 48 owning plus 24 separate preservation methods match 72 passed canonical native methods; build/signature, App/CLI wire and Qwen write/read consumption also passed. Both public native URL consumers passed seven small product WAVs with exact PCM/EOF and successful handle closure. Initial G3 and final prose hygiene/whitespace passed; source/wiki delivery remains pending. [Qualification](QUALIFICATION-STATUS.md).
+
+## Preceding 0.38.0 (54) qualification
+
 Current source documentation targets `0.38.0`, build `54`. `archive_write` joins documents tool cards and audit redaction. It adds no gauge, timer, producer or delivery queue. Focused checks do not establish general leak freedom. [Archive evidence](NATIVE-ARCHIVE-WRITING.md).
 
 Focused source/native evidence comprises 62 owning methods plus a separate initial G3, giving 63 distinct methods per route. Signed App/CLI archive transcripts, Qwen actual result consumption and separate App BSDtar payload extraction passed within their isolated scopes. Final document checks and exact source/wiki delivery are recorded separately; they add no runtime coverage. Broader GUI/full-web/all-model/lifetime/shipment acceptance remains open.

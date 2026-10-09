@@ -1,5 +1,5 @@
 // DocsToolPack.swift
-// What: Provides native PDF, plain-text DOCX, text-cell XLSX/ODS, text-slide PPTX, and PNG/TIFF/JPEG/GIF/WebP/BMP/ICO and supplied-entry ZIP tools to external MCP clients.
+// What: Provides native PDF, plain-text DOCX, text-cell XLSX/ODS, text-slide PPTX, and PNG/TIFF/JPEG/GIF/WebP/BMP/ICO and supplied-entry ZIP/PCM16 WAV tools to external MCP clients.
 // How: It translates validated tool arguments into PDFWriter operations and returns
 // bounded, structured success or error payloads.
 // Why: Document capability is an optional module rather than a responsibility of Core routing.
@@ -9,7 +9,7 @@ import Darwin
 import AppKit
 import CryptoKit
 
-/// Documentation tools: PDF write / PDF from file / plain-text DOCX / text-cell XLSX/ODS / text-slide PPTX / PNG/TIFF/JPEG/GIF/WebP/BMP/ICO / supplied-entry ZIP.
+/// Documentation tools: PDF write / PDF from file / plain-text DOCX / text-cell XLSX/ODS / text-slide PPTX / PNG/TIFF/JPEG/GIF/WebP/BMP/ICO / supplied-entry ZIP / supplied PCM16 WAV.
 public struct DocsToolPack: ToolPackHandling {
     private static let maximumSourceBytes = 4 * 1024 * 1024
     private let exporter: NativeDOCXExporter?
@@ -17,7 +17,7 @@ public struct DocsToolPack: ToolPackHandling {
     public init() { exporter = nil }
     init(exporter: NativeDOCXExporter) { self.exporter = exporter }
 
-    public var toolNames: [String] { ["pdf_write", "pdf_from_file", "docx_write", "xlsx_write", "pptx_write", "ods_write", "image_write", "archive_write"] }
+    public var toolNames: [String] { ["pdf_write", "pdf_from_file", "docx_write", "xlsx_write", "pptx_write", "ods_write", "image_write", "archive_write", "audio_write"] }
 
     public func handle(
         name: String,
@@ -46,9 +46,63 @@ public struct DocsToolPack: ToolPackHandling {
             return try imageWrite(arguments, context: context, app: app, cancellation: cancellation)
         case "archive_write":
             return try archiveWrite(arguments, context: context, app: app, cancellation: cancellation)
+        case "audio_write":
+            return try audioWrite(arguments, context: context, app: app, cancellation: cancellation)
         default:
             return nil
         }
+    }
+
+    private func audioWrite(_ args: [String: Any], context: ToolInvocationContext?,
+                            app: ForgeApp, cancellation: ToolCallCancellation?) throws -> ToolResult {
+        guard Set(args.keys).isSubset(of: ["path", "content", "sample_rate", "channels", "deadline_ms"]) else {
+            return .failure(code: "invalid_audio_arguments", message: "Only path, content, sample_rate, channels and the shared deadline_ms field are accepted")
+        }
+        guard let path = args["path"] as? String,
+              !path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              !path.utf8.contains(0) else {
+            return .failure(code: "invalid_path", message: "WAV path must be a nonblank string without NUL bytes")
+        }
+        let url = ToolArgHelpers.resolvePath(path)
+        guard url.pathExtension.lowercased() == "wav" else {
+            return .failure(code: "invalid_path", message: "An explicit .wav destination is required")
+        }
+        guard let content = args["content"] as? String else {
+            return .failure(code: "invalid_audio_content", message: "content must be a canonical padded base64 string")
+        }
+        let encoded: NativePCM16WAVWriter.EncodedAudio
+        do {
+            let rate = try NativePCM16WAVWriter.sampleRate(args["sample_rate"])
+            let channels = try NativePCM16WAVWriter.channels(args["channels"])
+            if let context { try app.projectContexts.validate(context, cancellation: cancellation) }
+            encoded = try NativePCM16WAVWriter.encode(content: content, sampleRate: rate,
+                channels: channels, cancellation: cancellation)
+            try cancellation?.checkCancellation()
+            if let context { try app.projectContexts.validate(context, cancellation: cancellation) }
+        } catch is CancellationError { throw CancellationError() }
+        catch let error as ToolCallDeadlineExceeded { throw error }
+        catch let error as NativePCM16WAVError {
+            return .failure(code: error.code, message: error.localizedDescription)
+        } catch {
+            return .failure(code: "audio_encode_failed", message: "Native encoding or project authorization failed")
+        }
+        try cancellation?.checkCancellation()
+        do {
+            try FilesystemToolPack.writePinnedText(encoded.data, to: url, cancellation: cancellation)
+        } catch is CancellationError { throw CancellationError() }
+        catch let error as ToolCallDeadlineExceeded { throw error }
+        catch {
+            return .failure(code: "audio_write_failed", message: "Destination write or durability confirmation failed; inspect the destination before retrying")
+        }
+        return .success([
+            "path": url.path, "format": "wav", "engine": "swift-pcm16-riff",
+            "bytes_written": encoded.data.count,
+            "sha256": SHA256.hash(data: encoded.data).map { String(format: "%02x", $0) }.joined(),
+            "pcm_bytes": encoded.pcmBytes, "sample_rate": encoded.sampleRate,
+            "channels": encoded.channels, "frames": encoded.frames,
+            "input_contract": NativePCM16WAVWriter.inputContract,
+            "output_contract": NativePCM16WAVWriter.outputContract,
+        ])
     }
 
     private func archiveWrite(_ args: [String: Any], context: ToolInvocationContext?,

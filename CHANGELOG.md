@@ -10,6 +10,13 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### `0.39.0 (55)` supplied PCM16 WAV writing
+
+- Add `audio_write(path, content, sample_rate, channels)` with shared deadline_ms: explicit case-insensitive .wav, canonical padded-base64 signed PCM16LE, rates 8000/44100/48000, mono/stereo, nonempty complete frames and 1 MiB raw maximum. Output is one 44-byte PCM RIFF header plus unchanged supplied bytes. [Contract](docs/NATIVE-AUDIO-WRITING.md).
+- Use the own grant, project context, ordinary defaults, idempotent broker classification and existing pinned writer. Managed canonical JSON remains bounded to 65,536 bytes; existing archive/image/document tools remain available.
+- Retain the original absent-definition NONPASS. Source 48 owning plus 24 separate preservation methods match 72 passed canonical native methods; CLI/app/ordinary Debug/strict signature passed. App/CLI each passed 33 responses/31 frames/three exact WAVs, 11 refusals and immediate cancellation with target preservation; Qwen completed three observed Low turns/two consumed actual results with strict six-field ACK. Seven small product WAVs passed both public native URL consumers with exact PCM/EOF and successful handle closure; initial G3 and final prose hygiene/whitespace passed; source/wiki delivery remains pending. [Qualification](docs/QUALIFICATION-STATUS.md); no codec/playback/install/shipment claim.
+- Separate prior .38/54 typed Projects candidate flow passed canonical Save/reopen, invalid-host preservation and Clear across six phases/five durable checkpoints/two ordinary exit-0 lifetimes in 11.452 s. Earlier driver NONPASSs remain; pixels/browser/Tools/installed GUI/full-web/all-model scopes stay unqualified.
+
 ### `0.38.0 (54)` supplied-entry stored ZIP writing
 
 - Add `archive_write` with explicit .zip path and 0–32 virtual name/base64 entries. Preserve exact NFC names, supplied order/bytes, stored method 0, CRC32 and fixed timestamps; reject unsafe/conflicting names/noncanonical base64 before saving.

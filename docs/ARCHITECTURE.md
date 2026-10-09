@@ -1,5 +1,11 @@
 # Forge Conductor architecture
 
+Version: `0.39.0`; build: `55`. NativePCM16WAVWriter preflights strict scalars, canonical base64, complete PCM16LE frames and the exact 44+raw output extent. A call-local worker appends explicit RIFF/WAVE bytes and bounded PCM chunks with existing cancellation checks. DocsToolPack.audioWrite validates project context before/after encoding and publishes through the existing pinned Data writer. Own grants, mutation/context, replay, defaults and document telemetry remain in their existing owners; no AudioFile handle, codec service or dependency is added. [Audio contract](NATIVE-AUDIO-WRITING.md).
+
+The original absent-definition NONPASS remains. Actual source 48 owning plus 24 separate preservation methods match 72 passed canonical native methods; build/signature, App/CLI wire and Qwen write/read consumption also passed. Both public native URL consumers passed seven small product WAVs with exact PCM/EOF and successful handle closure. Initial G3 and final prose hygiene/whitespace passed; source/wiki delivery remains pending. [Qualification](QUALIFICATION-STATUS.md).
+
+## Preceding 0.38.0 (54) qualification
+
 Version: `0.38.0`; build: `54`. NativeStoredZIPWriter preflights names/base64 and complete ZIP extents before allocating output. A call-local worker computes CRC32 and appends stored local/central/EOCD records under fixed caps/cancellation checks. DocsToolPack validates context before/after encoding and publishes through the existing pinned Data writer. Grants, mutation/context, replay, defaults and document telemetry use their existing owners. No dependency or service was added.
 
 Exactly two graph memberships add the writer and its tests. [Archive contract and evidence](NATIVE-ARCHIVE-WRITING.md).

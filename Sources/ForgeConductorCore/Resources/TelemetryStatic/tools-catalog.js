@@ -29,6 +29,7 @@ export const TOOL_PACKS = [
       "ods_write",
       "image_write",
       "archive_write",
+      "audio_write",
       "fs_edit",
       "fs_list",
       "fs_glob",

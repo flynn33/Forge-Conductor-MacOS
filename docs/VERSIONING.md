@@ -1,5 +1,9 @@
 # Versioning policy
 
+Current target identity is **0.39.0 (55)**. Adding a new backward-compatible user-facing `audio_write` tool advances the feature component under the policy below. The root selected VERSION/BUILD_NUMBER, compiled constants, twelve marketing/sixteen build values and both G3 identity expectations together. Two graph memberships are separate from the authority update. Historical receipts retain their tested identities. Build/signature and App/CLI identity checks passed on .39/55; initial G3 passed one method in each source/native route; matching 73-method unions preserve the tested .39/55 identity. Final prose hygiene/whitespace passed; publication remains pending.
+
+## Preceding 0.38.0 (54) qualification
+
 Current target identity is **0.38.0 (54)**. The compatible `archive_write` addition advances the minor version under this policy. VERSION, BUILD_NUMBER, compiled constants, twelve marketing/sixteen build values and both G3 expectations align. Writer/test memberships are separate from version edits. Historical receipts retain their tested identity. Initial G3 passed once per source/native route, giving 63 distinct methods with the 62 owning methods. Final document checks and exact source/wiki delivery are recorded separately; they add no runtime coverage.
 
 ## Preceding 0.37.0 (53) qualification
@@ -348,6 +352,10 @@ Update all four surfaces together. `script/check_repository_hygiene.sh`, the
 focused version test, and CI reject drift between them.
 
 ## Current identity
+
+Current source target is `0.39.0`, build `55`, for supplied PCM16 WAV writing; tested candidate evidence and remaining gates are in qualification status.
+
+Preceding .38 identity record (retained):
 
 Current source target is `0.38.0`, build `54`, for supplied-entry ZIP writing.
 

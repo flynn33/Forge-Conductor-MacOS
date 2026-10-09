@@ -1,5 +1,17 @@
 # Forge Conductor for macOS
 
+Current source target **0.39.0 (55)** adds supplied PCM16 WAV through `audio_write`. `audio_write` wraps supplied canonical padded-base64 signed PCM16 little-endian bytes in WAV. An explicit case-insensitive .wav path, integer sample_rate of 8000/44100/48000 and integer channels of 1/2 are required. Nonempty PCM must contain complete interleaved frames and fit 1 MiB; complete output is 44 bytes plus PCM. Managed broker calls retain their separate 65,536-byte canonical JSON bound and require the exact audio_write grant. [Audio writing](docs/NATIVE-AUDIO-WRITING.md) records the contract.
+
+The missing-feature catalog method failed at the absent audio_write definition in 7.325 s (one failure, normal exit 1). After integration, that same single method passed in 19.268 s (normal exit 0); this is a subset, not the owning selection. Actual source selections passed 48 owning methods (9 writer, 37 catalog, 2 audio broker) in 31.228 s and 24 separate preservation methods in 13.654 s; the matching 72 canonical native methods passed in 67.506 s. All three selections exited 0 without forced cleanup or failed/skipped tests on the same 468 inputs. Swift CLI/app compilation passed in 1.106/1.276 s; ordinary Debug/strict signature passed in 24.825/0.139 s, normal exit 0/unforced, for the separate .39/55 seven-artifact candidate.
+
+Candidate App/CLI wire checks passed in 1.558/1.098 s: 33 correlated responses/31 complete tool frames, three exact 46/52/60-byte WAVs, 11 refusals and immediate -32800 cancellation with the original target preserved per route. All 85 prior descriptors, packaged Docs bytes, ZIP/PNG parity, config, 468 inputs, candidate seven and historical 52 guards stayed exact. A Docs session exercised the own grant; a separate read-only session denied audio_write.
+
+Qwen qwen/qwen3.8-27b passed in 38.544 s: three normal completed responses with three observed Low templates, two actual audio_write/fs_read results consumed by completed turns 1/2, nine native responses/seven tool frames, and a strict six-scalar ACK of the exact 52-byte stereo WAV. Native/model/observer/outer groups were absent afterward; current inputs and guards stayed exact. Seven small product WAVs passed exact whole-header/PCM checks and both public native URL read routes in 0.260 s, normal exit 0/full EOF/unforced: seven AudioFile Close calls with 84 strict property values, seven ExtAudioFile Dispose calls with whole PCM and explicit zero-frame EOF, and 14 wrapper deinit/weak-gone observations. The 468 source inputs, seven candidate artifacts and historical 52 guards stayed exact. Initial document G3 passed one actual method per source/native route in 1.650/2.712 s, normal exit 0/unforced. Source 48 + 24 + G3 and native 72 + G3 give 73 distinct methods per route; these are separate selections. Hygiene/whitespace passed in 0.667/0.140 s, normal exit 0/unforced, on the unchanged 468 source/graph inputs. Final prose hygiene/whitespace passed; exact source/wiki delivery remains pending; the phase stays open. This scoped consumer does not qualify playback, large product output, framework-wide leak freedom or installed operation.
+
+The separately preserved .38/54 candidate passed the typed Projects GitHub flow: registration, canonical Save, ordinary quit/reopen, invalid-host rejection preserving the saved bytes, Clear and a second ordinary quit. Six semantic phases and five durable checkpoints passed in 11.452 s; both Apps exited 0 without forced cleanup. Project identity/generation, 52 guards and shared preferences stayed unchanged. The saved 377-byte metadata reopened byte-exact; Clear left 309 bytes without a repository URL. Earlier driver NONPASSs remain retained. This proves the isolated candidate semantic flow; pixels, external browser opening, Tools, installed GUI, full web and all models remain unqualified.
+
+## Preceding 0.38.0 (54) qualification
+
 Current source target **0.38.0 (54)** adds `archive_write` for 0–32 supplied virtual files. Use an explicit .zip destination, exact NFC relative names and canonical padded-base64 content. The writer permits 1 MiB decoded data and 2 MiB complete ZIP output; managed calls retain the separate 64 KiB JSON argument bound. [Archive writing](docs/NATIVE-ARCHIVE-WRITING.md) records the contract and evidence.
 
 The same 62 distinct methods passed in source and native checks, with no failures or skips. Native checks on 0.38.0/build 54 finished in 62.594 s; only five version authorities changed since the source checks. The ordinary Debug candidate built in 24.455 s and passed strict deep signature verification in 0.140 s. Swift CLI/app compilation passed in 6.188/2.194 s. The 62 owning methods plus one separate initial G3 method give 63 distinct methods per source/native route, with equal unique selector sets; this is not a single 63-method invocation. Initial G3 passed in 7.367/2.603 s and hygiene in 0.670 s; repeats add no coverage.
@@ -903,8 +915,8 @@ continuity. The user does not start project work through a Forge Managed Run.
 
 | | |
 |---|---|
-| **Version** | **0.38.0** |
-| **Build** | **54** |
+| **Version** | **0.39.0** |
+| **Build** | **55** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |
@@ -1020,6 +1032,10 @@ attached context; `fs_list`, `git_status`, `instruction_catalog`, and
 was not exercised; its source selects the running app executable, so the CLI
 receipt does not qualify that path. The full scope and remaining
 distribution limits are in the [qualification record](docs/QUALIFICATION-STATUS.md).
+
+The current target is `0.39.0 (55)` for supplied PCM16 WAV; tested candidate evidence and remaining phase gates are recorded above.
+
+Preceding .37 identity record (retained):
 
 The current target is `0.37.0 (53)` for additive standard-size ICO; see the latest phase above.
 

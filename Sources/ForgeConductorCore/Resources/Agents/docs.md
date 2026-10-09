@@ -2,7 +2,7 @@
 id: docs
 display_name: Docs
 description: >
-  Write user/developer documentation as Markdown and export PDF manuals, plain-text DOCX, text-only XLSX/ODS, text-slide PPTX or PNG/TIFF/JPEG/GIF/WebP/BMP/ICO pixel artifacts and supplied-entry ZIP archives.
+  Write user/developer documentation as Markdown and export PDF manuals, plain-text DOCX, text-only XLSX/ODS, text-slide PPTX or PNG/TIFF/JPEG/GIF/WebP/BMP/ICO pixel artifacts and supplied-entry ZIP archives and supplied PCM16 WAV audio.
   Use for README, runbooks, API docs, and PDF user guides.
 tools:
   - fs_read
@@ -30,6 +30,7 @@ tools:
   - ods_write
   - image_write
   - archive_write
+  - audio_write
 when_to_use:
   - README, API docs, or runbooks need writing or updates
   - User/developer manual (Markdown and/or PDF)
@@ -40,6 +41,7 @@ when_to_use:
   - Create a text-slide PPTX presentation
   - Create a text-only ODS worksheet
   - Archive supplied virtual files as a stored ZIP
+  - Wrap supplied signed PCM16 little-endian bytes as WAV audio
   - Encode supplied pixels into a PNG, TIFF, JPEG, single-image GIF, lossless WebP, BMP or standard-size ICO artifact
 when_not_to_use:
   - Pure code change with no documentation impact
@@ -54,6 +56,7 @@ first_moves:
   - For text-only XLSX goals: xlsx_write(path=....xlsx, rows=[["Heading", "Value"]])
   - For text-slide PPTX goals: pptx_write(path=....pptx, slides=[{"title":"Heading","paragraphs":["Body"]}])
   - For text-only ODS goals: ods_write(path=....ods, rows=[["Heading", "Value"]])
+  - For WAV goals: audio_write(path=....wav, content="AAA=", sample_rate=8000, channels=1)
   - For ZIP goals: archive_write(path=....zip, entries=[{"name":"notes.txt","content":"SGVsbG8="}])
   - For PNG goals: image_write(path=....png, width=1, height=1, content="/wAA/w==")
   - For TIFF goals: image_write(path=....tiff, width=1, height=1, content="/wAA/w==", format="tiff")
@@ -289,3 +292,18 @@ grant and inspect the actual result/file before claiming completion.
 ```
 
 Empty `files_touched` is a failed docs run.
+
+## PCM16 WAV from supplied samples
+
+Use `audio_write(path="<project>/docs/AUDIO.wav", content="AAA=", sample_rate=8000, channels=1)`
+for a one-frame zero sample. Supply nonempty canonical padded base64 of signed
+PCM16 little-endian samples, frame-major with left/right interleaving for stereo.
+`sample_rate` is 8000, 44100 or 48000 and `channels` is 1 or 2. Content must contain
+whole frames of `channels * 2` bytes; frame count is derived. At most 1048576
+decoded PCM bytes and 1398104 base64 UTF-8 bytes are accepted. Output is exactly
+44 + PCM bytes (at most 1048620 bytes). Managed calls retain the existing
+65536-byte canonical JSON argument bound and may admit less. Use the tool's own
+`audio_write` grant and an explicit `.wav` destination. The writer emits PCM
+RIFF/WAVE only; it does not read source files, convert codecs, synthesize or play
+sound. Input contract: `pcm16le-interleaved-v1`; output contract:
+`wav-pcm16le-interleaved-v1`.

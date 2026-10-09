@@ -1,5 +1,11 @@
 # Documentation guide
 
+Current source target **0.39.0 (55)** adds [supplied PCM16 WAV writing](NATIVE-AUDIO-WRITING.md), documenting strict input, writer versus broker bounds, own grants and separate consumer gates. Existing archive/image/web contracts retain their histories.
+
+The original absent-definition NONPASS remains. Actual source 48 owning plus 24 separate preservation methods match 72 passed canonical native methods; build/signature, App/CLI wire and Qwen write/read consumption also passed. Both public native URL consumers passed seven small product WAVs with exact PCM/EOF and successful handle closure. Initial G3 and final prose hygiene/whitespace passed; source/wiki delivery remains pending. [Qualification](QUALIFICATION-STATUS.md).
+
+## Preceding 0.38.0 (54) qualification
+
 Current source target **0.38.0 (54)** adds [supplied-entry ZIP writing](NATIVE-ARCHIVE-WRITING.md), covering exact names/base64, grants, writer versus broker limits and qualification. Existing image and web contracts remain available.
 
 Signed App/CLI archive checks passed with 25 native responses/23 tool frames/four ZIPs per route, preserving six refusal gates, immediate cancellation, PNG default and the 84 prior tool definitions. Qwen completed three observed Low turns and consumed two complete actual results with a strict metadata ACK. Four actual App ZIPs passed separate BSDtar canonical-name/payload checks; CLI/Qwen extraction and broader GUI/web/install/shipment acceptance are unqualified. Exact counts, retained failures and limits are in the archive guide. Final document checks and exact source/wiki delivery are recorded separately; they add no runtime coverage.

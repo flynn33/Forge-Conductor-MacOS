@@ -1,4 +1,12 @@
-# Context and agent continuity (v0.38.0)
+# Context and agent continuity (v0.39.0)
+
+Current source documentation targets 0.39.0 (55). `audio_write` uses its own exact grant, project context, idempotent broker classification, ordinary default enrollment and progress tools. Custom denials and imported explicit capabilities stay narrow. The broker retains its 65,536-byte canonical JSON argument/result bound; raw PCM writer capacity does not expand that call bound. Checkpoint/successor/ACK/seal are unchanged. [Audio contract](NATIVE-AUDIO-WRITING.md).
+
+Both audio broker methods passed within the actual 48-method owning selection and matching canonical native coverage, including completed small replay and over-bound refusal before dispatch. App/CLI own-grant/read-only denial and Qwen consumed write/read checks passed; the managed JSON bound remains unchanged. Both public native URL consumers passed seven small WAVs; initial G3 and final prose hygiene/whitespace passed, while delivery remains pending; see [qualification](QUALIFICATION-STATUS.md).
+
+The shared pinned writer late-cancel/revocation-before-rename boundary and actual in-work MCP audio cancellation remain unexercised. Passed pre-cancel/deadline tests and actual immediate cancellation transcripts do not establish those paths.
+
+## Preceding 0.38.0 (54) qualification
 
 Current source documentation targets 0.38.0 (54). `archive_write` receives its own grant, project context, idempotent broker replay and progress enrollment. Ordinary defaults add the exact tool; custom denials and imported explicit capabilities remain narrow. The broker retains its 65,536-byte canonical JSON argument bound. Checkpoint/successor/ACK/seal remain unchanged.
 

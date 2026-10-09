@@ -264,6 +264,14 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
             }
         }
 
+        if tool == "audio_write" {
+            guard let path = arguments["path"] as? String,
+                  !path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  !path.utf8.contains(0) else {
+                return .denied(code: "invalid_path", message: "WAV path must be a nonblank string without NUL bytes")
+            }
+        }
+
         if tool == "archive_write" {
             guard let path = arguments["path"] as? String,
                   !path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
@@ -490,7 +498,7 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
                     access($0, preservesFinalComponent: true)
                 },
             ].compactMap { $0 }
-        case "pdf_write", "docx_write", "xlsx_write", "pptx_write", "ods_write", "image_write", "archive_write":
+        case "pdf_write", "docx_write", "xlsx_write", "pptx_write", "ods_write", "image_write", "archive_write", "audio_write":
             return [access("path")].compactMap { $0 }
         case "pdf_from_file":
             var accesses = [access("source_path")].compactMap { $0 }

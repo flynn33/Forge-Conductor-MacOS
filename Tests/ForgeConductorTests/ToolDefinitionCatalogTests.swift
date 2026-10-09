@@ -133,7 +133,7 @@ final class ToolDefinitionCatalogTests: XCTestCase {
             }
             let docsTools: Set<String> = [
                 "fs_read", "fs_write", "fs_edit", "fs_list", "fs_glob", "fs_mkdir", "search_text",
-                "shell_exec", "pdf_write", "pdf_from_file", "docx_write", "xlsx_write", "pptx_write", "ods_write", "image_write", "archive_write", "git_status", "git_diff", "git_log",
+                "shell_exec", "pdf_write", "pdf_from_file", "docx_write", "xlsx_write", "pptx_write", "ods_write", "image_write", "archive_write", "audio_write", "git_status", "git_diff", "git_log",
                 "runtime.capabilities", "python.run",
             ]
             let auditTools: Set<String> = [
@@ -1586,12 +1586,48 @@ final class ToolDefinitionCatalogTests: XCTestCase {
         }
     }
 
+    func testAudioWriteHasExactSchemaReplayAndAllPriorToolNamesWithRequiredContext() throws {
+        try withProductionApp("audio-schema") { app in
+            let catalog = try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames)
+            let definition = try XCTUnwrap(catalog.definition(named: "audio_write"))
+            let previousNames: Set<String> = ["agent_context", "agent_get", "agent_list", "agent_recommend", "agent_run_complete", "agent_run_start", "agent_run_status", "archive_write", "bash.run", "clu_cancel", "clu_capabilities", "clu_start_handoff", "clu_status", "context_get", "context_list", "continuity.acknowledge_handoff", "continuity.checkpoint", "continuity.get_pending_handoff", "continuity.prepare_handoff", "continuity.request_rollover", "continuity.resume", "continuity.status", "docx_write", "forge_status", "fs_delete", "fs_delete_recovery", "fs_edit", "fs_glob", "fs_list", "fs_mkdir", "fs_move", "fs_read", "fs_write", "get_forge_status", "git_add", "git_commit", "git_diff", "git_log", "git_status", "image_write", "instruction_catalog", "instruction_read", "job.cancel", "job.list", "job.read_output", "job.status", "memory_delete", "memory_get", "memory_list", "memory_search", "memory_set", "ods_write", "pdf_from_file", "pdf_write", "powershell.run", "pptx_write", "process.run", "project_memory.export", "project_memory.forget", "project_memory.get", "project_memory.import", "project_memory.initialize", "project_memory.link", "project_memory.list_recent", "project_memory.remember", "project_memory.remember_batch", "project_memory.search", "project_memory.status", "project_memory.update", "python.run", "runtime.capabilities", "search_text", "session_checkpoint", "session_handoff", "shell.run", "shell_exec", "web.fetch", "web.render", "web.search", "xcode.debug", "xcode.discover", "xcode.result", "xcode.run", "xcode.simulator", "xlsx_write"]
+            XCTAssertEqual(catalog.definitions.count, 86)
+            XCTAssertEqual(Set(catalog.definitions.filter { $0.name != "audio_write" }.map(\.name)), previousNames)
+            XCTAssertTrue(definition.strict)
+            let schema = try definition.inputSchemaObject(), properties = try XCTUnwrap(schema["properties"] as? [String: Any])
+            XCTAssertEqual(Set(properties.keys), ["path", "content", "sample_rate", "channels", "deadline_ms"])
+            XCTAssertEqual(schema["required"] as? [String], ["path", "content", "sample_rate", "channels"])
+            XCTAssertEqual(schema["additionalProperties"] as? Bool, false)
+            let content = try XCTUnwrap(properties["content"] as? [String: Any])
+            XCTAssertEqual(content["type"] as? String, "string"); XCTAssertEqual(content["minLength"] as? Int, 4)
+            XCTAssertEqual(content["maxLength"] as? Int, 1_398_104)
+            let rate = try XCTUnwrap(properties["sample_rate"] as? [String: Any]), channels = try XCTUnwrap(properties["channels"] as? [String: Any])
+            XCTAssertEqual(rate["type"] as? String, "integer"); XCTAssertEqual(rate["enum"] as? [Int], [8000, 44100, 48000])
+            XCTAssertEqual(channels["type"] as? String, "integer"); XCTAssertEqual(channels["enum"] as? [Int], [1, 2])
+            let deadline = try XCTUnwrap(properties["deadline_ms"] as? [String: Any])
+            XCTAssertEqual(deadline["minimum"] as? Int, 1); XCTAssertEqual(deadline["maximum"] as? Int, ToolRouter.maximumRequestedDeadlineMilliseconds)
+            XCTAssertTrue(definition.description.contains("65536-byte canonical JSON")); XCTAssertTrue(definition.description.contains("Requires its own audio_write grant"))
+            XCTAssertEqual(ManagerToolCategory.classify("audio_write"), .documents); XCTAssertTrue(ToolRouter.isMutatingTool("audio_write"))
+            XCTAssertEqual(try ProductionToolReplayCatalog.classifier(productionToolNames: app.tools.toolNames).replayClass(for: "audio_write"), .idempotent)
+            let descriptor = try definition.mcpDescriptor()
+            XCTAssertEqual(try JSONSupport.data(from: try XCTUnwrap(descriptor["inputSchema"] as? [String: Any])), definition.inputSchemaJSON)
+            let advertised = try catalog.providerToolDefinitions(allowedToolNames: ["audio_write"])
+            XCTAssertEqual(advertised.count, 1)
+            let provider = try XCTUnwrap(JSONSerialization.jsonObject(with: try XCTUnwrap(advertised.first)) as? [String: Any])
+            XCTAssertEqual(provider["name"] as? String, "audio_write"); XCTAssertEqual(provider["strict"] as? Bool, true)
+            XCTAssertEqual(try JSONSupport.data(from: try XCTUnwrap(provider["parameters"] as? [String: Any])), definition.inputSchemaJSON)
+            for name in previousNames { XCTAssertNotNil(catalog.definition(named: name)) }
+            let absent = try app.tools.call(name: "audio_write", arguments: ["path": "unattached.wav", "content": "AAA=", "sample_rate": 8000, "channels": 1], clientID: ClientID("audio-unattached"))
+            XCTAssertFalse(absent.ok); XCTAssertEqual(absent.payload["code"] as? String, "project_context_required")
+        }
+    }
+
     func testArchiveWriteHasExactSchemaReplayCatalogAndRequiredContext() throws {
         try withProductionApp("archive-schema") { app in
             let catalog = try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames)
             let definition = try XCTUnwrap(catalog.definition(named: "archive_write"))
-            XCTAssertEqual(catalog.definitions.count, 85)
-            XCTAssertEqual(catalog.definitions.filter { $0.name != "archive_write" }.count, 84)
+            XCTAssertEqual(catalog.definitions.count, 86)
+            XCTAssertEqual(catalog.definitions.filter { $0.name != "archive_write" }.count, 85)
             XCTAssertTrue(definition.strict)
             let schema = try definition.inputSchemaObject()
             let properties = try XCTUnwrap(schema["properties"] as? [String: Any])
