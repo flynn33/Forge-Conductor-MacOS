@@ -1,5 +1,13 @@
 # Project repository, web access and Qwen verification
 
+Current source target **0.42.0 (58)** adds opt-in complete captured-text paging to existing `web.render`. Matching source/native 150, ordinary Debug/signature, separate initial G3 and bounded signed App/CLI functional/limits checks passed. The original missing-suffix baseline and App limits v1 continuity-200 NONPASS remain retained. All new network fixtures were owned loopback; the earlier .39 GUI public-page and .36.3 fetch paging receipts retain their exact scopes. [Renderer contract](NATIVE-WEB-RENDERING.md).
+
+Qwen `qwen/qwen3.8-27b` v6 passed the bounded owned-loopback paging flow: six completed responses consumed five actual native results in later turns, including both empty EOFs, reconstructed the 6,144/35,371-byte snapshots and returned the exact four-scalar byte/SHA ACK. All six actual Low input events were complete LF records, ordered and associated by prompt, nonce and tool-result hash. Earlier v2–v5 NONPASS attempts remain retained; v5 outer closure is unknown and the prior CLI pipe-loss mechanism remains unknown. This proves selected result delivery and metadata acknowledgment, not model understanding or new GUI/public-page/all-model/installed operation.
+
+Applied-v2 final source/native G3, hygiene and local link checks passed; final candidate v3 readback preserved source/artifact identities. Exact source/wiki publication and synchronization remain pending. Full web, every model/page and installed operation remain unqualified.
+
+## Preceding 0.41.0 (57) qualification
+
 Current source target **0.41.0 (57)** extends audio_write to optional FLAC without adding a tool or changing 85 neighboring descriptors. The 59-method source area passed before the identity advance. Candidate App/CLI each passed 40 responses/38 tool frames with full binary EOF, 18 refusals, immediate cancel and complete WAV parity in 1.800/1.292 s. Qwen qwen/qwen3.8-27b passed in 41.703 s: three observed Low inputs, two selected audio_write/fs_read results consumed by completed turns 1/2, nine native responses/seven frames, complete 85-byte mono44100/16-frame FLAC EOF and exact four-scalar metadata ACK. This is the bounded API workflow, not GUI, installed or all-model qualification. All three actual App/CLI/Qwen FLAC outputs passed Apple whole PCM consumers; the selected-identity source rerun passed the same 59 methods. Separate source/native G3 and initial hygiene/whitespace checks passed; first owner source/wiki publication, exact readback and clean synchronization passed. Preserve the earlier .39 GUI public-page, audio and archive/model evidence without reuse as FLAC, installed or all-model proof. [Audio contract](NATIVE-AUDIO-WRITING.md).
 
 ## Preceding 0.40.0 (56) qualification

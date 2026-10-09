@@ -1,5 +1,9 @@
 # Versioning policy
 
+Current target identity is **0.42.0 (58)**. Opt-in complete rendered-snapshot paging is a backward-compatible user-facing feature under the policy below; the context-budget correction is separate. Root selected `VERSION`/`BUILD_NUMBER`, compiled constants, twelve marketing/sixteen build values and both G3 expectations together. Existing graph memberships/signing remain unchanged. Matching selected-identity source/native 150, ordinary Debug/signature, separate initial G3 and bounded signed App/CLI paging passed on the 473-input `180a2c83…` map. Qwen v6 whole-paging/strict actual Low qualification passed; earlier observer NONPASS attempts remain retained. Applied-v2 final source/native G3, hygiene and local link checks passed; final candidate v3 readback preserved source/artifact identities. Exact source/wiki publication and synchronization remain pending. Historical receipts retain their tested identities; product version is not shipment.
+
+## Preceding 0.41.0 (57) qualification
+
 Current target identity is **0.41.0 (57)**. Optional FLAC is a backward-compatible user-facing capability under the feature-component policy below. Root selected VERSION/BUILD_NUMBER, compiled constants, twelve marketing/sixteen build values and both G3 expected literals together. Writer/test membership changes are separate. The 59-method source area passed before this identity selection with 0.40.0/56 authorities; the matching selected-identity native 59 and ordinary build/signature checks passed. App/CLI protocol and bounded Qwen API result-consumption checks passed; selected-identity source 59 and all three product native PCM consumers passed. Separate source/native G3 checks passed one actual method each, giving 60 distinct methods per route with the prior 59-method selections; these are separate invocations. Initial hygiene/whitespace passed; first owner source/wiki publication, exact readback and clean synchronization passed. Final C2 reread unchanged C1 binaries and source/protected inputs without a rebuild. Historical receipts retain their tested identities; product version is not shipment.
 
 ## Preceding 0.40.0 (56) qualification
@@ -360,6 +364,10 @@ Update all four surfaces together. `script/check_repository_hygiene.sh`, the
 focused version test, and CI reject drift between them.
 
 ## Current identity
+
+Current source target is `0.42.0`, build `58`, for opt-in complete rendered-snapshot paging; matching selected-identity and delivery gates are pending in this initial record.
+
+## Preceding 0.41.0 (57) identity record
 
 Current source target is `0.41.0`, build `57`, for optional supplied PCM16 FLAC; source/native/runtime and delivery scopes are recorded in qualification status.
 

@@ -335,6 +335,274 @@ final class WebRendererServiceTests: XCTestCase {
         XCTAssertEqual((result["content"] as? [[String: Any]])?.last?["text"] as? String, notice)
     }
 
+    func testPagedArgumentContractIsOptInStrictAndAllOrNothing() throws {
+        let url = "https://example.com/"
+        XCTAssertFalse(try WebRenderToolPack.Arguments(["url": url]).paged)
+        XCTAssertNil(try WebRenderToolPack.Arguments(["url": url, "paged": true]).continuation)
+        let id = UUID().uuidString
+        let sha = String(repeating: "A", count: 64)
+        let valid = try WebRenderToolPack.Arguments(["url": url, "paged": true,
+            "snapshot_id": id, "byte_offset": 1_048_576, "if_snapshot_sha256": sha])
+        XCTAssertEqual(valid.continuation?.digest, sha.lowercased())
+        let invalid: [[String: Any]] = [
+            ["url": url, "paged": 1], ["url": url, "paged": "true"],
+            ["url": url, "snapshot_id": id], ["url": url, "paged": true, "byte_offset": 0],
+            ["url": url, "paged": false, "snapshot_id": id, "byte_offset": 0, "if_snapshot_sha256": sha],
+            ["url": url, "paged": true, "snapshot_id": "invalid", "byte_offset": 0, "if_snapshot_sha256": sha],
+            ["url": url, "paged": true, "snapshot_id": id, "byte_offset": true, "if_snapshot_sha256": sha],
+            ["url": url, "paged": true, "snapshot_id": id, "byte_offset": 1_048_577, "if_snapshot_sha256": sha],
+            ["url": url, "paged": true, "snapshot_id": id, "byte_offset": 0, "if_snapshot_sha256": String(repeating: "g", count: 64)],
+        ]
+        for arguments in invalid { XCTAssertThrowsError(try WebRenderToolPack.Arguments(arguments)) }
+    }
+
+    func testCompleteProfileIsExplicitAndUsesTheSameOwnedTransportDispositionGates() async throws {
+        try requireSupported()
+        let transport = FixtureTransport()
+        let service = WebRendererService(transport: transport)
+        let request = makeRequest()
+        let reply = try await service.execute(request, cancellation: ToolCallCancellation(timeoutSeconds: 10), profile: .completeV2)
+        XCTAssertEqual(reply.text, "DOM marker 😀")
+        XCTAssertEqual(transport.count, 1)
+        let stopped = await service.shutdown()
+        XCTAssertTrue(stopped)
+        for mode in [FixtureTransport.Mode.duplicateFrame, .stdinPartial, .stderrForcedClose, .termRequested, .wrongGeneration] {
+            let invalid = WebRendererService(transport: FixtureTransport(mode: mode))
+            do {
+                _ = try await invalid.execute(makeRequest(), cancellation: ToolCallCancellation(timeoutSeconds: 10), profile: .completeV2)
+                XCTFail("Accepted incomplete completeV2 disposition")
+            } catch { XCTAssertEqual(error as? WebRenderError, .invalidResponse) }
+            let closed = await invalid.shutdown()
+            XCTAssertTrue(closed)
+        }
+    }
+
+    func testImmutableSnapshotPagesReconstructUnicodeWholeSHAAndEOFAfterFinalMCPTrimming() async throws {
+        let service = WebRendererService(transport: FixtureTransport())
+        let context = makeContext(), owner = try WebRenderSnapshotOwner(context)
+        let request = makeRequest(project: context.projectID.rawValue, generation: context.projectGeneration.rawValue)
+        let text = "BEGIN|" + String(repeating: "日本語😀\"\\\n\t", count: 700) + "|END-SENTINEL"
+        let control = ToolCallCancellation(timeoutSeconds: 10)
+        let id = try await service.publishSnapshot(makeReply(request, text: text), requestedURL: request.url,
+            owner: owner, cancellation: control)
+        let digest = JSONSupport.sha256Hex(Data(text.utf8))
+        var offset = 0, reconstructed = Data(), pages = 0
+        while offset < text.utf8.count && pages < 200 {
+            let page = try await service.snapshotPage(id: id, digest: digest, owner: owner,
+                requestedURL: request.url, offset: offset, maximumBytes: 4_000, cancellation: control)
+            var original = try WebRenderToolPack.pagedResult(page, budget: 4_000, cancellation: control)
+            original.payload["auto_handoff_id"] = "preserved-router-metadata"
+            let identifier = String(repeating: "id😀\"", count: 30), notice = "Required policy notice"
+            let frame = WebRenderToolPack.finalMCPResponse(id: identifier, result: original,
+                additiveNotice: notice, budget: 2_800)
+            XCTAssertLessThanOrEqual(try MCPStdioTransport.encode(frame).count, 2_800)
+            let response = try XCTUnwrap(frame["result"] as? [String: Any])
+            XCTAssertEqual(response["isError"] as? Bool, false)
+            let payload = try XCTUnwrap(response["structuredContent"] as? [String: Any])
+            let content = try XCTUnwrap(payload["content"] as? String)
+            guard !content.isEmpty else { XCTFail("Paging made no progress"); return }
+            XCTAssertEqual(payload["byte_offset"] as? Int, offset)
+            XCTAssertEqual(payload["snapshot_sha256"] as? String, digest)
+            XCTAssertEqual(payload["content_sha256"] as? String, JSONSupport.sha256Hex(Data(content.utf8)))
+            XCTAssertEqual(payload["returned_content_bytes"] as? Int, content.utf8.count)
+            XCTAssertEqual(payload["auto_handoff_id"] as? String, "preserved-router-metadata")
+            let contentBlocks = try XCTUnwrap(response["content"] as? [[String: Any]])
+            let json = try XCTUnwrap(contentBlocks.first?["text"] as? String)
+            let duplicated = try JSONSerialization.jsonObject(with: Data(json.utf8)) as? NSDictionary
+            XCTAssertEqual(duplicated, payload as NSDictionary)
+            XCTAssertEqual(contentBlocks.last?["text"] as? String, notice)
+            reconstructed.append(contentsOf: content.utf8)
+            offset += content.utf8.count; pages += 1
+            XCTAssertEqual(payload["has_more"] as? Bool, offset < text.utf8.count)
+            if offset < text.utf8.count { XCTAssertEqual(payload["next_byte_offset"] as? Int, offset) }
+            else { XCTAssertTrue(payload["next_byte_offset"] is NSNull) }
+            XCTAssertLessThan(pages, 200)
+        }
+        XCTAssertEqual(reconstructed, Data(text.utf8))
+        XCTAssertTrue(String(decoding: reconstructed, as: UTF8.self).hasSuffix("|END-SENTINEL"))
+        let eof = try await service.snapshotPage(id: id, digest: digest, owner: owner,
+            requestedURL: request.url, offset: offset, maximumBytes: 4_000, cancellation: control)
+        let final = try WebRenderToolPack.pagedResult(eof, budget: 4_000, cancellation: control)
+        XCTAssertEqual(final.payload["content"] as? String, "")
+        XCTAssertEqual(final.payload["has_more"] as? Bool, false)
+        XCTAssertTrue(final.payload["next_byte_offset"] is NSNull)
+        let stopped = await service.shutdown()
+        XCTAssertTrue(stopped)
+    }
+
+    func testSnapshotOwnerCanonicalizesToolOrderAndRejectsEveryActualScopeIdentityChange() throws {
+        let base = makeContext()
+        func context(client: ClientID? = nil, generation: UInt64 = 1, run: RunID? = nil,
+                     provider: String? = nil, job: UUID? = nil, remaining: Int? = nil,
+                     roots: [URL] = [], writable: [URL]? = nil,
+                     tools: Set<String> = ["web.render", "web.fetch"], network: Bool = true,
+                     inline: Int = 16_384) -> ToolInvocationContext {
+            ToolInvocationContext(projectID: base.projectID, projectGeneration: ProjectGeneration(generation),
+                clientID: client ?? base.clientID, runID: run, providerSessionID: provider, runtimeJobID: job,
+                remainingContextTokens: remaining, authorizationScope: ToolAuthorizationScope(canonicalRoots: roots,
+                    writableRoots: writable, allowedTools: tools, networkAllowed: network, maximumInlineOutputBytes: inline))
+        }
+        let owner = try WebRenderSnapshotOwner(context())
+        XCTAssertEqual(owner, try WebRenderSnapshotOwner(context(remaining: 10, tools: Set(["web.fetch", "web.render"]))))
+        for changed in [context(client: ClientID("other")), context(generation: 2), context(run: RunID()),
+            context(provider: ""), context(provider: "other"), context(job: UUID()), context(roots: [URL(fileURLWithPath: "/a")]),
+            context(writable: [URL(fileURLWithPath: "/a")]), context(tools: ["web.render"]),
+            context(network: false), context(inline: 8_192)] {
+            XCTAssertNotEqual(owner, try WebRenderSnapshotOwner(changed))
+        }
+        XCTAssertThrowsError(try WebRenderSnapshotOwner(context(client: ClientID(String(repeating: "x", count: 8_193)))))
+    }
+
+    func testSnapshotContinuationRejectsForeignOwnerDigestURLAndScalarInteriorWithoutRendering() async throws {
+        let transport = FixtureTransport(), service = WebRendererService(transport: transport)
+        let context = makeContext(), owner = try WebRenderSnapshotOwner(context)
+        let request = makeRequest(project: context.projectID.rawValue, generation: context.projectGeneration.rawValue)
+        let control = ToolCallCancellation(timeoutSeconds: 10)
+        let id = try await service.publishSnapshot(makeReply(request, text: "😀tail"), requestedURL: request.url,
+            owner: owner, cancellation: control)
+        let digest = JSONSupport.sha256Hex(Data("😀tail".utf8))
+        let foreign = try WebRenderSnapshotOwner(makeContext())
+        let foreignClient = try WebRenderSnapshotOwner(ToolInvocationContext(projectID: context.projectID,
+            projectGeneration: context.projectGeneration, clientID: ClientID("foreign-client"),
+            authorizationScope: context.authorizationScope))
+        for (token, sha, scope, url) in [(UUID(), digest, owner, request.url),
+            (id, String(repeating: "0", count: 64), owner, request.url), (id, digest, foreign, request.url), (id, digest, foreignClient, request.url),
+            (id, digest, owner, "https://example.com/changed")] {
+            do {
+                _ = try await service.snapshotPage(id: token, digest: sha, owner: scope, requestedURL: url,
+                    offset: 0, maximumBytes: 4_000, cancellation: control)
+                XCTFail("Foreign or stale continuation accepted")
+            } catch { XCTAssertTrue(error is WebRenderSnapshotError) }
+        }
+        for offset in [1, 2, 3, 9] {
+            do {
+                _ = try await service.snapshotPage(id: id, digest: digest, owner: owner, requestedURL: request.url,
+                    offset: offset, maximumBytes: 4_000, cancellation: control)
+                XCTFail("Invalid UTF-8 cursor accepted")
+            } catch { XCTAssertEqual(error as? WebRenderError, .invalidArgument("byte_offset")) }
+        }
+        XCTAssertEqual(transport.count, 0)
+        let stopped = await service.shutdown()
+        XCTAssertTrue(stopped)
+    }
+
+    func testReplacementExpirationCancellationAndShutdownReleaseOneBoundedSnapshot() async throws {
+        let service = WebRendererService(transport: FixtureTransport(), snapshotLifetime: 500_000_000)
+        let context = makeContext(), owner = try WebRenderSnapshotOwner(context)
+        let request = makeRequest(project: context.projectID.rawValue, generation: context.projectGeneration.rawValue)
+        let control = ToolCallCancellation(timeoutSeconds: 10)
+        let original = try await service.publishSnapshot(makeReply(request, text: "original"), requestedURL: request.url,
+            owner: owner, cancellation: control)
+        let cancelled = ToolCallCancellation(timeoutSeconds: 10); cancelled.cancel()
+        do {
+            _ = try await service.publishSnapshot(makeReply(request, text: "cancelled"), requestedURL: request.url,
+                owner: owner, cancellation: cancelled)
+            XCTFail("Cancelled capture replaced cache")
+        } catch { XCTAssertTrue(error is CancellationError) }
+        let retained = try await service.snapshotPage(id: original, digest: nil, owner: owner,
+            requestedURL: request.url, offset: 0, maximumBytes: 100, cancellation: control)
+        XCTAssertEqual(retained.text, "original")
+        for _ in 0..<20 {
+            _ = try await service.publishSnapshot(makeReply(request, text: "replacement"), requestedURL: request.url,
+                owner: owner, cancellation: control)
+            let bytes = await service.retainedSnapshotBytes, expiry = await service.hasSnapshotExpiryOwner
+            XCTAssertEqual(bytes, 11); XCTAssertTrue(expiry)
+        }
+        do {
+            _ = try await service.snapshotPage(id: original, digest: nil, owner: owner, requestedURL: request.url,
+                offset: 0, maximumBytes: 100, cancellation: control)
+            XCTFail("Replaced token remained valid")
+        } catch { XCTAssertTrue(error is WebRenderSnapshotError) }
+        try await waitUntilAsync { await service.retainedSnapshotBytes == 0 }
+        let expiredOwner = await service.hasSnapshotExpiryOwner
+        XCTAssertFalse(expiredOwner)
+        _ = try await service.publishSnapshot(makeReply(request, text: "last"), requestedURL: request.url,
+            owner: owner, cancellation: control)
+        let closed = await service.shutdown(), bytes = await service.retainedSnapshotBytes,
+            expiry = await service.hasSnapshotExpiryOwner
+        XCTAssertTrue(closed); XCTAssertEqual(bytes, 0); XCTAssertFalse(expiry)
+        do {
+            _ = try await service.publishSnapshot(makeReply(request), requestedURL: request.url,
+                owner: owner, cancellation: control)
+            XCTFail("Shutdown cache reopened")
+        } catch { XCTAssertEqual(error as? WebRenderError, .stopped) }
+    }
+
+    func testCompleteCacheRejectsIncompleteCaptureAndImpossibleFrameWithoutFalseCursor() async throws {
+        let service = WebRendererService(transport: FixtureTransport())
+        let context = makeContext(), owner = try WebRenderSnapshotOwner(context)
+        let request = makeRequest(project: context.projectID.rawValue, generation: context.projectGeneration.rawValue)
+        let control = ToolCallCancellation(timeoutSeconds: 10)
+        let id = try await service.publishSnapshot(makeReply(request, text: "😀tail"), requestedURL: request.url,
+            owner: owner, cancellation: control)
+        let incomplete = WebRenderProtocol.Reply(requestID: request.requestID, nonce: request.nonce,
+            projectID: request.projectID, projectGeneration: request.projectGeneration, outcome: .snapshotOverflow,
+            finalURL: request.url, title: "", text: "", nodesVisited: 0, textTruncated: false,
+            titleTruncated: false, readiness: .unavailable, snapshotExtracted: false, lockdownEnabled: true,
+            viewLifetime: .released, storeLifetime: .released)
+        do {
+            _ = try await service.publishSnapshot(incomplete, requestedURL: request.url, owner: owner, cancellation: control)
+            XCTFail("Overflow replaced complete cache")
+        } catch { XCTAssertEqual(error as? WebRenderError, .invalidResponse) }
+        let page = try await service.snapshotPage(id: id, digest: nil, owner: owner,
+            requestedURL: request.url, offset: 0, maximumBytes: 4_000, cancellation: control)
+        XCTAssertThrowsError(try WebRenderToolPack.pagedResult(page, budget: 1, cancellation: nil))
+        let result = try WebRenderToolPack.pagedResult(page, budget: 4_000, cancellation: nil)
+        let frame = WebRenderToolPack.finalMCPResponse(id: String(repeating: "escaped😀", count: 1000),
+            result: result, additiveNotice: "Required notice", budget: 128)
+        let payload = try XCTUnwrap((frame["result"] as? [String: Any])?["structuredContent"] as? [String: Any])
+        XCTAssertEqual(payload["code"] as? String, "web_render_output_budget")
+        XCTAssertNil(payload["next_byte_offset"])
+        let stopped = await service.shutdown()
+        XCTAssertTrue(stopped)
+    }
+
+    func testSnapshotOneMiBCeilingAndWeakServiceLifetimeDoNotRetainASecondBodyOrOwner() async throws {
+        var service: WebRendererService? = WebRendererService(transport: FixtureTransport())
+        weak let weakService = service
+        let context = makeContext(), owner = try WebRenderSnapshotOwner(context)
+        let request = makeRequest(project: context.projectID.rawValue, generation: context.projectGeneration.rawValue)
+        let control = ToolCallCancellation(timeoutSeconds: 10)
+        let text = String(repeating: "x", count: 1_048_576)
+        let id = try await service!.publishSnapshot(makeReply(request, text: text), requestedURL: request.url,
+            owner: owner, cancellation: control)
+        let retained = await service!.retainedSnapshotBytes
+        XCTAssertEqual(retained, 1_048_576)
+        do {
+            _ = try await service!.publishSnapshot(makeReply(request, text: text + "x"), requestedURL: request.url,
+                owner: owner, cancellation: control)
+            XCTFail("Oversized capture replaced bounded cache")
+        } catch { XCTAssertEqual(error as? WebRenderError, .invalidResponse) }
+        let page = try await service!.snapshotPage(id: id, digest: nil, owner: owner,
+            requestedURL: request.url, offset: 1_048_575, maximumBytes: 10, cancellation: control)
+        XCTAssertEqual(page.text, "x")
+        service = nil
+        try await waitUntil { weakService == nil }
+    }
+
+    func testContinuationsNeverRefreshTheOriginalExpiryOrStartAnotherRenderer() async throws {
+        let transport = FixtureTransport(), service = WebRendererService(transport: transport, snapshotLifetime: 100_000_000)
+        let context = makeContext(), owner = try WebRenderSnapshotOwner(context)
+        let request = makeRequest(project: context.projectID.rawValue, generation: context.projectGeneration.rawValue)
+        let control = ToolCallCancellation(timeoutSeconds: 10)
+        let id = try await service.publishSnapshot(makeReply(request), requestedURL: request.url,
+            owner: owner, cancellation: control)
+        let originalExpiry = await service.snapshotExpiryNanoseconds
+        _ = try await service.snapshotPage(id: id, digest: nil, owner: owner, requestedURL: request.url,
+            offset: 0, maximumBytes: 4_000, cancellation: control)
+        let continuedExpiry = await service.snapshotExpiryNanoseconds
+        XCTAssertEqual(continuedExpiry, originalExpiry)
+        try await waitUntilAsync { await service.retainedSnapshotBytes == 0 }
+        do {
+            _ = try await service.snapshotPage(id: id, digest: nil, owner: owner, requestedURL: request.url,
+                offset: 0, maximumBytes: 4_000, cancellation: control)
+            XCTFail("Expired continuation succeeded")
+        } catch { XCTAssertTrue(error is WebRenderSnapshotError) }
+        XCTAssertEqual(transport.count, 0)
+        let closed = await service.shutdown()
+        XCTAssertTrue(closed)
+    }
+
     private func requireSupported() throws {
         if !WebRendererService.isSupported { throw XCTSkip("Renderer actor execution is gated to macOS 27+; codec/admission tests remain portable") }
     }
@@ -403,9 +671,9 @@ private final class FixtureTransport: WebRenderTransport {
     func setRecoveryConfirmed(_ confirmed: Bool) { state.withLock { $0.recoveryConfirmed = confirmed } }
     func release() { gate.signal() }
 
-    func run(input: Data, deadline: UInt64, cancellation: ToolCallCancellation) throws -> OwnedDuplexResult {
+    func run(input: Data, profile: WebRenderProtocol.Profile, deadline: UInt64, cancellation: ToolCallCancellation) throws -> OwnedDuplexResult {
         let mode = state.withLock { value in value.count += 1; return value.mode }
-        let request = try WebRenderProtocol.decodeRequestFrame(input)
+        let request = try WebRenderProtocol.decodeRequestFrame(input, profile: profile)
         if mode == .hold, gate.wait(timeout: .now() + 5) != .success { throw FixtureFailure.holdExpired }
         if mode == .untilCancelled {
             let end = min(deadline, DispatchTime.now().uptimeNanoseconds + 3_000_000_000)
@@ -435,7 +703,7 @@ private final class FixtureTransport: WebRenderTransport {
             finalURL: request.url, title: "Native title", text: "DOM marker 😀", nodesVisited: 2,
             textTruncated: false, titleTruncated: false, readiness: .boundedStability, snapshotExtracted: true,
             lockdownEnabled: true, viewLifetime: .released, storeLifetime: .released)
-        var frame = try WebRenderProtocol.encodeReply(reply, matching: wireRequest)
+        var frame = try WebRenderProtocol.encodeReply(reply, matching: wireRequest, profile: profile)
         if mode == .duplicateFrame { frame.append(frame) }
         if mode == .oversizedStdout { frame = Data(repeating: 0, count: WebRenderProtocol.maximumReplyBodyBytes + 5) }
         let admission: OwnedAdmissionDisposition

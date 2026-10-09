@@ -54,7 +54,7 @@ public enum ForgeProcessEntry {
             // Argument validation happens in the bounded hook command. Classify
             // even malformed invocations as headless so they can never start UI.
             return .providerHook
-        case "--internal-web-render-v1":
+        case "--internal-web-render-v1", "--internal-web-render-v2":
             return .webRenderChild
         case "--internal-docx-export-v1":
             return .docxExportChild

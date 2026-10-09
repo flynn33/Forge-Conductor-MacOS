@@ -1,5 +1,9 @@
 # Forge Conductor user guide
 
+Version **0.42.0**, build **58** adds opt-in complete captured-text pages to `web.render` on macOS 27+. Start with `web.render(url="https://example.com", paged=true)`. While `has_more` is true, repeat the same URL with `paged=true`, `snapshot_id`, returned `next_byte_offset` as `byte_offset`, and `snapshot_sha256` as `if_snapshot_sha256`. The last page has `has_more: false` and `next_byte_offset: null`. The one retained snapshot expires after at most 120 seconds or is replaced by the next successful complete capture; stale continuation requires a fresh capture. The 1 MiB/65,536-node capture bound does not expand the inline response budget. Signed candidate App/CLI and Qwen v6 complete paging passed their bounded native/model matrices, including all six strict actual Low events. Earlier observer NONPASS attempts remain retained. Applied-v2 final source/native G3, hygiene and local link checks passed; final candidate v3 readback preserved source/artifact identities. Exact source/wiki publication and synchronization remain pending. [Contract and evidence](docs/NATIVE-WEB-RENDERING.md).
+
+## Preceding 0.41.0 (57) qualification
+
 Version **0.41.0**, build **57** adds an optional FLAC format to supplied-sample audio_write. Use `audio_write(path="<project>/silence.FLAC", content="AAA=", sample_rate=8000, channels=1, format="flac")` for one zero mono frame. Omit format for the existing WAV behavior, or select exact `"wav"` with a matching .wav path. An extension does not select a format. The tool preserves supplied PCM; it does not synthesize or play sound. The 1 MiB raw writer ceiling does not expand managed 65,536-byte JSON admission. [Contract and scoped qualification](docs/NATIVE-AUDIO-WRITING.md).
 
 ## Preceding 0.40.0 (56) qualification
@@ -742,7 +746,7 @@ can return errors. [Renderer contract and verified scopes](docs/NATIVE-WEB-RENDE
 | --- | --- |
 | `web.search` | `query`; optional `limit` from 1–10 (default 5). Returns titles, URLs and snippets through DuckDuckGo HTML. Read selected URLs with `web.fetch`. |
 | `web.fetch` | `url`; optional `format: "text"` (default), `"source"` or `"base64"`. Base64 preserves the original response bytes for any MIME type; offsets, counts and SHA256 refer to those original bytes (up to 1 MiB). Text/source offsets and counts refer to decoded UTF-8 content (up to 3 MiB); offsets must lie within content on a UTF-8 boundary. Text/source HTML can include `title` and first `heading`, each bounded to 512 UTF-8 bytes; metadata is omitted when it would displace a readable body page. When `has_more` is true, repeat with returned `next_byte_offset` as `byte_offset` and `content_sha256` as `if_content_sha256`. Changed content returns an error. |
-| `web.render` | `url`; optional `timeout_sec` and `maximum_bytes`. Returns a finite native JavaScript DOM snapshot with title, text, returned-content SHA256/count, URLs, project identity, readiness and truncation. There is no continuation cursor. Requires macOS 27+ and project network/tool authorization. |
+| `web.render` | `url`; optional `timeout_sec`, `maximum_bytes` and `deadline_ms`. Default/false `paged` returns the existing finite prefix. Opt in with `paged: true` for complete captured text up to 1 MiB/65,536 nodes or explicit overflow. Continue with the same URL, `snapshot_id`, returned `next_byte_offset` as `byte_offset` and whole `snapshot_sha256` as `if_snapshot_sha256`; final EOF has `has_more: false`/null cursor. One snapshot expires within 120 seconds or on replacement. Requires macOS 27+ and project network/tool authorization. [Contract](docs/NATIVE-WEB-RENDERING.md). |
 | `fs_list` | Optional `path`. Path-only calls retain the legacy 1,000-entry cap. Supply `limit` (1–1,000; default 100), `cursor` or `maximum_bytes` to select paged mode. Paged arguments are validated before path normalization; count tokens must have an exact integral value. Continue using the returned `next_cursor` until `has_more` is false; `deadline_ms` alone retains legacy mode. Directory changes require restarting. [Contract and verified scopes](docs/FILESYSTEM-LIST-PAGING.md). |
 | `fs_read` | Default `encoding: "utf8"` uses 1-based line `offset` and `length`/`limit`. For arbitrary bytes, use `encoding: "base64"`, zero-based `byte_offset` and optional `maximum_bytes`; continue at returned `next_byte_offset` while `has_more` is true. |
 | `fs_write` | `path`, `content`; optional `encoding: "base64"` requires canonical padded base64 without whitespace and accepts at most 2 MiB decoded bytes. The default writes UTF-8 text. |
@@ -825,9 +829,10 @@ responses include the actual request ID, required policy notice and terminating
 line feed in that allowance. The post-publication LF boundary correction has
 [source and new Debug/Release native coverage](docs/FILESYSTEM-LIST-PAGING.md#renderer-line-feed-boundary-after-023-publication);
 the original 0.23.0 JSON-only receipts retain their own measurement scope.
-An impossible envelope returns an explicit budget error. Renderer
-extraction visits at most 4,096 nodes and returns at most 8,192 UTF-8 text bytes;
-whole network bytes, DOM size and JavaScript heap are not capped.
+An impossible envelope returns an explicit budget error. Default v1 renderer
+extraction visits at most 4,096 nodes and returns at most 8,192 UTF-8 text bytes.
+Opt-in complete capture is bounded to 65,536 nodes/1 MiB text, then paged within
+the encoded allowance; whole network bytes, DOM size and JavaScript heap are not capped.
 Each HTTP fetch receives at most 1 MiB
 and follows at most five redirects. Text/source decoding can expand those bytes
 to at most 3 MiB of UTF-8 content; base64 keeps the original-byte 1 MiB limit. Each continued web page fetches the URL

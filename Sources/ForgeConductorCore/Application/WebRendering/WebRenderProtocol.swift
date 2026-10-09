@@ -17,9 +17,32 @@ enum WebRenderProtocol {
     static let maximumNodes = 4_096
     static let maximumURLBytes = 8_192
 
+    /// The existing codec remains v1 unless its native caller explicitly selects v2.
+    enum Profile: Sendable, Equatable {
+        case v1, completeV2
+        var version: String { self == .v1 ? WebRenderProtocol.version : "forge.web.render.v2" }
+        var internalArgument: String { self == .v1 ? WebRenderProtocol.internalArgument : "--internal-web-render-v2" }
+        var maximumTextBytes: Int { self == .v1 ? WebRenderProtocol.maximumTextBytes : 1_048_576 }
+        var maximumNodes: Int { self == .v1 ? WebRenderProtocol.maximumNodes : 65_536 }
+        // One JSON byte can require six escaped ASCII bytes. Metadata is bounded separately.
+        var maximumReplyBodyBytes: Int {
+            self == .v1 ? WebRenderProtocol.maximumReplyBodyBytes
+                : 6 * (maximumTextBytes + WebRenderProtocol.maximumTitleBytes + WebRenderProtocol.maximumURLBytes) + 4_096
+        }
+        var maximumDOMBodyBytes: Int { 6 * (maximumTextBytes + WebRenderProtocol.maximumTitleBytes) + 1_024 }
+        static func forInternalArgument(_ value: String?) -> Profile? {
+            switch value {
+            case WebRenderProtocol.internalArgument: .v1
+            case "--internal-web-render-v2": .completeV2
+            default: nil
+            }
+        }
+    }
+
     enum Outcome: String, Sendable {
         case rendered, navigationFailed, downloadDenied, redirectLimit
         case contentProcessTerminated, deadline, cancelled, unsupported, protocolError, identityRejected
+        case snapshotOverflow = "snapshot_overflow"
     }
     enum Readiness: String, Sendable { case boundedStability, maximumSettle, unavailable }
     enum Lifetime: String, Sendable { case notCreated, released, unreleasedAtDeadline, notObserved }
@@ -78,24 +101,24 @@ enum WebRenderProtocol {
         "view_lifetime", "store_lifetime",
     ]
 
-    static func encodeRequest(_ request: Request) throws -> Data {
+    static func encodeRequest(_ request: Request, profile: Profile = .v1) throws -> Data {
         let values: [String: Any] = [
-            "version": version, "request_id": identifier(request.requestID), "nonce": identifier(request.nonce),
+            "version": profile.version, "request_id": identifier(request.requestID), "nonce": identifier(request.nonce),
             "project_id": identifier(request.projectID), "project_generation": String(request.projectGeneration),
             "url": request.url, "deadline_uptime_ns": String(request.deadlineUptimeNanoseconds),
         ]
         let body = try canonical(values)
-        _ = try decodeRequestBody(body)
+        _ = try decodeRequestBody(body, profile: profile)
         return try frame(body, maximumBodyBytes: maximumRequestBodyBytes)
     }
 
-    static func decodeRequestFrame(_ bytes: Data) throws -> Request {
-        try decodeRequestBody(body(bytes, maximumBodyBytes: maximumRequestBodyBytes))
+    static func decodeRequestFrame(_ bytes: Data, profile: Profile = .v1) throws -> Request {
+        try decodeRequestBody(body(bytes, maximumBodyBytes: maximumRequestBodyBytes), profile: profile)
     }
 
-    static func decodeRequestBody(_ bytes: Data) throws -> Request {
+    static func decodeRequestBody(_ bytes: Data, profile: Profile = .v1) throws -> Request {
         let values = try object(bytes, keys: requestKeys, maximumBytes: maximumRequestBodyBytes)
-        guard try string(values, "version") == version else { throw WebRenderProtocolError.invalidField("version") }
+        guard try string(values, "version") == profile.version else { throw WebRenderProtocolError.invalidField("version") }
         let url = try string(values, "url")
         try validateURL(url)
         return Request(requestID: try uuid(values, "request_id"), nonce: try uuid(values, "nonce"),
@@ -105,9 +128,9 @@ enum WebRenderProtocol {
         // The child validates runtime deadline/self role before creating WebKit.
     }
 
-    static func encodeReply(_ reply: Reply, matching request: Request) throws -> Data {
+    static func encodeReply(_ reply: Reply, matching request: Request, profile: Profile = .v1) throws -> Data {
         let values: [String: Any] = [
-            "version": version, "request_id": identifier(reply.requestID), "nonce": identifier(reply.nonce),
+            "version": profile.version, "request_id": identifier(reply.requestID), "nonce": identifier(reply.nonce),
             "project_id": identifier(reply.projectID), "project_generation": String(reply.projectGeneration),
             "outcome": reply.outcome.rawValue, "final_url": reply.finalURL, "title": reply.title, "text": reply.text,
             "text_bytes": reply.text.utf8.count, "nodes_visited": reply.nodesVisited,
@@ -117,18 +140,18 @@ enum WebRenderProtocol {
             "view_lifetime": reply.viewLifetime.rawValue, "store_lifetime": reply.storeLifetime.rawValue,
         ]
         let body = try canonical(values)
-        _ = try decodeReplyBody(body, matching: request)
-        return try frame(body, maximumBodyBytes: maximumReplyBodyBytes)
-        // Renderer must reduce bounded text before encoding if JSON escaping exceeds this cap.
+        _ = try decodeReplyBody(body, matching: request, profile: profile)
+        return try frame(body, maximumBodyBytes: profile.maximumReplyBodyBytes)
+        // v1 may reduce text to its legacy frame cap; v2 retains complete text or fails.
     }
 
-    static func decodeReplyFrame(_ bytes: Data, matching request: Request) throws -> Reply {
-        try decodeReplyBody(body(bytes, maximumBodyBytes: maximumReplyBodyBytes), matching: request)
+    static func decodeReplyFrame(_ bytes: Data, matching request: Request, profile: Profile = .v1) throws -> Reply {
+        try decodeReplyBody(body(bytes, maximumBodyBytes: profile.maximumReplyBodyBytes), matching: request, profile: profile)
     }
 
-    static func decodeReplyBody(_ bytes: Data, matching request: Request) throws -> Reply {
-        let values = try object(bytes, keys: replyKeys, maximumBytes: maximumReplyBodyBytes)
-        guard try string(values, "version") == version else { throw WebRenderProtocolError.invalidField("version") }
+    static func decodeReplyBody(_ bytes: Data, matching request: Request, profile: Profile = .v1) throws -> Reply {
+        let values = try object(bytes, keys: replyKeys, maximumBytes: profile.maximumReplyBodyBytes)
+        guard try string(values, "version") == profile.version else { throw WebRenderProtocolError.invalidField("version") }
         let requestID = try uuid(values, "request_id"), nonce = try uuid(values, "nonce")
         let projectID = try uuid(values, "project_id")
         let generation = try decimal(values, "project_generation", positive: true)
@@ -137,6 +160,7 @@ enum WebRenderProtocol {
             throw WebRenderProtocolError.mismatchedReply
         }
         guard let outcome = Outcome(rawValue: try string(values, "outcome")),
+              profile == .completeV2 || outcome != .snapshotOverflow,
               let readiness = Readiness(rawValue: try string(values, "readiness")),
               let viewLifetime = Lifetime(rawValue: try string(values, "view_lifetime")),
               let storeLifetime = Lifetime(rawValue: try string(values, "store_lifetime")) else {
@@ -144,12 +168,15 @@ enum WebRenderProtocol {
         }
         let finalURL = try string(values, "final_url"), title = try string(values, "title"), text = try string(values, "text")
         if !finalURL.isEmpty { try validateURL(finalURL) }
-        guard title.utf8.count <= maximumTitleBytes, text.utf8.count <= maximumTextBytes,
-              try integer(values, "text_bytes", range: 0...maximumTextBytes) == text.utf8.count else {
+        guard title.utf8.count <= maximumTitleBytes, text.utf8.count <= profile.maximumTextBytes,
+              try integer(values, "text_bytes", range: 0...profile.maximumTextBytes) == text.utf8.count else {
             throw WebRenderProtocolError.invalidField("title/text/text_bytes")
         }
         let snapshotExtracted = try boolean(values, "snapshot_extracted")
         let lockdownEnabled = try boolean(values, "lockdown_enabled")
+        if profile == .completeV2, try boolean(values, "text_truncated") {
+            throw WebRenderProtocolError.invalidField("complete text_truncated")
+        }
         if outcome == .rendered {
             guard !finalURL.isEmpty, snapshotExtracted, lockdownEnabled, readiness != .unavailable else {
                 throw WebRenderProtocolError.invalidField("rendered fields")
@@ -161,11 +188,40 @@ enum WebRenderProtocol {
         }
         return Reply(requestID: requestID, nonce: nonce, projectID: projectID, projectGeneration: generation,
                      outcome: outcome, finalURL: finalURL, title: title, text: text,
-                     nodesVisited: try integer(values, "nodes_visited", range: 0...maximumNodes),
+                     nodesVisited: try integer(values, "nodes_visited", range: 0...profile.maximumNodes),
                      textTruncated: try boolean(values, "text_truncated"),
                      titleTruncated: try boolean(values, "title_truncated"), readiness: readiness,
                      snapshotExtracted: snapshotExtracted, lockdownEnabled: lockdownEnabled,
                      viewLifetime: viewLifetime, storeLifetime: storeLifetime)
+    }
+
+    /// Decodes only the fixed v2 extractor's bounded result, including explicit overflow.
+    struct CompleteSnapshot {
+        let title: String, text: String
+        let nodes: Int
+        let titleTruncated: Bool, overflow: Bool
+        init(_ data: Data) throws {
+            let profile = Profile.completeV2
+            guard !data.isEmpty, data.count <= profile.maximumDOMBodyBytes,
+                  String(data: data, encoding: .utf8) != nil,
+                  let values = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  Set(values.keys) == ["title", "text", "nodes", "truncated", "title_truncated", "overflow"] else {
+                throw WebRenderProtocolError.invalidJSON
+            }
+            let title = try WebRenderProtocol.string(values, "title")
+            let text = try WebRenderProtocol.string(values, "text")
+            let overflow = try WebRenderProtocol.boolean(values, "overflow")
+            let titleTruncated = try WebRenderProtocol.boolean(values, "title_truncated")
+            guard title.utf8.count <= WebRenderProtocol.maximumTitleBytes,
+                  text.utf8.count <= profile.maximumTextBytes,
+                  !(try WebRenderProtocol.boolean(values, "truncated")),
+                  !overflow || (text.isEmpty && title.isEmpty && !titleTruncated) else {
+                throw WebRenderProtocolError.invalidField("complete snapshot")
+            }
+            self.title = title; self.text = text; self.overflow = overflow
+            self.titleTruncated = titleTruncated
+            nodes = try WebRenderProtocol.integer(values, "nodes", range: 0...profile.maximumNodes)
+        }
     }
 
     static func frame(_ body: Data, maximumBodyBytes: Int) throws -> Data {

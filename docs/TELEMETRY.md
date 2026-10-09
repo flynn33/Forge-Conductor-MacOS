@@ -1,5 +1,9 @@
 # Telemetry architecture (real-time native)
 
+Current source documentation targets `0.42.0`, build `58`. Complete-render paging uses the existing renderer/tool owners and adds one bounded snapshot body with one expiry owner; it adds no telemetry schema, gauge or GUI delivery queue. The passed weak-service source method is included in the 150-method area and does not establish general lifetime or native child release. Signed App/CLI paging checks passed with normal owned-parent closure and complete streams; internal render child PIDs were not independently observed. Qwen v6 had normal owned native/model/observer/outer closure with complete streams and all six strict Low LF associations. General telemetry/lifetime qualification remains pending. Applied-v2 final source/native G3, hygiene and local link checks passed; final candidate v3 readback preserved source/artifact identities. Exact source/wiki publication and synchronization remain pending. [Renderer scope](NATIVE-WEB-RENDERING.md).
+
+## Preceding 0.41.0 (57) qualification
+
 Current source documentation targets `0.41.0`, build `57`. FLAC stays within existing audio_write documents/tool-card/content-redaction owners. No telemetry field, gauge, timer, producer or delivery queue is added. Four external test-owner weak/deinit witnesses do not establish product or framework-wide leak freedom. Source checks are separate from actual candidate telemetry/lifetime qualification. [Audio scope](NATIVE-AUDIO-WRITING.md).
 
 ## Preceding 0.40.0 (56) qualification

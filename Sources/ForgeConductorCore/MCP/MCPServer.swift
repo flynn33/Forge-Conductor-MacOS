@@ -369,10 +369,8 @@ public final class MCPServer: @unchecked Sendable {
                     ).toolResult(), cancellation: requestCancellation)
                 }
                 let arguments = params["arguments"] as? [String: Any] ?? [:]
-                let rendererBudget: Int? = name == "web.render"
-                    ? WebRenderToolPack.responseBudget(arguments: arguments,
-                        scope: (try? app.projectContexts.invocationContext(
-                            for: clientID, cancellation: requestCancellation))?.authorizationScope)
+                var rendererBudget: Int? = name == "web.render"
+                    ? WebRenderToolPack.responseBudget(arguments: arguments, scope: nil)
                     : nil
                 let listingBudget: Int? = name == "fs_list" && FilesystemListingPage.usesPagedMode(arguments: arguments)
                     ? FilesystemListingPage.responseBudget(arguments: arguments,
@@ -402,10 +400,16 @@ public final class MCPServer: @unchecked Sendable {
                     cancellation: requestCancellation) }
                 var webBudget: Int?
                 let result: ToolResult
-                if WebToolPack.names.contains(name) {
+                if WebToolPack.names.contains(name) || WebRenderToolPack.names.contains(name) {
                     result = try app.tools.callWithResolvedContext(name: name, arguments: arguments,
                         clientID: clientID, cancellation: requestCancellation) { context in
-                        webBudget = WebToolPack.responseBudget(arguments: arguments, scope: context.authorizationScope)
+                        if WebRenderToolPack.names.contains(name) {
+                            rendererBudget = WebRenderToolPack.responseBudget(arguments: arguments,
+                                scope: context.authorizationScope)
+                        } else {
+                            webBudget = WebToolPack.responseBudget(arguments: arguments,
+                                scope: context.authorizationScope)
+                        }
                     }
                 } else {
                     result = try app.tools.call(name: name, arguments: arguments, clientID: clientID,

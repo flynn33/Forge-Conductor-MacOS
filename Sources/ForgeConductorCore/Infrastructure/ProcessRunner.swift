@@ -23,11 +23,13 @@ public struct ProcessResult: Sendable {
 
 enum OwnedCurrentSelfMode: Sendable {
     case webRenderV1
+    case webRenderV2
     case docxExportV1
 
     var argument: String {
         switch self {
         case .webRenderV1: "--internal-web-render-v1"
+        case .webRenderV2: "--internal-web-render-v2"
         case .docxExportV1: "--internal-docx-export-v1"
         }
     }
@@ -35,6 +37,7 @@ enum OwnedCurrentSelfMode: Sendable {
     var maximumInputBytes: Int {
         switch self {
         case .webRenderV1: 16_388
+        case .webRenderV2: WebRenderProtocol.maximumRequestBodyBytes + 4
         case .docxExportV1: 65_536
         }
     }
@@ -42,6 +45,7 @@ enum OwnedCurrentSelfMode: Sendable {
     var maximumOutputBytes: Int {
         switch self {
         case .webRenderV1: 32_772
+        case .webRenderV2: WebRenderProtocol.Profile.completeV2.maximumReplyBodyBytes + 4
         case .docxExportV1: 1_048_576
         }
     }

@@ -172,6 +172,89 @@ final class WebRenderProtocolTests: XCTestCase {
         XCTAssertEqual(try WebRenderToolPack.Arguments(["url": "https://example.com/", "deadline_ms": 10]).deadlineMilliseconds, 10)
     }
 
+    func testVersionedProfilesPreserveV1FramesAndRejectCrossProfile() throws {
+        let request = makeRequest(generation: .max, deadline: .max)
+        let reply = makeReply(request)
+        let legacy = try WebRenderProtocol.encodeRequest(request)
+        XCTAssertEqual(legacy, try WebRenderProtocol.encodeRequest(request, profile: .v1))
+        XCTAssertEqual(try WebRenderProtocol.encodeReply(reply, matching: request),
+            try WebRenderProtocol.encodeReply(reply, matching: request, profile: .v1))
+        let complete = try WebRenderProtocol.encodeRequest(request, profile: .completeV2)
+        var expected = try requestObject(request)
+        expected["version"] = "forge.web.render.v2"
+        XCTAssertEqual(try WebRenderProtocol.body(complete, maximumBodyBytes: 16_384), try canonical(expected))
+        XCTAssertEqual(try WebRenderProtocol.decodeRequestFrame(complete, profile: .completeV2), request)
+        XCTAssertThrowsError(try WebRenderProtocol.decodeRequestFrame(complete))
+        XCTAssertThrowsError(try WebRenderProtocol.decodeRequestFrame(legacy, profile: .completeV2))
+        XCTAssertEqual(WebRenderProtocol.maximumTextBytes, 8_192)
+        XCTAssertEqual(WebRenderProtocol.maximumNodes, 4_096)
+        XCTAssertEqual(WebRenderProtocol.maximumReplyBodyBytes, 32_768)
+    }
+
+    func testCompleteReplyPreservesWholeEscapedMiBAndExactNodeBoundary() throws {
+        let request = makeRequest()
+        let text = String(repeating: "\u{0001}", count: 1_048_576)
+        let original = makeReply(request, text: text, title: String(repeating: "\u{0001}", count: 512))
+        var values = try replyObject(makeReply(request), request: request)
+        values["version"] = "forge.web.render.v2"
+        values["text"] = text; values["text_bytes"] = 1_048_576
+        values["title"] = original.title; values["nodes_visited"] = 65_536
+        let body = try canonical(values)
+        XCTAssertGreaterThan(body.count, 6 * 1_048_576)
+        let complete = try WebRenderProtocol.decodeReplyBody(body, matching: request, profile: .completeV2)
+        XCTAssertEqual(complete.text, text)
+        XCTAssertEqual(complete.title, original.title)
+        XCTAssertEqual(complete.nodesVisited, 65_536)
+        let frame = try WebRenderProtocol.encodeReply(complete, matching: request, profile: .completeV2)
+        XCTAssertLessThanOrEqual(frame.count, 6_347_780)
+        XCTAssertEqual(try WebRenderProtocol.decodeReplyFrame(frame, matching: request, profile: .completeV2), complete)
+        XCTAssertThrowsError(try WebRenderProtocol.decodeReplyFrame(frame, matching: request))
+        XCTAssertThrowsError(try WebRenderProtocol.decodeReplyFrame(frame + Data([0]), matching: request, profile: .completeV2))
+        XCTAssertThrowsError(try WebRenderProtocol.decodeReplyFrame(frame + frame, matching: request, profile: .completeV2))
+        for (key, value) in [("nodes_visited", 65_537), ("text_bytes", 1_048_575)] {
+            var invalid = values; invalid[key] = value
+            XCTAssertThrowsError(try WebRenderProtocol.decodeReplyBody(canonical(invalid), matching: request, profile: .completeV2))
+        }
+        values["text_truncated"] = true
+        XCTAssertThrowsError(try WebRenderProtocol.decodeReplyBody(canonical(values), matching: request, profile: .completeV2))
+        XCTAssertThrowsError(try WebRenderProtocol.encodeReply(makeReply(request, text: text + "x"), matching: request, profile: .completeV2))
+    }
+
+    func testCompleteOverflowIsExplicitEmptyFailureAndCannotBecomeV1Success() throws {
+        let request = makeRequest()
+        let overflow = makeReply(request, outcome: .snapshotOverflow, text: "", title: "", snapshot: false,
+            readiness: .unavailable)
+        let frame = try WebRenderProtocol.encodeReply(overflow, matching: request, profile: .completeV2)
+        XCTAssertEqual(try WebRenderProtocol.decodeReplyFrame(frame, matching: request, profile: .completeV2), overflow)
+        XCTAssertThrowsError(try WebRenderProtocol.encodeReply(overflow, matching: request))
+        for reply in [makeReply(request, outcome: .snapshotOverflow),
+                      makeReply(request, outcome: .snapshotOverflow, text: "partial", title: "", snapshot: false, readiness: .unavailable)] {
+            XCTAssertThrowsError(try WebRenderProtocol.encodeReply(reply, matching: request, profile: .completeV2))
+        }
+    }
+
+    func testCompleteDOMDecoderAcceptsExactBoundsAndRejectsPartialOverflow() throws {
+        var values: [String: Any] = ["title": "", "text": String(repeating: "😀", count: 262_144),
+            "nodes": 65_536, "truncated": false, "title_truncated": false, "overflow": false]
+        let snapshot = try WebRenderProtocol.CompleteSnapshot(canonical(values))
+        XCTAssertEqual(snapshot.text.utf8.count, 1_048_576)
+        XCTAssertEqual(snapshot.nodes, 65_536)
+        XCTAssertFalse(snapshot.overflow)
+        let invalidFields: [(String, Any)] = [("text", String(repeating: "x", count: 1_048_577)),
+            ("nodes", 65_537), ("nodes", true), ("truncated", true), ("overflow", 1)]
+        for (key, value) in invalidFields {
+            var invalid = values; invalid[key] = value
+            XCTAssertThrowsError(try WebRenderProtocol.CompleteSnapshot(canonical(invalid)), key)
+        }
+        values["overflow"] = true
+        XCTAssertThrowsError(try WebRenderProtocol.CompleteSnapshot(canonical(values)))
+        values["text"] = ""
+        XCTAssertTrue(try WebRenderProtocol.CompleteSnapshot(canonical(values)).overflow)
+        values["title"] = "discarded prefix"
+        XCTAssertThrowsError(try WebRenderProtocol.CompleteSnapshot(canonical(values)))
+        XCTAssertThrowsError(try WebRenderProtocol.CompleteSnapshot(Data(repeating: 32, count: 6_295_553)))
+    }
+
     private func makeRequest(generation: UInt64 = 1, deadline: UInt64 = 123_456_789,
                              url: String = "https://example.com/") -> WebRenderProtocol.Request {
         WebRenderProtocol.Request(requestID: UUID(uuidString: "a1111111-1111-1111-1111-111111111111")!,

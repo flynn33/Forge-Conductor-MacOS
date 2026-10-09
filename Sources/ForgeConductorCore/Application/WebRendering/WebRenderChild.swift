@@ -8,7 +8,7 @@ import WebKit
 public enum WebRenderChildEntry {
     public nonisolated static func runIfRequested(arguments: [String] = CommandLine.arguments,
                                       expectedRole: WebRenderProductRole) -> Bool {
-        guard arguments.dropFirst().first == WebRenderProtocol.internalArgument else { return false }
+        guard let profile = WebRenderProtocol.Profile.forInternalArgument(arguments.dropFirst().first) else { return false }
         // Matching malformed calls are consumed here; they must never fall through to GUI.
         guard arguments.count == 2, Thread.isMainThread else { exit(2) }
         guard #available(macOS 27.0, *) else { exit(3) }
@@ -22,7 +22,7 @@ public enum WebRenderChildEntry {
             do {
                 try validateSelf(expectedRole)
                 let data = try readInput(end: inputEnd, cancellation: cancellation)
-                let request = try WebRenderProtocol.decodeRequestFrame(data)
+                let request = try WebRenderProtocol.decodeRequestFrame(data, profile: profile)
                 let now = DispatchTime.now().uptimeNanoseconds
                 guard request.deadlineUptimeNanoseconds > now,
                       request.deadlineUptimeNanoseconds <= upperEnd else { throw WebRenderError.deadline }
@@ -43,10 +43,10 @@ public enum WebRenderChildEntry {
         let owner = MainActor.assumeIsolated { WebRenderChildOwner(cancellation: cancellation) }
         MainActor.assumeIsolated {
             autoreleasepool {
-                owner.start(request) { reply in
+                owner.start(request, profile: profile) { reply in
                     DispatchQueue.global(qos: .utility).async {
                         do {
-                            let frame = try boundedFrame(reply, matching: request)
+                            let frame = try boundedFrame(reply, matching: request, profile: profile)
                             let success = try writeOutput(frame, end: end > 1_500_000_000 ? end - 1_500_000_000 : 0)
                             output.withLock { $0 = .complete(success) }
                         } catch { output.withLock { $0 = .complete(false) } }
@@ -131,7 +131,11 @@ public enum WebRenderChildEntry {
     }
 
     private static func boundedFrame(_ reply: WebRenderProtocol.Reply,
-                                     matching request: WebRenderProtocol.Request) throws -> Data {
+                                     matching request: WebRenderProtocol.Request,
+                                     profile: WebRenderProtocol.Profile) throws -> Data {
+        if profile == .completeV2 {
+            return try WebRenderProtocol.encodeReply(reply, matching: request, profile: profile)
+        }
         var candidate = reply
         for _ in 0...14 {
             if let frame = try? WebRenderProtocol.encodeReply(candidate, matching: request) { return frame }
@@ -165,9 +169,9 @@ private final class WebRenderChildOwner {
         source.resume()
     }
 
-    func start(_ request: WebRenderProtocol.Request,
+    func start(_ request: WebRenderProtocol.Request, profile: WebRenderProtocol.Profile,
                completion: @escaping @Sendable (WebRenderProtocol.Reply) -> Void) {
-        session = WebRenderSession(request: request, completion: completion)
+        session = WebRenderSession(request: request, profile: profile, completion: completion)
         if cancellation.isCancelled { session?.finish(.cancelled) }
     }
     func stop() { signalSource?.cancel(); signalSource = nil; session?.discard(); session = nil }
@@ -177,6 +181,7 @@ private final class WebRenderChildOwner {
 @MainActor
 private final class WebRenderSession: NSObject, WKNavigationDelegate, WKUIDelegate {
     private let request: WebRenderProtocol.Request
+    private let profile: WebRenderProtocol.Profile
     private let completion: @Sendable (WebRenderProtocol.Reply) -> Void
     private var view: WKWebView?
     private var store: WKWebsiteDataStore?
@@ -201,8 +206,9 @@ private final class WebRenderSession: NSObject, WKNavigationDelegate, WKUIDelega
     private var releaseEnd: UInt64 = 0
     private var finalReply: WebRenderProtocol.Reply?
 
-    init(request: WebRenderProtocol.Request, completion: @escaping @Sendable (WebRenderProtocol.Reply) -> Void) {
+    init(request: WebRenderProtocol.Request, profile: WebRenderProtocol.Profile, completion: @escaping @Sendable (WebRenderProtocol.Reply) -> Void) {
         self.request = request
+        self.profile = profile
         self.completion = completion
         super.init()
         let now = DispatchTime.now().uptimeNanoseconds
@@ -277,14 +283,30 @@ private final class WebRenderSession: NSObject, WKNavigationDelegate, WKUIDelega
         guard !completing, !inFlight, let view, let loadedAt else { return }
         inFlight = true
         let generation = navigationGeneration
-        view.evaluateJavaScript(Self.extractor, in: nil, in: .defaultClient) { [weak self] result in
+        view.evaluateJavaScript(profile == .v1 ? Self.extractor : Self.completeExtractor, in: nil, in: .defaultClient) { [weak self] result in
             guard let self else { return }
             self.inFlight = false
             guard !self.completing else { return }
             guard generation == self.navigationGeneration else { self.pollDOM(); return }
-            guard case .success(let value) = result, let raw = value as? String,
-                  raw.utf8.count <= 16_384, let data = raw.data(using: .utf8),
-                  let snapshot = try? DOMSnapshot(data) else { self.finish(.navigationFailed); return }
+            guard case .success(let value) = result, let raw = value as? String else {
+                self.finish(.navigationFailed); return
+            }
+            guard raw.utf8.count <= (self.profile == .v1 ? 16_384 : self.profile.maximumDOMBodyBytes) else {
+                self.finish(self.profile == .v1 ? .navigationFailed : .snapshotOverflow); return
+            }
+            guard let data = raw.data(using: .utf8) else { self.finish(.navigationFailed); return }
+            let snapshot: DOMSnapshot
+            if self.profile == .completeV2 {
+                guard let complete = try? WebRenderProtocol.CompleteSnapshot(data) else {
+                    self.finish(.navigationFailed); return
+                }
+                guard !complete.overflow else { self.finish(.snapshotOverflow); return }
+                snapshot = DOMSnapshot(title: complete.title, text: complete.text, nodes: complete.nodes,
+                    truncated: false, titleTruncated: complete.titleTruncated)
+            } else {
+                guard let legacy = try? DOMSnapshot(data) else { self.finish(.navigationFailed); return }
+                snapshot = legacy
+            }
             self.stableSamples = self.previousSample == raw ? min(2, self.stableSamples + 1) : 1
             self.previousSample = raw
             let elapsed = DispatchTime.now().uptimeNanoseconds - loadedAt
@@ -303,6 +325,10 @@ private final class WebRenderSession: NSObject, WKNavigationDelegate, WKUIDelega
         let title: String, text: String
         let nodes: Int
         let truncated: Bool, titleTruncated: Bool
+        init(title: String, text: String, nodes: Int, truncated: Bool, titleTruncated: Bool) {
+            self.title = title; self.text = text; self.nodes = nodes
+            self.truncated = truncated; self.titleTruncated = titleTruncated
+        }
         init(_ data: Data) throws {
             guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                   Set(object.keys) == ["title", "text", "nodes", "truncated", "title_truncated"],
@@ -337,6 +363,28 @@ private final class WebRenderSession: NSObject, WKNavigationDelegate, WKUIDelega
       let out=pack(text,false);if(enc.encode(out).length>16384){let lo=0,hi=bytes;
         while(lo<hi){let mid=Math.floor((lo+hi+1)/2);if(enc.encode(pack(take(text,mid),true)).length<=16384)lo=mid;else hi=mid-1;}
         out=pack(take(text,lo),true);}return out;})()
+    """
+
+    // v2 returns only a complete bounded traversal or an empty explicit overflow.
+    private static let completeExtractor = """
+    (()=>{const enc=new TextEncoder(),dec=new TextDecoder('utf-8'),cap=1048576,nodeCap=65536;
+      const parts=[];let bytes=0,nodes=0,moves=0;const root=document.body||document.documentElement||document;
+      function overflow(){return JSON.stringify({title:'',text:'',nodes,truncated:false,title_truncated:false,overflow:true});}
+      function take(raw,max){let s=dec.decode(enc.encode(raw.slice(0,Math.max(0,max))));let lo=0,hi=s.length;
+        while(lo<hi){let mid=Math.floor((lo+hi+1)/2),p=s.slice(0,mid);if(/[\\uD800-\\uDBFF]$/.test(p))p=p.slice(0,-1);
+          if(enc.encode(p).length<=max)lo=mid;else hi=mid-1;}let p=s.slice(0,lo);if(/[\\uD800-\\uDBFF]$/.test(p))p=p.slice(0,-1);return p;}
+      let node=root;while(node){if(nodes===nodeCap)return overflow();nodes++;
+        const excluded=node.nodeType===1&&['script','style','noscript','template'].includes(node.localName);
+        if(node.nodeType===3){const raw=node.data,remaining=cap-bytes,prefix=raw.slice(0,remaining+1);
+          if(prefix.length!==raw.length)return overflow();
+          const part=dec.decode(enc.encode(prefix)),size=enc.encode(part).length;
+          if(size>remaining)return overflow();if(size>0)parts.push(part);bytes+=size;}
+        if(!excluded&&node.firstChild){node=node.firstChild;if(++moves>2*nodeCap)return overflow();continue;}
+        while(node!==root&&!node.nextSibling){node=node.parentNode;if(++moves>2*nodeCap||!node)return overflow();}
+        node=node===root?null:node.nextSibling;if(node&&++moves>2*nodeCap)return overflow();}
+      const title=take(document.title,512),titleTruncated=title.length<document.title.length;
+      const out=JSON.stringify({title,text:parts.join(''),nodes,truncated:false,title_truncated:titleTruncated,overflow:false});
+      return enc.encode(out).length<=6295552?out:overflow();})()
     """
 
     func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction, preferences: WKWebpagePreferences,

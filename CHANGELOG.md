@@ -10,6 +10,12 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### `0.42.0 (58)` complete rendered-snapshot paging
+
+- Add opt-in `paged: true` to existing web.render with immutable snapshot ID/whole SHA, scalar-safe byte cursor and explicit EOF. Retain one ≤1 MiB/65,536-node body for at most 120 seconds with one expiry owner; overflow/stale continuation fail explicitly. Default v1 prefix, existing authorization and final actual-ID/notice/LF budgets remain. [Contract](docs/NATIVE-WEB-RENDERING.md).
+- Matching .42/58 source/native 150, separate initial G3 one each, ordinary Debug/signature and signed App/CLI functional/limits checks passed. Limits v2 returned 241 pages/246 responses per route; the original App limits v1 continuity-200 NONPASS remains retained. [Qualification](docs/QUALIFICATION-STATUS.md).
+- Qwen v6 passed six completed responses, five later-consumed native results/both empty EOFs, whole 6,144/35,371-byte reconstruction, exact four-scalar ACK and all six strict actual Low LF associations. Earlier v2–v5 NONPASS attempts remain retained; v5 outer closure and prior pipe-loss cause remain unknown. Applied-v2 final source/native G3, hygiene/local links and unchanged final candidate v3 readback passed; exact source/wiki publication and synchronization remain pending; no full-web/all-model/installed/Release/shipment claim.
+
 ### `0.41.0 (57)` FLAC format extension
 
 - Extend existing audio_write with exact optional wav/flac and matching .wav/.flac paths; omission remains WAV. Preserve supplied signed PCM16LE/rates/channels, 1 MiB raw and bounded canonical base64, own grant/context/replay, pinned publication and separate 65,536-byte managed JSON admission. FLAC is lossless verbatim with native-swift-flac / flac-pcm16le-verbatim-v1 metadata; no conversion, playback or source-file import is added. [Contract](docs/NATIVE-AUDIO-WRITING.md).

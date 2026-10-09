@@ -30,6 +30,28 @@ final class OwnedDuplexProcessTests: XCTestCase {
         XCTAssertTrue(runner.shutdownOwnedCurrentSelf(deadlineUptimeNanoseconds: 0))
     }
 
+    func testCompleteRendererFixedModeCapsRejectOversizeBeforeAdmission() throws {
+        XCTAssertEqual(OwnedCurrentSelfMode.webRenderV2.argument, "--internal-web-render-v2")
+        XCTAssertEqual(OwnedCurrentSelfMode.webRenderV2.maximumInputBytes, 16_388)
+        XCTAssertEqual(OwnedCurrentSelfMode.webRenderV2.maximumOutputBytes, 6_347_780)
+        XCTAssertEqual(OwnedCurrentSelfMode.webRenderV1.maximumOutputBytes, 32_772)
+        let runner = ProcessRunner()
+        let result = try runOnWorker {
+            try runner.runOwnedCurrentSelf(mode: .webRenderV2,
+                standardInput: Data(repeating: 0, count: 16_389),
+                deadlineUptimeNanoseconds: DispatchTime.now().uptimeNanoseconds + 30_000_000_000,
+                cancellation: ToolCallCancellation())
+        }
+        switch result {
+        case .failure(let error):
+            let failure = error as NSError
+            XCTAssertEqual(failure.domain, "ProcessRunner")
+            XCTAssertEqual(failure.code, 21)
+        case .success: XCTFail("Oversize v2 input must fail before native admission")
+        }
+        XCTAssertTrue(runner.shutdownOwnedCurrentSelf(deadlineUptimeNanoseconds: 0))
+    }
+
     func testOpenEmptyPipeIsNotEOFAndFinalizationReportsForcedClose() throws {
         let pipe = try OwnedCaptureTestPipe()
         let capture = OwnedPipeCapture(limit: 32)

@@ -73,7 +73,18 @@ final class ForgeProcessEntryTests: XCTestCase {
                           ["/app", "--internal-web-render-v1", "--home", "/tmp/ignored"]] {
             XCTAssertEqual(ForgeProcessEntry.parseMode(arguments: arguments), .webRenderChild)
         }
-        XCTAssertEqual(ForgeProcessEntry.parseMode(arguments: ["/app", "--internal-web-render-v2"]), .gui)
+        XCTAssertEqual(ForgeProcessEntry.parseMode(arguments: ["/app", "--internal-web-render-v3"]), .gui)
+    }
+
+    func testCompleteRendererModeAndMalformedCallsRemainHeadless() {
+        for arguments in [["/app", "--internal-web-render-v2"],
+                          ["/app", "--internal-web-render-v2", "--home", "/tmp/ignored"]] {
+            XCTAssertEqual(ForgeProcessEntry.parseMode(arguments: arguments), .webRenderChild)
+        }
+        XCTAssertEqual(WebRenderProtocol.Profile.forInternalArgument("--internal-web-render-v1"), .v1)
+        XCTAssertEqual(WebRenderProtocol.Profile.forInternalArgument("--internal-web-render-v2"), .completeV2)
+        XCTAssertNil(WebRenderProtocol.Profile.forInternalArgument("--internal-web-render-v3"))
+        XCTAssertFalse(WebRenderChildEntry.runIfRequested(arguments: ["/app", "serve"], expectedRole: .app))
     }
 
     func testServeArgumentsConstant() {

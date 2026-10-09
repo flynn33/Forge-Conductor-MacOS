@@ -1,5 +1,15 @@
 # Forge Conductor for macOS
 
+Current source target **0.42.0 (58)** adds opt-in complete captured-text paging to existing `web.render`. Set `paged: true`, then continue the same immutable snapshot using `snapshot_id`, returned `next_byte_offset` and whole `snapshot_sha256` as `if_snapshot_sha256`. One captured UTF-8 body is bounded to 1 MiB/65,536 visited nodes and retained for at most 120 seconds; overflow and stale continuation fail explicitly. Omitted/false `paged` preserves the existing v1 prefix. [Renderer contract](docs/NATIVE-WEB-RENDERING.md).
+
+Matching .42/58 source/native selections passed 150 owning methods each; separate initial G3 checks passed one method per route. Ordinary Debug/signature and signed App/CLI complete-paging checks passed, including 1 MiB capture, scalar-safe pages, explicit EOF and overflow/stale refusals. The original App limits v1 continuity-200 NONPASS is retained; limits v2 passed 241 pages/246 responses per route. [Evidence](docs/QUALIFICATION-STATUS.md).
+
+Qwen `qwen/qwen3.8-27b` v6 passed the bounded owned-loopback paging flow: six completed responses consumed five actual native results in later turns, including both empty EOFs, reconstructed the 6,144/35,371-byte snapshots and returned the exact four-scalar byte/SHA ACK. All six actual Low input events were complete LF records, ordered and associated by prompt, nonce and tool-result hash. Earlier v2–v5 NONPASS attempts remain retained; v5 outer closure is unknown and the prior CLI pipe-loss mechanism remains unknown. This proves selected result delivery and metadata acknowledgment, not model understanding or new GUI/public-page/all-model/installed operation.
+
+Applied-v2 final source/native G3, hygiene and local link checks passed; final candidate v3 readback preserved source/artifact identities. Exact source/wiki publication and synchronization remain pending. Full web, every model/page, installed operation, general lifetime, Release and shipment remain unqualified.
+
+## Preceding 0.41.0 (57) qualification
+
 Current source target **0.41.0 (57)** extends existing `audio_write` with exact optional `format: "wav"` or `"flac"`; omission remains WAV. Explicit case-insensitive .wav/.flac destinations must match the selected format. Supplied signed PCM16LE, rates 8000/44100/48000, mono/stereo, complete nonempty frames and 1 MiB raw remain bounded. The separate managed canonical JSON bound stays 65,536 bytes. [Audio contract](docs/NATIVE-AUDIO-WRITING.md).
 
 The 59-method source area passed before the identity advance, with all 11 new methods included; the focused 8 is a subset. Matching canonical native 59 and ordinary build/signature gates passed; App/CLI passed their bounded wire matrix and Qwen consumed two actual selected results with exact metadata ACK. The selected-identity source 59 rerun and three native whole product PCM consumers passed. Separate source/native G3 checks passed one actual method each, giving 60 distinct methods per route with the prior 59-method selections; these are separate invocations. Initial hygiene/whitespace passed; first owner source/wiki publication, exact readback and clean synchronization passed. Final C2 reread unchanged C1 binaries and source/protected inputs without a rebuild. Existing WAV bytes/metadata/grants and 85 neighboring descriptors are preserved by the executed source checks; these are scoped test, native protocol and model metadata checks, not installed, playback, general lifetime or shipment qualification. [Qualification](docs/QUALIFICATION-STATUS.md).
@@ -935,8 +945,8 @@ continuity. The user does not start project work through a Forge Managed Run.
 
 | | |
 |---|---|
-| **Version** | **0.41.0** |
-| **Build** | **57** |
+| **Version** | **0.42.0** |
+| **Build** | **58** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |

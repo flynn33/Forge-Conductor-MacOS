@@ -38,7 +38,8 @@ final class ToolDefinitionCatalogTests: XCTestCase {
             XCTAssertEqual(schema["required"] as? [String], ["url"])
             XCTAssertEqual(schema["additionalProperties"] as? Bool, false)
             let properties = try XCTUnwrap(schema["properties"] as? [String: Any])
-            XCTAssertEqual(Set(properties.keys), ["url", "timeout_sec", "maximum_bytes", "deadline_ms"])
+            XCTAssertEqual(Set(properties.keys), ["url", "timeout_sec", "maximum_bytes", "deadline_ms",
+                "paged", "snapshot_id", "byte_offset", "if_snapshot_sha256"])
             XCTAssertEqual((properties["timeout_sec"] as? [String: Any])?["maximum"] as? Int, 30)
             XCTAssertEqual((properties["maximum_bytes"] as? [String: Any])?["maximum"] as? Int, 65_536)
             XCTAssertEqual(try replay.replayClass(for: "web.render"), .readOnly)
@@ -58,6 +59,30 @@ final class ToolDefinitionCatalogTests: XCTestCase {
             let missing = try app.tools.call(name: "web.render", arguments: ["url": "https://example.com/"],
                 clientID: ClientID("renderer-unattached"))
             XCTAssertEqual(missing.payload["code"] as? String, "project_context_required")
+        }
+    }
+
+    func testRendererPagingIsAdditiveAndRetainsLegacyDefaultsAndNeighborDescriptors() throws {
+        try withProductionApp("renderer-paging-catalog") { app in
+            let catalog = try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames)
+            let renderer = try XCTUnwrap(catalog.definition(named: "web.render"))
+            let schema = try renderer.inputSchemaObject()
+            let properties = try XCTUnwrap(schema["properties"] as? [String: Any])
+            XCTAssertEqual(schema["required"] as? [String], ["url"])
+            XCTAssertEqual((properties["paged"] as? [String: Any])?["default"] as? Bool, false)
+            XCTAssertEqual((properties["timeout_sec"] as? [String: Any])?["default"] as? Int, 20)
+            XCTAssertEqual((properties["maximum_bytes"] as? [String: Any])?["default"] as? Int, 16_384)
+            XCTAssertEqual((properties["byte_offset"] as? [String: Any])?["maximum"] as? Int, 1_048_576)
+            XCTAssertEqual((properties["if_snapshot_sha256"] as? [String: Any])?["pattern"] as? String, "^[0-9a-fA-F]{64}$")
+            XCTAssertTrue(renderer.description.contains("Text extraction visits at most 4096 nodes/8192 UTF-8 bytes."))
+            XCTAssertTrue(renderer.description.contains("paged=true"))
+            XCTAssertEqual(WebRenderToolPack.names, ["web.render"])
+            XCTAssertEqual(app.tools.toolNames.count, 86)
+            let neighbors = try catalog.definitions.filter { $0.name != "audio_write" && $0.name != "web.render" }
+                .map { try $0.mcpDescriptor() }
+            XCTAssertEqual(neighbors.count, 84)
+            let encoded = try JSONSerialization.data(withJSONObject: ["tools": neighbors], options: [.sortedKeys, .withoutEscapingSlashes])
+            XCTAssertEqual(JSONSupport.sha256Hex(encoded), "ca281ae655c31e27b6b02a0f232207f59c5d9482d1540897f33a0910ad08c782")
         }
     }
 
@@ -1593,7 +1618,7 @@ final class ToolDefinitionCatalogTests: XCTestCase {
             let neighbors = try catalog.definitions.filter { $0.name != "audio_write" }.map { try $0.mcpDescriptor() }
             XCTAssertEqual(neighbors.count, 85)
             let normalized = try JSONSerialization.data(withJSONObject: ["tools": neighbors], options: [.sortedKeys, .withoutEscapingSlashes])
-            XCTAssertEqual(JSONSupport.sha256Hex(normalized), "20f510699240b4d1ae1026c55ff9e018bc111fe1e5114f7d989587e3082d4404")
+            XCTAssertEqual(JSONSupport.sha256Hex(normalized), "3f45c8aa3a387025a654b2fa71badac1c5dccac9fff9ede7ed73cfbe28af70b5")
             let audio = try XCTUnwrap(catalog.definition(named: "audio_write"))
             XCTAssertTrue(audio.strict)
             let schema = try audio.inputSchemaObject(), properties = try XCTUnwrap(schema["properties"] as? [String: Any])
