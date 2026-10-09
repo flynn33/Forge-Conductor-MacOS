@@ -14,7 +14,7 @@ The isolated .41 App/CLI baseline observed four truthful truncated missing-suffi
 
 Qwen `qwen/qwen3.8-27b` v6 passed the bounded owned-loopback paging flow: six completed responses consumed five actual native results in later turns, including both empty EOFs, reconstructed the 6,144/35,371-byte snapshots and returned the exact four-scalar byte/SHA ACK. All six actual Low input events were complete LF records, ordered and associated by prompt, nonce and tool-result hash. Earlier v2–v5 NONPASS attempts remain retained; v5 outer closure is unknown and the prior CLI pipe-loss mechanism remains unknown. This proves selected result delivery and metadata acknowledgment, not model understanding or new GUI/public-page/all-model/installed operation.
 
-Applied-v2 final source/native G3, hygiene and local link checks passed; final candidate v3 readback preserved source/artifact identities. Exact source/wiki publication and synchronization remain pending.
+Applied-v2 final source/native G3, hygiene and local link checks passed; final candidate v3 readback preserved source/artifact identities. First owner source/wiki publication, exact readback and clean synchronization passed.
 
 Full web, every model/page, GUI/installed operation, authenticated browsing, Release and shipment remain unqualified. The preceding .39 GUI and .23/.24 contract/ownership records below retain their original scope.
 

@@ -2,7 +2,7 @@
 
 ## Complete rendered-snapshot paging
 
-Current target **0.42.0 (58)** adds opt-in paging to existing web.render; this row records work, not dispatch. The bounded App/CLI/Qwen paging gates passed; the phase remains open at exact source/wiki publication and synchronization.
+Current target **0.42.0 (58)** adds opt-in paging to existing web.render; this row records work, not dispatch. The bounded App/CLI/Qwen paging gates passed; the scoped paging phase closed with first owner source/wiki publication, exact readback and clean synchronization; broader qualification remains separate.
 
 | Milestone | Actual evidence | Remaining gate |
 | --- | --- | --- |
@@ -10,7 +10,7 @@ Current target **0.42.0 (58)** adds opt-in paging to existing web.render; this r
 | Source and preservation | Six protocol plus ten paging additions are included in 150 distinct methods. Matching .42/58 source/native 150 passed in 43.375/71.458 s; separate initial G3 one each passed in 1.391/2.753 s. Default v1 framing/prefix and existing owners remain. | Applied-v2 final G3 one each passed in 5.658/5.560 s; hygiene passed. No general lifetime claim. |
 | Contract and native runtime | One Data body ≤1 MiB/65,536 nodes, one expiry owner/120-second lifetime. Signed App/CLI functional v1 and limits v2 passed whole reconstruction, explicit EOF, final budgets and scoped refusals. Limits v2: 241 pages/246 responses each, 6.070/6.638 s. Original App limits v1 continuity-200 NONPASS retained. | Full web/every page, GUI/installed and general lifetime remain unqualified. |
 | Qwen | V6 passed six completed responses, five native results consumed in later turns/both empty EOFs, whole 6,144/35,371-byte reconstruction, four-scalar ACK and six strict actual Low LF associations; owned outer closure was normal in 143.233 s. V2–v5 NONPASS attempts remain retained; v5 outer closure and prior CLI pipe-loss cause remain unknown. | Selected loopback/model flow only; full web/all models/GUI/installed remain unqualified. |
-| Identity/documents/delivery | Final .42/58 signed Debug candidate v3 readback retained seven artifacts/Info, 73 historical identities and the 473-input `180a2c83…` map without rebuilding; graph/signing membership unchanged. Applied-v2 final G3/hygiene and 668 local link targets passed; preceding histories remain exact. | Exact source/wiki publication and synchronization pending. |
+| Identity/documents/delivery | Final .42/58 signed Debug candidate v3 readback retained seven artifacts/Info, 73 historical identities and the 473-input `180a2c83…` map without rebuilding; graph/signing membership unchanged. Applied-v2 final G3/hygiene and 668 local link targets passed; preceding histories remain exact. | First owner source/wiki publication, exact readback and clean synchronization passed; broader gates remain separate. |
 
 [Renderer contract](docs/NATIVE-WEB-RENDERING.md). Remaining formats, Release and shipment remain separate.
 

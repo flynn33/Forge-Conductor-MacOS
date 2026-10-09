@@ -4,7 +4,7 @@ Current source target **0.42.0 (58)** adds opt-in complete captured-text paging 
 
 Qwen `qwen/qwen3.8-27b` v6 passed the bounded owned-loopback paging flow: six completed responses consumed five actual native results in later turns, including both empty EOFs, reconstructed the 6,144/35,371-byte snapshots and returned the exact four-scalar byte/SHA ACK. All six actual Low input events were complete LF records, ordered and associated by prompt, nonce and tool-result hash. Earlier v2–v5 NONPASS attempts remain retained; v5 outer closure is unknown and the prior CLI pipe-loss mechanism remains unknown. This proves selected result delivery and metadata acknowledgment, not model understanding or new GUI/public-page/all-model/installed operation.
 
-Applied-v2 final source/native G3, hygiene and local link checks passed; final candidate v3 readback preserved source/artifact identities. Exact source/wiki publication and synchronization remain pending. Full web, every model/page and installed operation remain unqualified.
+Applied-v2 final source/native G3, hygiene and local link checks passed; final candidate v3 readback preserved source/artifact identities. First owner source/wiki publication, exact readback and clean synchronization passed. Full web, every model/page and installed operation remain unqualified.
 
 ## Preceding 0.41.0 (57) qualification
 
