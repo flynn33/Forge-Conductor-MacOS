@@ -1,6 +1,6 @@
 # Versioning policy
 
-Current target identity is **0.43.0 (59)**. Optional AAC-LC M4A extends an existing format enum compatibly and advances the feature component under the policy below; WAV remains the absent-format default. Version/build authorities advance with this increment, separately from the new encoder/test memberships. Matching source/native owning selections passed the same 139 methods on 475 exact inputs; CLI/app compilation and ordinary Debug/strict signature passed. Candidate C1 readback passed with seven artifacts/Info, 475 inputs and 80 preceding guards exact. Six actual App/CLI rate cohorts and separate native consumers passed their 24-file matrices. Scoped Qwen/exact-artifact consumer and initial G3/hygiene passed; first owner source publication/synchronization passed. Final result-document/wiki checks and delivery closeout remain pending. Historical receipts keep their tested identities; a source version does not claim shipment.
+Current target identity is **0.43.0 (59)**. Optional AAC-LC M4A extends an existing format enum compatibly and advances the feature component under the policy below; WAV remains the absent-format default. Version/build authorities advance with this increment, separately from the new encoder/test memberships. Matching source/native owning selections passed the same 139 methods on 475 exact inputs; CLI/app compilation and ordinary Debug/strict signature passed. Candidate C1 readback passed with seven artifacts/Info, 475 inputs and 80 preceding guards exact. Six actual App/CLI rate cohorts and separate native consumers passed their 24-file matrices. Scoped Qwen/exact-artifact consumer and initial G3/hygiene passed; first owner source publication/synchronization passed. Scoped AAC result-document/wiki checks and source/wiki delivery are complete. Historical receipts keep their tested identities; a source version does not claim shipment.
 
 ## Preceding 0.42.0 (58) qualification
 
@@ -369,7 +369,7 @@ focused version test, and CI reject drift between them.
 
 ## Current identity
 
-Current source target is `0.43.0`, build `59`, for optional supplied PCM16 AAC-LC M4A. Matching owning/build/C1, six App/CLI rate cohorts, 24-file native consumers and scoped Qwen/exact-artifact checks passed. Initial G3/hygiene and first owner source publication/synchronization passed; final result-document/wiki checks and delivery closeout remain pending.
+Current source target is `0.43.0`, build `59`, for optional supplied PCM16 AAC-LC M4A. Matching owning/build/C1, six App/CLI rate cohorts, 24-file native consumers and scoped Qwen/exact-artifact checks passed. Initial G3/hygiene and first owner source publication/synchronization passed; scoped AAC result-document/wiki checks and source/wiki delivery are complete.
 
 ## Preceding 0.42.0 (58) initial identity record
 
