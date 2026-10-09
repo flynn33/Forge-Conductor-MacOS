@@ -10,6 +10,15 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### `0.38.0 (54)` supplied-entry stored ZIP writing
+
+- Add `archive_write` with explicit .zip path and 0–32 virtual name/base64 entries. Preserve exact NFC names, supplied order/bytes, stored method 0, CRC32 and fixed timestamps; reject unsafe/conflicting names/noncanonical base64 before saving.
+- Add own grant/context, ordinary defaults, idempotent replay, Docs guidance and document telemetry. Preserve custom denials, imported explicit capabilities and pinned publication.
+- Matching 62 owning source/native methods plus one separate initial G3 give 63 distinct methods per route. Ordinary candidate build/signature and Swift CLI/app compilation passed. App/CLI each passed 25 responses/23 frames/four ZIPs, six refusals and one immediate cancellation; Qwen completed three observed Low turns and consumed two actual results with strict metadata ACK. Four actual App ZIPs passed BSDtar canonical-name lookup/36 exact payload files. Original failures and GUI/full-web/all-model/install/shipment limits remain; exact document/delivery outcomes are external. [Archive contract](docs/NATIVE-ARCHIVE-WRITING.md).
+
+- Later isolated Projects v3 registration passed with matching ID/root and generation 1, but the whole flow remains NONPASS at the Save-stage 8,192 AX call cap after one field set/Save press. Its 303-byte metadata stayed unchanged with no repository URL; ordinary exit 0/no force does not qualify Save/reopen/reject/clear/Tools. Cause unknown; prior failures and the sheet diagnostic PASS remain retained.
+
+
 ### `0.37.0 (53)` additive standard-size ICO pixel writing
 
 - `image_write` accepts exact lowercase `ico` with an explicit case-insensitive `.ico` path. Square 16/32/48/256 produces one bounded 32-bit bottom-up BI_RGB DIB/AND image, preserving encoded alpha 0…255 and hidden RGB; native premultiplied rendering is separate. Engine is `swift-ico-dib32`, output contract `ico-dib32-rgba8-srgb-v1`; no embedded ICC or Windows interoperability guarantee.

@@ -1,5 +1,25 @@
 # Version and qualification status
 
+Current source target **0.38.0, build 54** adds `archive_write`. The missing-registration baseline ran one failing catalog method, normal exit 1 in 6.850 s; it remains recorded.
+
+The same 62 distinct methods passed in source and native checks, with no failures or skips. Native checks on 0.38.0/build 54 finished in 62.594 s; only five version authorities changed since the source checks. The ordinary Debug candidate built in 24.455 s and passed strict deep signature verification in 0.140 s. Swift CLI/app compilation passed in 6.188/2.194 s. The 62 owning methods plus one separate initial G3 method give 63 distinct methods per source/native route, with equal unique selector sets; this is not a single 63-method invocation. Initial G3 passed in 7.367/2.603 s and hygiene in 0.670 s; repeats add no coverage. The 62-method owning selection is 11 writer, 36 catalog, 4 broker/status, 2 audit, 2 ODS, 2 PPTX and 5 ZIP-import methods. Source 49/13 finished in 24.901/9.435 s; native owning membership is Core/ForgeConductorTests.
+
+Signed App/CLI archive checks passed in 2.820/2.856 s, each with 25 correlated native responses, 23 tool frames and four ZIPs. Six refusals, an immediate cancellation preserving the existing 609-byte ZIP, PNG default and all 84 prior catalog definitions passed per route. Small ZIP reads were complete; the maximum archive used two bounded read windows plus exact whole local container/CRC/payload verification.
+
+Qwen completed three observed Low API turns in 51.538 s and consumed two complete actual archive_write/fs_read results, with six native responses/four tool frames and a strict four-scalar metadata acknowledgement. This does not prove member-content understanding, installed chat behavior, full web or all models.
+
+A separate native BSDtar consumer passed four actual App ZIPs: 36 exact payload files/1,048,999 bytes under canonical filesystem-name lookup, with normal exits/full EOF/no forced cleanup. CLI/Qwen extraction, exact physical filename spelling, general ZIP/Windows interoperability and installation are unqualified.
+
+Final document checks and exact source/wiki delivery are recorded separately; they add no runtime coverage.
+
+Before the later v3 flow, Projects GitHub registration/save/reopen/reject/clear was unqualified. The retained .37 flow failed before registration. In the later .38 public-AX sheet diagnostic, the unique source-identified Cancel was pressed; post-open settled copies succeeded, but the immediate post-Cancel AXWindows count returned -25204, so the whole diagnostic remained NONPASS. The App quit normally with no forced cleanup and unchanged shared preferences; no Register/Save occurred. Product cause is unknown. A separate v2 sheet diagnostic passed in 5.669 s: the immediate post-Cancel copy still returned -25204, both settled copies succeeded and the final complete semantic scan confirmed registration controls absent. It qualified only open/Cancel/ordinary cleanup, with no Register/GitHub Save/reopen/reject/clear or Tools acceptance. Installed full web/all-model, host rollover, general lifetime, Release and shipment qualification remain separate.
+
+Mechanism-only ZIP wire/CRC and four BSDtar canonical-name/payload consumers passed separately. Original ditto empty-ZIP and BSDtar physical-name-byte failures remain retained; mechanism outputs are not product acceptance. [Archive evidence](NATIVE-ARCHIVE-WRITING.md).
+
+Later .38 Projects v3 registered one isolated folder with matching project ID/root and generation 1, then remained NONPASS when the Save phase reached the 8,192 AX call cap after one field set and one Save press. The 303-byte metadata stayed byte-exact with no repository URL. The App quit ordinarily with exit 0 and no forced cleanup; guards and shared preferences were unchanged. Save/reopen/reject/clear and Tools remain unqualified; cause unknown. The inner/outer attempt took 6.647/6.683 s; the registration worker used 3,956 AX calls. This later registration observation does not replace the earlier sheet diagnostic PASS or any retained NONPASS, and it adds no archive/runtime test methods.
+
+## Preceding 0.37.0 (53) qualification
+
 Current source target **0.37.0, build 53** adds standard-size ICO to `image_write`. Exact lowercase `format: "ico"` requires an explicit case-insensitive `.ico` destination and equal width/height of **16, 32, 48 or 256**. The call-local Swift writer preserves all supplied alpha and hidden RGB in one bottom-up 32-bit BI_RGB DIB with a padded AND mask. Native premultiplied rendering is separate; no embedded ICC or Windows interoperability is promised.
 
 Missing-feature baselines executed exactly one failed method per source/native route in **6.822/43.672 s**, normal exits **1/65**, unforced/full EOF, before production edits; both remain **NONPASS**. After admission, focused source eight passed in **13.931 s**. Matching full raster source/native selections passed **56 methods** in **13.550/24.569 s**; five separate neighbors passed in **2.201/2.504 s**, giving **61 distinct methods per route**. Focused source eight is a subset and adds no distinct methods.
@@ -2016,6 +2036,10 @@ native UI cases passed before the version-only update: checkbox interaction,
 Dashboard geometry, minimum/normal containment of every primary view, and
 populated policy evaluation rows. Live completion of the reported owner run,
 universal policy enforcement, and distribution qualification remain open.
+
+Current source target: **0.38.0, build 54**, supporting **macOS 26+**; current archive evidence is above.
+
+Preceding .37 identity record (retained):
 
 Current source target: **0.37.0, build 53**, supporting **macOS 26+**; matching 56 raster plus five neighbor methods passed and remaining gates are recorded above.
 

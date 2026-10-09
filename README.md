@@ -1,5 +1,21 @@
 # Forge Conductor for macOS
 
+Current source target **0.38.0 (54)** adds `archive_write` for 0–32 supplied virtual files. Use an explicit .zip destination, exact NFC relative names and canonical padded-base64 content. The writer permits 1 MiB decoded data and 2 MiB complete ZIP output; managed calls retain the separate 64 KiB JSON argument bound. [Archive writing](docs/NATIVE-ARCHIVE-WRITING.md) records the contract and evidence.
+
+The same 62 distinct methods passed in source and native checks, with no failures or skips. Native checks on 0.38.0/build 54 finished in 62.594 s; only five version authorities changed since the source checks. The ordinary Debug candidate built in 24.455 s and passed strict deep signature verification in 0.140 s. Swift CLI/app compilation passed in 6.188/2.194 s. The 62 owning methods plus one separate initial G3 method give 63 distinct methods per source/native route, with equal unique selector sets; this is not a single 63-method invocation. Initial G3 passed in 7.367/2.603 s and hygiene in 0.670 s; repeats add no coverage.
+
+Signed App/CLI archive checks passed in 2.820/2.856 s, each with 25 correlated native responses, 23 tool frames and four ZIPs. Six refusals, an immediate cancellation preserving the existing 609-byte ZIP, PNG default and all 84 prior catalog definitions passed per route. Small ZIP reads were complete; the maximum archive used two bounded read windows plus exact whole local container/CRC/payload verification.
+
+Qwen completed three observed Low API turns in 51.538 s and consumed two complete actual archive_write/fs_read results, with six native responses/four tool frames and a strict four-scalar metadata acknowledgement. This does not prove member-content understanding, installed chat behavior, full web or all models.
+
+A separate native BSDtar consumer passed four actual App ZIPs: 36 exact payload files/1,048,999 bytes under canonical filesystem-name lookup, with normal exits/full EOF/no forced cleanup. CLI/Qwen extraction, exact physical filename spelling, general ZIP/Windows interoperability and installation are unqualified.
+
+Final document checks and exact source/wiki delivery are recorded separately; they add no runtime coverage. Before the later v3 flow, Projects GitHub registration/save/reopen/reject/clear was unqualified. The retained .37 flow failed before registration. In the later .38 public-AX sheet diagnostic, the unique source-identified Cancel was pressed; post-open settled copies succeeded, but the immediate post-Cancel AXWindows count returned -25204, so the whole diagnostic remained NONPASS. The App quit normally with no forced cleanup and unchanged shared preferences; no Register/Save occurred. Product cause is unknown. A separate v2 sheet diagnostic passed in 5.669 s: the immediate post-Cancel copy still returned -25204, both settled copies succeeded and the final complete semantic scan confirmed registration controls absent. It qualified only open/Cancel/ordinary cleanup, with no Register/GitHub Save/reopen/reject/clear or Tools acceptance. Installed full web/all-model, host rollover, general lifetime, Release and shipment qualification remain separate.
+
+Later .38 Projects v3 registered one isolated folder with matching project ID/root and generation 1, then remained NONPASS when the Save phase reached the 8,192 AX call cap after one field set and one Save press. The 303-byte metadata stayed byte-exact with no repository URL. The App quit ordinarily with exit 0 and no forced cleanup; guards and shared preferences were unchanged. Save/reopen/reject/clear and Tools remain unqualified; cause unknown.
+
+## Preceding 0.37.0 (53) qualification
+
 Current source target **0.37.0 (53)** adds standard-size ICO to `image_write`, preserving PNG/TIFF/JPEG/GIF/WebP/BMP. Exact lowercase `format: "ico"` requires an explicit case-insensitive `.ico` destination and equal width/height of **16, 32, 48 or 256**. The call-local Swift writer preserves all supplied alpha and hidden RGB in one bottom-up 32-bit BI_RGB DIB with a padded AND mask. Native premultiplied rendering is separate; no embedded ICC or Windows interoperability is promised.
 
 Matching full raster source/native selections passed **56 methods** in **13.550/24.569 s**; five separate neighbors passed in **2.201/2.504 s**, giving **61 distinct methods per route**. Focused source eight is a subset and adds no distinct methods.
@@ -887,8 +903,8 @@ continuity. The user does not start project work through a Forge Managed Run.
 
 | | |
 |---|---|
-| **Version** | **0.37.0** |
-| **Build** | **53** |
+| **Version** | **0.38.0** |
+| **Build** | **54** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |

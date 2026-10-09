@@ -1,5 +1,9 @@
 # Versioning policy
 
+Current target identity is **0.38.0 (54)**. The compatible `archive_write` addition advances the minor version under this policy. VERSION, BUILD_NUMBER, compiled constants, twelve marketing/sixteen build values and both G3 expectations align. Writer/test memberships are separate from version edits. Historical receipts retain their tested identity. Initial G3 passed once per source/native route, giving 63 distinct methods with the 62 owning methods. Final document checks and exact source/wiki delivery are recorded separately; they add no runtime coverage.
+
+## Preceding 0.37.0 (53) qualification
+
 Current target identity is **0.37.0 (53)**. Adding ICO to the existing `image_write` enum is an additive capability and advances the minor version; existing tool names/input keys/defaults/grants remain available. `VERSION`, `BUILD_NUMBER`, compiled constants, twelve marketing/sixteen build values and the two G3 expectations align with that root-selected identity, without graph membership or signing changes.
 
 Matching full raster source/native selections passed **56 methods** in **13.550/24.569 s**; five separate neighbors passed in **2.201/2.504 s**, giving **61 distinct methods per route**. Focused source eight is a subset and adds no distinct methods.
@@ -344,6 +348,10 @@ Update all four surfaces together. `script/check_repository_hygiene.sh`, the
 focused version test, and CI reject drift between them.
 
 ## Current identity
+
+Current source target is `0.38.0`, build `54`, for supplied-entry ZIP writing.
+
+Preceding .37 identity record (retained):
 
 Current source target is `0.37.0`, build `53`, for additive standard-size ICO; preceding phase identities remain unchanged.
 

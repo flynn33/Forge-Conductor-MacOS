@@ -1,5 +1,15 @@
 # Forge Conductor architecture
 
+Version: `0.38.0`; build: `54`. NativeStoredZIPWriter preflights names/base64 and complete ZIP extents before allocating output. A call-local worker computes CRC32 and appends stored local/central/EOCD records under fixed caps/cancellation checks. DocsToolPack validates context before/after encoding and publishes through the existing pinned Data writer. Grants, mutation/context, replay, defaults and document telemetry use their existing owners. No dependency or service was added.
+
+Exactly two graph memberships add the writer and its tests. [Archive contract and evidence](NATIVE-ARCHIVE-WRITING.md).
+
+Focused source/native evidence comprises 62 owning methods plus a separate initial G3, giving 63 distinct methods per route. Signed App/CLI archive transcripts, Qwen actual result consumption and separate App BSDtar payload extraction passed within their isolated scopes. Final document checks and exact source/wiki delivery are recorded separately; they add no runtime coverage. Broader GUI/full-web/all-model/lifetime/shipment acceptance remains open.
+
+Later .38 Projects v3 registered one isolated folder with matching project ID/root and generation 1, then remained NONPASS when the Save phase reached the 8,192 AX call cap after one field set and one Save press. The 303-byte metadata stayed byte-exact with no repository URL. The App quit ordinarily with exit 0 and no forced cleanup; guards and shared preferences were unchanged. Save/reopen/reject/clear and Tools remain unqualified; cause unknown.
+
+## Preceding 0.37.0 (53) qualification
+
 Version: `0.37.0`; build: `53`. `NativeRasterWriter.encodeICO` adds a bounded call-local Swift branch for square 16/32/48/256 images after the existing global dimension/pixel and canonical base64 admission. A 22-byte ICONDIR/entry precedes a 40-byte BI_RGB DIB, bottom-up straight BGRA XOR rows and DWORD-padded alpha-zero AND rows. Exact total output is preflighted before row/mask allocation; the existing Output owner checks cancellation/sticky errors on append and snapshot.
 
 The branch preserves all encoded RGBA bytes; native premultiplied rendering and wire inspection are separate. DocsToolPack retains its own grant, project context, pinned writer, modes and redacted audit; only the existing format enum/path/description and ICO engine/output contract expand. No new tool, input key, framework, dependency, graph member, service, signing policy or production interpreter is added. Matching full raster source/native selections passed **56 methods** in **13.550/24.569 s**; five separate neighbors passed in **2.201/2.504 s**, giving **61 distinct methods per route**. Focused source eight is a subset and adds no distinct methods.

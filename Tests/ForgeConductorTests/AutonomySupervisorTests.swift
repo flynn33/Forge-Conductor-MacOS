@@ -717,6 +717,59 @@ final class AutonomySupervisorTests: XCTestCase {
         }
     }
 
+    func testArchiveBrokerPersistsSmallRealWriteAndReplaysWithoutSecondDispatch() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("forge-archive-broker-\(UUID().uuidString)", isDirectory: true)
+        let project = root.appendingPathComponent("project", isDirectory: true)
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+        let app = try ForgeApp.bootstrap(home: root.appendingPathComponent("home", isDirectory: true), startTelemetry: false)
+        defer { XCTAssertTrue(app.shutdown().completed); try? FileManager.default.removeItem(at: root) }
+        let repository = app.projectContexts.repository
+        let fixture = try await makeRun(repository: repository, root: root, allowedTools: ["archive_write"])
+        let lease = try await repository.acquireRunLease(runID: fixture.run.runID, ownerID: "archive-broker", policy: fixture.leasePolicy)
+        let tool = try await makeProviderToolContext(repository: repository, run: fixture.run, lease: lease, sessionID: "archive-small")
+        let executor = ArchiveCountingToolExecutor(base: app.tools)
+        let broker = try ToolInvocationBroker(repository: repository, executor: executor,
+            classifier: ProductionToolReplayCatalog.classifier(productionToolNames: app.tools.toolNames))
+        let destination = project.appendingPathComponent("small.zip")
+        let call = BrokeredToolCall(providerCallID: "archive-small-call", toolName: "archive_write",
+            arguments: ["path": destination.path, "entries": [["name": "note.txt", "content": "SGVsbG8="]]], idempotencyKey: "archive-small-key")
+        XCTAssertLessThan(try JSONSupport.canonicalJSON(call.arguments).utf8.count, 65_536)
+        let first = try await broker.invoke(call, turnID: tool.turn.turnID, context: tool.context, lease: lease)
+        XCTAssertTrue(first.ok, "\(first.payload)")
+        let bytes = try Data(contentsOf: destination)
+        XCTAssertEqual(first.payload["sha256"] as? String, JSONSupport.sha256Hex(bytes))
+        let persistedValue = try await repository.toolInvocation(sessionID: "archive-small", providerCallID: call.providerCallID)
+        let persisted = try XCTUnwrap(persistedValue)
+        XCTAssertEqual(persisted.state, .completed); XCTAssertEqual(persisted.replayClass, .idempotent)
+        let repeated = try await broker.invoke(call, turnID: tool.turn.turnID, context: tool.context, lease: lease)
+        XCTAssertEqual(try JSONSupport.canonicalJSON(first.payload), try JSONSupport.canonicalJSON(repeated.payload))
+        XCTAssertEqual(try Data(contentsOf: destination), bytes); XCTAssertEqual(executor.callCount, 1)
+        let retained = try await repository.toolInvocation(sessionID: "archive-small", providerCallID: call.providerCallID)
+        XCTAssertEqual(try XCTUnwrap(retained), persisted)
+    }
+
+    func testArchiveBrokerRetainsCanonicalJSONBoundBeforeAnyDispatchOrIntent() async throws {
+        try await withRepository { repository, root in
+            let fixture = try await makeRun(repository: repository, root: root, allowedTools: ["archive_write"])
+            let lease = try await repository.acquireRunLease(runID: fixture.run.runID, ownerID: "archive-refusal", policy: fixture.leasePolicy)
+            let tool = try await makeProviderToolContext(repository: repository, run: fixture.run, lease: lease, sessionID: "archive-large")
+            let executor = CountingToolExecutor()
+            let broker = ToolInvocationBroker(repository: repository, executor: executor,
+                classifier: StaticToolReplayClassifier(classifications: ["archive_write": .idempotent]))
+            let destination = root.appendingPathComponent("must-not-exist.zip")
+            let call = BrokeredToolCall(providerCallID: "archive-large-call", toolName: "archive_write",
+                arguments: ["path": destination.path, "entries": [["name": "bytes.bin", "content": String(repeating: "A", count: 70_000)]]], idempotencyKey: "archive-large-key")
+            XCTAssertEqual(ToolInvocationBroker.maximumDurableResultBytes, 65_536)
+            XCTAssertGreaterThan(try JSONSupport.canonicalJSON(call.arguments).utf8.count, 65_536)
+            await assertAutonomyError(code: "autonomy_invalid_request") {
+                _ = try await broker.invoke(call, turnID: tool.turn.turnID, context: tool.context, lease: lease)
+            }
+            XCTAssertEqual(executor.callCount, 0)
+            let record = try await repository.toolInvocation(sessionID: "archive-large", providerCallID: call.providerCallID)
+            XCTAssertNil(record); XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
+        }
+    }
+
     func testToolBrokerAcceptsWildcardAndReusesCompletedIdempotentResult() async throws {
         try await withRepository { repository, root in
             let fixture = try await makeRun(repository: repository, root: root, allowedTools: ["*"])
@@ -2912,6 +2965,23 @@ private final class MutableAutonomyClock: Clock, @unchecked Sendable {
         lock.lock()
         value = value.addingTimeInterval(interval)
         lock.unlock()
+    }
+}
+
+private final class ArchiveCountingToolExecutor: ToolExecuting, @unchecked Sendable {
+    private let base: any ToolExecuting
+    private let lock = NSLock()
+    private var count = 0
+    init(base: any ToolExecuting) { self.base = base }
+    var toolNames: [String] { base.toolNames }
+    var callCount: Int { lock.lock(); defer { lock.unlock() }; return count }
+    func call(name: String, arguments: [String: Any], clientID: ClientID) throws -> ToolResult {
+        lock.lock(); count += 1; lock.unlock()
+        return try base.call(name: name, arguments: arguments, clientID: clientID)
+    }
+    func call(name: String, arguments: [String: Any], context: ToolInvocationContext) throws -> ToolResult {
+        lock.lock(); count += 1; lock.unlock()
+        return try base.call(name: name, arguments: arguments, context: context)
     }
 }
 

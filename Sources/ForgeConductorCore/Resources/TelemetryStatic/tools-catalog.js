@@ -28,6 +28,7 @@ export const TOOL_PACKS = [
       "pptx_write",
       "ods_write",
       "image_write",
+      "archive_write",
       "fs_edit",
       "fs_list",
       "fs_glob",

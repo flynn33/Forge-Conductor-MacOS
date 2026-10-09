@@ -1,5 +1,23 @@
 # Forge Conductor macOS — project roadmap
 
+## Supplied-entry stored ZIP writing
+
+Current target **0.38.0 (54)** adds `archive_write`. Scoped tests, candidate, archive transports and App native extraction passed; broader GUI/install/web/shipment gates remain open.
+
+| Milestone | Observed evidence | Remaining gate |
+| --- | --- | --- |
+| Baseline/contract | One missing-registration failure; bounded Swift stored ZIP with virtual names/base64. | No compression, source-file traversal or extraction feature. |
+| Source/native/graph | Matching 62 owning methods plus separate initial G3 one each give 63 distinct methods per route; native selection 62.594 s, G3 7.367/2.603 s; no failures/skips. Writer/Core and tests/ForgeConductorTests memberships compiled. | Focused area; full-suite/general lifetime remain open. |
+| Authorities/candidate | .38/54 aligned; ordinary build 24.455 s, strict signature 0.140 s; CLI/app compilation 6.188/2.194 s. | Separate from installation/shipment. |
+| App/CLI/Qwen | Signed App/CLI 2.820/2.856 s each passed 25 responses/23 frames/four ZIPs, six refusals and one immediate cancellation; PNG default/84 prior definitions preserved. Qwen 51.538 s: three observed Low turns/two consumed results/strict metadata ACK, six responses/four frames. | No installed-chat/member-understanding/full-web/all-model claim; in-work/late-cancel boundaries remain open. |
+| Container/consumers | Product local ZIP container/CRC/payload verification passed. Separate App BSDtar four actual ZIPs passed 36 files/1,048,999 exact payload bytes; mechanism evidence stays separate. | Original ditto/BSDtar failures retained; no CLI/Qwen extraction, physical spelling/general ZIP/Windows/installation guarantee. |
+| Documents/delivery | Thirteen current guides/contract retain history; initial G3 one each and hygiene 0.670 s passed. | Final document checks and exact source/wiki delivery are recorded separately; they add no runtime coverage. |
+| Original user acceptance | Prior .37 flow NONPASS retained. Later .38 sheet Cancel observed; immediate post-Cancel count−25204 retained whole NONPASS despite ordinary exit 0/no force. Separate v2 sheet diagnostic 5.669 s passed settled copies/final absence and ordinary cleanup while retaining immediate copy−25204; no Register/Save. Later v3 registered one isolated folder with matching ID/root and generation 1; Save then reached the 8,192 AX call cap after one field set/press. The 303-byte metadata stayed byte-exact without a repository URL; ordinary exit 0/no force and unchanged guards/preferences do not qualify Save. | Projects GitHub save/reopen/reject/clear/Tools, full web/all models, rollover, lifetime, Release/shipment remain open; cause unknown. |
+
+[Archive contract](docs/NATIVE-ARCHIVE-WRITING.md). Complete preceding phases follow.
+
+## Preceding 0.37.0 (53) qualification
+
 ## Additive standard-size ICO pixel writing
 
 Current target **0.37.0 (53)** adds ICO to the existing supplied-pixel tool while preserving all six preceding formats.

@@ -1,5 +1,13 @@
 # Telemetry architecture (real-time native)
 
+Current source documentation targets `0.38.0`, build `54`. `archive_write` joins documents tool cards and audit redaction. It adds no gauge, timer, producer or delivery queue. Focused checks do not establish general leak freedom. [Archive evidence](NATIVE-ARCHIVE-WRITING.md).
+
+Focused source/native evidence comprises 62 owning methods plus a separate initial G3, giving 63 distinct methods per route. Signed App/CLI archive transcripts, Qwen actual result consumption and separate App BSDtar payload extraction passed within their isolated scopes. Final document checks and exact source/wiki delivery are recorded separately; they add no runtime coverage. Broader GUI/full-web/all-model/lifetime/shipment acceptance remains open.
+
+Later .38 Projects v3 registered one isolated folder with matching project ID/root and generation 1, then remained NONPASS when the Save phase reached the 8,192 AX call cap after one field set and one Save press. The 303-byte metadata stayed byte-exact with no repository URL. The App quit ordinarily with exit 0 and no forced cleanup; guards and shared preferences were unchanged. Save/reopen/reject/clear and Tools remain unqualified; cause unknown.
+
+## Preceding 0.37.0 (53) qualification
+
 Current source documentation targets `0.37.0`, build `53`. ICO joins the existing `image_write` documents/tool-card classification and redacted audit surface; no gauge, producer, cadence, delivery queue, timer, telemetry schema or long-lived resource owner changes. Matching full raster source/native selections passed **56 methods** in **13.550/24.569 s**; five separate neighbors passed in **2.201/2.504 s**, giving **61 distinct methods per route**. Focused source eight is a subset and adds no distinct methods.
 Candidate build/signature checks passed; these image tests do not prove general leak freedom or installed telemetry. Candidate App/CLI/Qwen wire and seven native ICO/PNG consumer pairs passed in isolated contexts. Two immediate canceled calls were exercised per App/CLI route; cancellation after work has started and the common writer’s late-cancel/revocation-before-rename boundary remain unexercised. Final G3/hygiene/whitespace and exact owner source/wiki delivery outcomes are retained in external root receipts. Projects GitHub Save/reopen/stable identity and filtered Tools web rows remain blocked by the retained CUA native-pipe failure; installed/full-web/all-model/managed-adapter/other-format/Release/shipment gates remain open.
 
@@ -516,6 +524,10 @@ autonomous continuity, long-duration resource budgets, and owner-deferred
 representative physical-hardware qualification remain open.
 
 ## Version
+
+Current source target: `0.38.0`; build: `54`.
+
+Preceding .37 identity record (retained):
 
 Current source target: `0.37.0`; build: `53`.
 

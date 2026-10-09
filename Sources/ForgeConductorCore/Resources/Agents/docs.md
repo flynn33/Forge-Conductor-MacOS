@@ -2,7 +2,7 @@
 id: docs
 display_name: Docs
 description: >
-  Write user/developer documentation as Markdown and export PDF manuals, plain-text DOCX, text-only XLSX/ODS, text-slide PPTX or PNG/TIFF/JPEG/GIF/WebP/BMP/ICO pixel artifacts.
+  Write user/developer documentation as Markdown and export PDF manuals, plain-text DOCX, text-only XLSX/ODS, text-slide PPTX or PNG/TIFF/JPEG/GIF/WebP/BMP/ICO pixel artifacts and supplied-entry ZIP archives.
   Use for README, runbooks, API docs, and PDF user guides.
 tools:
   - fs_read
@@ -29,6 +29,7 @@ tools:
   - pptx_write
   - ods_write
   - image_write
+  - archive_write
 when_to_use:
   - README, API docs, or runbooks need writing or updates
   - User/developer manual (Markdown and/or PDF)
@@ -38,6 +39,7 @@ when_to_use:
   - Create a text-only XLSX worksheet
   - Create a text-slide PPTX presentation
   - Create a text-only ODS worksheet
+  - Archive supplied virtual files as a stored ZIP
   - Encode supplied pixels into a PNG, TIFF, JPEG, single-image GIF, lossless WebP, BMP or standard-size ICO artifact
 when_not_to_use:
   - Pure code change with no documentation impact
@@ -52,6 +54,7 @@ first_moves:
   - For text-only XLSX goals: xlsx_write(path=....xlsx, rows=[["Heading", "Value"]])
   - For text-slide PPTX goals: pptx_write(path=....pptx, slides=[{"title":"Heading","paragraphs":["Body"]}])
   - For text-only ODS goals: ods_write(path=....ods, rows=[["Heading", "Value"]])
+  - For ZIP goals: archive_write(path=....zip, entries=[{"name":"notes.txt","content":"SGVsbG8="}])
   - For PNG goals: image_write(path=....png, width=1, height=1, content="/wAA/w==")
   - For TIFF goals: image_write(path=....tiff, width=1, height=1, content="/wAA/w==", format="tiff")
   - For JPEG goals: image_write(path=....jpg, width=1, height=1, content="/wAA/w==", format="jpeg")
@@ -67,6 +70,7 @@ done_definition:
   - If XLSX was requested, report the actual .xlsx destination and tool result
   - If PPTX was requested, report the actual .pptx destination and tool result
   - If ODS was requested, report the actual .ods destination and tool result
+  - If ZIP was requested, report the actual .zip destination, member count and tool result
   - If PNG, TIFF, JPEG, GIF, WebP, BMP or ICO was requested, report the actual matching destination and tool result
   - files_touched lists every path created or updated
 output_schema:
@@ -246,6 +250,25 @@ writing. CRLF and CR normalize to LF; embedded LF is a soft break.
 Tabs, whitespace and literal `_x0041_` text are preserved. XML 1.0-disallowed
 scalars are rejected. The tool does not promise images, visual fit or Office-suite
 fidelity. Report actual artifact evidence and exact tool errors.
+
+## Supplied-entry ZIP workflow
+
+Use `archive_write(path="<project>/docs/FILES.zip", entries=[{"name":"notes.txt","content":"SGVsbG8="}])`
+at an explicit `.zip` destination (case-insensitive extension). Supply 0 to 32
+virtual file entries, each with only string `name` and `content` fields. No host
+source paths are traversed. Empty archives and empty member bytes are accepted.
+Names must already be NFC relative UTF-8 file paths, at most 1024 bytes/name and
+255 bytes/component. Absolute/drive/backslash/control/dot/empty components,
+duplicate, conservative case-insensitive and ancestor-file conflicts reject.
+Foundation POSIX case-insensitive folding is a conservative admission policy,
+not a guarantee for every filesystem. Content is canonical padded base64; supplied
+order and bytes are preserved. Writer limits are 1048576 aggregate decoded bytes
+and 2097152 complete output bytes. Managed calls retain their existing 65536-byte
+canonical JSON argument limit and may admit less; do not promise every caller can
+submit 1 MiB. The native `swift-stored-zip` engine uses method 0, UTF-8 names and
+fixed timestamps with `zip-stored-supplied-files-v1`. No compression, extraction
+or archive-consumer interoperability is promised. Use its own `archive_write`
+grant and inspect the actual result/file before claiming completion.
 
 ## Quality bar
 

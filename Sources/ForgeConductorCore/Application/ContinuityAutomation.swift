@@ -1066,7 +1066,7 @@ public final class ContinuityAutomation: WorkspaceRootProviding, @unchecked Send
         "agent_run_start", "agent_run_complete",
         "search_text",
         "web.fetch", "web.search", "web.render",
-        "pdf_write", "pdf_from_file", "docx_write", "xlsx_write", "pptx_write", "ods_write", "image_write",
+        "pdf_write", "pdf_from_file", "docx_write", "xlsx_write", "pptx_write", "ods_write", "image_write", "archive_write",
         "process.run", "shell.run", "bash.run", "python.run", "powershell.run",
         "job.status", "job.read_output", "job.list", "job.cancel",
         "xcode.discover", "xcode.run", "xcode.result", "xcode.debug", "xcode.simulator",

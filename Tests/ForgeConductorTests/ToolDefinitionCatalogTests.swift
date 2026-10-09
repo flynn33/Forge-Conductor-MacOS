@@ -133,7 +133,7 @@ final class ToolDefinitionCatalogTests: XCTestCase {
             }
             let docsTools: Set<String> = [
                 "fs_read", "fs_write", "fs_edit", "fs_list", "fs_glob", "fs_mkdir", "search_text",
-                "shell_exec", "pdf_write", "pdf_from_file", "docx_write", "xlsx_write", "pptx_write", "ods_write", "image_write", "git_status", "git_diff", "git_log",
+                "shell_exec", "pdf_write", "pdf_from_file", "docx_write", "xlsx_write", "pptx_write", "ods_write", "image_write", "archive_write", "git_status", "git_diff", "git_log",
                 "runtime.capabilities", "python.run",
             ]
             let auditTools: Set<String> = [
@@ -1583,6 +1583,54 @@ final class ToolDefinitionCatalogTests: XCTestCase {
             guard case .denied(let code, _) = denied else { return XCTFail("Ordinary defaults must not expand an imported explicit image grant") }
             XCTAssertEqual(code, "tool_not_granted")
             XCTAssertFalse(FileManager.default.fileExists(atPath: source.appendingPathComponent("report.png").path))
+        }
+    }
+
+    func testArchiveWriteHasExactSchemaReplayCatalogAndRequiredContext() throws {
+        try withProductionApp("archive-schema") { app in
+            let catalog = try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames)
+            let definition = try XCTUnwrap(catalog.definition(named: "archive_write"))
+            XCTAssertEqual(catalog.definitions.count, 85)
+            XCTAssertEqual(catalog.definitions.filter { $0.name != "archive_write" }.count, 84)
+            XCTAssertTrue(definition.strict)
+            let schema = try definition.inputSchemaObject()
+            let properties = try XCTUnwrap(schema["properties"] as? [String: Any])
+            XCTAssertEqual(Set(properties.keys), ["path", "entries", "deadline_ms"])
+            XCTAssertEqual(schema["required"] as? [String], ["path", "entries"])
+            XCTAssertEqual(schema["additionalProperties"] as? Bool, false)
+            let entries = try XCTUnwrap(properties["entries"] as? [String: Any])
+            XCTAssertEqual(entries["type"] as? String, "array"); XCTAssertEqual(entries["maxItems"] as? Int, 32)
+            XCTAssertNil(entries["minItems"])
+            let entry = try XCTUnwrap(entries["items"] as? [String: Any])
+            XCTAssertEqual(entry["required"] as? [String], ["name", "content"])
+            XCTAssertEqual(entry["additionalProperties"] as? Bool, false)
+            let fields = try XCTUnwrap(entry["properties"] as? [String: Any])
+            XCTAssertEqual(Set(fields.keys), ["name", "content"])
+            XCTAssertEqual((fields["name"] as? [String: Any])?["type"] as? String, "string")
+            XCTAssertEqual((fields["name"] as? [String: Any])?["minLength"] as? Int, 1)
+            XCTAssertEqual((fields["name"] as? [String: Any])?["maxLength"] as? Int, 1024)
+            XCTAssertEqual((fields["content"] as? [String: Any])?["maxLength"] as? Int, 1_398_104)
+            let deadline = try XCTUnwrap(properties["deadline_ms"] as? [String: Any])
+            XCTAssertEqual(deadline["minimum"] as? Int, 1)
+            XCTAssertEqual(deadline["maximum"] as? Int, ToolRouter.maximumRequestedDeadlineMilliseconds)
+            XCTAssertTrue(definition.description.contains("65536-byte canonical JSON"))
+            XCTAssertTrue(definition.description.contains("Requires its own archive_write grant"))
+            XCTAssertEqual(ManagerToolCategory.classify("archive_write"), .documents)
+            XCTAssertTrue(ToolRouter.isMutatingTool("archive_write"))
+            XCTAssertEqual(try ProductionToolReplayCatalog.classifier(productionToolNames: app.tools.toolNames).replayClass(for: "archive_write"), .idempotent)
+            let descriptor = try definition.mcpDescriptor()
+            XCTAssertEqual(try JSONSupport.data(from: try XCTUnwrap(descriptor["inputSchema"] as? [String: Any])), definition.inputSchemaJSON)
+            let advertised = try catalog.providerToolDefinitions(allowedToolNames: ["archive_write"])
+            XCTAssertEqual(advertised.count, 1)
+            let provider = try XCTUnwrap(JSONSerialization.jsonObject(with: try XCTUnwrap(advertised.first)) as? [String: Any])
+            XCTAssertEqual(provider["name"] as? String, "archive_write"); XCTAssertEqual(provider["strict"] as? Bool, true)
+            XCTAssertEqual(try JSONSupport.data(from: try XCTUnwrap(provider["parameters"] as? [String: Any])), definition.inputSchemaJSON)
+            for name in ["pdf_write", "pdf_from_file", "docx_write", "xlsx_write", "pptx_write", "ods_write", "image_write"] {
+                XCTAssertNotNil(catalog.definition(named: name))
+                XCTAssertEqual(try catalog.definitions(allowedToolNames: [name]).map(\.name), [name])
+            }
+            let absent = try app.tools.call(name: "archive_write", arguments: ["path": "unattached.zip", "entries": []], clientID: ClientID("archive-unattached"))
+            XCTAssertFalse(absent.ok); XCTAssertEqual(absent.payload["code"] as? String, "project_context_required")
         }
     }
 

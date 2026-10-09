@@ -497,7 +497,7 @@ public final class ForgeCollector: ForgeMetricsCollecting, @unchecked Sendable {
             "session_checkpoint", "session_handoff", "context_get", "context_list",
             "fs_read", "fs_write", "fs_edit", "fs_list", "fs_glob", "fs_mkdir", "fs_delete", "fs_delete_recovery", "fs_move",
             "shell_exec", "git_status", "git_diff", "git_log", "git_add", "git_commit",
-            "pdf_write", "pdf_from_file", "docx_write", "xlsx_write", "pptx_write", "ods_write", "image_write", "search_text",
+            "pdf_write", "pdf_from_file", "docx_write", "xlsx_write", "pptx_write", "ods_write", "image_write", "archive_write", "search_text",
             "memory_set", "memory_get", "memory_list", "memory_delete", "memory_search",
         ]
     }
@@ -508,7 +508,7 @@ public final class ForgeCollector: ForgeMetricsCollecting, @unchecked Sendable {
         if name.hasPrefix("memory_") { return "memory" }
         if name.hasPrefix("fs_") { return "filesystem" }
         if name.hasPrefix("git_") { return "git" }
-        if name.hasPrefix("pdf_") || name == "docx_write" || name == "xlsx_write" || name == "pptx_write" || name == "ods_write" || name == "image_write" { return "docs" }
+        if name.hasPrefix("pdf_") || name == "docx_write" || name == "xlsx_write" || name == "pptx_write" || name == "ods_write" || name == "image_write" || name == "archive_write" { return "docs" }
         if name.hasPrefix("shell_") { return "shell" }
         if name.hasPrefix("forge_") { return "forge" }
         if name.hasPrefix("search_") { return "search" }
