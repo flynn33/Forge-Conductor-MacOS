@@ -1,5 +1,9 @@
 # Telemetry architecture (real-time native)
 
+Current source documentation targets `0.43.0`, build `59`. AAC-LC M4A uses the existing audio tool/card/content-redaction surfaces and an explicit bounded native worker owner. It adds no telemetry field, gauge, recurring renderer or GUI delivery queue. Six App/CLI cohorts closed outer/native parents normally with both EOFs; observed child cancellation preserved destinations and ended with the child absent. The separate consumer measured known success-owner disposal/close/deinit on 24 files. Failed/unresolved native-owner paths, general shutdown and leak freedom remain unqualified. Previous telemetry/renderer qualification retains its scope. [Audio gates](NATIVE-AUDIO-WRITING.md).
+
+## Preceding 0.42.0 (58) qualification
+
 Current source documentation targets `0.42.0`, build `58`. Complete-render paging uses the existing renderer/tool owners and adds one bounded snapshot body with one expiry owner; it adds no telemetry schema, gauge or GUI delivery queue. The passed weak-service source method is included in the 150-method area and does not establish general lifetime or native child release. Signed App/CLI paging checks passed with normal owned-parent closure and complete streams; internal render child PIDs were not independently observed. Qwen v6 had normal owned native/model/observer/outer closure with complete streams and all six strict Low LF associations. General telemetry/lifetime qualification remains pending. Applied-v2 final source/native G3, hygiene and local link checks passed; final candidate v3 readback preserved source/artifact identities. First owner source/wiki publication, exact readback and clean synchronization passed. [Renderer scope](NATIVE-WEB-RENDERING.md).
 
 ## Preceding 0.41.0 (57) qualification

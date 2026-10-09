@@ -1,5 +1,9 @@
 # Versioning policy
 
+Current target identity is **0.43.0 (59)**. Optional AAC-LC M4A extends an existing format enum compatibly and advances the feature component under the policy below; WAV remains the absent-format default. Version/build authorities advance with this increment, separately from the new encoder/test memberships. Matching source/native owning selections passed the same 139 methods on 475 exact inputs; CLI/app compilation and ordinary Debug/strict signature passed. Candidate C1 readback passed with seven artifacts/Info, 475 inputs and 80 preceding guards exact. Six actual App/CLI rate cohorts and separate native consumers passed their 24-file matrices. Qwen, G3/hygiene and delivery gates are pending. Historical receipts keep their tested identities; a source version does not claim shipment.
+
+## Preceding 0.42.0 (58) qualification
+
 Current target identity is **0.42.0 (58)**. Opt-in complete rendered-snapshot paging is a backward-compatible user-facing feature under the policy below; the context-budget correction is separate. Root selected `VERSION`/`BUILD_NUMBER`, compiled constants, twelve marketing/sixteen build values and both G3 expectations together. Existing graph memberships/signing remain unchanged. Matching selected-identity source/native 150, ordinary Debug/signature, separate initial G3 and bounded signed App/CLI paging passed on the 473-input `180a2c83…` map. Qwen v6 whole-paging/strict actual Low qualification passed; earlier observer NONPASS attempts remain retained. Applied-v2 final source/native G3, hygiene and local link checks passed; final candidate v3 readback preserved source/artifact identities. First owner source/wiki publication, exact readback and clean synchronization passed. Historical receipts retain their tested identities; product version is not shipment.
 
 ## Preceding 0.41.0 (57) qualification
@@ -364,6 +368,10 @@ Update all four surfaces together. `script/check_repository_hygiene.sh`, the
 focused version test, and CI reject drift between them.
 
 ## Current identity
+
+Current source target is `0.43.0`, build `59`, for optional supplied PCM16 AAC-LC M4A. Matching owning/build/C1, six App/CLI rate cohorts and 24-file native consumers passed; Qwen/G3/hygiene and delivery gates remain pending.
+
+## Preceding 0.42.0 (58) initial identity record
 
 Current source target is `0.42.0`, build `58`, for opt-in complete rendered-snapshot paging; matching selected-identity and delivery gates are pending in this initial record.
 

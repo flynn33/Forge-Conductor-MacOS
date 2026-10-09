@@ -1,4 +1,10 @@
-# Context and agent continuity (v0.42.0)
+# Context and agent continuity (v0.43.0)
+
+<a id="context-and-agent-continuity-v0420"></a>
+
+Current source documentation targets 0.43.0 (59). M4A is an exact value of existing audio_write, retaining its own grant, resolved project context, idempotent replay classification, content redaction and separate 65,536-byte managed canonical JSON admission. Before/after encoding context checks and the common pinned publisher remain in their owners. Modeled AAC broker/grant/replay and ownership cases passed within the matching 139-method source/native selections; six direct App/CLI cohorts also passed grant/context refusals, WAV/FLAC parity and observed-child cancellation with destination preservation/child absence. These direct MCP calls do not qualify durable broker replay. Checkpoint/successor/ACK/seal and project formats are unchanged; these checks add no host rollover proof. [Audio contract](NATIVE-AUDIO-WRITING.md).
+
+## Preceding 0.42.0 (58) qualification
 
 Current source documentation targets 0.42.0 (58). Opt-in render continuation requires the same resolved project/client authorization, generation, requested URL, snapshot ID and digest; stale, expired or replaced snapshots fail without network refetch. Existing network/tool grants and managed broker limits remain in their owners; paging does not qualify broker replay or host rollover. The separately corrected context-budget path sizes output from the resolved invocation scope before final actual-ID/notice/LF fitting; its runtime reachability remains a distinct gate. Checkpoint/successor/ACK/seal and project formats are unchanged. Matching source/native 150 and signed App/CLI complete-paging checks passed. Qwen v6 passed whole traversal/ACK and all six strict actual Low input associations; earlier v2–v5 NONPASS attempts remain retained. Applied-v2 final source/native G3, hygiene and local link checks passed; final candidate v3 readback preserved source/artifact identities. First owner source/wiki publication, exact readback and clean synchronization passed. [Contract](NATIVE-WEB-RENDERING.md).
 

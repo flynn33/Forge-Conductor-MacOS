@@ -1,6 +1,21 @@
 # Forge Conductor macOS — project roadmap
 
-## Complete rendered-snapshot paging
+## Supplied PCM16 AAC-LC M4A format extension
+
+Current target **0.43.0 (59)** extends existing audio_write with exact optional m4a and matching .m4a; omission remains WAV. This row records work, not dispatch. Product source is applied; qualification and delivery remain open.
+
+| Milestone | Actual evidence or preparation | Remaining gate |
+| --- | --- | --- |
+| Source and preservation | Applied native owned-worker integration and explicit format/path contract. Matching source/native 139 passed in 76.318/108.450 s on the same 475 inputs, zero failures/skips; WAV/FLAC, grant/context/replay and 85-neighbor source preservation are included. Warnings retained. | Source preservation PASS; actual native/wire scopes below are separate from durable broker replay and general shutdown. |
+| Native candidate and protocol | Signed current-self worker and measured valid-frame accounting are implemented in source. CLI/app builds (1.013/1.006 s), ordinary Debug (24.067 s) and strict signature (0.134 s) passed, normal exit 0/unforced. C1 readback passed with seven artifacts/Info, 475 inputs and 80 preceding guards exact. Six App/CLI rate cohorts passed 24 real M4A files, 112 pages/364 responses, four explicit EOF reads per cohort and observed-child cancellation/destination preservation. All 24 files passed separate native valid-frame/true+extra EOF decode (12,583,488 bytes). | Failed/unresolved native-owner reachability, general shutdown and quality/lossless/installed claims remain unqualified. |
+| Qwen | Complete product model verification remains pending. | Completed later turns, actual Low inputs and scoped ACK PENDING. |
+| Documents and delivery | Current .43 proposal records pending gates; .42 delivery and histories remain separate. | Source/native G3, hygiene, source/wiki parity, publication and synchronization PENDING. |
+
+[Audio contract](docs/NATIVE-AUDIO-WRITING.md). Raw ADTS .aac, remaining formats, full web/all models, installed operation, general lifetime, Release and shipment remain unqualified.
+
+<a id="complete-rendered-snapshot-paging"></a>
+
+## Preceding 0.42.0 (58) complete rendered-snapshot paging
 
 Current target **0.42.0 (58)** adds opt-in paging to existing web.render; this row records work, not dispatch. The bounded App/CLI/Qwen paging gates passed; the scoped paging phase closed with first owner source/wiki publication, exact readback and clean synchronization; broader qualification remains separate.
 

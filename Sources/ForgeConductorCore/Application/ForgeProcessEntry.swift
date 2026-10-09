@@ -39,6 +39,7 @@ public enum ForgeProcessEntry {
         case providerHook
         case webRenderChild
         case docxExportChild
+        case aacM4AChild
         case managerRun(openBrowser: Bool)
         case managerOther // start/stop/restart/status — delegated if needed
     }
@@ -58,6 +59,8 @@ public enum ForgeProcessEntry {
             return .webRenderChild
         case "--internal-docx-export-v1":
             return .docxExportChild
+        case "--internal-aac-m4a-v1":
+            return .aacM4AChild
         case "manager":
             let sub = args.dropFirst().first ?? "run"
             if sub == "run" || sub.hasPrefix("-") {
@@ -184,6 +187,9 @@ public enum ForgeProcessEntry {
             exit(2)
         case .docxExportChild:
             _ = DOCXExportChildEntry.runIfRequested(arguments: arguments, expectedRole: .app)
+            exit(2)
+        case .aacM4AChild:
+            _ = AACM4AChildEntry.runIfRequested(arguments: arguments, expectedRole: .app)
             exit(2)
         case .managerRun(let open):
             runManager(home: homeOverride(from: arguments), openBrowser: open)

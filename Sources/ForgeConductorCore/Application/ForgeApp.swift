@@ -31,6 +31,7 @@ public final class ForgeApp: @unchecked Sendable {
     public let runtimeJobs: RuntimeJobSubsystem
     public let webRenderer: WebRendererService
     let docxExporter: NativeDOCXExporter
+    let aacEncoder: NativeAACM4AEncoder
     /// Read-side access to the ordered Development Policy sources selected in
     /// Rune Forge. The manager remains the mutation and indexing owner.
     public let developmentPolicySources: (any DevelopmentPolicySourceReading)?
@@ -95,6 +96,7 @@ public final class ForgeApp: @unchecked Sendable {
         self.runtimeJobs = runtimeJobs
         self.webRenderer = WebRendererService()
         self.docxExporter = NativeDOCXExporter()
+        self.aacEncoder = NativeAACM4AEncoder()
         self.developmentPolicySources = developmentPolicySources
         self.developmentPolicySourceCatalog = developmentPolicySources
         self.stjornarvaldObservations = stjornarvaldObservations
@@ -296,14 +298,17 @@ public final class ForgeApp: @unchecked Sendable {
         _ = stjornarvaldObservations.shutdown(timeoutSeconds: 3)
         let runtimeStopped = DispatchSemaphore(value: 0)
         let reportBox = RuntimeShutdownReportBox()
-        Task.detached(priority: .high) { [runtimeJobs, webRenderer, docxExporter] in
+        Task.detached(priority: .high) { [runtimeJobs, webRenderer, docxExporter, aacEncoder] in
             async let jobs = runtimeJobs.shutdown()
             async let renderer = webRenderer.shutdown()
-            let docxStopped = docxExporter.shutdown()
+            async let docx = docxExporter.shutdown()
+            async let aac = aacEncoder.shutdown()
             let report = await jobs
             let rendererStopped = await renderer
+            let docxStopped = await docx
+            let aacStopped = await aac
             reportBox.store(RuntimeJobShutdownReport(
-                completed: report.completed && rendererStopped && docxStopped,
+                completed: report.completed && rendererStopped && docxStopped && aacStopped,
                 unresolvedJobIDs: report.unresolvedJobIDs,
                 persistencePendingJobIDs: report.persistencePendingJobIDs
             ))

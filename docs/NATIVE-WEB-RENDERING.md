@@ -1,6 +1,10 @@
 # Native JavaScript web snapshots
 
-## Current 0.42.0 (58) complete captured-text paging
+Current source documentation targets **0.43.0 (59)**. The AAC increment does not change the complete captured-text paging contract. The .42 source/native/App/CLI/Qwen and delivery evidence below retains its tested identity; it is not .43 product requalification or full-web/all-model/installed proof. AAC App/CLI wire and separate native consumer gates passed their bounded matrices; Qwen and delivery remain [pending](QUALIFICATION-STATUS.md).
+
+<a id="current-0420-58-complete-captured-text-paging"></a>
+
+## Preceding 0.42.0 (58) complete captured-text paging
 
 `web.render` adds four optional arguments: `paged` (Boolean, default false), `snapshot_id` (UUID), `byte_offset` (integer 0–1,048,576) and `if_snapshot_sha256` (64 hexadecimal characters). Start with `paged: true` and the existing URL/timeout/inline budget arguments. A continuation requires all three identity/offset fields together with `paged: true`, the same requested URL and the same resolved project/client authorization. Omitted/false `paged` retains the v1 8,192-byte/4,096-node prefix and existing frames.
 

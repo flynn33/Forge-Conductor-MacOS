@@ -52,6 +52,29 @@ final class OwnedDuplexProcessTests: XCTestCase {
         XCTAssertTrue(runner.shutdownOwnedCurrentSelf(deadlineUptimeNanoseconds: 0))
     }
 
+    func testAACFixedModeCapsRejectOversizeBeforeAdmissionWithoutChangingExistingModes() throws {
+        XCTAssertEqual(OwnedCurrentSelfMode.aacM4AV1.argument, "--internal-aac-m4a-v1")
+        XCTAssertEqual(OwnedCurrentSelfMode.aacM4AV1.maximumInputBytes, 1_049_604)
+        XCTAssertEqual(OwnedCurrentSelfMode.aacM4AV1.maximumOutputBytes, 2_101_252)
+        XCTAssertEqual(OwnedCurrentSelfMode.docxExportV1.maximumInputBytes, 65_536)
+        XCTAssertEqual(OwnedCurrentSelfMode.docxExportV1.maximumOutputBytes, 1_048_576)
+        XCTAssertEqual(OwnedCurrentSelfMode.webRenderV1.maximumOutputBytes, 32_772)
+        XCTAssertEqual(OwnedCurrentSelfMode.webRenderV2.maximumOutputBytes, 6_347_780)
+        let runner = ProcessRunner()
+        let result = try runOnWorker {
+            try runner.runOwnedCurrentSelf(mode: .aacM4AV1,
+                standardInput: Data(repeating: 0, count: 1_049_605),
+                deadlineUptimeNanoseconds: DispatchTime.now().uptimeNanoseconds + 30_000_000_000,
+                cancellation: ToolCallCancellation())
+        }
+        switch result {
+        case .failure(let error):
+            XCTAssertEqual((error as NSError).domain, "ProcessRunner"); XCTAssertEqual((error as NSError).code, 21)
+        case .success: XCTFail("Oversize AAC input must fail before native admission")
+        }
+        XCTAssertTrue(runner.shutdownOwnedCurrentSelf(deadlineUptimeNanoseconds: 0))
+    }
+
     func testOpenEmptyPipeIsNotEOFAndFinalizationReportsForcedClose() throws {
         let pipe = try OwnedCaptureTestPipe()
         let capture = OwnedPipeCapture(limit: 32)

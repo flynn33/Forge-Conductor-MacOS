@@ -10,6 +10,11 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### `0.43.0 (59)` AAC-LC M4A format extension
+
+- Extend supplied-PCM audio_write with exact m4a and a matching .m4a path; retain WAV default, explicit WAV/FLAC, existing response keys, own grant/context/replay, pinned publication and writer versus managed JSON bounds. Native AudioToolbox AAC-LC runs in a bounded signed owned worker; decoded samples are lossy, encoded bytes may vary, and supplied valid-frame count is retained. [Contract](docs/NATIVE-AUDIO-WRITING.md).
+- Matching source/native owning selections passed 139 methods each on the same 475 inputs, zero failures/skips, with warnings retained. CLI/app compilation and ordinary Debug/strict signature passed. Candidate C1 readback passed with seven artifacts/Info, 475 inputs and 80 preceding guards exact; six App/CLI cohorts passed 24 real M4A outputs/whole readback, observed-child cancellation with destination preservation and separate native valid-frame/true EOF checks for all 24 files. Qwen remains pending; failed/unresolved native-owner paths and general shutdown remain unqualified. G3/hygiene and source/wiki delivery are pending; prior standalone and .42 results do not qualify AAC integration. Raw ADTS .aac and broader installed/Release/shipment gates remain unqualified. [Qualification](docs/QUALIFICATION-STATUS.md).
+
 ### `0.42.0 (58)` complete rendered-snapshot paging
 
 - Add opt-in `paged: true` to existing web.render with immutable snapshot ID/whole SHA, scalar-safe byte cursor and explicit EOF. Retain one ≤1 MiB/65,536-node body for at most 120 seconds with one expiry owner; overflow/stale continuation fail explicitly. Default v1 prefix, existing authorization and final actual-ID/notice/LF budgets remain. [Contract](docs/NATIVE-WEB-RENDERING.md).

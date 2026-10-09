@@ -19,6 +19,7 @@ enum ForgeConductorMain {
     static func main() {
         if WebRenderChildEntry.runIfRequested(expectedRole: .app) { return }
         if DOCXExportChildEntry.runIfRequested(expectedRole: .app) { return }
+        if AACM4AChildEntry.runIfRequested(expectedRole: .app) { return }
         ForgeNativeSessionHostPlugin.register()
         // LaunchAgent:  …/Forge Conductor manager run --home …
         // LM Studio:    …/Forge Conductor serve   (+ FORGE_MCP_ROLE)

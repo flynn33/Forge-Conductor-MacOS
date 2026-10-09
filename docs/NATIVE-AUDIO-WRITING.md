@@ -1,6 +1,28 @@
-# Native PCM16 WAV and FLAC writing
+# Native PCM16 audio writing
+
+<a id="native-pcm16-wav-and-flac-writing"></a>
 
 <a id="native-pcm16-wav-writing"></a>
+
+Current source target **0.43.0 (59)** adds AAC-LC M4A to existing audio_write. The product source is applied; matching source/native owning selections passed 139 methods each on the same 475 inputs, zero failures/skips, with warnings retained. CLI/app compilation and ordinary Debug/strict signature passed. Candidate C1 readback passed with seven artifacts/Info, 475 inputs and 80 preceding guards exact. Six App/CLI rate cohorts passed actual writes/whole EOF, observed-child cancellation and the separate 24-file native consumer matrix. Qwen and delivery gates remain **pending**; failed/unresolved native-owner paths and general shutdown remain unqualified. Standalone mechanism results do not qualify the integrated tool. [Current gates](QUALIFICATION-STATUS.md).
+
+## M4A contract and preservation
+
+Required path/content/sample_rate/channels and optional shared deadline_ms remain. Exact optional format now accepts `"wav"`, `"flac"` or `"m4a"`; omission remains WAV. Explicit case-insensitive .wav/.flac/.m4a paths must match the selected format; no extension selects a format. Malformed/nonexact formats return invalid_audio_arguments and mismatched paths return invalid_path. Canonical padded-base64 PCM16LE must contain nonempty complete frame-major samples (left then right for stereo), with rate exactly 8000/44100/48000 and channels 1/2.
+
+| Bound or identity | Current M4A contract |
+| --- | --- |
+| Supplied raw/base64 UTF-8 | At most 1,048,576/1,398,104 bytes; same WAV/FLAC input contract. |
+| Complete encoded output | At most 2,097,152 bytes; encoded bytes may vary. |
+| Engine / output contract | native-audiotoolbox-aac-lc / m4a-aac-lc-from-pcm16le-v1 |
+| Input / response | pcm16le-interleaved-v1; eleven existing writer fields plus ok=true, twelve actual keys. |
+| Managed canonical arguments/results | Separate 65,536-byte bound; writer ceilings do not increase managed admission. |
+
+M4A contains lossy AAC-LC. Native conversion uses measured priming/trailing values and same-sum packet-table metadata. The worker reopens the M4A read-only and verifies its container metadata and valid-frame count; it does not decode PCM. The separate native consumer passed decoding to the supplied valid-frame count and true+extra EOF for all 24 actual App/CLI products. This is scoped product/consumer evidence, not a promise of equal decoded PCM, deterministic bytes, listening quality or general interoperability. Raw ADTS .aac is not an admitted format.
+
+One encoder operation is admitted before PCM preparation. A bounded request/reply crosses the fixed signed current-self worker under the original at-most-30-second deadline. Normal confirmed termination and complete streams are required before result acceptance; unresolved ownership blocks reuse. WAV/FLAC writers, own audio_write grant, before/after project-context checks, redaction, broker replay and the common pinned atomic Data publisher remain in source; modeled preservation/cancellation/shutdown checks passed within the owning selections. Six actual observed-child cancellations returned -32800, preserved destinations and ended with the child absent. This does not establish a normal canceled-child exit, failed/unresolved native-owner reachability or general shutdown. No source-file import, synthesis or playback is added.
+
+## Preceding 0.41.0 (57) WAV/FLAC qualification
 
 Current source target **0.41.0 (57)** extends existing audio_write with exact optional wav/flac; omission remains WAV. Source qualification passed before the identity advance; matching selected-identity native 59, ordinary build/signature, App/CLI protocol and bounded Qwen API result-consumption checks passed. The selected-identity source 59 and all three product native PCM consumers passed. Separate source/native G3 and initial hygiene/whitespace checks passed; first owner source/wiki publication, exact readback and clean synchronization passed.
 

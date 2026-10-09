@@ -2,7 +2,7 @@
 id: docs
 display_name: Docs
 description: >
-  Write user/developer documentation as Markdown and export PDF manuals, plain-text DOCX, text-only XLSX/ODS, text-slide PPTX or PNG/TIFF/JPEG/GIF/WebP/BMP/ICO pixel artifacts and supplied-entry ZIP/TAR/tar.gz archives and supplied PCM16 WAV/FLAC audio.
+  Write user/developer documentation as Markdown and export PDF manuals, plain-text DOCX, text-only XLSX/ODS, text-slide PPTX or PNG/TIFF/JPEG/GIF/WebP/BMP/ICO pixel artifacts and supplied-entry ZIP/TAR/tar.gz archives and supplied PCM16 WAV/FLAC or lossy AAC-LC M4A audio.
   Use for README, runbooks, API docs, and PDF user guides.
 tools:
   - fs_read
@@ -43,6 +43,7 @@ when_to_use:
   - Archive supplied virtual files as a stored ZIP, PAX TAR or gzip-wrapped PAX TAR
   - Wrap supplied signed PCM16 little-endian bytes as WAV audio
   - Wrap supplied signed PCM16 little-endian bytes as lossless verbatim FLAC audio
+  - Encode supplied signed PCM16 little-endian bytes as lossy AAC-LC M4A audio
   - Encode supplied pixels into a PNG, TIFF, JPEG, single-image GIF, lossless WebP, BMP or standard-size ICO artifact
 when_not_to_use:
   - Pure code change with no documentation impact
@@ -316,9 +317,19 @@ play sound. Input contract: `pcm16le-interleaved-v1`; WAV output contract:
 `wav-pcm16le-interleaved-v1`.
 
 For lossless verbatim FLAC use the same PCM fields with an explicit `.flac`
-destination and `format="flac"`. Only exact `wav` and `flac` format tokens are
+destination and `format="flac"`. Only exact `wav`, `flac` and `m4a` format tokens are
 accepted; the extension does not select the format. FLAC has one STREAMINFO
 block, exact PCM MD5, independent verbatim channels and CRC-protected frames
 with nominal 4608-frame blocks and an unpadded final block. Complete FLAC output
 is limited to 2097152 bytes. Engine: `native-swift-flac`; output contract:
 `flac-pcm16le-verbatim-v1`. Existing PCM, managed argument and grant limits apply.
+
+For lossy AAC-LC M4A use the same PCM fields, an explicit `.m4a` destination and
+`format="m4a"`. An admitted owned native child encodes at most 2097152 complete
+output bytes and verifies the supplied valid-frame count before publication.
+Engine: `native-audiotoolbox-aac-lc`; output contract:
+`m4a-aac-lc-from-pcm16le-v1`. Encoded bytes can vary, and decoded samples are
+lossy; no quality, listening or source-PCM byte-equality guarantee is made.
+WAV remains the absent-format default. Existing rates/channels, raw PCM limits,
+managed argument bound and the tool's own grant remain unchanged. Complete
+artifact reads may require multiple `fs_read` binary pages and a real EOF.

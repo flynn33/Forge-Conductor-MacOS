@@ -1,5 +1,11 @@
 # Forge Conductor for macOS
 
+Current source target **0.43.0 (59)** adds optional AAC-LC M4A to existing `audio_write`: select exact `format: "m4a"` and an explicit matching .m4a path. Omitted format remains WAV; explicit WAV and FLAC remain available. Supplied PCM16LE, rates/channels and writer versus managed-call bounds remain. AAC is lossy, with variable encoded bytes and a retained supplied valid-frame count. [Audio contract](docs/NATIVE-AUDIO-WRITING.md).
+
+The AAC product source is applied; matching source/native owning selections passed 139 distinct methods each in 76.318/108.450 s on the same 475 inputs, zero failures/skips, with warnings retained. CLI/app compilation, ordinary Debug and strict signature passed. Candidate C1 readback passed on seven artifacts/Info, 475 source inputs and 80 preceding guards. Six App/CLI rate cohorts passed 24 actual M4A writes and complete binary EOF; all 24 files passed separate native valid-frame/decode EOF checks. Observed child cancellation preserved destinations and the child was gone. Qwen consumption remains **pending**. G3, hygiene and source/wiki delivery are also pending for this increment. Completed .42 evidence below retains its tested identity. Raw ADTS .aac, installed operation, full web/all models, general lifetime, Release and shipment remain unqualified. [Current gates](docs/QUALIFICATION-STATUS.md).
+
+## Preceding 0.42.0 (58) qualification
+
 Current source target **0.42.0 (58)** adds opt-in complete captured-text paging to existing `web.render`. Set `paged: true`, then continue the same immutable snapshot using `snapshot_id`, returned `next_byte_offset` and whole `snapshot_sha256` as `if_snapshot_sha256`. One captured UTF-8 body is bounded to 1 MiB/65,536 visited nodes and retained for at most 120 seconds; overflow and stale continuation fail explicitly. Omitted/false `paged` preserves the existing v1 prefix. [Renderer contract](docs/NATIVE-WEB-RENDERING.md).
 
 Matching .42/58 source/native selections passed 150 owning methods each; separate initial G3 checks passed one method per route. Ordinary Debug/signature and signed App/CLI complete-paging checks passed, including 1 MiB capture, scalar-safe pages, explicit EOF and overflow/stale refusals. The original App limits v1 continuity-200 NONPASS is retained; limits v2 passed 241 pages/246 responses per route. [Evidence](docs/QUALIFICATION-STATUS.md).
@@ -945,8 +951,8 @@ continuity. The user does not start project work through a Forge Managed Run.
 
 | | |
 |---|---|
-| **Version** | **0.42.0** |
-| **Build** | **58** |
+| **Version** | **0.43.0** |
+| **Build** | **59** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |

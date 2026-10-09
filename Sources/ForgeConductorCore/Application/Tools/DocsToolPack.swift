@@ -13,9 +13,11 @@ import CryptoKit
 public struct DocsToolPack: ToolPackHandling {
     private static let maximumSourceBytes = 4 * 1024 * 1024
     private let exporter: NativeDOCXExporter?
+    private let aacEncoder: NativeAACM4AEncoder?
 
-    public init() { exporter = nil }
-    init(exporter: NativeDOCXExporter) { self.exporter = exporter }
+    public init() { exporter = nil; aacEncoder = nil }
+    init(exporter: NativeDOCXExporter) { self.exporter = exporter; aacEncoder = nil }
+    init(aacEncoder: NativeAACM4AEncoder) { exporter = nil; self.aacEncoder = aacEncoder }
 
     public var toolNames: [String] { ["pdf_write", "pdf_from_file", "docx_write", "xlsx_write", "pptx_write", "ods_write", "image_write", "archive_write", "audio_write"] }
 
@@ -60,15 +62,15 @@ public struct DocsToolPack: ToolPackHandling {
         }
         let format: String
         if let supplied = args["format"] {
-            guard let value = supplied as? String, ["wav", "flac"].contains(value) else {
-                return .failure(code: "invalid_audio_arguments", message: "format must be exactly wav or flac")
+            guard let value = supplied as? String, ["wav", "flac", "m4a"].contains(value) else {
+                return .failure(code: "invalid_audio_arguments", message: "format must be exactly wav, flac or m4a")
             }
             format = value
         } else { format = "wav" }
         guard let path = args["path"] as? String,
               !path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               !path.utf8.contains(0) else {
-            return .failure(code: "invalid_path", message: format == "flac" ? "FLAC path must be a nonblank string without NUL bytes" : "WAV path must be a nonblank string without NUL bytes")
+            return .failure(code: "invalid_path", message: format == "flac" ? "FLAC path must be a nonblank string without NUL bytes" : format == "m4a" ? "M4A path must be a nonblank string without NUL bytes" : "WAV path must be a nonblank string without NUL bytes")
         }
         let url = ToolArgHelpers.resolvePath(path)
         guard url.pathExtension.lowercased() == format else {
@@ -83,7 +85,10 @@ public struct DocsToolPack: ToolPackHandling {
             let rate = try NativePCM16WAVWriter.sampleRate(args["sample_rate"])
             let channels = try NativePCM16WAVWriter.channels(args["channels"])
             if let context { try app.projectContexts.validate(context, cancellation: cancellation) }
-            if format == "flac" {
+            if format == "m4a" {
+                encoded = try (aacEncoder ?? app.aacEncoder).encode(content: content, sampleRate: rate, channels: channels, cancellation: cancellation)
+                engine = "native-audiotoolbox-aac-lc"; outputContract = AACM4AProtocol.outputContract
+            } else if format == "flac" {
                 encoded = try NativePCM16FLACWriter.encode(content: content, sampleRate: rate,
                     channels: channels, cancellation: cancellation)
                 engine = "native-swift-flac"; outputContract = NativePCM16FLACWriter.outputContract
@@ -98,11 +103,12 @@ public struct DocsToolPack: ToolPackHandling {
         catch let error as ToolCallDeadlineExceeded { throw error }
         catch let error as NativePCM16WAVError {
             let message: String
-            if format == "flac" {
+            if format == "flac" || format == "m4a" {
+                let label = format == "flac" ? "FLAC" : "AAC-LC M4A"
                 switch error {
-                case .workerRequired: message = "FLAC encoding requires a worker thread"
-                case .outputLimit: message = "Complete FLAC output exceeds the bounded output limit"
-                case .internalMismatch: message = "FLAC encoding could not confirm the preflight plan"
+                case .workerRequired: message = "\(label) encoding requires a worker thread"
+                case .outputLimit: message = "Complete \(label) output exceeds the bounded output limit"
+                case .internalMismatch: message = "\(label) encoding could not confirm the preflight plan"
                 default: message = error.localizedDescription
                 }
             } else { message = error.localizedDescription }
