@@ -2,7 +2,7 @@
 
 Current source documentation targets 0.40.0 (56). TAR/tar.gz remain values of existing archive_write: own grant, project context, idempotent replay, ordinary defaults/custom denials/imported capabilities and progress ownership are retained. The broker still refuses canonical arguments above 65,536 bytes before intent/dispatch. Source and canonical native replay/over-bound checks passed. Direct App/CLI MCP and Qwen TAR/tar.gz result consumption/ACK passed; direct MCP has no broker replay claim. Checkpoint/successor/ACK/seal and project formats are unchanged. [Archive contract](NATIVE-ARCHIVE-WRITING.md).
 
-Separate G3 source/native checks passed once each, giving 26 distinct methods per route with the prior 25; hygiene/whitespace passed. The initial zero-selection native attempt remains NONPASS. Final C2 passed as a reread of unchanged C1 binaries with only two G3 assertions changed in the source map; source/wiki delivery remains pending.
+Separate G3 source/native checks passed once each, giving 26 distinct methods per route with the prior 25; hygiene/whitespace passed. The initial zero-selection native attempt remains NONPASS. Final C2 passed as a reread of unchanged C1 binaries with only two G3 assertions changed in the source map; initial owner source/wiki publication, readback and clean synchronization passed; exact revisions are retained in the external delivery receipt.
 
 ## Preceding 0.39.0 (55) qualification
 

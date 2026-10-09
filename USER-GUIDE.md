@@ -2,7 +2,7 @@
 
 Version **0.40.0**, build **56** extends archive_write with optional exact tar/tar.gz while keeping absent/default ZIP. Use `archive_write(path="<project>/supplied.TAR", entries=[{"name":"notes.txt","content":"SGVsbG8K"}], format="tar")`, or a matching .tar.gz path with `format="tar.gz"`. These preserve supplied bytes and the own grant/context; the 1 MiB raw/2 MiB writer ceilings do not expand managed 64 KiB JSON admission. [Contract and scoped qualification](docs/NATIVE-ARCHIVE-WRITING.md).
 
-Separate G3 source/native checks passed once each, giving 26 distinct methods per route with the prior 25; hygiene/whitespace passed. The initial zero-selection native attempt remains NONPASS. Final C2 passed as a reread of unchanged C1 binaries with only two G3 assertions changed in the source map; source/wiki delivery remains pending.
+Separate G3 source/native checks passed once each, giving 26 distinct methods per route with the prior 25; hygiene/whitespace passed. The initial zero-selection native attempt remains NONPASS. Final C2 passed as a reread of unchanged C1 binaries with only two G3 assertions changed in the source map; initial owner source/wiki publication, readback and clean synchronization passed; exact revisions are retained in the external delivery receipt.
 
 ## Preceding 0.39.0 (55) qualification
 
