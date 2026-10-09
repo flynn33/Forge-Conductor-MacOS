@@ -1,5 +1,9 @@
 # Versioning policy
 
+Current target identity is **0.41.0 (57)**. Optional FLAC is a backward-compatible user-facing capability under the feature-component policy below. Root selected VERSION/BUILD_NUMBER, compiled constants, twelve marketing/sixteen build values and both G3 expected literals together. Writer/test membership changes are separate. The 59-method source area passed before this identity selection with 0.40.0/56 authorities; the matching selected-identity native 59 and ordinary build/signature checks passed. App/CLI protocol and bounded Qwen API result-consumption checks passed; selected-identity source 59 and all three product native PCM consumers passed. Separate source/native G3 checks passed one actual method each, giving 60 distinct methods per route with the prior 59-method selections; these are separate invocations. Initial hygiene/whitespace passed; owner source/wiki delivery remains pending. Final C2 reread unchanged C1 binaries and source/protected inputs without a rebuild. Historical receipts retain their tested identities; product version is not shipment.
+
+## Preceding 0.40.0 (56) qualification
+
 Current target identity is **0.40.0 (56)**. TAR/tar.gz extend an existing format enum compatibly; default ZIP, tool/field names and grants remain. Root aligned VERSION/BUILD_NUMBER, compiled constants and twelve marketing/sixteen build values after the 25-method source closure. New memberships are separate. The matching 25 canonical native methods and ordinary Debug/strict-signature gates passed on current .40/56 inputs; App/CLI full-byte wire and Qwen TAR/tar.gz result consumption/ACK passed on unchanged inputs. Fifteen product BSD checks passed on the same guarded inputs. Separate source/native G3 checks passed one actual method each in 7.174/14.946 s, giving 26 distinct methods per route with the prior 25-method selections; these are separate invocations. The initial native AppTests zero-selection attempt remains NONPASS. Hygiene/whitespace passed in 0.668/0.140 s, normal exit 0/unforced. The final C2 passed a reread of the same seven immutable C1 binaries, with no rebuild: the current 471-input map differs only in two G3 identity assertions; all other 470 inputs, including production, resources, authorities and graph, remain exact. Initial owner source/wiki publication, readback and clean synchronization passed; exact revisions are retained in the external delivery receipt. Historical receipts retain their tested identities.
 
 ## Preceding 0.39.0 (55) qualification
@@ -356,6 +360,10 @@ Update all four surfaces together. `script/check_repository_hygiene.sh`, the
 focused version test, and CI reject drift between them.
 
 ## Current identity
+
+Current source target is `0.41.0`, build `57`, for optional supplied PCM16 FLAC; source/native/runtime and delivery scopes are recorded in qualification status.
+
+## Preceding 0.39.0 (55) identity record
 
 Current source target is `0.39.0`, build `55`, for supplied PCM16 WAV writing; tested candidate evidence and remaining gates are in qualification status.
 

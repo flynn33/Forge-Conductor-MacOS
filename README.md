@@ -1,5 +1,11 @@
 # Forge Conductor for macOS
 
+Current source target **0.41.0 (57)** extends existing `audio_write` with exact optional `format: "wav"` or `"flac"`; omission remains WAV. Explicit case-insensitive .wav/.flac destinations must match the selected format. Supplied signed PCM16LE, rates 8000/44100/48000, mono/stereo, complete nonempty frames and 1 MiB raw remain bounded. The separate managed canonical JSON bound stays 65,536 bytes. [Audio contract](docs/NATIVE-AUDIO-WRITING.md).
+
+The 59-method source area passed before the identity advance, with all 11 new methods included; the focused 8 is a subset. Matching canonical native 59 and ordinary build/signature gates passed; App/CLI passed their bounded wire matrix and Qwen consumed two actual selected results with exact metadata ACK. The selected-identity source 59 rerun and three native whole product PCM consumers passed. Separate source/native G3 checks passed one actual method each, giving 60 distinct methods per route with the prior 59-method selections; these are separate invocations. Initial hygiene/whitespace passed; owner source/wiki delivery remains pending. Final C2 reread unchanged C1 binaries and source/protected inputs without a rebuild. Existing WAV bytes/metadata/grants and 85 neighboring descriptors are preserved by the executed source checks; these are scoped test, native protocol and model metadata checks, not installed, playback, general lifetime or shipment qualification. [Qualification](docs/QUALIFICATION-STATUS.md).
+
+## Preceding 0.40.0 (56) qualification
+
 Current source target **0.40.0 (56)** extends supplied-entry archive writing. `archive_write` now accepts optional exact `format: "zip"`, `"tar"` or `"tar.gz"`; omitted format remains stored ZIP. Explicit case-insensitive .zip/.tar/.tar.gz paths must match the selected format. Supplied virtual NFC names, canonical padded-base64 content, entry order/bytes, 0–32 entries, 1 MiB aggregate raw and 2 MiB complete output remain bounded. The separate managed canonical JSON argument limit remains 65,536 bytes. Standalone raw-file GZIP, host member sources and extraction are not added. [Contract](docs/NATIVE-ARCHIVE-WRITING.md).
 
 Source checks passed 11 owning and 14 preservation methods across eight invocations; the matching .40/56 canonical native selection passed the same 25 distinct methods in 22.035 s. CLI/app compilation passed in 5.849/2.297 s; ordinary Debug/strict signature passed in 25.674/0.138 s on 471 inputs. The first test-helper type-checking NONPASS and its explicit UInt32 CRC correction remain recorded.
@@ -929,8 +935,8 @@ continuity. The user does not start project work through a Forge Managed Run.
 
 | | |
 |---|---|
-| **Version** | **0.40.0** |
-| **Build** | **56** |
+| **Version** | **0.41.0** |
+| **Build** | **57** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |

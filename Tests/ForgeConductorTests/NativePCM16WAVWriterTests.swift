@@ -161,7 +161,7 @@ final class NativePCM16WAVWriterTests: XCTestCase {
                 let bad: [(String, Any, String)] = [("path", 1, "invalid_path"), ("path", true, "invalid_path"), ("path", " \n", "invalid_path"), ("path", "nul\u{0}.wav", "invalid_path"),
                     ("path", "no-extension", "invalid_path"), ("content", false, "invalid_audio_content"), ("content", "AAB=", "invalid_audio_content"),
                     ("sample_rate", true, "invalid_audio_sample_rate"), ("sample_rate", 96000, "invalid_audio_sample_rate"), ("channels", "1", "invalid_audio_channels"),
-                    ("format", "wav", "invalid_audio_arguments")]
+                    ("unknown", "wav", "invalid_audio_arguments")]
                 for (key, value, code) in bad {
                     var args = valid; args[key] = value
                     let result = try XCTUnwrap(try DocsToolPack().handle(name: "audio_write", arguments: args, context: nil, clientID: client, app: app, cancellation: nil))

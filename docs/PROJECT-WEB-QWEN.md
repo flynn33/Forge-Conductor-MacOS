@@ -1,5 +1,9 @@
 # Project repository, web access and Qwen verification
 
+Current source target **0.41.0 (57)** extends audio_write to optional FLAC without adding a tool or changing 85 neighboring descriptors. The 59-method source area passed before the identity advance. Candidate App/CLI each passed 40 responses/38 tool frames with full binary EOF, 18 refusals, immediate cancel and complete WAV parity in 1.800/1.292 s. Qwen qwen/qwen3.8-27b passed in 41.703 s: three observed Low inputs, two selected audio_write/fs_read results consumed by completed turns 1/2, nine native responses/seven frames, complete 85-byte mono44100/16-frame FLAC EOF and exact four-scalar metadata ACK. This is the bounded API workflow, not GUI, installed or all-model qualification. All three actual App/CLI/Qwen FLAC outputs passed Apple whole PCM consumers; the selected-identity source rerun passed the same 59 methods. Separate source/native G3 and initial hygiene/whitespace checks passed; owner source/wiki delivery remains pending. Preserve the earlier .39 GUI public-page, audio and archive/model evidence without reuse as FLAC, installed or all-model proof. [Audio contract](NATIVE-AUDIO-WRITING.md).
+
+## Preceding 0.40.0 (56) qualification
+
 Current source target **0.40.0 (56)** extends archive_write to TAR/tar.gz while preserving default ZIP and all 85 neighboring definitions. Matching source/native 25-method and ordinary Debug/signature gates passed.
 
 Direct App/CLI MCP each passed 32 responses/30 tool frames, seven base64 pages, five complete EOF readbacks, ten refusals, immediate cancellation and ZIP parity.

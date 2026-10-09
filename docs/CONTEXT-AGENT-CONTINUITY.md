@@ -1,4 +1,8 @@
-# Context and agent continuity (v0.40.0)
+# Context and agent continuity (v0.41.0)
+
+Current source documentation targets 0.41.0 (57). FLAC is a value of existing audio_write, preserving the own grant, project context, idempotent replay classification, ordinary defaults, custom denials and imported explicit capabilities. The broker canonical argument/result bound remains 65,536 bytes. Both new FLAC broker methods and prior audio methods passed within the pre-version 59 source area; direct MCP runtime does not prove durable broker replay. Checkpoint/successor/ACK/seal and project formats remain unchanged. The matching 59 canonical native methods passed on .41/57 inputs, including these broker tests. App/CLI protocol and bounded Qwen result-consumption checks passed; those direct MCP calls do not exercise the broker. The selected-identity source rerun passed the same 59 methods, and all three actual product outputs passed whole PCM consumers. Separate source/native G3 and initial hygiene/whitespace checks passed; owner source/wiki delivery remains pending. [Audio contract](NATIVE-AUDIO-WRITING.md).
+
+## Preceding 0.40.0 (56) qualification
 
 Current source documentation targets 0.40.0 (56). TAR/tar.gz remain values of existing archive_write: own grant, project context, idempotent replay, ordinary defaults/custom denials/imported capabilities and progress ownership are retained. The broker still refuses canonical arguments above 65,536 bytes before intent/dispatch. Source and canonical native replay/over-bound checks passed. Direct App/CLI MCP and Qwen TAR/tar.gz result consumption/ACK passed; direct MCP has no broker replay claim. Checkpoint/successor/ACK/seal and project formats are unchanged. [Archive contract](NATIVE-ARCHIVE-WRITING.md).
 

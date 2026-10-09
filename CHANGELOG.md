@@ -10,6 +10,11 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### `0.41.0 (57)` FLAC format extension
+
+- Extend existing audio_write with exact optional wav/flac and matching .wav/.flac paths; omission remains WAV. Preserve supplied signed PCM16LE/rates/channels, 1 MiB raw and bounded canonical base64, own grant/context/replay, pinned publication and separate 65,536-byte managed JSON admission. FLAC is lossless verbatim with native-swift-flac / flac-pcm16le-verbatim-v1 metadata; no conversion, playback or source-file import is added. [Contract](docs/NATIVE-AUDIO-WRITING.md).
+- Pre-version source checks passed 59 distinct methods, including all 11 new methods and complete WAV/85-neighbor preservation; focused 8 adds no coverage. Matching .41/57 canonical native 59 and ordinary build/signature gates passed; App/CLI each passed 40 responses/38 frames with refusals, immediate cancel and complete WAV parity; Qwen completed three Low responses, consumed two actual results and acknowledged four exact scalars. Selected-identity source 59 and all three App/CLI/Qwen native whole PCM consumers also passed. Separate source/native G3 checks passed one actual method each, giving 60 distinct methods per route with the prior 59-method selections; these are separate invocations. Initial hygiene/whitespace passed; owner source/wiki delivery remains pending. Final C2 reread unchanged C1 binaries and source/protected inputs without a rebuild. Standalone bitstream/native whole PCM and 42 test-hook controls retain separate provenance. [Qualification](docs/QUALIFICATION-STATUS.md).
+
 ### `0.40.0 (56)` supplied-entry TAR/GZIP writing
 
 - Extend archive_write with exact optional zip/default, tar and tar.gz and matching explicit paths. Preserve virtual NFC names/order/bytes, canonical base64, 32 members, 1 MiB raw/2 MiB output, own grant/context/pinned writer and separate 65,536-byte managed JSON bound. Standalone GZIP/source-file members/extraction are not added. [Contract](docs/NATIVE-ARCHIVE-WRITING.md).

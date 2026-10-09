@@ -268,7 +268,7 @@ public final class ToolAuthorizationService: ToolAuthorizing, @unchecked Sendabl
             guard let path = arguments["path"] as? String,
                   !path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                   !path.utf8.contains(0) else {
-                return .denied(code: "invalid_path", message: "WAV path must be a nonblank string without NUL bytes")
+                return .denied(code: "invalid_path", message: arguments["format"] as? String == "flac" ? "FLAC path must be a nonblank string without NUL bytes" : "WAV path must be a nonblank string without NUL bytes")
             }
         }
 

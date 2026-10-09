@@ -1,4 +1,55 @@
-# Native PCM16 WAV writing
+# Native PCM16 WAV and FLAC writing
+
+<a id="native-pcm16-wav-writing"></a>
+
+Current source target **0.41.0 (57)** extends existing audio_write with exact optional wav/flac; omission remains WAV. Source qualification passed before the identity advance; matching selected-identity native 59, ordinary build/signature, App/CLI protocol and bounded Qwen API result-consumption checks passed. The selected-identity source 59 and all three product native PCM consumers passed. Separate source/native G3 and initial hygiene/whitespace checks passed; owner source/wiki delivery remains pending.
+
+## Current input and output contract
+
+Required path/content/sample_rate/channels and optional shared deadline_ms remain; optional format accepts exactly `"wav"` or `"flac"`. Malformed/other tokens return invalid_audio_arguments. Explicit case-insensitive .wav/.flac paths must match; no extension selects the format. Signed PCM16LE is nonempty, frame-major/interleaved, with rate exactly 8000/44100/48000 and channels 1/2. Booleans/fractions/strings, partial frames and noncanonical padded base64 are rejected.
+
+```text
+audio_write(path="<project>/silence.FLAC", content="AAA=", sample_rate=8000, channels=1, format="flac")
+```
+
+| Bound or identity | WAV | FLAC |
+| --- | --- | --- |
+| Supplied raw/base64 UTF-8 | 1,048,576/1,398,104 bytes | Same |
+| Complete output | 44 + raw, at most 1,048,620 bytes | 42 + raw + blockCount * (10 + channels), at most 2,097,152 bytes |
+| Engine | swift-pcm16-riff | native-swift-flac |
+| Output contract | wav-pcm16le-interleaved-v1 | flac-pcm16le-verbatim-v1 |
+| Input contract | pcm16le-interleaved-v1 | Same |
+| Managed canonical arguments/results | Separate 65,536-byte bound | Same |
+
+FLAC contains one STREAMINFO with rate, channels, 16-bit depth, total frame count and whole PCM MD5. Fixed blocks have nominal 4,608 frames and an unpadded final 1..4,608, independent verbatim channel subframes, CRC8 headers/CRC16 frames and exact EOF. Maximum 1 MiB raw has 114 mono or 57 stereo blocks. Verbatim coding promises exact supplied PCM, not compression efficiency. Successful ToolResult payloads keep eleven writer fields plus existing ok=true, twelve actual keys. No synthesis/playback/source-file codec conversion is added.
+
+## Current owners and preservation
+
+NativePCM16FLACWriter reuses the WAV EncodedAudio value and existing admission errors; its qualified serializer body has no testhook. DocsToolPack retains project context before/after encoding and the common pinned atomic writer, mode preservation and failure behavior. Own audio_write grant, ordinary enrollment/custom denial/imported capabilities, content redaction, idempotent completed replay and binary fs_read paging remain. WAV-specific worker/output/internal descriptions are mapped locally only on exact FLAC; codes and other messages remain. The bundled WAV heading/example and both original when_to_use hints remain, with additive FLAC guidance. All 85 neighboring full descriptors and omitted/explicit WAV complete same-path payload/bytes passed source preservation checks.
+
+## Current evidence and remaining gates
+
+The actual pre-version source area passed 59 distinct methods (8 FLAC, 9 WAV, 38 catalog and 4 audio broker) in 35.339 s, normal exit 0/unforced, with zero failures/skips on unchanged 473 inputs. The earlier focused 8 passed in 37.562 s and is a subset, adding no distinct methods. These tests ran with 0.40.0/56 authorities before the selected 0.41.0/57 identity advance.
+
+The 59 methods include 11 new methods. Tests cover original short/block-boundary streams, independent restricted CRC/MD5/whole PCM/EOF inspection, six 1 MiB rate/channel combinations, malformed syntax/scalars/paths, complete bounds, own grants/stale context/modes/publication failures, explicit/default WAV parity and durable broker replay/refusal. The reader rejects unsupported syntax; its MD5 primitive shares CryptoKit with the writer, while whole decoded PCM and actual maximum golden stream hashes are separate checks. The source compile retains an unrelated TAR-test unnecessary-try warning; support zero-selection contributes no methods.
+
+Separate standalone boundary and six 1 MiB rate-channel bitstreams and Apple whole PCM consumers passed. The 42-control refusal/cancellation mechanism used a test-only hook after an emitted block and measured four test-owned weak/deinit witnesses. These qualify only their standalone scopes. Historical framework callback, constructor and short-input NONPASSs remain retained; no framework-cause claim follows. Pre-cancel/source/test-hook checks do not establish actual product mid-loop or common late-cancel/revocation-before-rename behavior, heap leak freedom or general interoperability.
+
+The selected .41/57 canonical native run passed the same 59 methods in 69.268 s. CLI/app compilation passed in 5.646/2.323 s; ordinary Debug/strict signature passed in 25.586/0.136 s on unchanged 473 inputs.
+
+The ordinary candidate App/CLI routes each passed 40 responses/38 tool frames, eight binary readback pages (seven FLAC plus one WAV), 18 refusals, immediate-cancel destination preservation and complete WAV parity in 1.800/1.292 s. Each App/CLI result includes one FLAC and one WAV artifact, exact whole binary EOF, 86 catalog definitions with all 85 neighbors preserved, and normal native exit/both EOF/unforced. Qwen qwen/qwen3.8-27b passed in 41.703 s: three observed Low inputs, two selected audio_write/fs_read results consumed by completed turns 1/2, nine native responses/seven frames, complete 85-byte mono44100/16-frame FLAC EOF and exact four-scalar metadata ACK. This is the bounded API workflow, not GUI, installed or all-model qualification.
+
+The selected .41/57 source rerun passed the same 59 distinct methods in 40.694 s (tests 33.227 s), matching the canonical native and pre-version method sets on unchanged 473 inputs.
+
+Three actual App/CLI/Qwen FLAC outputs passed Apple afconvert whole RIFF/PCM checks in 0.024/0.018/0.017 s, each normal exit 0/unforced with both EOF and the owned group absent. Both App/CLI stereo48000/9,217-frame outputs decoded to the exact 36,868 supplied PCM bytes; Qwen mono44100/16-frame decoded to the exact 32 supplied bytes. Complete RIFF extents, PCM format and EOF were checked. This qualifies these three product outputs only.
+
+Separate G3 source/native checks each passed the intended G1G10AcceptanceTests/testG3_VersionAndReleaseDocumentsAreAligned method in 1.389/2.869 s, normal exit 0/unforced with zero failures/skips. The selected-identity source 59 plus source G3 and native 59 plus native G3 give matching 60-method unions; no single 60-method run is claimed. The source support bundle selected zero methods and contributes no coverage. Native destination and DVTAssertions warnings remain in the retained log. Hygiene/whitespace passed in 0.657/0.139 s on the applied initial thirteen documents and unchanged 473 source inputs.
+
+Final C2 reread the same seven immutable .41/57 C1 artifacts and Info identity without a rebuild. The complete 473-input map and all 66 historical/protected identities remained exact; fresh strict signature passed in 0.134 s. The C2 receipt is `native-audio-flac-final-candidate-root-readback-0410-v1.json`, SHA256 `38c6a5612bc8c7e0a9d84306d9983a5c26fe9fbad80df6ec2eba9ede356a62b6`. Owner source/wiki publication, readback and clean synchronization remain pending; final prose checks are recorded separately before publication. Standalone mechanism receipts do not replace integrated product consumers.
+
+MP3, AAC, OGG/Opus and MIDI authoring, playback, installed operation, general lifetime/full web/all models/Release/shipment remain separate. The entire preceding .39 WAV body, including its unsupported-FLAC and pending statements at that tested time, follows as retained historical evidence.
+
+## Preceding 0.39.0 (55) WAV qualification
 
 Current source target **0.39.0 (55)** adds `audio_write` for supplied samples. Product qualification is open.
 

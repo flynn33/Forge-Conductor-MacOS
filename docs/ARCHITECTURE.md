@@ -1,5 +1,9 @@
 # Forge Conductor architecture
 
+Version: `0.41.0`; build: `57`. NativePCM16FLACWriter reuses NativePCM16WAVWriter.EncodedAudio and the existing admission error. It emits one STREAMINFO and independent verbatim PCM16 channel subframes, nominal 4,608-frame blocks with an unpadded final block, whole PCM MD5, CRC8 headers and CRC16 frames. DocsToolPack.audioWrite dispatches exact wav/flac while retaining before/after context checks and the pinned Data publication owner. No AudioFile encoder, codec process, service or dependency is added. The 59-method source area passed before the identity advance and the matching canonical native selection passed on .41/57 inputs. App/CLI and the bounded Qwen API workflow passed; three actual product outputs passed Apple whole PCM consumers. These tests do not establish general lifetime or interoperability. [Audio contract](NATIVE-AUDIO-WRITING.md).
+
+## Preceding 0.40.0 (56) qualification
+
 Version: `0.40.0`; build: `56`. NativePAXTARWriter preflights complete per-file PAX/USTAR extents before payload/output allocation. NativeGZIPArchiveWriter wraps that bounded TAR in one system-zlib member with pinned call-local storage, bounded allocation and row/chunk/native-call cancellation checks. Existing ZIP/Office bytes, Docs context-before/after checks and the pinned publication owner stay intact. Native mechanism cleanup witnesses do not qualify product in-work or shared late-cancel/revocation-before-rename paths. [Contract](NATIVE-ARCHIVE-WRITING.md).
 
 Separate G3 source/native checks passed once each, giving 26 distinct methods per route with the prior 25; hygiene/whitespace passed. The initial zero-selection native attempt remains NONPASS. Final C2 passed as a reread of unchanged C1 binaries with only two G3 assertions changed in the source map; initial owner source/wiki publication, readback and clean synchronization passed; exact revisions are retained in the external delivery receipt.

@@ -1,5 +1,20 @@
 # Forge Conductor macOS — project roadmap
 
+## Supplied PCM16 FLAC format extension
+
+Current target **0.41.0 (57)** extends existing audio_write; this row records work, not dispatch.
+
+| Milestone | Actual evidence or preparation | Remaining gate |
+| --- | --- | --- |
+| Standalone mechanism | Boundary and six 1 MiB rate/channel streams passed independent CRC/MD5/whole PCM/EOF and Apple whole PCM consumers; the separate 42 controls measured named test-hook cancellation/refusal and four test-owned releases. | Separate from integrated product and general lifetime/late-publication cancellation. |
+| Source and preservation | The pre-version 0.40/56 area passed 59 distinct methods in 35.339 s (8 FLAC, 9 WAV, 38 catalog, 4 broker), normal exit 0/unforced/zero failures or skips on 473 unchanged inputs. Earlier focused 8 is a subset. Eleven new methods are included; complete default/explicit WAV and 85 neighbors are preserved. Matching .41/57 canonical native 59 passed in 69.268 s; CLI/app compilation 5.646/2.323 s and ordinary Debug/signature 25.586/0.136 s passed on current 473 inputs. The selected-identity source rerun passed the identical 59 methods in 40.694 s. | Owner source/wiki delivery and final prose checks. |
+| Product wire/model/native PCM | App/CLI each passed 40 responses/38 tool frames, eight binary pages, 18 refusals, immediate cancel and complete WAV parity in 1.800/1.292 s. Qwen passed three observed Low responses/two consumed results/9 native responses/7 frames/exact four-scalar ACK in 41.703 s. Apple afconvert decoded all three actual App/CLI/Qwen FLAC outputs to whole supplied PCM/RIFF/EOF, normal exit 0/unforced. | Owner source/wiki delivery and final document closure. |
+| Identity/documents/delivery | Root selected .41.0/57 under compatible-feature policy; two writer/test memberships are separate from authority updates. Full .40/.39 histories remain. Separate source/native G3 passed one actual method each, giving 60-method unions with the prior 59; initial hygiene/whitespace passed. Final C2 reread the same seven C1 artifacts, 473 source inputs and 66 prior/protected identities without a rebuild. | Owner source publication/readback/clean sync, final prose checks and affected wiki mirror. |
+
+[Audio contract](docs/NATIVE-AUDIO-WRITING.md). Installed, playback, general lifetime/interoperability, other codecs, full web/all models, Release and shipment remain separate.
+
+## Preceding 0.40.0 (56) qualification
+
 ## Supplied-entry TAR/GZIP formats
 
 Current target **0.40.0 (56)** extends existing archive_write; this affected row records work, not dispatch.

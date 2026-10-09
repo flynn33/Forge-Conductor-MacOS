@@ -1586,6 +1586,32 @@ final class ToolDefinitionCatalogTests: XCTestCase {
         }
     }
 
+    func testAudioFLACFormatSchemaAndAllEightyFivePriorDescriptors() throws {
+        try withProductionApp("audio-flac-schema") { app in
+            let catalog = try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames)
+            XCTAssertEqual(catalog.definitions.count, 86)
+            let neighbors = try catalog.definitions.filter { $0.name != "audio_write" }.map { try $0.mcpDescriptor() }
+            XCTAssertEqual(neighbors.count, 85)
+            let normalized = try JSONSerialization.data(withJSONObject: ["tools": neighbors], options: [.sortedKeys, .withoutEscapingSlashes])
+            XCTAssertEqual(JSONSupport.sha256Hex(normalized), "20f510699240b4d1ae1026c55ff9e018bc111fe1e5114f7d989587e3082d4404")
+            let audio = try XCTUnwrap(catalog.definition(named: "audio_write"))
+            XCTAssertTrue(audio.strict)
+            let schema = try audio.inputSchemaObject(), properties = try XCTUnwrap(schema["properties"] as? [String: Any])
+            XCTAssertEqual(Set(properties.keys), ["path", "content", "sample_rate", "channels", "format", "deadline_ms"])
+            XCTAssertEqual(schema["required"] as? [String], ["path", "content", "sample_rate", "channels"])
+            XCTAssertEqual(schema["additionalProperties"] as? Bool, false)
+            let format = try XCTUnwrap(properties["format"] as? [String: Any])
+            XCTAssertEqual(format["type"] as? String, "string"); XCTAssertEqual(format["enum"] as? [String], ["wav", "flac"])
+            XCTAssertEqual(format["default"] as? String, "wav")
+            let path = try XCTUnwrap(properties["path"] as? [String: Any])
+            XCTAssertTrue(try XCTUnwrap(path["description"] as? String).contains(".flac"))
+            XCTAssertTrue(audio.description.contains("flac-pcm16le-verbatim-v1")); XCTAssertTrue(audio.description.contains("wav-pcm16le-interleaved-v1"))
+            XCTAssertTrue(audio.description.contains("65536-byte canonical JSON")); XCTAssertTrue(audio.description.contains("Requires its own audio_write grant"))
+            XCTAssertEqual(try catalog.definitions(allowedToolNames: ["audio_write"]).map(\.name), ["audio_write"])
+            XCTAssertEqual(try ProductionToolReplayCatalog.classifier(productionToolNames: app.tools.toolNames).replayClass(for: "audio_write"), .idempotent)
+        }
+    }
+
     func testAudioWriteHasExactSchemaReplayAndAllPriorToolNamesWithRequiredContext() throws {
         try withProductionApp("audio-schema") { app in
             let catalog = try ToolDefinitionCatalog.production(toolNames: app.tools.toolNames)
@@ -1595,7 +1621,10 @@ final class ToolDefinitionCatalogTests: XCTestCase {
             XCTAssertEqual(Set(catalog.definitions.filter { $0.name != "audio_write" }.map(\.name)), previousNames)
             XCTAssertTrue(definition.strict)
             let schema = try definition.inputSchemaObject(), properties = try XCTUnwrap(schema["properties"] as? [String: Any])
-            XCTAssertEqual(Set(properties.keys), ["path", "content", "sample_rate", "channels", "deadline_ms"])
+            XCTAssertEqual(Set(properties.keys), ["path", "content", "sample_rate", "channels", "format", "deadline_ms"])
+            let format = try XCTUnwrap(properties["format"] as? [String: Any])
+            XCTAssertEqual(format["type"] as? String, "string"); XCTAssertEqual(format["enum"] as? [String], ["wav", "flac"])
+            XCTAssertEqual(format["default"] as? String, "wav")
             XCTAssertEqual(schema["required"] as? [String], ["path", "content", "sample_rate", "channels"])
             XCTAssertEqual(schema["additionalProperties"] as? Bool, false)
             let content = try XCTUnwrap(properties["content"] as? [String: Any])

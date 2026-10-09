@@ -1,5 +1,9 @@
 # Documentation guide
 
+Current source target **0.41.0 (57)** adds an optional FLAC format to [supplied PCM16 audio writing](NATIVE-AUDIO-WRITING.md), preserving WAV defaults and strict grants/bounds. The pre-version source area passed 59 methods; matching selected-identity native 59 and ordinary build/signature gates passed, as did App/CLI protocol and bounded Qwen API result-consumption checks. The selected-identity source 59 and all three product native PCM consumers passed. Separate source/native G3 and initial hygiene/whitespace checks passed; owner source/wiki delivery remains pending. Complete archive/image/web and previous audio evidence retain their historical identities. [Qualification](QUALIFICATION-STATUS.md).
+
+## Preceding 0.40.0 (56) qualification
+
 Current source target **0.40.0 (56)** extends [supplied-entry archive writing](NATIVE-ARCHIVE-WRITING.md) to optional PAX TAR and GZIP-wrapped PAX TAR while preserving ZIP default, exact virtual names/bytes and distinct writer/broker bounds. Matching source/native 25-method, ordinary Debug/signature and separate mechanism/container/BSD gates passed; App/CLI full-byte wire and Qwen TAR/tar.gz consumption/ACK passed; fifteen product BSD checks passed. Separate G3 source/native checks passed once each, giving 26 distinct methods per route with the prior 25; hygiene/whitespace passed. The initial zero-selection native attempt remains NONPASS. Final C2 passed as a reread of unchanged C1 binaries with only two G3 assertions changed in the source map; initial owner source/wiki publication, readback and clean synchronization passed; exact revisions are retained in the external delivery receipt. Previous histories retain their identities.
 
 ## Preceding 0.39.0 (55) qualification

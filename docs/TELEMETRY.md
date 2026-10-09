@@ -1,5 +1,9 @@
 # Telemetry architecture (real-time native)
 
+Current source documentation targets `0.41.0`, build `57`. FLAC stays within existing audio_write documents/tool-card/content-redaction owners. No telemetry field, gauge, timer, producer or delivery queue is added. Four external test-owner weak/deinit witnesses do not establish product or framework-wide leak freedom. Source checks are separate from actual candidate telemetry/lifetime qualification. [Audio scope](NATIVE-AUDIO-WRITING.md).
+
+## Preceding 0.40.0 (56) qualification
+
 Current source documentation targets `0.40.0`, build `56`. TAR/tar.gz stay within existing archive_write document/tool-card/content-redaction owners; no telemetry schema, gauge, timer, producer or delivery queue is added. Selected mechanism allocation/free/End/deinit/weak observations are test-only call-local evidence, not general leak freedom or product telemetry qualification. [Scope](NATIVE-ARCHIVE-WRITING.md).
 
 Separate G3 source/native checks passed once each, giving 26 distinct methods per route with the prior 25; hygiene/whitespace passed. The initial zero-selection native attempt remains NONPASS. Final C2 passed as a reread of unchanged C1 binaries with only two G3 assertions changed in the source map; initial owner source/wiki publication, readback and clean synchronization passed; exact revisions are retained in the external delivery receipt.

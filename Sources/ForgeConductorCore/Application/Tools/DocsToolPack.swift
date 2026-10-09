@@ -1,5 +1,5 @@
 // DocsToolPack.swift
-// What: Provides native PDF, plain-text DOCX, text-cell XLSX/ODS, text-slide PPTX, and PNG/TIFF/JPEG/GIF/WebP/BMP/ICO and supplied-entry ZIP/TAR/tar.gz/PCM16 WAV tools to external MCP clients.
+// What: Provides native PDF, plain-text DOCX, text-cell XLSX/ODS, text-slide PPTX, and PNG/TIFF/JPEG/GIF/WebP/BMP/ICO and supplied-entry ZIP/TAR/tar.gz/PCM16 WAV/FLAC tools to external MCP clients.
 // How: It translates validated tool arguments into PDFWriter operations and returns
 // bounded, structured success or error payloads.
 // Why: Document capability is an optional module rather than a responsibility of Core routing.
@@ -9,7 +9,7 @@ import Darwin
 import AppKit
 import CryptoKit
 
-/// Documentation tools: PDF write / PDF from file / plain-text DOCX / text-cell XLSX/ODS / text-slide PPTX / PNG/TIFF/JPEG/GIF/WebP/BMP/ICO / supplied-entry ZIP/TAR/tar.gz / supplied PCM16 WAV.
+/// Documentation tools: PDF write / PDF from file / plain-text DOCX / text-cell XLSX/ODS / text-slide PPTX / PNG/TIFF/JPEG/GIF/WebP/BMP/ICO / supplied-entry ZIP/TAR/tar.gz / supplied PCM16 WAV/FLAC.
 public struct DocsToolPack: ToolPackHandling {
     private static let maximumSourceBytes = 4 * 1024 * 1024
     private let exporter: NativeDOCXExporter?
@@ -55,34 +55,58 @@ public struct DocsToolPack: ToolPackHandling {
 
     private func audioWrite(_ args: [String: Any], context: ToolInvocationContext?,
                             app: ForgeApp, cancellation: ToolCallCancellation?) throws -> ToolResult {
-        guard Set(args.keys).isSubset(of: ["path", "content", "sample_rate", "channels", "deadline_ms"]) else {
-            return .failure(code: "invalid_audio_arguments", message: "Only path, content, sample_rate, channels and the shared deadline_ms field are accepted")
+        guard Set(args.keys).isSubset(of: ["path", "content", "sample_rate", "channels", "format", "deadline_ms"]) else {
+            return .failure(code: "invalid_audio_arguments", message: "Only path, content, sample_rate, channels, format and the shared deadline_ms field are accepted")
         }
+        let format: String
+        if let supplied = args["format"] {
+            guard let value = supplied as? String, ["wav", "flac"].contains(value) else {
+                return .failure(code: "invalid_audio_arguments", message: "format must be exactly wav or flac")
+            }
+            format = value
+        } else { format = "wav" }
         guard let path = args["path"] as? String,
               !path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               !path.utf8.contains(0) else {
-            return .failure(code: "invalid_path", message: "WAV path must be a nonblank string without NUL bytes")
+            return .failure(code: "invalid_path", message: format == "flac" ? "FLAC path must be a nonblank string without NUL bytes" : "WAV path must be a nonblank string without NUL bytes")
         }
         let url = ToolArgHelpers.resolvePath(path)
-        guard url.pathExtension.lowercased() == "wav" else {
-            return .failure(code: "invalid_path", message: "An explicit .wav destination is required")
+        guard url.pathExtension.lowercased() == format else {
+            return .failure(code: "invalid_path", message: "An explicit .\(format) destination is required")
         }
         guard let content = args["content"] as? String else {
             return .failure(code: "invalid_audio_content", message: "content must be a canonical padded base64 string")
         }
         let encoded: NativePCM16WAVWriter.EncodedAudio
+        let engine: String, outputContract: String
         do {
             let rate = try NativePCM16WAVWriter.sampleRate(args["sample_rate"])
             let channels = try NativePCM16WAVWriter.channels(args["channels"])
             if let context { try app.projectContexts.validate(context, cancellation: cancellation) }
-            encoded = try NativePCM16WAVWriter.encode(content: content, sampleRate: rate,
-                channels: channels, cancellation: cancellation)
+            if format == "flac" {
+                encoded = try NativePCM16FLACWriter.encode(content: content, sampleRate: rate,
+                    channels: channels, cancellation: cancellation)
+                engine = "native-swift-flac"; outputContract = NativePCM16FLACWriter.outputContract
+            } else {
+                encoded = try NativePCM16WAVWriter.encode(content: content, sampleRate: rate,
+                    channels: channels, cancellation: cancellation)
+                engine = "swift-pcm16-riff"; outputContract = NativePCM16WAVWriter.outputContract
+            }
             try cancellation?.checkCancellation()
             if let context { try app.projectContexts.validate(context, cancellation: cancellation) }
         } catch is CancellationError { throw CancellationError() }
         catch let error as ToolCallDeadlineExceeded { throw error }
         catch let error as NativePCM16WAVError {
-            return .failure(code: error.code, message: error.localizedDescription)
+            let message: String
+            if format == "flac" {
+                switch error {
+                case .workerRequired: message = "FLAC encoding requires a worker thread"
+                case .outputLimit: message = "Complete FLAC output exceeds the bounded output limit"
+                case .internalMismatch: message = "FLAC encoding could not confirm the preflight plan"
+                default: message = error.localizedDescription
+                }
+            } else { message = error.localizedDescription }
+            return .failure(code: error.code, message: message)
         } catch {
             return .failure(code: "audio_encode_failed", message: "Native encoding or project authorization failed")
         }
@@ -95,13 +119,13 @@ public struct DocsToolPack: ToolPackHandling {
             return .failure(code: "audio_write_failed", message: "Destination write or durability confirmation failed; inspect the destination before retrying")
         }
         return .success([
-            "path": url.path, "format": "wav", "engine": "swift-pcm16-riff",
+            "path": url.path, "format": format, "engine": engine,
             "bytes_written": encoded.data.count,
             "sha256": SHA256.hash(data: encoded.data).map { String(format: "%02x", $0) }.joined(),
             "pcm_bytes": encoded.pcmBytes, "sample_rate": encoded.sampleRate,
             "channels": encoded.channels, "frames": encoded.frames,
             "input_contract": NativePCM16WAVWriter.inputContract,
-            "output_contract": NativePCM16WAVWriter.outputContract,
+            "output_contract": outputContract,
         ])
     }
 

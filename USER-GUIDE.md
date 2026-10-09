@@ -1,5 +1,9 @@
 # Forge Conductor user guide
 
+Version **0.41.0**, build **57** adds an optional FLAC format to supplied-sample audio_write. Use `audio_write(path="<project>/silence.FLAC", content="AAA=", sample_rate=8000, channels=1, format="flac")` for one zero mono frame. Omit format for the existing WAV behavior, or select exact `"wav"` with a matching .wav path. An extension does not select a format. The tool preserves supplied PCM; it does not synthesize or play sound. The 1 MiB raw writer ceiling does not expand managed 65,536-byte JSON admission. [Contract and scoped qualification](docs/NATIVE-AUDIO-WRITING.md).
+
+## Preceding 0.40.0 (56) qualification
+
 Version **0.40.0**, build **56** extends archive_write with optional exact tar/tar.gz while keeping absent/default ZIP. Use `archive_write(path="<project>/supplied.TAR", entries=[{"name":"notes.txt","content":"SGVsbG8K"}], format="tar")`, or a matching .tar.gz path with `format="tar.gz"`. These preserve supplied bytes and the own grant/context; the 1 MiB raw/2 MiB writer ceilings do not expand managed 64 KiB JSON admission. [Contract and scoped qualification](docs/NATIVE-ARCHIVE-WRITING.md).
 
 Separate G3 source/native checks passed once each, giving 26 distinct methods per route with the prior 25; hygiene/whitespace passed. The initial zero-selection native attempt remains NONPASS. Final C2 passed as a reread of unchanged C1 binaries with only two G3 assertions changed in the source map; initial owner source/wiki publication, readback and clean synchronization passed; exact revisions are retained in the external delivery receipt.
