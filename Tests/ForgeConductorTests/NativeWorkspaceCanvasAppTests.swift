@@ -2217,6 +2217,8 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
         window = owned
         var stage = "fixture-created", records: [[String: Any]] = [], menus: [[String: Any]] = []
         var latestControlDiscovery: [String: Any] = [:]
+        let menuLifecycle = identifierRoute == .exportedApplicationContent
+            ? WorkspaceSharedControlsMenuLifecycleObservation(window: owned, hosting: hosting) : nil
         defer {
             nativeDraftRetainMeasurement(["classification": identifierRoute == .ordinary
                     ? "Separate real Tools shared native controls route; runtime assertions determine qualification, no all-view/desktop claim"
@@ -2225,8 +2227,10 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
                 "stage": stage, "view_id": "tools", "flow_deadline_seconds": 45,
                 "stage_record_limit": 16, "records": records, "menu_record_limit": 8, "menus": menus,
                 "latest_control_discovery": latestControlDiscovery,
+                "first_native_menu_lifecycle_observation": menuLifecycle.map { $0.evidence as Any } ?? NSNull(),
                 "original_naming_whole_window_and_desktop_gates": "unchanged/open"], name: "workspace-tools-shared-controls")
         }
+        defer { menuLifecycle?.stop() }
         func close() async {
             owned.endEditing(for: nil); _ = owned.makeFirstResponder(nil)
             hosting.rootView = AnyView(EmptyView()); hosting.layoutSubtreeIfNeeded()
@@ -2375,6 +2379,8 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
             let capture = WorkspaceSharedControlsMenuCapture(window: owned, hosting: hosting,
                 preferences: preferences, expectedCollection: expected, command: command, titles: titles,
                 states: states, deadline: min(deadline, ProcessInfo.processInfo.systemUptime + 3))
+            if let menuLifecycle { capture.observeLifecycle(menuLifecycle, attemptOrdinal: menus.count + 1) }
+            if identifierRoute == .exportedApplicationContent { capture.observeExactTrackingEnd() }
             NotificationCenter.default.addObserver(capture, selector: #selector(WorkspaceSharedControlsMenuCapture.didBegin(_:)),
                 name: NSMenu.didBeginTrackingNotification, object: nil)
             let timer = Timer(timeInterval: 0.02, target: capture, selector: #selector(WorkspaceSharedControlsMenuCapture.fire(_:)), userInfo: nil, repeats: true)
@@ -2396,7 +2402,11 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
                 guard let element = opener.exportedAX, let context = opener.exportedContext else {
                     throw WorkspaceCanvasFixtureFailure("The exact shared exported opener lost its owner context.")
                 }
+                menuLifecycle?.noteSecondAction(returned: false, attemptOrdinal: menus.count + 1,
+                    captureDeadline: capture.deadline, actionDeadline: context.deadline)
                 try context.pressToolsMenu(element, requestedIdentifier: panels ? "workspace-panels-menu-tools" : "workspace-layout-menu-tools")
+                menuLifecycle?.noteSecondAction(returned: true, attemptOrdinal: menus.count + 1,
+                    captureDeadline: capture.deadline, actionDeadline: context.deadline)
             } else {
                 try opener.press()
             }
@@ -2405,6 +2415,18 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
                 try await Task.sleep(for: .milliseconds(10))
             }
             try XCTUnwrap(capture.result).get(); try requireOwner()
+            if identifierRoute == .exportedApplicationContent {
+                while capture.exactTrackingEndedAt == nil {
+                    guard ProcessInfo.processInfo.systemUptime < capture.deadline else {
+                        throw WorkspaceCanvasFixtureFailure("The exact captured shared native menu did not report tracking end within its original deadline.")
+                    }
+                    try await Task.sleep(for: .milliseconds(10))
+                }
+                guard let endedAt = capture.exactTrackingEndedAt, endedAt < capture.deadline,
+                      ProcessInfo.processInfo.systemUptime < capture.deadline else {
+                    throw WorkspaceCanvasFixtureFailure("The exact captured shared native menu did not report tracking end within its original deadline.")
+                }
+            }
         }
         do {
             try await waitUntil("The isolated Tools startup did not settle.") { !model.isBootstrapping }
@@ -3829,6 +3851,102 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
 }
 
 @MainActor
+private final class WorkspaceSharedControlsMenuLifecycleObservation: NSObject {
+    enum Stage: String {
+        case firstCaptured = "first_menu_captured"
+        case firstDispatchReturned = "first_native_dispatch_return"
+        case firstCancelReturned = "first_optional_cancel_call_return"
+        case firstResultAssigned = "first_result_assignment_return"
+        case firstCaptureCleared = "first_capture_reference_clear_return"
+        case secondActionBefore = "before_second_opener_action"
+        case secondActionAfter = "second_opener_return_after_existing_guards"
+        case firstExactEnd = "first_exact_end_notification_receipt"
+        case cleanup = "flow_observer_removal_return"
+    }
+    private weak var window: NSWindow?
+    private weak var hosting: NSView?
+    private weak var firstMenu: NSMenu?
+    private var firstMenuWasCaptured = false, stopped = false
+    private var exactEndsFirstTwo = 0
+    private var stages: [String: [String: Any]] = [:]
+    init(window: NSWindow, hosting: NSView) {
+        self.window = window; self.hosting = hosting
+        super.init()
+        NotificationCenter.default.addObserver(self, selector: #selector(didEnd(_:)),
+            name: NSMenu.didEndTrackingNotification, object: nil)
+    }
+    var evidence: [String: Any] {
+        ["classification": "Weak exact first captured menu and later scalar stages only; no enclosing-loop unwind, release or cause claim",
+         "first_write_stage_limit": 9, "exact_end_counter_limit": 2,
+         "first_menu_was_captured": firstMenuWasCaptured, "exact_ends_first_two": exactEndsFirstTwo,
+         "observer_removed": stopped, "stages": stages]
+    }
+    func noteCapturedMenu(_ menu: NSMenu, attemptOrdinal: Int) {
+        guard !stopped, attemptOrdinal == 1, !firstMenuWasCaptured else { return }
+        firstMenuWasCaptured = true; firstMenu = menu
+        record(.firstCaptured)
+    }
+    func noteFirst(_ stage: Stage, attemptOrdinal: Int, resultPresent: Bool) {
+        guard !stopped, attemptOrdinal == 1 else { return }
+        record(stage, resultPresent: resultPresent)
+    }
+    func noteSecondAction(returned: Bool, attemptOrdinal: Int, captureDeadline: TimeInterval, actionDeadline: TimeInterval) {
+        guard !stopped, attemptOrdinal == 2 else { return }
+        record(returned ? .secondActionAfter : .secondActionBefore, nativeState: true,
+            captureDeadline: captureDeadline, actionDeadline: actionDeadline)
+    }
+    @objc private func didEnd(_ notification: Notification) {
+        guard !stopped, exactEndsFirstTwo < 2, let held = firstMenu,
+              let actual = notification.object as? NSMenu, actual === held else { return }
+        exactEndsFirstTwo += 1
+        if exactEndsFirstTwo == 1 { record(.firstExactEnd) }
+    }
+    func stop() {
+        guard !stopped else { return }
+        NotificationCenter.default.removeObserver(self, name: NSMenu.didEndTrackingNotification, object: nil)
+        stopped = true
+        record(.cleanup)
+        firstMenu = nil
+    }
+    private func record(_ stage: Stage, resultPresent: Bool? = nil, nativeState: Bool = false,
+                        captureDeadline: TimeInterval? = nil, actionDeadline: TimeInterval? = nil) {
+        guard stages[stage.rawValue] == nil, stages.count < 9 else { return }
+        let observed = ProcessInfo.processInfo.systemUptime
+        var row: [String: Any] = ["snapshot_uptime": observed, "first_menu_was_captured": firstMenuWasCaptured,
+            "weak_first_menu_present": firstMenu != nil, "exact_ends_first_two_at_stage": exactEndsFirstTwo,
+            "result_present": resultPresent.map { $0 as Any } ?? NSNull()]
+        if nativeState {
+            let readDeadline = observed + 0.02, window = self.window, hosting = self.hosting
+            row["classification"] = "Later native scalar snapshot only; mode is correlated state, not original guard evaluation or menu-loop cause"
+            row["getter_group_limit"] = 7; row["read_budget_seconds"] = 0.02
+            row["window_present"] = window != nil; row["hosting_present"] = hosting != nil
+            row["capture_deadline"] = captureDeadline.map { $0 as Any } ?? NSNull()
+            row["action_context_deadline"] = actionDeadline.map { $0 as Any } ?? NSNull()
+            for key in ["run_loop_mode_utf8_prefix", "window_is_key", "window_is_main", "window_is_visible",
+                        "window_content_is_host", "host_window_is_fixture", "host_has_no_hidden_ancestor"] { row[key] = NSNull() }
+            var reads = 0
+            func read(_ body: () -> Void) {
+                guard ProcessInfo.processInfo.systemUptime < readDeadline else { return }
+                reads += 1; body()
+            }
+            read { row["run_loop_mode_utf8_prefix"] = RunLoop.current.currentMode.map { String(decoding: $0.rawValue.utf8.prefix(128), as: UTF8.self) as Any } ?? NSNull() }
+            if let window, let hosting {
+                read { row["window_is_key"] = window.isKeyWindow }
+                read { row["window_is_main"] = window.isMainWindow }
+                read { row["window_is_visible"] = window.isVisible }
+                read { row["window_content_is_host"] = window.contentView === hosting }
+                read { row["host_window_is_fixture"] = hosting.window === window }
+                read { row["host_has_no_hidden_ancestor"] = !hosting.isHiddenOrHasHiddenAncestor }
+            }
+            let finished = ProcessInfo.processInfo.systemUptime
+            row["getter_groups_attempted"] = reads; row["snapshot_elapsed_seconds"] = finished - observed
+            row["read_budget_expired"] = finished >= readDeadline
+        }
+        stages[stage.rawValue] = row
+    }
+}
+
+@MainActor
 private final class WorkspaceSharedControlsMenuCapture: NSObject {
     private weak var window: NSWindow?
     private weak var hosting: NSView?
@@ -3843,6 +3961,10 @@ private final class WorkspaceSharedControlsMenuCapture: NSObject {
     private var querying = false, cancellationRequested = false
     private var menu: NSMenu?
     private var provenMenu = false
+    private weak var lifecycleObservation: WorkspaceSharedControlsMenuLifecycleObservation?
+    private var attemptOrdinal = 0
+    private var observesExactTrackingEnd = false
+    private(set) var exactTrackingEndedAt: TimeInterval?
     private(set) var result: Result<Void, Error>?
     private(set) var receipt: [String: Any] = ["classification": "One exact armed native opener and captured literal menu; no desktop or enclosing-loop unwind claim",
         "item_limit": 64, "tick_limit": 160, "native_dispatch_requested": false,
@@ -3856,6 +3978,22 @@ private final class WorkspaceSharedControlsMenuCapture: NSObject {
         self.titles = titles; self.states = states; self.deadline = deadline
         super.init()
     }
+    func observeLifecycle(_ observation: WorkspaceSharedControlsMenuLifecycleObservation, attemptOrdinal: Int) {
+        lifecycleObservation = observation; self.attemptOrdinal = attemptOrdinal
+    }
+    func observeExactTrackingEnd() {
+        guard !observesExactTrackingEnd else { return }
+        observesExactTrackingEnd = true
+        NotificationCenter.default.addObserver(self, selector: #selector(didEnd(_:)),
+            name: NSMenu.didEndTrackingNotification, object: nil)
+    }
+    @objc func didEnd(_ notification: Notification) {
+        guard armed, observesExactTrackingEnd, exactTrackingEndedAt == nil,
+              let menu, let ended = notification.object as? NSMenu, ended === menu else { return }
+        let observedAt = ProcessInfo.processInfo.systemUptime
+        exactTrackingEndedAt = observedAt
+        receipt["exact_tracking_end_uptime"] = observedAt
+    }
     @objc func didBegin(_ notification: Notification) {
         guard armed, !isFinished else { return }
         roots += 1
@@ -3864,6 +4002,7 @@ private final class WorkspaceSharedControlsMenuCapture: NSObject {
             result = .failure(WorkspaceCanvasFixtureFailure("The armed shared-control opener did not produce exactly one native menu root.")); return
         }
         menu = captured
+        lifecycleObservation?.noteCapturedMenu(captured, attemptOrdinal: attemptOrdinal)
     }
     @objc func fire(_ timer: Timer) {
         guard armed, !isFinished else { timer.invalidate(); return }
@@ -3911,15 +4050,18 @@ private final class WorkspaceSharedControlsMenuCapture: NSObject {
             receipt["native_dispatch_requested"] = true
             menu.performActionForItem(at: index)
             receipt["native_dispatch_returned"] = true
+            lifecycleObservation?.noteFirst(.firstDispatchReturned, attemptOrdinal: attemptOrdinal, resultPresent: isFinished)
             cancelProvenTracking()
             if let callbackResult = result { try callbackResult.get() }
             guard roots == 1, !isFinished else {
                 throw WorkspaceCanvasFixtureFailure("Shared native menu violated its one-root contract during dispatch or tracking cancellation.")
             }
             result = .success(()); timer.invalidate()
+            lifecycleObservation?.noteFirst(.firstResultAssigned, attemptOrdinal: attemptOrdinal, resultPresent: isFinished)
         } catch {
             cancelProvenTracking()
             if case .none = result { result = .failure(error) }
+            lifecycleObservation?.noteFirst(.firstResultAssigned, attemptOrdinal: attemptOrdinal, resultPresent: isFinished)
             if case .failure(let retainedFailure) = result {
                 receipt["failure"] = String(String(describing: retainedFailure).prefix(1_024))
             }
@@ -3929,13 +4071,19 @@ private final class WorkspaceSharedControlsMenuCapture: NSObject {
     func stop() {
         armed = false
         NotificationCenter.default.removeObserver(self, name: NSMenu.didBeginTrackingNotification, object: nil)
+        if observesExactTrackingEnd {
+            NotificationCenter.default.removeObserver(self, name: NSMenu.didEndTrackingNotification, object: nil)
+            observesExactTrackingEnd = false; receipt["exact_tracking_end_observer_removed"] = true
+        }
         cancelProvenTracking()
         menu = nil
+        lifecycleObservation?.noteFirst(.firstCaptureCleared, attemptOrdinal: attemptOrdinal, resultPresent: isFinished)
     }
     private func cancelProvenTracking() {
         guard provenMenu, !cancellationRequested else { return }
         cancellationRequested = true; receipt["cancel_tracking_requested"] = true
         menu?.cancelTracking()
+        lifecycleObservation?.noteFirst(.firstCancelReturned, attemptOrdinal: attemptOrdinal, resultPresent: isFinished)
     }
 }
 
