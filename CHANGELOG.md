@@ -35,6 +35,8 @@ Product versions do not by themselves claim shipment.
 
 - Add separate native draft checks and bounded exported ancestry diagnostics. V32–v35 remain NONPASS; the removed v33 metadata experiment and v36/v37 scope-guard failures are retained. V38 passed both explicit application-content cases after the new guard was corrected from observed standard-control metadata, preserving all copied draft assertions/actions. Layout transitions use the preferences API; a fresh v39 original whole-window rerun failed both methods, and ordinary-native gates stay unchanged/NONPASS. No backend Save success, production repair or full UI pass follows. [Qualification](docs/QUALIFICATION-STATUS.md).
 
+- Record separate Rune native-menu/exported-Save results: v41 Rename and isolated v42 Save As pass exact identity/copy, collection and restored-preference guards; combined v40 and mixed v41 remain NONPASS. The three existing Return/Escape regressions pass in v43. These test-only checks preserve original ordinary-native Save failures and establish no product repair, failure cause, repeated-menu or full UI qualification. [Qualification](docs/QUALIFICATION-STATUS.md).
+
 #### Earlier UI checks before the naming repair
 
 - Verify the post-Compute ordinary Debug candidate, strict signature and CLI/app product links. Candidate Dashboard startup was observed. The later whole native Canvas selection passed 11 of 13 methods; both draft cases, Projects desktop navigation and Rune naming qualification remain open. The installed 0.18.0 (28) app was not replaced.

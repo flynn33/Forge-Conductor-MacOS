@@ -312,6 +312,224 @@ final class RuneForgeAppTests: XCTestCase {
         await runeNamingClose(fixture, runeModel: runeModel)
     }
 
+    func testMountedRuneNativeMenuExportedSavePersistsNamesAndLayoutIdentity() async throws {
+        let commands = ["Rename Layout…", "Save Layout As…"]
+        guard NSApp != nil, Bundle.main.bundleURL.pathExtension == "app", !NSScreen.screens.isEmpty else {
+            throw RuneWorkspaceVisibilityFailure("Run in ForgeConductorAppTests with a native display.")
+        }
+        let source = DevelopmentPolicySource(displayName: "Naming policy",
+            selectedPath: "/tmp/rune-naming-policy.md", interpretationState: .cataloging)
+        let client = RuneWorkspaceNamingClient(snapshot: policySnapshot(events: [], sources: [source]))
+        let runeModel = RuneForgeViewModel(client: client)
+        let fixture = try RuneWorkspaceVisibilityFixture(model: runeModel, urls: [])
+        let descriptors = NativeWorkspaceCatalog.runePanels(for: "source")
+        let original = NativeWorkspaceLayout(id: UUID(), viewID: "rune-forge.source", name: "Source-" + UUID().uuidString,
+            canvas: .init(width: max(1_280, descriptors.map { $0.defaultFrame.x + $0.defaultFrame.width + 20 }.max() ?? 0),
+                          height: max(900, descriptors.map { $0.defaultFrame.y + $0.defaultFrame.height + 20 }.max() ?? 0)),
+            panels: descriptors.map { .init(id: $0.id, frame: $0.defaultFrame, isVisible: true) })
+        let observer = RuneWorkspaceNamingAX(window: fixture.window, hosting: fixture.hosting)
+        var stage = "mount", witnesses: [[String: Any]] = []
+        var menu: RuneWorkspaceNativeNamingMenuCapture?
+        func retain(_ error: Error? = nil) throws {
+            let bytes = try JSONEncoder().encode(fixture.preferences.collection)
+            guard bytes.count <= NativeWorkspaceLimits.maximumStoredBytes, witnesses.count <= 2 else {
+                throw RuneWorkspaceVisibilityFailure("Positive naming evidence exceeded its collection/witness bound.")
+            }
+            let report: [String: Any] = ["classification": "Separate mounted native menu, actual NSTextView editor and exported exact-sheet Save accessibility activation; no Return fallback or desktop/pointer-input proof.",
+                "stage": stage, "normal_naming_witnesses": witnesses,
+                "actual_menu_transition": menu?.evidence ?? [:],
+                "collection": try JSONSerialization.jsonObject(with: bytes),
+                "error": error.map { String(String(describing: $0).prefix(4_096)) as Any } ?? NSNull()]
+            let data = try JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys])
+            guard data.count <= 1_152 * 1_024 else { throw RuneWorkspaceVisibilityFailure("Positive naming JSON exceeded its payload bound.") }
+            let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+            attachment.name = "rune-native-menu-exported-save-" + stage; attachment.lifetime = .keepAlways; add(attachment)
+        }
+        do {
+            try fixture.preferences.save(original)
+            fixture.window.orderFront(nil); fixture.hosting.layoutSubtreeIfNeeded()
+            try await runeWorkspaceWait("The real Rune source owners did not settle for positive naming.") {
+                !fixture.model.isBootstrapping && !runeModel.isLoading && runeModel.sources.count == 1
+                    && fixture.document?.panelHosts.count == fixture.layout.panels.count
+            }
+            runeModel.pauseObservation()
+            let row = try await observer.required(identifier: "rune-policy-source-row-" + source.id.description)
+            try observer.pressOwned(row, role: kAXButtonRole)
+            _ = try await observer.required(identifier: "workspace-controls-rune-forge.source")
+            try await runeWorkspaceWait("The actual source row did not mount its source workspace.") {
+                Set(fixture.document?.panelHosts.keys.map { $0 } ?? []) == Set(original.panels.map(\.id))
+            }
+            for command in commands {
+                let before = fixture.preferences.collection
+                let active = try XCTUnwrap(fixture.preferences.activeLayout(for: original.viewID))
+                let newName = (command == "Rename Layout…" ? "Renamed-" : "Saved-") + UUID().uuidString
+                stage = command == "Rename Layout…" ? "exported-save-rename" : "exported-save-as"
+                let capture = RuneWorkspaceNativeNamingMenuCapture(window: fixture.window, hosting: fixture.hosting,
+                    expectedName: active.name, requestedCommand: command)
+                menu = capture
+                let opener = try await observer.required(identifier: "workspace-layout-menu-" + original.viewID)
+                try await observer.openOwnedMenuAndPressNativeNamingCommand(opener, capture: capture)
+                try await runeWorkspaceWait("The actual naming command did not present its production sheet.") { fixture.window.attachedSheet != nil }
+                let sheet = try XCTUnwrap(fixture.window.attachedSheet), content = try XCTUnwrap(sheet.contentView)
+                let (field, identity) = try await runeRequiredOwnedNamingField(fixture, sheet: sheet, content: content,
+                    expectedValue: command == "Rename Layout…" ? active.name : "Custom")
+                try runeReplaceOwnedNamingText(fixture, sheet: sheet, content: content, field: field, name: newName)
+                guard fixture.preferences.collection == before else { throw RuneWorkspaceVisibilityFailure("Actual editing/endEditing changed saved layouts before the exported Save action.") }
+                witnesses.append(["command": command, "new_name": newName, "identity_source": identity,
+                    "actual_editor_changed": true, "actual_Save_action_requested": false,
+                    "actual_Save_action_returned": false, "actual_sheet_dismissed": false])
+                let save = try await observer.required(identifier: "workspace-save-layout", inSheet: true)
+                try runeRequireNamingSheetOwner(fixture, sheet: sheet, content: content)
+                guard field.window === sheet, field.stringValue == newName, fixture.preferences.collection == before else {
+                    throw RuneWorkspaceVisibilityFailure("Exported Save lost its retained actual name field or unchanged collection.")
+                }
+                try observer.pressRetainedSheetSave(save, sheet: sheet, content: content,
+                    witness: &witnesses[witnesses.count - 1])
+                try await runeWorkspaceWait("The exact exported Save action did not dismiss the naming sheet.") {
+                    fixture.window.attachedSheet == nil
+                }
+                witnesses[witnesses.count - 1]["actual_sheet_dismissed"] = true
+                let after = fixture.preferences.collection
+                let result = try XCTUnwrap(fixture.preferences.activeLayout(for: original.viewID))
+                if command == "Rename Layout…" {
+                    var expected = before
+                    let index = try XCTUnwrap(expected.layouts.firstIndex(where: { $0.id == active.id }))
+                    expected.layouts[index].name = newName
+                    guard result.id == original.id, after == expected else { throw RuneWorkspaceVisibilityFailure("Actual Rename did not preserve exact layout identity, geometry, panels and other namespaces.") }
+                } else {
+                    guard result.id != active.id, result.name == newName, result.viewID == active.viewID,
+                          result.canvas == active.canvas, result.panels == active.panels else { throw RuneWorkspaceVisibilityFailure("Actual Save As did not create a new named identity with copied geometry/panels.") }
+                    var expected = before; expected.layouts.append(result); expected.activeLayoutIDs[original.viewID] = result.id
+                    guard after == expected else { throw RuneWorkspaceVisibilityFailure("Actual Save As changed more than its new layout and source selection.") }
+                }
+                let restored = NativeWorkspacePreferences(knownPanelIDsByView: NativeWorkspaceCatalog.knownPanelIDsByView,
+                    panelSizeBoundsByView: NativeWorkspaceCatalog.sizeBoundsByView, defaults: fixture.defaults)
+                guard restored.restorationError == nil, restored.collection == after else {
+                    throw RuneWorkspaceVisibilityFailure("The actual naming result did not restore exactly from isolated preferences.")
+                }
+                try retain()
+            }
+        } catch {
+            try? retain(error); await runeNamingClose(fixture, runeModel: runeModel); throw error
+        }
+        await runeNamingClose(fixture, runeModel: runeModel)
+    }
+
+    func testMountedRuneFreshNativeRenameExportedSavePersistsIdentity() async throws {
+        try await runeExerciseFreshNativeMenuExportedSave(commands: ["Rename Layout…"])
+    }
+
+    func testMountedRuneFreshNativeSaveAsExportedSavePersistsCopy() async throws {
+        try await runeExerciseFreshNativeMenuExportedSave(commands: ["Save Layout As…"])
+    }
+
+    private func runeExerciseFreshNativeMenuExportedSave(commands: [String]) async throws {
+        guard !commands.isEmpty, commands.count <= 2, Set(commands).count == commands.count,
+              commands.allSatisfy({ $0 == "Rename Layout…" || $0 == "Save Layout As…" }) else {
+            throw RuneWorkspaceVisibilityFailure("Fresh exported Save requires one or two distinct literal naming commands.")
+        }
+        guard NSApp != nil, Bundle.main.bundleURL.pathExtension == "app", !NSScreen.screens.isEmpty else {
+            throw RuneWorkspaceVisibilityFailure("Run in ForgeConductorAppTests with a native display.")
+        }
+        let source = DevelopmentPolicySource(displayName: "Naming policy",
+            selectedPath: "/tmp/rune-naming-policy.md", interpretationState: .cataloging)
+        let client = RuneWorkspaceNamingClient(snapshot: policySnapshot(events: [], sources: [source]))
+        let runeModel = RuneForgeViewModel(client: client)
+        let fixture = try RuneWorkspaceVisibilityFixture(model: runeModel, urls: [])
+        let descriptors = NativeWorkspaceCatalog.runePanels(for: "source")
+        let original = NativeWorkspaceLayout(id: UUID(), viewID: "rune-forge.source", name: "Source-" + UUID().uuidString,
+            canvas: .init(width: max(1_280, descriptors.map { $0.defaultFrame.x + $0.defaultFrame.width + 20 }.max() ?? 0),
+                          height: max(900, descriptors.map { $0.defaultFrame.y + $0.defaultFrame.height + 20 }.max() ?? 0)),
+            panels: descriptors.map { .init(id: $0.id, frame: $0.defaultFrame, isVisible: true) })
+        let observer = RuneWorkspaceNamingAX(window: fixture.window, hosting: fixture.hosting)
+        var stage = "mount", witnesses: [[String: Any]] = []
+        var menu: RuneWorkspaceNativeNamingMenuCapture?
+        func retain(_ error: Error? = nil) throws {
+            let bytes = try JSONEncoder().encode(fixture.preferences.collection)
+            guard bytes.count <= NativeWorkspaceLimits.maximumStoredBytes, witnesses.count <= 2 else {
+                throw RuneWorkspaceVisibilityFailure("Positive naming evidence exceeded its collection/witness bound.")
+            }
+            let report: [String: Any] = ["classification": "Separate fresh-fixture naming reachability: native menu, actual NSTextView editor and exported exact-sheet Save activation; distinct from combined sequential Rename/Save As qualification, no Return fallback or desktop/pointer-input proof.",
+                "stage": stage, "requested_commands": commands, "fresh_fixture_command_count": commands.count,
+                "normal_naming_witnesses": witnesses,
+                "actual_menu_transition": menu?.evidence ?? [:],
+                "collection": try JSONSerialization.jsonObject(with: bytes),
+                "error": error.map { String(String(describing: $0).prefix(4_096)) as Any } ?? NSNull()]
+            let data = try JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys])
+            guard data.count <= 1_152 * 1_024 else { throw RuneWorkspaceVisibilityFailure("Positive naming JSON exceeded its payload bound.") }
+            let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+            attachment.name = "rune-fresh-native-menu-exported-save-" + stage; attachment.lifetime = .keepAlways; add(attachment)
+        }
+        do {
+            try fixture.preferences.save(original)
+            fixture.window.orderFront(nil); fixture.hosting.layoutSubtreeIfNeeded()
+            try await runeWorkspaceWait("The real Rune source owners did not settle for positive naming.") {
+                !fixture.model.isBootstrapping && !runeModel.isLoading && runeModel.sources.count == 1
+                    && fixture.document?.panelHosts.count == fixture.layout.panels.count
+            }
+            runeModel.pauseObservation()
+            let row = try await observer.required(identifier: "rune-policy-source-row-" + source.id.description)
+            try observer.pressOwned(row, role: kAXButtonRole)
+            _ = try await observer.required(identifier: "workspace-controls-rune-forge.source")
+            try await runeWorkspaceWait("The actual source row did not mount its source workspace.") {
+                Set(fixture.document?.panelHosts.keys.map { $0 } ?? []) == Set(original.panels.map(\.id))
+            }
+            for command in commands {
+                let before = fixture.preferences.collection
+                let active = try XCTUnwrap(fixture.preferences.activeLayout(for: original.viewID))
+                let newName = (command == "Rename Layout…" ? "Renamed-" : "Saved-") + UUID().uuidString
+                stage = command == "Rename Layout…" ? "exported-save-rename" : "exported-save-as"
+                let capture = RuneWorkspaceNativeNamingMenuCapture(window: fixture.window, hosting: fixture.hosting,
+                    expectedName: active.name, requestedCommand: command)
+                menu = capture
+                let opener = try await observer.required(identifier: "workspace-layout-menu-" + original.viewID)
+                try await observer.openOwnedMenuAndPressNativeNamingCommand(opener, capture: capture)
+                try await runeWorkspaceWait("The actual naming command did not present its production sheet.") { fixture.window.attachedSheet != nil }
+                let sheet = try XCTUnwrap(fixture.window.attachedSheet), content = try XCTUnwrap(sheet.contentView)
+                let (field, identity) = try await runeRequiredOwnedNamingField(fixture, sheet: sheet, content: content,
+                    expectedValue: command == "Rename Layout…" ? active.name : "Custom")
+                try runeReplaceOwnedNamingText(fixture, sheet: sheet, content: content, field: field, name: newName)
+                guard fixture.preferences.collection == before else { throw RuneWorkspaceVisibilityFailure("Actual editing/endEditing changed saved layouts before the exported Save action.") }
+                witnesses.append(["command": command, "new_name": newName, "identity_source": identity,
+                    "actual_editor_changed": true, "actual_Save_action_requested": false,
+                    "actual_Save_action_returned": false, "actual_sheet_dismissed": false])
+                let save = try await observer.required(identifier: "workspace-save-layout", inSheet: true)
+                try runeRequireNamingSheetOwner(fixture, sheet: sheet, content: content)
+                guard field.window === sheet, field.stringValue == newName, fixture.preferences.collection == before else {
+                    throw RuneWorkspaceVisibilityFailure("Exported Save lost its retained actual name field or unchanged collection.")
+                }
+                try observer.pressRetainedSheetSave(save, sheet: sheet, content: content,
+                    witness: &witnesses[witnesses.count - 1])
+                try await runeWorkspaceWait("The exact exported Save action did not dismiss the naming sheet.") {
+                    fixture.window.attachedSheet == nil
+                }
+                witnesses[witnesses.count - 1]["actual_sheet_dismissed"] = true
+                let after = fixture.preferences.collection
+                let result = try XCTUnwrap(fixture.preferences.activeLayout(for: original.viewID))
+                if command == "Rename Layout…" {
+                    var expected = before
+                    let index = try XCTUnwrap(expected.layouts.firstIndex(where: { $0.id == active.id }))
+                    expected.layouts[index].name = newName
+                    guard result.id == original.id, after == expected else { throw RuneWorkspaceVisibilityFailure("Actual Rename did not preserve exact layout identity, geometry, panels and other namespaces.") }
+                } else {
+                    guard result.id != active.id, result.name == newName, result.viewID == active.viewID,
+                          result.canvas == active.canvas, result.panels == active.panels else { throw RuneWorkspaceVisibilityFailure("Actual Save As did not create a new named identity with copied geometry/panels.") }
+                    var expected = before; expected.layouts.append(result); expected.activeLayoutIDs[original.viewID] = result.id
+                    guard after == expected else { throw RuneWorkspaceVisibilityFailure("Actual Save As changed more than its new layout and source selection.") }
+                }
+                let restored = NativeWorkspacePreferences(knownPanelIDsByView: NativeWorkspaceCatalog.knownPanelIDsByView,
+                    panelSizeBoundsByView: NativeWorkspaceCatalog.sizeBoundsByView, defaults: fixture.defaults)
+                guard restored.restorationError == nil, restored.collection == after else {
+                    throw RuneWorkspaceVisibilityFailure("The actual naming result did not restore exactly from isolated preferences.")
+                }
+                try retain()
+            }
+        } catch {
+            try? retain(error); await runeNamingClose(fixture, runeModel: runeModel); throw error
+        }
+        await runeNamingClose(fixture, runeModel: runeModel)
+    }
+
     private func runeRequireNamingSheetOwner(_ fixture: RuneWorkspaceVisibilityFixture,
         sheet: NSWindow, content: NSView) throws {
         guard fixture.window.contentView === fixture.hosting, fixture.hosting.window === fixture.window,
@@ -1916,6 +2134,55 @@ private final class RuneWorkspaceNamingAX {
         let main = try ownedWindow(deadline)
         guard try nodes(main, deadline).contains(where: { CFEqual($0.0, element) }) else { throw RuneWorkspaceVisibilityFailure("The exact naming control left the owned window graph.") }
         try perform(element, action: kAXPressAction, roles: [role], deadline)
+    }
+
+    func pressRetainedSheetSave(_ element: AXUIElement, sheet: NSWindow, content: NSView,
+                               witness: inout [String: Any]) throws {
+        let deadline = ProcessInfo.processInfo.systemUptime + 3
+        func requireNativeOwner() throws {
+            try check(deadline)
+            guard let window, let hosting, window.contentView === hosting, hosting.window === window,
+                  window.isVisible, !hosting.isHiddenOrHasHiddenAncestor,
+                  window.attachedSheet === sheet, sheet.sheetParent === window,
+                  window.sheets.count == 1, window.sheets.first === sheet, sheet.sheets.isEmpty,
+                  sheet.contentView === content, content.window === sheet, sheet.isVisible,
+                  !content.isHiddenOrHasHiddenAncestor else {
+                throw RuneWorkspaceVisibilityFailure("Exported Save lost its exact sole native attached sheet/content/window.")
+            }
+        }
+        try requireNativeOwner()
+        let main = try ownedWindow(deadline)
+        let tree = try nodes(main, deadline)
+        let sheets = tree.filter { $0.3 == kAXSheetRole }
+        let saves = tree.filter { $0.2 == "workspace-save-layout" }
+        guard sheets.count == 1, saves.count == 1, let save = saves.first, let exportedSheet = sheets.first,
+              CFEqual(save.0, element), save.3 == kAXButtonRole,
+              save.1.contains(where: { CFEqual($0, exportedSheet.0) }) else {
+            throw RuneWorkspaceVisibilityFailure("Exported Save requires one exact identifier inside one owned AXSheet.")
+        }
+        guard let parent = try attribute(exportedSheet.0, kAXWindowAttribute, deadline),
+              CFGetTypeID(parent) == AXUIElementGetTypeID(), CFEqual(parent, main) else {
+            throw RuneWorkspaceVisibilityFailure("The sole exported sheet does not belong to its exact native parent window.")
+        }
+        try requireNativeOwner()
+        guard CFEqual(try ownedWindow(deadline), main) else {
+            throw RuneWorkspaceVisibilityFailure("Exported Save changed its exact parent window before dispatch.")
+        }
+        try requireNativeOwner()
+        witness["exact_retained_native_sheet_and_content"] = true
+        witness["unique_owned_AXSheet_and_Save_identifier"] = true
+        witness["Save_CFEqual_held_target"] = true
+        witness["Save_AXWindow_is_exact_parent"] = true
+        witness["complete_owned_identifier_walk_nodes"] = tree.count
+        witness["Save_action"] = kAXPressAction
+        var returnedStatus: Int32?
+        defer {
+            witness["actual_Save_action_returned"] = returnedStatus != nil
+            witness["actual_Save_action_status"] = returnedStatus.map { $0 as Any } ?? NSNull()
+        }
+        witness["actual_Save_action_requested"] = true
+        try perform(element, action: kAXPressAction, roles: [kAXButtonRole], deadline,
+                    recordStatus: { _, status in returnedStatus = status })
     }
 
     func openOwnedMenuAndPressNativeRename(_ opener: AXUIElement, capture: RuneWorkspaceNativeNamingMenuCapture) async throws {
