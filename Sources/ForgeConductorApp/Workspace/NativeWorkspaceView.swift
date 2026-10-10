@@ -193,10 +193,11 @@ private struct NativeWorkspaceScope<DefaultContent: View>: View {
     }
 
     private func unusedName() -> String {
-        let names = Set(preferences.layouts(for: viewID).map { $0.name.lowercased() })
+        let locale = Locale(identifier: "en_US_POSIX")
+        let names = Set(preferences.layouts(for: viewID).map { $0.name.folding(options: .caseInsensitive, locale: locale) })
         for index in 1...NativeWorkspaceLimits.maximumSavedLayouts + 1 {
             let name = index == 1 ? "Custom" : "Custom \(index)"
-            if !names.contains(name.lowercased()) { return name }
+            if !names.contains(name.folding(options: .caseInsensitive, locale: locale)) { return name }
         }
         return "Custom"
     }

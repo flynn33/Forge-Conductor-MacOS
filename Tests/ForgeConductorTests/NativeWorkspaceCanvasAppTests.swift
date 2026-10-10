@@ -2843,6 +2843,69 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
         }
     }
 
+    func testCustomizeSkipsUnicodeCaseFoldCollisionAndPreservesSavedLayouts() async throws {
+        let deadline = ProcessInfo.processInfo.systemUptime + 15
+        let fixture = try await mountScope()
+        let collision = workspaceLayout(name: "Cu\u{017f}tom")
+        try fixture.preferences.save(collision, activate: false)
+        try fixture.preferences.reset("fixture")
+        try await waitUntil("Default must dismantle the fixture canvas before Customize.") {
+            fixture.hosting.layoutSubtreeIfNeeded()
+            return !self.descendants(fixture.hosting).contains { $0 is NativeWorkspaceDocumentView }
+        }
+        let baseline = fixture.preferences.collection
+        let beforeBytes = try XCTUnwrap(fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey))
+        var progress: [String: Any] = [:]
+        var pressed = false
+        defer {
+            nativeDraftRetainMeasurement([
+                "classification": "Actual Customize button with a valid nonactive Unicode case-fold collision; runtime assertions determine qualification",
+                "collision_name": collision.name, "expected_name": "Custom 2", "press_returned": pressed,
+                "active_name": (fixture.preferences.activeLayout(for: "fixture")?.name).map { $0 as Any } ?? NSNull(),
+                "saved_names": fixture.preferences.layouts(for: "fixture").map(\.name),
+                "prior_layouts_unchanged": baseline.layouts.allSatisfy { prior in
+                    fixture.preferences.collection.layouts.first { $0.id == prior.id } == prior
+                },
+                "control_discovery": progress,
+            ], name: "workspace-customize-unicode-name-collision")
+        }
+        let control = try await nativeDraftObserveAXElement("workspace-customize-fixture",
+            window: fixture.window, hosting: fixture.hosting,
+            deadline: min(deadline, ProcessInfo.processInfo.systemUptime + 3),
+            scope: .applicationContent, progress: &progress)
+        guard ProcessInfo.processInfo.systemUptime < deadline,
+              fixture.window.contentView === fixture.hosting, fixture.hosting.window === fixture.window,
+              fixture.window.isVisible, control.identifier == "workspace-customize-fixture",
+              control.role == .button, control.enabled == true,
+              fixture.preferences.collection == baseline,
+              fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey) == beforeBytes else {
+            throw WorkspaceCanvasFixtureFailure("Customize lost its exact owned button or saved-layout baseline.")
+        }
+        try control.press(); pressed = true
+        try await waitUntil("Actual Customize must choose Custom 2 after the Unicode case-fold collision.",
+            timeout: min(3, deadline - ProcessInfo.processInfo.systemUptime)) {
+            fixture.preferences.activeLayout(for: "fixture")?.name == "Custom 2"
+        }
+        let created = try XCTUnwrap(fixture.preferences.activeLayout(for: "fixture"))
+        XCTAssertFalse(baseline.layouts.contains { $0.id == created.id })
+        var expected = baseline
+        expected.layouts.append(created); expected.activeLayoutIDs["fixture"] = created.id
+        XCTAssertEqual(fixture.preferences.collection, expected)
+        let bytes = try XCTUnwrap(fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey))
+        XCTAssertEqual(try JSONDecoder().decode(NativeWorkspaceCollection.self, from: bytes), expected)
+        let bounds = workspaceDescriptors.reduce(into: [String: NativeWorkspacePanelSizeBounds]()) { result, panel in
+            result[panel.id] = .init(minimumWidth: panel.minimumSize.width, minimumHeight: panel.minimumSize.height,
+                maximumWidth: panel.maximumSize.width, maximumHeight: panel.maximumSize.height)
+        }
+        let restored = NativeWorkspacePreferences(knownPanelIDsByView: ["fixture": Set(workspaceDescriptors.map(\.id))],
+            panelSizeBoundsByView: ["fixture": bounds], defaults: fixture.defaults)
+        XCTAssertNil(restored.restorationError)
+        XCTAssertEqual(restored.collection, expected)
+        XCTAssertNil(fixture.model.app); XCTAssertNil(fixture.model.manager); XCTAssertNil(fixture.model.remoteManager)
+        XCTAssertFalse(fixture.model.hasLoadedInitialSettings)
+        XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, deadline)
+    }
+
     func testHeaderPointerMoveCommitsOnlyAtMouseUpAndKeepsIdentityDuringReorder() throws {
         let document = mountDocument()
         var commits: [NativeWorkspaceFrame] = []

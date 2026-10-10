@@ -353,6 +353,275 @@ final class NativeWorkspacePageCaptureAppTests: XCTestCase, @unchecked Sendable 
         }
     }
 
+    /// Two owned-window wheel events; conversion and measured movement must both qualify.
+    func testNativeProjectsCustomCanvasQueuedScrollWheelExposesResizeCenterAtMinimumSize() async throws {
+        let deadline = ProcessInfo.processInfo.systemUptime + 30
+        let viewport = NSSize(width: 1_100, height: 720)
+        var stage = "presentation", events: [[String: Any]] = [], posted = 0
+        var report: [String: Any] = ["classification": "Owned-window queued wheel input; no direct scroll or semantic action",
+            "execution_completed": false, "maximum_events": 2, "maximum_case_seconds": 30,
+            "maximum_phase_seconds": 3, "case_deadline_uptime": deadline]
+        func retainReport(_ suffix: String) throws {
+            report["last_stage"] = stage; report["events"] = events; report["posted_events"] = posted
+            let data = try JSONSerialization.data(withJSONObject: report, options: [.sortedKeys])
+            guard events.count <= 2, data.count <= 512 * 1_024 else {
+                throw NativeWorkspacePageCaptureFailure("Projects wheel receipt exceeded its event/JSON bound")
+            }
+            let receiptName = "projects-queued-wheel-" + suffix
+            try directEvidence.save(data, name: receiptName, extension: "json")
+            let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+            attachment.name = receiptName; attachment.lifetime = .keepAlways; add(attachment)
+        }
+        do {
+            try directEvidence.configure(testName: name + "-queued-wheel")
+            try await prepareHost()
+            guard deadline - ProcessInfo.processInfo.systemUptime > 10 else {
+                throw NativeWorkspacePageCaptureFailure("Projects wheel case lacks bounded presentation time")
+            }
+            let owned = try NativeWorkspacePageCaptureFixture(contentSize: viewport)
+            fixture = owned; owned.route.page = .projects
+            try await presentPhysicalCache(owned, expectedContentSize: viewport)
+            let layout = try owned.customize("projects")
+            guard deadline - ProcessInfo.processInfo.systemUptime > 5 else {
+                throw NativeWorkspacePageCaptureFailure("Projects wheel case lacks bounded canvas time")
+            }
+            try await requireCanvas(layout, in: owned)
+            let documents = nativeViews(owned.hosting).compactMap { $0 as? NativeWorkspaceDocumentView }
+            guard documents.count == 1, let document = documents.first,
+                  let scroll = document.enclosingScrollView, scroll.documentView === document,
+                  document.superview === scroll.contentView, document.isFlipped,
+                  scroll.hasHorizontalScroller, scroll.hasVerticalScroller,
+                  let horizontal = scroll.horizontalScroller, let vertical = scroll.verticalScroller,
+                  horizontal !== vertical, let panel = document.panelHosts["projects-summary"],
+                  layout.panels.count > 0, layout.panels.count <= 64, layout.panels.allSatisfy(\.isVisible) else {
+                throw NativeWorkspacePageCaptureFailure("Projects wheel exact document/panel/scrollers are absent")
+            }
+            let frame = document.frame, bounds = document.bounds
+            let canvasSize = NSSize(width: layout.canvas.width, height: layout.canvas.height)
+            let identities = document.panelHosts.mapValues { ObjectIdentifier($0) }
+            let panelFrames = document.panelHosts.mapValues(\.frame)
+            let hostingIdentities = document.panelHosts.mapValues { ObjectIdentifier($0.hostingView) }
+            guard Set(identities.keys) == Set(layout.panels.map(\.id)), frame.size == canvasSize,
+                  bounds.origin == .zero, bounds.size == canvasSize,
+                  layout.panels.allSatisfy({ document.panelHosts[$0.id]?.frame == NSRect(x: $0.frame.x,
+                    y: $0.frame.y, width: $0.frame.width, height: $0.frame.height) }) else {
+                throw NativeWorkspacePageCaptureFailure("Projects wheel catalog frames/canvas differ from its layout")
+            }
+            let controls = nativeViews(panel).filter { $0.accessibilityIdentifier() == "workspace-resize-projects-summary" }
+            guard controls.count == 1, let control = controls.first, control.superview === panel,
+                  !control.isHiddenOrHasHiddenAncestor, control.bounds.width >= 8, control.bounds.height >= 8 else {
+                throw NativeWorkspacePageCaptureFailure("Projects wheel exact resize control is absent")
+            }
+            let controlFrame = control.frame, controlBounds = control.bounds
+            let targetBounds = document.convert(control.bounds, from: control)
+            let target = NSRect(x: targetBounds.midX - 4, y: targetBounds.midY - 4, width: 8, height: 8)
+            let baseline = owned.preferences.collection
+            let beforeBytes = try XCTUnwrap(owned.defaults.data(forKey: NativeWorkspacePreferences.storageKey))
+            let initialKey = owned.window.isKeyWindow, initialActive = NSApp.isActive
+            guard beforeBytes.count <= NativeWorkspaceLimits.maximumStoredBytes,
+                  try JSONDecoder().decode(NativeWorkspaceCollection.self, from: beforeBytes) == baseline,
+                  owned.preferences.activeLayout(for: "projects") == layout, document.bounds.contains(target),
+                  target.minX > document.visibleRect.maxX, target.minY > document.visibleRect.maxY else {
+                throw NativeWorkspacePageCaptureFailure("Projects wheel storage or initially offscreen resize center is invalid")
+            }
+            func requireOwner() throws {
+                try Task.checkCancellation()
+                guard ProcessInfo.processInfo.systemUptime < deadline,
+                      self.physicalCachePresentationIsReady(owned, expectedContentSize: viewport),
+                      owned.route.page == .projects, owned.window.isKeyWindow == initialKey, NSApp.isActive == initialActive,
+                      document.window === owned.window, scroll.window === owned.window,
+                      document.enclosingScrollView === scroll, scroll.documentView === document,
+                      document.superview === scroll.contentView, document.frame == frame, document.bounds == bounds,
+                      scroll.horizontalScroller === horizontal, scroll.verticalScroller === vertical,
+                      horizontal.superview === scroll, vertical.superview === scroll,
+                      document.panelHosts.mapValues({ ObjectIdentifier($0) }) == identities,
+                      document.panelHosts.mapValues(\.frame) == panelFrames,
+                      document.panelHosts.mapValues({ ObjectIdentifier($0.hostingView) }) == hostingIdentities,
+                      panel.superview === document, !panel.isHiddenOrHasHiddenAncestor,
+                      control.superview === panel, control.window === owned.window,
+                      !control.isHiddenOrHasHiddenAncestor, control.frame == controlFrame, control.bounds == controlBounds,
+                      document.convert(control.bounds, from: control) == targetBounds,
+                      owned.preferences.collection == baseline,
+                      owned.defaults.data(forKey: NativeWorkspacePreferences.storageKey) == beforeBytes,
+                      owned.model.app == nil, owned.model.manager == nil, owned.model.remoteManager == nil,
+                      !owned.model.hasLoadedInitialSettings else {
+                    throw NativeWorkspacePageCaptureFailure("Projects wheel owner/geometry/storage/model changed or deadline elapsed")
+                }
+                var ancestor: NSView? = document, seen = Set<ObjectIdentifier>()
+                while let view = ancestor {
+                    guard seen.count < 64, seen.insert(ObjectIdentifier(view)).inserted,
+                          view.window === owned.window, ProcessInfo.processInfo.systemUptime < deadline else {
+                        throw NativeWorkspacePageCaptureFailure("Projects wheel native ancestry exceeded its owner/depth/deadline bound")
+                    }
+                    if view === owned.hosting { return }
+                    ancestor = view.superview
+                }
+                throw NativeWorkspacePageCaptureFailure("Projects wheel document ancestry did not reach its exact hosting owner")
+            }
+            try requireOwner()
+            report["initial_document_visible"] = NSStringFromRect(document.visibleRect)
+            report["target_center_rect"] = NSStringFromRect(target)
+            report["window_key"] = initialKey; report["application_active"] = initialActive
+            report["stored_bytes"] = beforeBytes.count
+            try retainReport("before")
+            try capturePhysicalCache(owned, expectedContentSize: viewport, name: "projects-queued-wheel-before")
+            for (axis, wheel1, wheel2) in [("horizontal", Int32(0), Int32(-480)), ("vertical", Int32(-120), Int32(0))] {
+                stage = axis + ".document-hit"
+                try requireOwner()
+                let before = scroll.contentView.bounds, visible = document.visibleRect
+                let point = NSPoint(x: visible.midX, y: visible.minY + 10)
+                guard [before.minX, before.minY, before.width, before.height, point.x, point.y].allSatisfy({ $0.isFinite }),
+                      before.width > 0, before.height > 20, visible.contains(point),
+                      owned.hosting.hitTest(document.convert(point, to: owned.hosting.superview)) === document else {
+                    throw NativeWorkspacePageCaptureFailure("Projects wheel point does not physically hit the exact blank document")
+                }
+                let slot = events.count
+                events.append(["axis": axis, "requested_wheel1": wheel1, "requested_wheel2": wheel2,
+                    "posted": false, "before_clip_bounds": NSStringFromRect(before)])
+                defer {
+                    events[slot]["after_clip_bounds"] = NSStringFromRect(scroll.contentView.bounds)
+                    events[slot]["after_document_visible"] = NSStringFromRect(document.visibleRect)
+                    events[slot]["finished_uptime"] = ProcessInfo.processInfo.systemUptime
+                }
+                stage = axis + ".conversion"
+                let local = document.convert(point, to: nil), windowNumber = owned.window.windowNumber
+                let seed = try XCTUnwrap(NSEvent.mouseEvent(with: .mouseMoved, location: local,
+                    modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: windowNumber,
+                    context: nil, eventNumber: 1, clickCount: 0, pressure: 0))
+                events[slot]["seed_exact_window"] = seed.window === owned.window
+                events[slot]["seed_window_number"] = seed.windowNumber
+                guard windowNumber > 0, seed.window === owned.window, seed.windowNumber == windowNumber,
+                      abs(seed.locationInWindow.x - local.x) <= 0.5, abs(seed.locationInWindow.y - local.y) <= 0.5 else {
+                    throw NativeWorkspacePageCaptureFailure("Projects wheel seed lacks exact window/point association")
+                }
+                let seedCG = try XCTUnwrap(seed.cgEvent)
+                let seedRoundTrip = NSEvent(cgEvent: seedCG)
+                events[slot]["seed_cg_roundtrip_exact_window"] = seedRoundTrip?.window === owned.window
+                events[slot]["seed_cg_roundtrip_window_number"] = seedRoundTrip.map { $0.windowNumber as Any } ?? NSNull()
+                events[slot]["seed_cg_roundtrip_point"] = seedRoundTrip.map { NSStringFromPoint($0.locationInWindow) as Any } ?? NSNull()
+                let template = try XCTUnwrap(CGEvent(scrollWheelEvent2Source: nil, units: .pixel,
+                    wheelCount: 2, wheel1: wheel1, wheel2: wheel2, wheel3: 0))
+                let wheel = try XCTUnwrap(seedCG.copy())
+                wheel.type = .scrollWheel
+                for field in [CGEventField.scrollWheelEventDeltaAxis1, .scrollWheelEventDeltaAxis2, .scrollWheelEventDeltaAxis3,
+                    .scrollWheelEventPointDeltaAxis1, .scrollWheelEventPointDeltaAxis2, .scrollWheelEventPointDeltaAxis3,
+                    .scrollWheelEventIsContinuous] {
+                    wheel.setIntegerValueField(field, value: template.getIntegerValueField(field))
+                }
+                for field in [CGEventField.scrollWheelEventFixedPtDeltaAxis1, .scrollWheelEventFixedPtDeltaAxis2,
+                    .scrollWheelEventFixedPtDeltaAxis3] {
+                    wheel.setDoubleValueField(field, value: template.getDoubleValueField(field))
+                }
+                guard seedCG.location.x.isFinite, seedCG.location.y.isFinite else {
+                    throw NativeWorkspacePageCaptureFailure("Projects wheel seed global point is nonfinite")
+                }
+                let field91 = wheel.getIntegerValueField(.mouseEventWindowUnderMousePointer)
+                let field92 = wheel.getIntegerValueField(.mouseEventWindowUnderMousePointerThatCanHandleThisEvent)
+                events[slot]["field91"] = field91; events[slot]["field92"] = field92
+                let event = try XCTUnwrap(NSEvent(cgEvent: wheel))
+                events[slot]["converted_exact_window"] = event.window === owned.window
+                events[slot]["converted_window_number"] = event.windowNumber
+                events[slot]["converted_type"] = event.type.rawValue
+                events[slot]["local_point"] = NSStringFromPoint(local)
+                events[slot]["converted_point"] = NSStringFromPoint(event.locationInWindow)
+                guard event.type == .scrollWheel else {
+                    throw NativeWorkspacePageCaptureFailure("Projects wheel conversion did not return a scroll-wheel event")
+                }
+                let dx = event.scrollingDeltaX, dy = event.scrollingDeltaY
+                events[slot]["delta_x"] = dx.isFinite ? dx as Any : String(describing: dx)
+                events[slot]["delta_y"] = dy.isFinite ? dy as Any : String(describing: dy)
+                events[slot]["precise_deltas"] = event.hasPreciseScrollingDeltas
+                events[slot]["direction_inverted"] = event.isDirectionInvertedFromDevice
+                guard event.window === owned.window, event.windowNumber == windowNumber,
+                      [local.x, local.y, event.locationInWindow.x, event.locationInWindow.y, dx, dy].allSatisfy({ $0.isFinite }),
+                      abs(event.locationInWindow.x - local.x) <= 0.5, abs(event.locationInWindow.y - local.y) <= 0.5,
+                      axis == "horizontal" ? (dx < 0 && abs(dy) <= 0.1) : (dy < 0 && abs(dx) <= 0.1) else {
+                    throw NativeWorkspacePageCaptureFailure("Projects wheel conversion lacks exact window/point/single-axis association")
+                }
+                try requireOwner()
+                guard posted < 2, owned.hosting.hitTest(document.convert(point, to: owned.hosting.superview)) === document else {
+                    throw NativeWorkspacePageCaptureFailure("Projects wheel dispatch lost its exact document/two-event bound")
+                }
+                stage = axis + ".movement"
+                events[slot]["post_uptime"] = ProcessInfo.processInfo.systemUptime
+                NSApp.postEvent(event, atStart: false); posted += 1; events[slot]["posted"] = true
+                let settleDeadline = min(deadline, ProcessInfo.processInfo.systemUptime + 3)
+                var progressed = false
+                while ProcessInfo.processInfo.systemUptime < settleDeadline {
+                    try requireOwner(); owned.hosting.layoutSubtreeIfNeeded(); try requireOwner()
+                    let after = scroll.contentView.bounds, currentVisible = document.visibleRect
+                    let delta = axis == "horizontal" ? after.minX - before.minX : after.minY - before.minY
+                    let other = axis == "horizontal" ? after.minY - before.minY : after.minX - before.minX
+                    events[slot]["axis_delta"] = delta.isFinite ? delta as Any : String(describing: delta)
+                    events[slot]["other_axis_delta"] = other.isFinite ? other as Any : String(describing: other)
+                    guard [after.minX, after.minY, after.width, after.height, delta, other].allSatisfy({ $0.isFinite }),
+                          abs(after.width - before.width) <= 0.1, abs(after.height - before.height) <= 0.1,
+                          delta >= -0.1, abs(other) <= 0.1 else {
+                        throw NativeWorkspacePageCaptureFailure("Projects wheel moved in an unexpected axis/direction or resized its clip")
+                    }
+                    let contains = axis == "horizontal" ? currentVisible.minX <= target.minX && currentVisible.maxX >= target.maxX
+                        : currentVisible.minY <= target.minY && currentVisible.maxY >= target.maxY
+                    if delta > 0.1 && contains {
+                        guard ProcessInfo.processInfo.systemUptime < settleDeadline else {
+                            throw NativeWorkspacePageCaptureFailure("Projects wheel progress sample crossed its phase deadline")
+                        }
+                        progressed = true; break
+                    }
+                    try await Task.sleep(for: .milliseconds(20))
+                }
+                guard progressed else {
+                    throw NativeWorkspacePageCaptureFailure("Projects wheel did not expose its target axis within three seconds")
+                }
+                try requireOwner(); events[slot]["target_axis_visible"] = true
+            }
+            stage = "final-storage-and-hit-test"
+            let fresh = NativeWorkspacePreferences(knownPanelIDsByView: NativeWorkspaceCatalog.knownPanelIDsByView,
+                panelSizeBoundsByView: NativeWorkspaceCatalog.sizeBoundsByView, defaults: owned.defaults)
+            let mutations = await owned.client.mutationNames()
+            try requireOwner()
+            guard posted == 2, document.visibleRect.contains(target),
+                  owned.hosting.hitTest(document.convert(NSPoint(x: target.midX, y: target.midY), to: owned.hosting.superview)) === control,
+                  fresh.restorationError == nil, fresh.collection == baseline, mutations.isEmpty else {
+                throw NativeWorkspacePageCaptureFailure("Projects wheel final control hit/storage/isolation proof failed")
+            }
+            report["target_center_visible"] = true; report["exact_control_hit_test"] = true
+            report["complete_preferences_and_bytes_unchanged"] = true; report["fresh_restoration_unchanged"] = true
+            report["fixture_mutations"] = mutations
+            try capturePhysicalCache(owned, expectedContentSize: viewport, name: "projects-queued-wheel-after")
+            try requireOwner()
+            guard deadline - ProcessInfo.processInfo.systemUptime > 5 else {
+                throw NativeWorkspacePageCaptureFailure("Projects wheel case lacks bounded reset time")
+            }
+            try owned.preferences.reset("projects")
+            try await waitUntil("Projects wheel canvas did not dismantle after reset",
+                timeout: min(5, deadline - ProcessInfo.processInfo.systemUptime)) {
+                owned.hosting.layoutSubtreeIfNeeded()
+                return !self.nativeViews(owned.hosting).contains { $0 is NativeWorkspaceDocumentView }
+            }
+            guard owned.preferences.activeLayout(for: "projects") == nil,
+                  physicalCachePresentationIsReady(owned, expectedContentSize: viewport) else {
+                throw NativeWorkspacePageCaptureFailure("Projects wheel reset changed its exact presentation owner")
+            }
+            await owned.close(); fixture = nil; await restoreHost()
+            try Task.checkCancellation()
+            stage = "complete"; report["execution_completed"] = true
+            try retainReport("after")
+            guard ProcessInfo.processInfo.systemUptime < deadline else {
+                throw NativeWorkspacePageCaptureFailure("Projects wheel case exceeded its cleanup/receipt deadline")
+            }
+        } catch let failure {
+            report["execution_completed"] = false
+            report["original_error"] = scrollerActionBoundedString(String(reflecting: failure), bytes: 512)
+            if let owned = fixture, physicalCachePresentationIsReady(owned, expectedContentSize: viewport) {
+                do { try capturePhysicalCache(owned, expectedContentSize: viewport, name: "projects-queued-wheel-failed") }
+                catch { report["failure_cache_error"] = scrollerActionBoundedString(String(reflecting: error), bytes: 512) }
+            }
+            do { try retainReport("failed"); try retainFailure(failure) }
+            catch { XCTFail("Could not retain Projects wheel failure: \(scrollerActionBoundedString(String(reflecting: error), bytes: 512))") }
+            await restoreHost(); throw failure
+        }
+    }
+
     func testRealCatalogViewsQueuedMoveResizePersistsGeometry() async throws {
         let deadline = ProcessInfo.processInfo.systemUptime + 120
         try await prepareHost()

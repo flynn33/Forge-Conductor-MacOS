@@ -12,6 +12,8 @@ Product versions do not by themselves claim shipment.
 
 ### `0.44.0 (60)` custom layouts within each view
 
+- Fix Customize Layout name generation to use the validator’s Unicode case folding with en_US_POSIX. A saved `Cuſtom` now produces `Custom 2`, retaining all prior layouts and fresh stored restoration; the native regression passed twice, with 18 preferences and two normal Rune naming cases also passing in each invocation. Wheel host aborts keep both aggregate runs NONPASS. Fresh v123 ordinary Debug/strict signature pass (25.642/0.282 s), Info 0.44.0 (60); unchanged graph/verified source membership, candidate-only.
+
 - Add native movable/resizable panel frames, show/hide controls, saved named layouts, rename/delete and Restore Default to all 13 main views. Manager sections and Rune Forge detail modes retain independent layouts within their existing views. [Workspace guide](docs/NATIVE-WORKSPACES.md).
 - Keep page-owned settings and project drafts outside rearranged panels. Cancel a drag with Escape. Pause Provider setup observation when all its panels are hidden and resume the durable operation without reloading unsaved LM Studio settings.
 - Keep accepted Rune Forge policy commands running when all panels are hidden; pause background observation separately. The mounted regression and all 16 owning native Rune cases passed.
@@ -66,6 +68,7 @@ Product versions do not by themselves claim shipment.
 - Record v113’s separate outcomes: original whole-window and formal horizontal scroller FAIL, scoped 104-phase PASS; retain cached copied-lineage equality without identity/cause inference and complete visual coverage with 90 exact prior reuses/14 original inspections. Current ordinary v8 candidate input/artifact/signature readback passes; older v6 current-source mismatch remains preserved. Test-only; scrolling and broader UI gates stay open, with capabilities deferred.
 
 - Record v114’s four-method result: three FAIL/one scoped 104-phase PASS. Typed Zoom/FullScreen equality identifies only a copied ancestor; formal horizontal increment returns false, and the read-only advertisement probe fails its existing receipt-byte bound with zero actions. Preserve v113 and all original errors/bounds; no production repair or broader UI closure. The compact v115 native rerun still fails the unchanged half-second observation deadline with zero actions.
+- Retain v117–v122 wheel probes as NONPASS: conversion prerequisites fail before posting, or the host aborts after a retained cache without a final wheel receipt/cleanup proof. Restore the exact v119 test after the unsuccessful v122 isolation experiment; no scrolling defect, cause or repair is claimed.
 
 #### Earlier UI checks before the naming repair
 
