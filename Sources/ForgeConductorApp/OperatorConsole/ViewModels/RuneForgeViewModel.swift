@@ -217,11 +217,15 @@ final class RuneForgeViewModel: ObservableObject {
         }
     }
 
-    func stop() {
+    func pauseObservation() {
         pollingTask?.cancel()
         pollingTask = nil
         refreshTask?.cancel()
         refreshTask = nil
+    }
+
+    func stop() {
+        pauseObservation()
         commandTask?.cancel()
         commandTask = nil
     }

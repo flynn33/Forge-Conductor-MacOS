@@ -1115,6 +1115,14 @@ final class AppBootstrapOperation {
     }
 }
 
+/// Initialization controls only automatic runtime integration. A successful
+/// isolated presentation still publishes the real bootstrap/settings snapshot;
+/// manager mutation credentials and all later command guards remain unchanged.
+enum AppBootstrapIntegrationMode: Sendable {
+    case live
+    case isolatedPresentation
+}
+
 /// Owns the macOS app's observable state and coordinates every user-facing module.
 ///
 /// Views read immutable projections from this model and send user intent back through
@@ -1191,6 +1199,7 @@ public final class AppModel: ObservableObject {
     private var rigOperationalTask: Task<Void, Never>?
     private var remoteManagerLastError: String?
     private let bootstrapOperation: AppBootstrapOperation
+    private let bootstrapIntegration: AppBootstrapIntegrationMode
     private let startupDiagnosticPaths: AppPaths
     private var startupDiagnostics: DiagnosticLog?
     private let revealDiagnosticExport: ([URL]) -> Void
@@ -1267,12 +1276,14 @@ public final class AppModel: ObservableObject {
 
     init(
         bootstrapOperation: AppBootstrapOperation,
+        bootstrapIntegration: AppBootstrapIntegrationMode = .live,
         diagnosticPaths: AppPaths = AppPaths(),
         revealDiagnosticExport: @escaping ([URL]) -> Void = {
             NSWorkspace.shared.activateFileViewerSelecting($0)
         }
     ) {
         self.bootstrapOperation = bootstrapOperation
+        self.bootstrapIntegration = bootstrapIntegration
         self.startupDiagnosticPaths = diagnosticPaths
         self.revealDiagnosticExport = revealDiagnosticExport
         secureFilesystemService.setLifecycleStateObserver { [weak self] observation in
@@ -1580,46 +1591,50 @@ public final class AppModel: ObservableObject {
         self.deployController = AppDeployController(app: forgeApp)
         telemetryBinding.autoRefresh = autoRefresh
         telemetryBinding.attach(app: forgeApp)
-        if CommandLine.arguments.contains("--uitesting") {
-            let fixturePort = ProcessInfo.processInfo.environment["FORGE_OPERATOR_UI_TEST_PORT"]
-                .flatMap(Int.init)
-                .flatMap { (1...65_535).contains($0) ? $0 : nil }
-            if let fixturePort {
-                let credentials = ManagerControlCredentialStore(paths: forgeApp.paths)
-                remoteManager = ManagerDashboardClient(
-                    host: "127.0.0.1",
-                    port: fixturePort,
-                    credentials: credentials
-                )
-                operatorManagerClient.replace(
-                    with: OperatorManagerHTTPClient(
+        if bootstrapIntegration == .live {
+            if CommandLine.arguments.contains("--uitesting") {
+                let fixturePort = ProcessInfo.processInfo.environment["FORGE_OPERATOR_UI_TEST_PORT"]
+                    .flatMap(Int.init)
+                    .flatMap { (1...65_535).contains($0) ? $0 : nil }
+                if let fixturePort {
+                    let credentials = ManagerControlCredentialStore(paths: forgeApp.paths)
+                    remoteManager = ManagerDashboardClient(
                         host: "127.0.0.1",
                         port: fixturePort,
                         credentials: credentials
                     )
-                )
-                managerMessage = "Attached to operator UI test fixture"
+                    operatorManagerClient.replace(
+                        with: OperatorManagerHTTPClient(
+                            host: "127.0.0.1",
+                            port: fixturePort,
+                            credentials: credentials
+                        )
+                    )
+                    managerMessage = "Attached to operator UI test fixture"
+                } else {
+                    operatorManagerClient.replace(
+                        with: UnavailableOperatorManagerClient(
+                            reason: "Manager control is intentionally disabled during UI tests."
+                        )
+                    )
+                    managerMessage = "Manager disabled during UI tests"
+                }
             } else {
                 operatorManagerClient.replace(
-                    with: UnavailableOperatorManagerClient(
-                        reason: "Manager control is intentionally disabled during UI tests."
+                    with: OperatorManagerHTTPClient(
+                        host: forgeApp.config.model.dashboard.host,
+                        port: forgeApp.config.model.dashboard.port,
+                        credentials: ManagerControlCredentialStore(paths: forgeApp.paths)
                     )
                 )
-                managerMessage = "Manager disabled during UI tests"
+                attachToOrStartManager(app: forgeApp)
             }
-        } else {
-            operatorManagerClient.replace(
-                with: OperatorManagerHTTPClient(
-                    host: forgeApp.config.model.dashboard.host,
-                    port: forgeApp.config.model.dashboard.port,
-                    credentials: ManagerControlCredentialStore(paths: forgeApp.paths)
-                )
-            )
-            attachToOrStartManager(app: forgeApp)
         }
         apply(settings: snapshot.settings)
         hasLoadedInitialSettings = true
-        bootstrapSecureFilesystemService(paths: forgeApp.paths)
+        if bootstrapIntegration == .live {
+            bootstrapSecureFilesystemService(paths: forgeApp.paths)
+        }
         lmStudioPluginStatus = snapshot.pluginStatus
         preferredServeBinaryURL = snapshot.pluginStatus.map { URL(fileURLWithPath: $0.binaryPath) }
         refreshDiagnosticsPreview()

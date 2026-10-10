@@ -14,34 +14,73 @@ struct ProviderOperatorView: View {
     }
 
     var body: some View {
+        NativeWorkspaceView(viewID: "provider", descriptors: NativeWorkspaceCatalog.provider,
+                            defaultContent: { defaultContent }, panelContent: workspacePanel,
+                            activityChanged: viewModel.setProviderOperationObservationActive)
+        .task { viewModel.load() }
+        .onDisappear {
+            viewModel.clearCredentialEntry()
+            viewModel.stopObservingProviderOperation()
+        }
+        .guidedHelpState(viewModel.guidedHelpState, for: .provider)
+    }
+
+    private func workspacePanel(_ id: String, _ visible: Bool) -> AnyView {
+        switch id {
+        case "provider-controls": AnyView(providerControls)
+        case "provider-browser": AnyView(providerSelection)
+        case "provider-operation": AnyView(workspaceOperation)
+        case "provider-integration": AnyView(workspaceIntegration)
+        case "provider-readiness": AnyView(workspaceReadiness)
+        case "provider-settings", "provider-connection", "provider-authentication", "provider-model", "provider-contract": AnyView(advancedWorkspacePanel(id))
+        default: AnyView(EmptyView())
+        }
+    }
+
+    @ViewBuilder
+    private var workspaceOperation: some View {
+        if let operation = viewModel.currentProviderOperation { providerOperation(operation) }
+        else { Text("No provider setup operation is active.").foregroundStyle(GraphitePalette.textSecondary) }
+    }
+
+    @ViewBuilder
+    private var workspaceIntegration: some View {
+        if let descriptor = inspectedDescriptor { providerInspection(descriptor) }
+        else { Text("Select an execution provider to inspect its integration.").foregroundStyle(GraphitePalette.textSecondary) }
+    }
+
+    @ViewBuilder
+    private var workspaceReadiness: some View {
+        if inspectedDescriptor?.id == .lmStudio { readiness }
+        else { Text("Model connection details apply to LM Studio.").foregroundStyle(GraphitePalette.textSecondary) }
+    }
+
+    @ViewBuilder
+    private func advancedWorkspacePanel(_ id: String) -> some View {
+        if inspectedDescriptor?.id == .lmStudio, showingAdvancedSettings {
+            if id == "provider-settings" { configurationEditor }
+            else if let provider = viewModel.provider {
+                switch id {
+                case "provider-connection": providerConnection(provider)
+                case "provider-authentication": providerAuthentication(provider)
+                case "provider-model": providerModel(provider)
+                case "provider-contract": VStack(alignment: .leading, spacing: 16) { providerContract(provider); providerWorkflowNote }
+                default: EmptyView()
+                }
+            } else { Text("Provider details are not available yet.").foregroundStyle(GraphitePalette.textSecondary) }
+        } else {
+            Text("Inspect LM Studio and open LM Studio Advanced in the Provider and Actions panel to display these settings.")
+                .foregroundStyle(GraphitePalette.textSecondary)
+        }
+    }
+
+    private var defaultContent: some View {
         HSplitView {
             providerSelection
                 .frame(minWidth: 220, idealWidth: 250, maxWidth: 290)
 
             VStack(alignment: .leading, spacing: 0) {
-                VStack(alignment: .leading, spacing: 12) {
-                    OperatorHeader(
-                        title: "Provider",
-                        subtitle: "Choose the provider Forge connects to for MCP governance and automatic continuity.",
-                        isLoading: viewModel.isBusy,
-                        titleAccessibilityIdentifier: "detail-provider",
-                        subtitleAccessibilityIdentifier: "provider-operator-view",
-                        onRefresh: viewModel.load
-                    )
-                    if let error = viewModel.errorMessage {
-                        OperatorErrorBanner(message: error, retry: viewModel.load)
-                    }
-                    if let notice = viewModel.noticeMessage {
-                        Text(notice)
-                            .font(.callout)
-                            .foregroundStyle(GraphitePalette.textSecondary)
-                            .accessibilityIdentifier("provider-probe-notice")
-                    }
-                    if inspectedDescriptor?.id == .lmStudio {
-                        primaryActions
-                    }
-                }
-                .padding(20)
+                providerControls
                 Divider()
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
@@ -70,12 +109,33 @@ struct ProviderOperatorView: View {
             .frame(minWidth: 400, maxWidth: .infinity, maxHeight: .infinity)
         }
         .background(GraphitePalette.canvas)
-        .task { viewModel.load() }
-        .onDisappear {
-            viewModel.clearCredentialEntry()
-            viewModel.stopObservingProviderOperation()
+    }
+
+    @ViewBuilder
+    private var providerControls: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            OperatorHeader(
+                title: "Provider",
+                subtitle: "Choose the provider Forge connects to for MCP governance and automatic continuity.",
+                isLoading: viewModel.isBusy,
+                titleAccessibilityIdentifier: "detail-provider",
+                subtitleAccessibilityIdentifier: "provider-operator-view",
+                onRefresh: viewModel.load
+            )
+            if let error = viewModel.errorMessage {
+                OperatorErrorBanner(message: error, retry: viewModel.load)
+            }
+            if let notice = viewModel.noticeMessage {
+                Text(notice)
+                    .font(.callout)
+                    .foregroundStyle(GraphitePalette.textSecondary)
+                    .accessibilityIdentifier("provider-probe-notice")
+            }
+            if inspectedDescriptor?.id == .lmStudio {
+                primaryActions
+            }
         }
-        .guidedHelpState(viewModel.guidedHelpState, for: .provider)
+        .padding(20)
     }
 
     private var primaryActions: some View {
@@ -398,65 +458,89 @@ struct ProviderOperatorView: View {
 
     private func providerDetail(_ provider: OperatorProvider) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            GroupBox("Connection") {
-                VStack(alignment: .leading, spacing: 9) {
-                    LabeledContent("Health") {
-                        OperatorStateBadge(state: provider.health)
-                            .accessibilityIdentifier("provider-health")
-                    }
-                    LabeledContent("Adapter", value: provider.adapterID ?? "Unavailable")
-                    LabeledContent("Provider", value: provider.providerID ?? "Unavailable")
-                    LabeledContent("Endpoint") { OperatorIdentifier(provider.endpoint) }
-                    LabeledContent("Loopback", value: OperatorFormat.yesNo(provider.loopback))
-                    LabeledContent("TLS", value: OperatorFormat.yesNo(provider.tls))
-                    LabeledContent("API mode", value: provider.apiMode ?? "Unavailable")
-                }
-            }
+            providerConnection(provider)
 
-            GroupBox("Authentication") {
-                VStack(alignment: .leading, spacing: 9) {
-                    LabeledContent("Authentication enabled", value: OperatorFormat.yesNo(provider.authenticationEnabled))
-                    LabeledContent("Keychain credential configured", value: OperatorFormat.yesNo(provider.credentialConfigured))
-                    Text("Credential values are never displayed or returned by the operator snapshot.")
+            providerAuthentication(provider)
+
+            providerModel(provider)
+
+            providerContract(provider)
+
+            providerWorkflowNote
+        }
+        .labeledContentStyle(ProviderFactsStyle())
+    }
+
+    private var providerWorkflowNote: some View {
+        Text("Connect and Check uses one manager-owned path for model discovery, LM Studio recovery, Forge MCP registration, and contract verification.")
+            .font(.caption)
+            .foregroundStyle(GraphitePalette.textSecondary)
+    }
+
+    private func providerConnection(_ provider: OperatorProvider) -> some View {
+        GroupBox("Connection") {
+            VStack(alignment: .leading, spacing: 9) {
+                LabeledContent("Health") {
+                    OperatorStateBadge(state: provider.health)
+                        .accessibilityIdentifier("provider-health")
+                }
+                LabeledContent("Adapter", value: provider.adapterID ?? "Unavailable")
+                LabeledContent("Provider", value: provider.providerID ?? "Unavailable")
+                LabeledContent("Endpoint") { OperatorIdentifier(provider.endpoint) }
+                LabeledContent("Loopback", value: OperatorFormat.yesNo(provider.loopback))
+                LabeledContent("TLS", value: OperatorFormat.yesNo(provider.tls))
+                LabeledContent("API mode", value: provider.apiMode ?? "Unavailable")
+            }
+        }
+        .labeledContentStyle(ProviderFactsStyle())
+    }
+
+    private func providerAuthentication(_ provider: OperatorProvider) -> some View {
+        GroupBox("Authentication") {
+            VStack(alignment: .leading, spacing: 9) {
+                LabeledContent("Authentication enabled", value: OperatorFormat.yesNo(provider.authenticationEnabled))
+                LabeledContent("Keychain credential configured", value: OperatorFormat.yesNo(provider.credentialConfigured))
+                Text("Credential values are never displayed or returned by the operator snapshot.")
+                    .font(.caption)
+                    .foregroundStyle(GraphitePalette.textSecondary)
+            }
+        }
+        .labeledContentStyle(ProviderFactsStyle())
+    }
+
+    private func providerModel(_ provider: OperatorProvider) -> some View {
+        GroupBox("Loaded model") {
+            VStack(alignment: .leading, spacing: 9) {
+                LabeledContent("Model", value: provider.modelKey ?? "Unavailable")
+                LabeledContent("Instance", value: provider.instanceID ?? "Unavailable")
+                LabeledContent("Active context", value: context(provider.activeContextLength))
+                LabeledContent("Maximum context", value: context(provider.maximumContextLength))
+                LabeledContent("Tool use", value: OperatorFormat.yesNo(provider.toolUseCapable))
+            }
+        }
+        .labeledContentStyle(ProviderFactsStyle())
+    }
+
+    private func providerContract(_ provider: OperatorProvider) -> some View {
+        GroupBox("Lifecycle and contract") {
+            VStack(alignment: .leading, spacing: 9) {
+                LabeledContent("Lifecycle management", value: OperatorFormat.yesNo(provider.lifecycleManagementEnabled))
+                LabeledContent("Idle TTL", value: provider.idleTTLSeconds.map { "\($0)s" } ?? "Unavailable")
+                LabeledContent("Contract fingerprint") { OperatorIdentifier(provider.contractFingerprint) }
+                LabeledContent("Last probe mode", value: provider.lastProbeMode ?? "Unavailable")
+                LabeledContent(
+                    "Probe result storage",
+                    value: probeStorage(provider.probeResultStorage)
+                )
+                LabeledContent("Last probe", value: provider.lastProbeAt ?? "Unavailable")
+                if let error = provider.lastProbeError {
+                    Text(error)
                         .font(.caption)
-                        .foregroundStyle(GraphitePalette.textSecondary)
+                        .foregroundStyle(GraphitePalette.failure)
+                        .textSelection(.enabled)
+                        .accessibilityIdentifier("provider-last-probe-error")
                 }
             }
-
-            GroupBox("Loaded model") {
-                VStack(alignment: .leading, spacing: 9) {
-                    LabeledContent("Model", value: provider.modelKey ?? "Unavailable")
-                    LabeledContent("Instance", value: provider.instanceID ?? "Unavailable")
-                    LabeledContent("Active context", value: context(provider.activeContextLength))
-                    LabeledContent("Maximum context", value: context(provider.maximumContextLength))
-                    LabeledContent("Tool use", value: OperatorFormat.yesNo(provider.toolUseCapable))
-                }
-            }
-
-            GroupBox("Lifecycle and contract") {
-                VStack(alignment: .leading, spacing: 9) {
-                    LabeledContent("Lifecycle management", value: OperatorFormat.yesNo(provider.lifecycleManagementEnabled))
-                    LabeledContent("Idle TTL", value: provider.idleTTLSeconds.map { "\($0)s" } ?? "Unavailable")
-                    LabeledContent("Contract fingerprint") { OperatorIdentifier(provider.contractFingerprint) }
-                    LabeledContent("Last probe mode", value: provider.lastProbeMode ?? "Unavailable")
-                    LabeledContent(
-                        "Probe result storage",
-                        value: probeStorage(provider.probeResultStorage)
-                    )
-                    LabeledContent("Last probe", value: provider.lastProbeAt ?? "Unavailable")
-                    if let error = provider.lastProbeError {
-                        Text(error)
-                            .font(.caption)
-                            .foregroundStyle(GraphitePalette.failure)
-                            .textSelection(.enabled)
-                            .accessibilityIdentifier("provider-last-probe-error")
-                    }
-                }
-            }
-
-            Text("Connect and Check uses one manager-owned path for model discovery, LM Studio recovery, Forge MCP registration, and contract verification.")
-                .font(.caption)
-                .foregroundStyle(GraphitePalette.textSecondary)
         }
         .labeledContentStyle(ProviderFactsStyle())
     }

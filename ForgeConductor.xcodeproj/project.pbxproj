@@ -7,6 +7,14 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		14AC3699E3C741DDB7D731CA /* NativeWorkspacePageCaptureAppTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEDAF9CB7A714F319B1A98AB /* NativeWorkspacePageCaptureAppTests.swift */; };
+		01400CB822154663A656784F /* NativeWorkspaceCanvasAppTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47360B0AFC62433FB2225759 /* NativeWorkspaceCanvasAppTests.swift */; };
+		195DA2713D5946F687569262 /* NativeWorkspacePreferencesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D418B6CE6FF49DBAF0FD57A /* NativeWorkspacePreferencesTests.swift */; };
+		0690B54EFAFC411791E166CC /* Workspace/NativeWorkspaceCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E21D53A2EC440249C79B755 /* Workspace/NativeWorkspaceCatalog.swift */; };
+		19625563D01C4269A354BEAC /* Workspace/NativeWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24034DD4B02C4D008383EE66 /* Workspace/NativeWorkspaceView.swift */; };
+		7F4506CE9964414D99C7520D /* Workspace/NativeWorkspaceCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D32EC0A9CB04C74B040C90B /* Workspace/NativeWorkspaceCanvasView.swift */; };
+		07207D69EB384B5BA97CE3E2 /* Workspace/NativeWorkspacePreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6EE1912AADF455CA9A49D6D /* Workspace/NativeWorkspacePreferences.swift */; };
+		A3A814B2AEC0448495085A7B /* Workspace/NativeWorkspaceLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCAAD39D833A46F9B3736F7C /* Workspace/NativeWorkspaceLayout.swift */; };
 		B25000000000000000000001 /* PDFWriterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B25000000000000000000002 /* PDFWriterTests.swift */; };
 		B25200000000000000000001 /* NativePDFTextReaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B25200000000000000000002 /* NativePDFTextReaderTests.swift */; };
 		2142D9AEBFBC985D49B9914D /* OwnedDuplexProcessTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC0EF021B8CA7FF1195007DA /* OwnedDuplexProcessTests.swift */; };
@@ -687,6 +695,14 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		BEDAF9CB7A714F319B1A98AB /* NativeWorkspacePageCaptureAppTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeWorkspacePageCaptureAppTests.swift; sourceTree = "<group>"; };
+		47360B0AFC62433FB2225759 /* NativeWorkspaceCanvasAppTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeWorkspaceCanvasAppTests.swift; sourceTree = "<group>"; };
+		2D418B6CE6FF49DBAF0FD57A /* NativeWorkspacePreferencesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeWorkspacePreferencesTests.swift; sourceTree = "<group>"; };
+		8E21D53A2EC440249C79B755 /* Workspace/NativeWorkspaceCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Workspace/NativeWorkspaceCatalog.swift; sourceTree = "<group>"; };
+		24034DD4B02C4D008383EE66 /* Workspace/NativeWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Workspace/NativeWorkspaceView.swift; sourceTree = "<group>"; };
+		1D32EC0A9CB04C74B040C90B /* Workspace/NativeWorkspaceCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Workspace/NativeWorkspaceCanvasView.swift; sourceTree = "<group>"; };
+		E6EE1912AADF455CA9A49D6D /* Workspace/NativeWorkspacePreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Workspace/NativeWorkspacePreferences.swift; sourceTree = "<group>"; };
+		FCAAD39D833A46F9B3736F7C /* Workspace/NativeWorkspaceLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Workspace/NativeWorkspaceLayout.swift; sourceTree = "<group>"; };
 		B25000000000000000000002 /* PDFWriterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFWriterTests.swift; sourceTree = "<group>"; };
 		B25200000000000000000002 /* NativePDFTextReaderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativePDFTextReaderTests.swift; sourceTree = "<group>"; };
 		AC0EF021B8CA7FF1195007DA /* OwnedDuplexProcessTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OwnedDuplexProcessTests.swift; sourceTree = "<group>"; };
@@ -1270,6 +1286,9 @@
 		64BB9664134D41DE87CE4C03 /* Tests/ForgeConductorTests */ = {
 			isa = PBXGroup;
 			children = (
+				BEDAF9CB7A714F319B1A98AB /* NativeWorkspacePageCaptureAppTests.swift */,
+				47360B0AFC62433FB2225759 /* NativeWorkspaceCanvasAppTests.swift */,
+				2D418B6CE6FF49DBAF0FD57A /* NativeWorkspacePreferencesTests.swift */,
 				A60700000000000000000002 /* ComputeChipPresentationAppTests.swift */,
 				A6060000000000000000000E /* ComputeChipAppTests.swift */,
 				A60500000000000000000002 /* ComputeTelemetryProvenanceTests.swift */,
@@ -1484,6 +1503,11 @@
 		DB59238523D446A9AC5B2534 /* ForgeConductorApp */ = {
 			isa = PBXGroup;
 			children = (
+				8E21D53A2EC440249C79B755 /* Workspace/NativeWorkspaceCatalog.swift */,
+				24034DD4B02C4D008383EE66 /* Workspace/NativeWorkspaceView.swift */,
+				1D32EC0A9CB04C74B040C90B /* Workspace/NativeWorkspaceCanvasView.swift */,
+				E6EE1912AADF455CA9A49D6D /* Workspace/NativeWorkspacePreferences.swift */,
+				FCAAD39D833A46F9B3736F7C /* Workspace/NativeWorkspaceLayout.swift */,
 				A6060000000000000000000C /* Views/Rig/ComputeCoresContentView.swift */,
 				A6060000000000000000000A /* Metal/ComputeChipShaders.metal */,
 				A60600000000000000000008 /* Metal/ComputeChipRenderer.swift */,
@@ -2352,6 +2376,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				14AC3699E3C741DDB7D731CA /* NativeWorkspacePageCaptureAppTests.swift in Sources */,
+				01400CB822154663A656784F /* NativeWorkspaceCanvasAppTests.swift in Sources */,
+				195DA2713D5946F687569262 /* NativeWorkspacePreferencesTests.swift in Sources */,
 				A60700000000000000000001 /* ComputeChipPresentationAppTests.swift in Sources */,
 				A6060000000000000000000D /* ComputeChipAppTests.swift in Sources */,
 				A10700000000000000000004 /* RuneForgeAppTests.swift in Sources */,
@@ -2372,6 +2399,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0690B54EFAFC411791E166CC /* Workspace/NativeWorkspaceCatalog.swift in Sources */,
+				19625563D01C4269A354BEAC /* Workspace/NativeWorkspaceView.swift in Sources */,
+				7F4506CE9964414D99C7520D /* Workspace/NativeWorkspaceCanvasView.swift in Sources */,
+				07207D69EB384B5BA97CE3E2 /* Workspace/NativeWorkspacePreferences.swift in Sources */,
+				A3A814B2AEC0448495085A7B /* Workspace/NativeWorkspaceLayout.swift in Sources */,
 				A6060000000000000000000B /* Views/Rig/ComputeCoresContentView.swift in Sources */,
 				A60600000000000000000009 /* Metal/ComputeChipShaders.metal in Sources */,
 				A60600000000000000000007 /* Metal/ComputeChipRenderer.swift in Sources */,
@@ -2907,7 +2939,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Manual;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 59;
+				CURRENT_PROJECT_VERSION = 60;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				EAGER_COMPILATION_ALLOW_SCRIPTS = NO;
@@ -2923,7 +2955,7 @@
 					"@loader_path",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.43.0;
+				MARKETING_VERSION = 0.44.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.cli";
 				PRODUCT_NAME = "forge-conductor";
 				SKIP_INSTALL = YES;
@@ -2992,13 +3024,13 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = Tests/ForgeConductorUITests/ForgeConductorUITests.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 59;
+				CURRENT_PROJECT_VERSION = 60;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.43.0;
+				MARKETING_VERSION = 0.44.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.uitests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
@@ -3019,7 +3051,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 59;
+				CURRENT_PROJECT_VERSION = 60;
 				DEAD_CODE_STRIPPING = YES;
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
@@ -3038,7 +3070,7 @@
 					"@executable_path",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.43.0;
+				MARKETING_VERSION = 0.44.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.app";
 				PRODUCT_NAME = "Forge Conductor";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -3058,7 +3090,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 59;
+				CURRENT_PROJECT_VERSION = 60;
 				DEAD_CODE_STRIPPING = YES;
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
@@ -3076,7 +3108,7 @@
 					"@executable_path",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.43.0;
+				MARKETING_VERSION = 0.44.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.app";
 				PRODUCT_NAME = "Forge Conductor";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -3092,7 +3124,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 59;
+				CURRENT_PROJECT_VERSION = 60;
 				DEAD_CODE_STRIPPING = YES;
 				DEFINES_MODULE = NO;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
@@ -3103,7 +3135,7 @@
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.43.0;
+				MARKETING_VERSION = 0.44.0;
 				OTHER_LDFLAGS = ("$(inherited)", "-lbsm");
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.core";
 				PRODUCT_NAME = ForgeConductorCore;
@@ -3204,7 +3236,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 59;
+				CURRENT_PROJECT_VERSION = 60;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				EAGER_COMPILATION_ALLOW_SCRIPTS = NO;
@@ -3220,7 +3252,7 @@
 					"@loader_path",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.43.0;
+				MARKETING_VERSION = 0.44.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.cli";
 				PRODUCT_NAME = "forge-conductor";
 				SWIFT_STRICT_CONCURRENCY = complete;
@@ -3234,7 +3266,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 59;
+				CURRENT_PROJECT_VERSION = 60;
 				DEAD_CODE_STRIPPING = YES;
 				DEFINES_MODULE = NO;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
@@ -3247,7 +3279,7 @@
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.43.0;
+				MARKETING_VERSION = 0.44.0;
 				OTHER_LDFLAGS = ("$(inherited)", "-lbsm");
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.core";
 				PRODUCT_NAME = ForgeConductorCore;
@@ -3298,7 +3330,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 59;
+				CURRENT_PROJECT_VERSION = 60;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
@@ -3322,7 +3354,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 59;
+				CURRENT_PROJECT_VERSION = 60;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
@@ -3346,7 +3378,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 59;
+				CURRENT_PROJECT_VERSION = 60;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
@@ -3370,7 +3402,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 59;
+				CURRENT_PROJECT_VERSION = 60;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
@@ -3426,7 +3458,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 59;
+				CURRENT_PROJECT_VERSION = 60;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
@@ -3435,7 +3467,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.43.0;
+				MARKETING_VERSION = 0.44.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.filesystem-daemon";
 				PRODUCT_NAME = "forge-filesystem-daemon";
 				SKIP_INSTALL = YES;
@@ -3451,7 +3483,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Manual;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 59;
+				CURRENT_PROJECT_VERSION = 60;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
@@ -3460,7 +3492,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.43.0;
+				MARKETING_VERSION = 0.44.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.filesystem-daemon";
 				PRODUCT_NAME = "forge-filesystem-daemon";
 				SKIP_INSTALL = YES;
@@ -3475,7 +3507,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 59;
+				CURRENT_PROJECT_VERSION = 60;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
@@ -3483,7 +3515,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.43.0;
+				MARKETING_VERSION = 0.44.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.runtime-launcher";
 				PRODUCT_NAME = "forge-runtime-launcher";
 				SKIP_INSTALL = YES;
@@ -3499,7 +3531,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Manual;
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 59;
+				CURRENT_PROJECT_VERSION = 60;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
@@ -3507,7 +3539,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.43.0;
+				MARKETING_VERSION = 0.44.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.runtime-launcher";
 				PRODUCT_NAME = "forge-runtime-launcher";
 				SKIP_INSTALL = YES;
@@ -3522,13 +3554,13 @@
 				CODE_SIGN_ENTITLEMENTS = Tests/ForgeConductorUITests/ForgeConductorUITests.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 59;
+				CURRENT_PROJECT_VERSION = 60;
 				DEVELOPMENT_TEAM = 9AQ2C2838M;
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INJECT_APP_INTENTS_INTO_MAIN_BINARY = NO;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.43.0;
+				MARKETING_VERSION = 0.44.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.forge-conductor.uitests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;

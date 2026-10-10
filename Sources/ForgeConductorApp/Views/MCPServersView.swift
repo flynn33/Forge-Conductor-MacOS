@@ -15,6 +15,39 @@ struct MCPServersView: View {
     @EnvironmentObject private var model: AppModel
 
     var body: some View {
+        NativeWorkspaceView(viewID: "mcp", descriptors: NativeWorkspaceCatalog.mcp,
+                            defaultContent: { defaultContent }, panelContent: workspacePanel)
+            .onAppear { model.refreshLMStudioPluginStatus() }
+    }
+
+    private func workspacePanel(_ id: String, _ visible: Bool) -> AnyView {
+        switch id {
+        case "mcp-controls": AnyView(mcpControls)
+        case "mcp-plugin-status": AnyView(pluginStatusBanner)
+        case "mcp-servers": AnyView(serverCollection)
+        case "mcp-guidance": AnyView(productFlowBanner)
+        default: AnyView(EmptyView())
+        }
+    }
+
+    private var defaultContent: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            mcpControls
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    pluginStatusBanner
+                    serverCollection
+                    productFlowBanner
+                }
+            }
+        }
+        .padding(20)
+        .background(GraphitePalette.canvas)
+        .buttonStyle(GraphiteButtonStyle(kind: .secondary))
+    }
+
+    @ViewBuilder
+    private var mcpControls: some View {
         VStack(alignment: .leading, spacing: 16) {
             GraphitePageHeader(
                 title: "LM Studio · MCP",
@@ -25,32 +58,26 @@ struct MCPServersView: View {
                 HStack(spacing: 10) { deploymentActions }
                 VStack(alignment: .leading, spacing: 10) { deploymentActions }
             }
-            ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    pluginStatusBanner
-                    if model.mcpServerCards.isEmpty {
-                        GraphitePanel {
-                            ContentUnavailableView(
-                                "No LM Studio MCP activity yet",
-                                systemImage: "server.rack",
-                                description: Text(
-                                    "Click Deploy to LM Studio. Forge writes and validates all required configuration, reloads LM Studio, and verifies both hosted connections automatically."
-                                )
-                            )
-                        }
-                    } else {
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 270), spacing: 14)], spacing: 14) {
-                            ForEach(model.mcpServerCards) { server in serverCard(server) }
-                        }
-                    }
-                    productFlowBanner
-                }
+        }
+    }
+
+    @ViewBuilder
+    private var serverCollection: some View {
+        if model.mcpServerCards.isEmpty {
+            GraphitePanel {
+                ContentUnavailableView(
+                    "No LM Studio MCP activity yet",
+                    systemImage: "server.rack",
+                    description: Text(
+                        "Click Deploy to LM Studio. Forge writes and validates all required configuration, reloads LM Studio, and verifies both hosted connections automatically."
+                    )
+                )
+            }
+        } else {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 270), spacing: 14)], spacing: 14) {
+                ForEach(model.mcpServerCards) { server in serverCard(server) }
             }
         }
-        .padding(20)
-        .background(GraphitePalette.canvas)
-        .buttonStyle(GraphiteButtonStyle(kind: .secondary))
-        .onAppear { model.refreshLMStudioPluginStatus() }
     }
 
     @ViewBuilder

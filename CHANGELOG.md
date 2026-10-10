@@ -10,6 +10,28 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### `0.44.0 (60)` custom layouts within each view
+
+- Add native movable/resizable panel frames, show/hide controls, saved named layouts, rename/delete and Restore Default to all 13 main views. Manager sections and Rune Forge detail modes retain independent layouts within their existing views. [Workspace guide](docs/NATIVE-WORKSPACES.md).
+- Keep page-owned settings and project drafts outside rearranged panels. Cancel a drag with Escape. Pause Provider setup observation when all its panels are hidden and resume the durable operation without reloading unsaved LM Studio settings.
+- Keep accepted Rune Forge policy commands running when all panels are hidden; pause background observation separately. The mounted regression and all 16 owning native Rune cases passed.
+- Fix Compute viewport resume after outer scrolling and moving a shown panel. Use bounded shared ancestor frame and clip bounds observations and restore their original notification flags on final detach; both focused native cases passed. All 27 Compute owning native methods also passed. Complete UI qualification remains open.
+- Fix stale naming submission: a held Rename dialog must not rename a newly selected layout. Capture its originating view/layout and request identity; dismiss changed-context submission without changing saved layouts.
+- Pass the scoped v17 23-method native selection on its recorded inputs: 18 preference cases, separate normal Rename/Save As, same-view selection/source-refresh isolation and native move/resize/Hide restoration through fresh owners. Post-naming ordinary Debug, strict signature and candidate input/artifact readback passed. Full UI/drafts/desktop, original combined naming/exported-AX/Save-button checks and exact source/wiki delivery remain open; new capabilities remain deferred.
+
+- Verify a separate queued native pointer case: exact owned-window hit testing routes move/resize events through the app queue, preserves transient stored state and persists completed geometry with the same hosts. Cleanup cancels an unfinished test gesture. V18 draft/Save and v21 Save checks remain NONPASS; full UI and desktop/compositor qualification stay open.
+
+#### Earlier UI checks before the naming repair
+
+- Verify the post-Compute ordinary Debug candidate, strict signature and CLI/app product links. Candidate Dashboard startup was observed. The later whole native Canvas selection passed 11 of 13 methods; both draft cases, Projects desktop navigation and Rune naming qualification remain open. The installed 0.18.0 (28) app was not replaced.
+- Full-view/draft-retention and final native build/delivery checks are in progress. Remaining new capability implementations are deferred at the owner's request. [Qualification](docs/QUALIFICATION-STATUS.md).
+
+- Record the later two-draft failures, forced Rune naming timeout and separate candidate-owner cleanup without a complete UI claim. Source/native version-document checks each passed one method and hygiene passed; final documentation readback and exact source/wiki delivery remain open.
+
+- Exercise actual native Rename menu dispatch and sheet presentation. Native Save discovery remains NONPASS before the namespace-change flow; the observations do not establish a product naming defect or close UI qualification.
+
+- Record the separate native Return check as NONPASS at owned name-field discovery before any submission or namespace change. Naming qualification remains open.
+
 ### `0.43.0 (59)` AAC-LC M4A format extension
 
 - Extend supplied-PCM audio_write with exact m4a and a matching .m4a path; retain WAV default, explicit WAV/FLAC, existing response keys, own grant/context/replay, pinned publication and writer versus managed JSON bounds. Native AudioToolbox AAC-LC runs in a bounded signed owned worker; decoded samples are lossy, encoded bytes may vary, and supplied valid-frame count is retained. [Contract](docs/NATIVE-AUDIO-WRITING.md).

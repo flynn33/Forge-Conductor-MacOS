@@ -12,6 +12,32 @@ struct EvidenceOperatorView: View {
     }
 
     var body: some View {
+        NativeWorkspaceView(viewID: "evidence", descriptors: NativeWorkspaceCatalog.evidence,
+                            defaultContent: { defaultContent }, panelContent: workspacePanel)
+            .task { viewModel.load() }
+    }
+
+    private func workspacePanel(_ id: String, _ visible: Bool) -> AnyView {
+        switch id {
+        case "evidence-controls": AnyView(evidenceControls)
+        case "evidence-events": AnyView(eventRecords)
+        case "evidence-paging": AnyView(eventPaging)
+        default: AnyView(EmptyView())
+        }
+    }
+
+    private var defaultContent: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            evidenceControls
+            eventRecords
+            eventPaging
+        }
+        .padding(20)
+        .background(GraphitePalette.canvas)
+    }
+
+    @ViewBuilder
+    private var evidenceControls: some View {
         VStack(alignment: .leading, spacing: 14) {
             OperatorHeader(
                 title: "Events & Evidence",
@@ -34,60 +60,64 @@ struct EvidenceOperatorView: View {
                     exportButton
                 }
             }
+        }
+    }
 
-            GraphitePanel {
-                List(viewModel.filteredEvents) { event in
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack(alignment: .firstTextBaseline) {
-                            Text(event.kind.replacingOccurrences(of: "_", with: " "))
-                                .font(.headline)
-                            Spacer()
-                            Text(event.timestamp)
-                                .font(.caption.monospacedDigit())
-                                .foregroundStyle(GraphitePalette.textSecondary)
-                        }
-                        Text(event.summary)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .textSelection(.enabled)
-                        referenceRow(event)
+    @ViewBuilder
+    private var eventRecords: some View {
+        GraphitePanel {
+            List(viewModel.filteredEvents) { event in
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(event.kind.replacingOccurrences(of: "_", with: " "))
+                            .font(.headline)
+                        Spacer()
+                        Text(event.timestamp)
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(GraphitePalette.textSecondary)
                     }
-                    .padding(.vertical, 8)
-                    .listRowSeparatorTint(GraphitePalette.separator)
-                    .accessibilityElement(children: .contain)
-                    .accessibilityIdentifier("evidence-event-\(event.eventID)")
+                    Text(event.summary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .textSelection(.enabled)
+                    referenceRow(event)
                 }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
-                .background(GraphitePalette.panelBottom)
-                .overlay {
-                    if viewModel.filteredEvents.isEmpty, viewModel.errorMessage == nil, !viewModel.isLoading {
-                        ContentUnavailableView(
-                            viewModel.events.isEmpty ? "No Events" : "No Matching Events",
-                            systemImage: "list.bullet.rectangle",
-                            description: Text("The bounded manager page contains no events for this view.")
-                        )
-                    }
-                }
+                .padding(.vertical, 8)
+                .listRowSeparatorTint(GraphitePalette.separator)
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("evidence-event-\(event.eventID)")
             }
-
-            HStack {
-                Text("Showing \(viewModel.filteredEvents.count) of \(viewModel.events.count) bounded events")
-                    .font(.caption)
-                    .foregroundStyle(GraphitePalette.textSecondary)
-                Spacer()
-                if viewModel.nextCursor != nil {
-                    Button("Load Older Events", action: viewModel.loadMore)
-                        .buttonStyle(GraphiteButtonStyle(kind: .secondary))
-                        .controlSize(.small)
-                        .disabled(viewModel.isLoadingMore)
-                        .accessibilityIdentifier("evidence-load-more")
-                    if viewModel.isLoadingMore { ProgressView().controlSize(.small) }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(GraphitePalette.panelBottom)
+            .overlay {
+                if viewModel.filteredEvents.isEmpty, viewModel.errorMessage == nil, !viewModel.isLoading {
+                    ContentUnavailableView(
+                        viewModel.events.isEmpty ? "No Events" : "No Matching Events",
+                        systemImage: "list.bullet.rectangle",
+                        description: Text("The bounded manager page contains no events for this view.")
+                    )
                 }
             }
         }
-        .padding(20)
-        .background(GraphitePalette.canvas)
-        .task { viewModel.load() }
+    }
+
+    @ViewBuilder
+    private var eventPaging: some View {
+
+        HStack {
+            Text("Showing \(viewModel.filteredEvents.count) of \(viewModel.events.count) bounded events")
+                .font(.caption)
+                .foregroundStyle(GraphitePalette.textSecondary)
+            Spacer()
+            if viewModel.nextCursor != nil {
+                Button("Load Older Events", action: viewModel.loadMore)
+                    .buttonStyle(GraphiteButtonStyle(kind: .secondary))
+                    .controlSize(.small)
+                    .disabled(viewModel.isLoadingMore)
+                    .accessibilityIdentifier("evidence-load-more")
+                if viewModel.isLoadingMore { ProgressView().controlSize(.small) }
+            }
+        }
     }
 
     private var searchField: some View {

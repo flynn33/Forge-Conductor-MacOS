@@ -100,7 +100,33 @@ struct RigDashboardView: View {
 
     var body: some View {
         // Telemetry drives measurements; Compute owns its bounded visible-only FX clock.
-        rigContent
+        NativeWorkspaceView(viewID: "rig", descriptors: NativeWorkspaceCatalog.dashboard,
+                            defaultContent: { rigContent }, panelContent: workspacePanel,
+                            activityChanged: { visible in
+                                if visible { model.startRigOperationalMonitoring() }
+                                else { model.stopRigOperationalMonitoring() }
+                            })
+            .onDisappear { model.stopRigOperationalMonitoring() }
+    }
+
+    private func workspacePanel(_ id: String, _ visible: Bool) -> AnyView {
+        switch id {
+        case "rig-header": AnyView(headerPills)
+        case "rig-current-project": AnyView(currentProjectPanel)
+        case "rig-system-strip": AnyView(sysStrip)
+        case "rig-load-trace": AnyView(loadTracePanel)
+        case "rig-operational-indicators": AnyView(operationalIndicatorsPanel)
+        case "rig-compute-cores-panel": AnyView(computeCoresPanel)
+        case "rig-storage-panel": AnyView(storagePanel)
+        case "rig-orchestration-panel": AnyView(orchestrationPanel)
+        case "rig-managed-activity-feed": AnyView(managedActivityFeedPanel)
+        case "rig-mcp-servers-panel": AnyView(mcpServersPanel)
+        case "rig-mcp-tools-panel": AnyView(mcpToolsPanel)
+        case "rig-sub-agents-panel": AnyView(agentsPanel)
+        case "rig-hot-processes-panel": AnyView(processesPanel)
+        case "rig-live-stream-panel": AnyView(liveFeedPanel)
+        default: AnyView(EmptyView())
+        }
     }
 
     private var rigContent: some View {
@@ -149,8 +175,6 @@ struct RigDashboardView: View {
             .padding(20)
         }
         .background(GraphitePalette.canvas)
-        .onAppear { model.startRigOperationalMonitoring() }
-        .onDisappear { model.stopRigOperationalMonitoring() }
         }
     }
 

@@ -725,10 +725,61 @@ final class ComputeChipRenderer: NSObject, MTKViewDelegate {
 }
 
 @MainActor
+private enum ComputeGeometryObservations {
+    @MainActor
+    final class Entry {
+        let identity: ObjectIdentifier
+        weak var view: NSView?
+        let originalFrameFlag: Bool
+        let originalClipBoundsFlag: Bool?
+        var owners = 1
+
+        init(_ view: NSView) {
+            identity = ObjectIdentifier(view); self.view = view
+            originalFrameFlag = view.postsFrameChangedNotifications
+            originalClipBoundsFlag = (view as? NSClipView)?.postsBoundsChangedNotifications
+            view.postsFrameChangedNotifications = true
+            (view as? NSClipView)?.postsBoundsChangedNotifications = true
+        }
+    }
+
+    // Only active surface leases are retained; each surface visits at most 64 ancestors.
+    private static var entries: [ObjectIdentifier: Entry] = [:]
+    static var entryCount: Int { entries.count }
+    static var clipEntryCount: Int { entries.values.reduce(0) { $0 + ($1.view is NSClipView ? 1 : 0) } }
+
+    static func acquire(_ view: NSView) -> Entry {
+        entries = entries.filter { $0.value.view != nil }
+        let identity = ObjectIdentifier(view)
+        if let entry = entries[identity], entry.view === view {
+            entry.owners += 1
+            return entry
+        }
+        let entry = Entry(view)
+        entries[identity] = entry
+        return entry
+    }
+
+    static func release(_ entry: Entry) {
+        guard entry.owners > 0 else { return }
+        entry.owners -= 1
+        guard entry.owners == 0 else { return }
+        entry.view?.postsFrameChangedNotifications = entry.originalFrameFlag
+        if let original = entry.originalClipBoundsFlag {
+            (entry.view as? NSClipView)?.postsBoundsChangedNotifications = original
+        }
+        // A stale weak entry must never remove a later object that reused its address.
+        if entries[entry.identity] === entry { entries.removeValue(forKey: entry.identity) }
+    }
+}
+
+@MainActor
 final class ComputeChipMetalView: MTKView {
     weak var renderer: ComputeChipRenderer?
-    private weak var observedClip: NSClipView?
-    private var changedClipNotificationFlag = false
+    private var geometryObservations: [ComputeGeometryObservations.Entry] = []
+
+    static var clipBoundsObservationEntryCount: Int { ComputeGeometryObservations.clipEntryCount }
+    static var geometryObservationEntryCount: Int { ComputeGeometryObservations.entryCount }
     private var powerStateObservation: NSObjectProtocol?
     private(set) var powerStateNotificationCount = 0
 
@@ -770,16 +821,15 @@ final class ComputeChipMetalView: MTKView {
                 self.renderer?.visibilityChanged()
             }
         }
-        var parent = superview
-        while let candidate = parent {
+        var parent = superview, ancestorsVisited = 0
+        while let candidate = parent, ancestorsVisited < 64 {
+            ancestorsVisited += 1
+            geometryObservations.append(ComputeGeometryObservations.acquire(candidate))
+            NotificationCenter.default.addObserver(self, selector: #selector(lifecycleChanged),
+                                                   name: NSView.frameDidChangeNotification, object: candidate)
             if let clip = candidate as? NSClipView {
-                observedClip = clip
-                if !clip.postsBoundsChangedNotifications {
-                    clip.postsBoundsChangedNotifications = true; changedClipNotificationFlag = true
-                }
                 NotificationCenter.default.addObserver(self, selector: #selector(lifecycleChanged),
                                                        name: NSView.boundsDidChangeNotification, object: clip)
-                break
             }
             parent = candidate.superview
         }
@@ -789,8 +839,9 @@ final class ComputeChipMetalView: MTKView {
         NotificationCenter.default.removeObserver(self)
         if let powerStateObservation { NotificationCenter.default.removeObserver(powerStateObservation) }
         powerStateObservation = nil
-        if changedClipNotificationFlag { observedClip?.postsBoundsChangedNotifications = false }
-        changedClipNotificationFlag = false; observedClip = nil
+        let released = geometryObservations
+        geometryObservations.removeAll(keepingCapacity: false)
+        released.forEach { ComputeGeometryObservations.release($0) }
     }
 
     @objc private func lifecycleChanged(_ notification: Notification) { renderer?.visibilityChanged() }

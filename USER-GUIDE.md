@@ -1,5 +1,20 @@
 # Forge Conductor user guide
 
+Version **0.44.0**, build **60** adds custom layouts within each existing view.
+
+1. Open a view and select **Customize Layout**.
+2. Drag a panel's header to move it. Drag its lower-right grip to resize it.
+3. Hide a panel with its **X** button; use **Panels** to show it again.
+4. Open the layout menu and choose **Save Layout As…** to create a named arrangement. Completed moves, sizes and visibility changes are saved automatically to the active layout.
+5. Switch between saved layouts in that view. **Rename Layout…** and **Delete Layout** manage the selected layout.
+6. Select **Restore Default** to return to the original view arrangement. Saved layouts remain available.
+
+Focus a panel's header and use arrow keys to move it by 10 points; Option-arrow resizes it. Arrow keys on the resize grip resize directly. Escape cancels a drag. Layouts stay within the current view; Manager sections and Rune Forge detail modes have their own arrangements. [Workspace details](docs/NATIVE-WORKSPACES.md).
+
+If the view or selected layout changes while a naming dialog is open, saving closes that dialog without changing the saved layouts. The message says **“The layout changed. Open the layout menu and try again.”** Reopen the menu for the layout you want to name.
+
+## Preceding 0.43.0 (59) qualification
+
 Version **0.43.0**, build **59** adds `format: "m4a"` with an explicit case-insensitive .m4a destination to supplied-sample `audio_write`. Provide the existing required path, canonical padded-base64 PCM16LE content, sample_rate and channels; omit format for WAV or select exact wav/flac with a matching path. M4A uses lossy AAC-LC: decoded samples need not equal input PCM, encoded bytes may vary, and no listening/quality guarantee is made. The 1 MiB raw ceiling does not expand managed 65,536-byte JSON admission. Matching source/native owning checks and six App/CLI rate cohorts passed. All 24 actual M4A outputs passed separate native decoding to the supplied valid-frame count and true EOF; decoded PCM remains lossy. Scoped Qwen result consumption/metadata ACK and exact-artifact native valid-frame/EOF checks passed. Initial document checks and first source publication/synchronization passed; scoped AAC result-document/wiki checks and source/wiki delivery are complete. [Contract and gates](docs/NATIVE-AUDIO-WRITING.md).
 
 ## Preceding 0.42.0 (58) qualification

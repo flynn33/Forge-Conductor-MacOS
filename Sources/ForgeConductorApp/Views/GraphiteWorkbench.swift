@@ -66,59 +66,20 @@ struct WorkbenchSettingsView: View {
     @EnvironmentObject private var preferences: WorkbenchPreferences
     @EnvironmentObject private var guidedMode: GuidedModeCoordinator
 
+    enum Section: String { case navigation, guidance, controls }
+    var section: Section? = nil
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            GraphitePanel(title: "Navigation and updates") {
-                Toggle("Show navigation", isOn: $model.isNavigationVisible)
-                    .accessibilityIdentifier("settings-navigation-visible")
-                Toggle("Auto-refresh telemetry", isOn: $model.autoRefresh)
-                    .accessibilityIdentifier("settings-auto-refresh")
-                Button("Refresh Now", systemImage: "arrow.clockwise") {
-                    model.refresh(force: true)
-                }
-                .accessibilityIdentifier("settings-refresh")
-                Text("Refresh manually with Command-R. Show or hide navigation with Control-Command-S.")
-                    .foregroundStyle(GraphitePalette.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                if model.isLoading {
-                    Label("Refreshing…", systemImage: "arrow.clockwise")
-                        .accessibilityIdentifier("settings-refresh-status")
-                } else if let updated = model.updated {
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        Text("Last updated")
-                        Text(updated, style: .time).monospacedDigit()
-                    }
-                    .font(.system(size: 12))
-                    .foregroundStyle(GraphitePalette.textSecondary)
-                    .accessibilityIdentifier("settings-refresh-status")
-                }
-            }
-            GraphitePanel(title: "Guidance") {
-                Toggle("Show contextual Guided Mode", isOn: $guidedMode.isEnabled)
-                    .accessibilityIdentifier("settings-guided-mode")
-                Text("Contextual guidance appears within the selected view. The guide and setup review are also available from the Guide menu.")
-                    .foregroundStyle(GraphitePalette.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                HStack(spacing: 10) {
-                    Button("Open Guide") {
-                        preferences.activateMainWindow()
-                        guidedMode.present()
-                    }
-                    .accessibilityIdentifier("settings-show-guide")
-                    Button("Guided Setup") { preferences.presentGuidedSetup() }
-                        .accessibilityIdentifier("settings-guided-setup")
-                }
-            }
-            GraphitePanel(title: "Optional view controls") {
-                Text("The workspace opens without a control bar. Enable only the shortcuts you want above the current view.")
-                    .foregroundStyle(GraphitePalette.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                ForEach(WorkbenchPreferences.Control.allCases, id: \.self) { control in
-                    Toggle(control.title, isOn: Binding(
-                        get: { preferences.shows(control) },
-                        set: { preferences.setShown($0, for: control) }
-                    ))
-                    .accessibilityIdentifier("settings-control-\(control.rawValue)")
+        Group {
+            switch section {
+            case .navigation: navigationSettings
+            case .guidance: guidanceSettings
+            case .controls: optionalControls
+            case nil:
+                VStack(alignment: .leading, spacing: 16) {
+                    navigationSettings
+                    guidanceSettings
+                    optionalControls
                 }
             }
         }
@@ -127,8 +88,73 @@ struct WorkbenchSettingsView: View {
         .font(.system(size: 13))
         .frame(maxWidth: 720, alignment: .leading)
         .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("workbench-settings")
+        .accessibilityIdentifier(section.map { "workbench-settings-" + $0.rawValue } ?? "workbench-settings")
     }
+    @ViewBuilder
+    private var navigationSettings: some View {
+        GraphitePanel(title: "Navigation and updates") {
+            Toggle("Show navigation", isOn: $model.isNavigationVisible)
+                .accessibilityIdentifier("settings-navigation-visible")
+            Toggle("Auto-refresh telemetry", isOn: $model.autoRefresh)
+                .accessibilityIdentifier("settings-auto-refresh")
+            Button("Refresh Now", systemImage: "arrow.clockwise") {
+                model.refresh(force: true)
+            }
+            .accessibilityIdentifier("settings-refresh")
+            Text("Refresh manually with Command-R. Show or hide navigation with Control-Command-S.")
+                .foregroundStyle(GraphitePalette.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            if model.isLoading {
+                Label("Refreshing…", systemImage: "arrow.clockwise")
+                    .accessibilityIdentifier("settings-refresh-status")
+            } else if let updated = model.updated {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text("Last updated")
+                    Text(updated, style: .time).monospacedDigit()
+                }
+                .font(.system(size: 12))
+                .foregroundStyle(GraphitePalette.textSecondary)
+                .accessibilityIdentifier("settings-refresh-status")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var guidanceSettings: some View {
+        GraphitePanel(title: "Guidance") {
+            Toggle("Show contextual Guided Mode", isOn: $guidedMode.isEnabled)
+                .accessibilityIdentifier("settings-guided-mode")
+            Text("Contextual guidance appears within the selected view. The guide and setup review are also available from the Guide menu.")
+                .foregroundStyle(GraphitePalette.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 10) {
+                Button("Open Guide") {
+                    preferences.activateMainWindow()
+                    guidedMode.present()
+                }
+                .accessibilityIdentifier("settings-show-guide")
+                Button("Guided Setup") { preferences.presentGuidedSetup() }
+                    .accessibilityIdentifier("settings-guided-setup")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var optionalControls: some View {
+        GraphitePanel(title: "Optional view controls") {
+            Text("The workspace opens without a control bar. Enable only the shortcuts you want above the current view.")
+                .foregroundStyle(GraphitePalette.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            ForEach(WorkbenchPreferences.Control.allCases, id: \.self) { control in
+                Toggle(control.title, isOn: Binding(
+                    get: { preferences.shows(control) },
+                    set: { preferences.setShown($0, for: control) }
+                ))
+                .accessibilityIdentifier("settings-control-\(control.rawValue)")
+            }
+        }
+    }
+
 }
 
 /// Compiled sRGB presentation values shared by SwiftUI, AppKit and Metal.

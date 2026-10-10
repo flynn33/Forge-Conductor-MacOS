@@ -1,5 +1,33 @@
 # Forge Conductor for macOS
 
+Current source target **0.44.0 (60)** adds movable, resizable, show/hide panels and named layouts within each existing view. Use **Customize Layout**, drag a panel header or resize grip, and select visible panels in **Panels**. **Restore Default** returns to the original composition while retaining saved layouts. [Workspace guide](docs/NATIVE-WORKSPACES.md).
+
+A held Rename dialog could rename a different layout after the active selection changed. Naming now retains its originating view/layout and rejects stale submission. The scoped native v17 selection passed all 23 actual methods on its recorded inputs: 18 preferences, separate normal Rename/Save As, two stale-context checks and native move/resize/Hide restoration through fresh owners. The original combined naming, exported-AX and Save-button routes remain NONPASS; complete UI/draft/desktop checks and exact source/wiki delivery remain open.
+
+A separate v20 native pointer check passed actual owned-window hit testing and queued move/resize events: transient frames leave stored preferences unchanged, completed gestures persist and panel hosts remain the same. V18 draft/Save and v21 Save checks remain NONPASS; their failure-only diagnostics establish no control-lifetime, permission or broken-action cause. Desktop input and compositor qualification remain open.
+
+The post-naming v6 ordinary Debug build, strict signature and seven-artifact/Info 0.44.0 (60) readback passed against 320 product/build inputs. This qualifies candidate compilation and file identities; candidate launch, installed operation and full UI remain unverified. Remaining new capability implementations stay deferred. [Current gates](docs/QUALIFICATION-STATUS.md).
+
+## Earlier UI checks before the naming repair
+
+The following receipts retain their earlier inputs and outcomes; their failed naming observations are historical, not the latest scoped result.
+
+UI completion is the current owner priority. Remaining new file-format and other capability implementations are deferred. Provider hidden observation and Rune hidden-command regressions passed their owning checks. Native physical-cache fixtures passed for all 13 pages at two sizes and separately for nine Manager sections. A separate minimum-size native check passed scroll reachability for 396 panel-control centers across 22 fixtures; this check does not exercise panel-body actions or wheel input. Complete semantic view and draft-retention checks remain open. The updated ordinary build/signature and candidate readback passed; final affected checks and document/delivery gates remain pending. [Current gates](docs/QUALIFICATION-STATUS.md).
+
+Scoped Compute native tests now pass viewport suspension/resume for outer scrolling and shown-panel movement, preserving the same panel, surface and renderer. The subsequent complete Compute owning native selection passed all 27 methods. Projects' real AppKit edit survived custom layout and hide/show, but a later API-disabled lookup left the complete draft case NONPASS; draft loss is not established. Read-only page semantics reached 19 normal-size phases before another API-disabled failure. Complete UI qualification remains open.
+
+The post-Compute v5 ordinary Debug build, strict signature, seven-artifact/Info and 320-input candidate readback, and CLI/app compilation passed. Its native Dashboard startup was observed, but computer-use communication closed during the Projects action, leaving navigation unverified. Only owned candidate PID 25818 was stopped with SIGTERM; installed 0.18.0 (28), PID 16472, remained separate and unchanged at cleanup.
+
+The subsequent whole Canvas selection executed 13 methods: 11 passed and both Manager/Projects draft methods failed at public AXIdentifier lookup despite retained Projects native draft values. Earlier Rune naming attempts did not reach Rename, a sheet or Save; namespace-change behavior remains an unverified source risk. Complete UI and delivery gates remain open.
+
+Later diagnostics still leave the UI phase open: both draft methods failed, and the Rune naming attempt reached its 100.227 s outer deadline without a completed method. A fresh isolated v5 candidate again showed Dashboard before Projects communication closed; verified candidate PID 29810 was SIGTERM-cleaned, preserving installed PID 16472. Separate source/native version-document checks each passed one method, and hygiene passed before this documentation addition; exact source/wiki delivery remains pending.
+
+The separate native menu route subsequently opened the actual Rename sheet. Both completed attempts stopped at native Save-identifier discovery before source refresh or submission. The naming risk and complete UI qualification remain open; no production naming fix has been made from these observations.
+
+The separate native Return check also stopped before submission at owned name-field discovery. Full naming behavior remains unverified; the earlier failed checks remain recorded.
+
+## Preceding 0.43.0 (59) qualification
+
 Current source target **0.43.0 (59)** adds optional AAC-LC M4A to existing `audio_write`: select exact `format: "m4a"` and an explicit matching .m4a path. Omitted format remains WAV; explicit WAV and FLAC remain available. Supplied PCM16LE, rates/channels and writer versus managed-call bounds remain. AAC is lossy, with variable encoded bytes and a retained supplied valid-frame count. [Audio contract](docs/NATIVE-AUDIO-WRITING.md).
 
 The AAC product source is applied; matching source/native owning selections passed 139 distinct methods each in 76.318/108.450 s on the same 475 inputs, zero failures/skips, with warnings retained. CLI/app compilation, ordinary Debug and strict signature passed. Candidate C1 readback passed on seven artifacts/Info, 475 source inputs and 80 preceding guards. Six App/CLI rate cohorts passed 24 actual M4A writes and complete binary EOF; all 24 files passed separate native valid-frame/decode EOF checks. Observed child cancellation preserved destinations and the child was gone. Qwen v3 passed six actual Low turns, five consumed native results, whole readback/metadata ACK and a separate exact-artifact native decode. Initial source/native G3 and hygiene passed; first owner source publication/synchronization passed for 35 paths. Scoped AAC result-document/wiki checks and source/wiki delivery are complete. Completed .42 evidence below retains its tested identity. Raw ADTS .aac, installed operation, full web/all models, general lifetime, Release and shipment remain unqualified. [Current gates](docs/QUALIFICATION-STATUS.md).
@@ -951,8 +979,8 @@ continuity. The user does not start project work through a Forge Managed Run.
 
 | | |
 |---|---|
-| **Version** | **0.43.0** |
-| **Build** | **59** |
+| **Version** | **0.44.0** |
+| **Build** | **60** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |

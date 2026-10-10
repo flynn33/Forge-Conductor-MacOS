@@ -9,37 +9,60 @@ struct AgentsView: View {
     @EnvironmentObject private var model: AppModel
 
     var body: some View {
+        NativeWorkspaceView(viewID: "agents", descriptors: NativeWorkspaceCatalog.agents,
+                            defaultContent: { defaultContent }, panelContent: workspacePanel)
+    }
+
+    private func workspacePanel(_ id: String, _ visible: Bool) -> AnyView {
+        switch id {
+        case "agents-controls": AnyView(agentsControls)
+        case "agents-catalog": AnyView(agentCatalog)
+        default: AnyView(EmptyView())
+        }
+    }
+
+    private var defaultContent: some View {
         VStack(alignment: .leading, spacing: 16) {
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .top, spacing: 16) {
-                    pageHeader
-                    Spacer(minLength: 16)
-                    pruneButton
-                }
-                VStack(alignment: .leading, spacing: 12) {
-                    pageHeader
-                    pruneButton
-                }
-            }
-            if model.agentCards.isEmpty {
-                GraphitePanel {
-                    ContentUnavailableView(
-                        "No agents in the catalog", systemImage: "person.3.sequence",
-                        description: Text("Available agent playbooks appear here with their current session health."))
-                }
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: 10) {
-                        ForEach(model.agentCards) { agent in
-                            agentRow(agent)
-                        }
-                    }
-                }
-            }
+            agentsControls
+            agentCatalog
         }
         .padding(20)
         .background(GraphitePalette.canvas)
         .buttonStyle(GraphiteButtonStyle(kind: .secondary))
+    }
+
+    @ViewBuilder
+    private var agentsControls: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: 16) {
+                pageHeader
+                Spacer(minLength: 16)
+                pruneButton
+            }
+            VStack(alignment: .leading, spacing: 12) {
+                pageHeader
+                pruneButton
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var agentCatalog: some View {
+        if model.agentCards.isEmpty {
+            GraphitePanel {
+                ContentUnavailableView(
+                    "No agents in the catalog", systemImage: "person.3.sequence",
+                    description: Text("Available agent playbooks appear here with their current session health."))
+            }
+        } else {
+            ScrollView {
+                LazyVStack(spacing: 10) {
+                    ForEach(model.agentCards) { agent in
+                        agentRow(agent)
+                    }
+                }
+            }
+        }
     }
 
     private var pageHeader: some View {

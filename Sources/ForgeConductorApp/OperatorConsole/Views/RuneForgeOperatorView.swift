@@ -31,15 +31,78 @@ struct RuneForgeOperatorView: View {
         self.selectExportDestination = selectExportDestination
     }
 
+    init(
+        viewModel: RuneForgeViewModel,
+        selectPolicySources: @escaping @MainActor () -> [URL],
+        selectExportDestination: @escaping @MainActor (StjornarvaldExportFormat) -> URL?
+    ) {
+        _viewModel = StateObject(wrappedValue: viewModel)
+        self.selectPolicySources = selectPolicySources
+        self.selectExportDestination = selectExportDestination
+    }
+
     var body: some View {
+        NativeWorkspaceView(viewID: workspaceViewID,
+                            descriptors: NativeWorkspaceCatalog.runePanels(for: workspaceMode),
+                            defaultContent: { defaultContent }, panelContent: workspacePanel,
+                            activityChanged: { visible in
+                                if visible { viewModel.start() } else { viewModel.pauseObservation() }
+                            })
+            .onDisappear { viewModel.stop() }
+    }
+
+    private var selectedSource: RuneForgeSourceItem? {
+        guard case .source(let id) = selection else { return nil }
+        return viewModel.sources.first { $0.id == id }
+    }
+
+    private var selectedViolation: StjornarvaldViolationPageItem? {
+        guard case .violation(let id) = selection else { return nil }
+        return viewModel.violations.first { $0.violation.id.description == id }
+    }
+
+    private var workspaceMode: String {
+        if selectedSource != nil { return "source" }
+        if selectedViolation != nil { return "violation" }
+        return selection == .policyFeed ? "feed" : "overview"
+    }
+    private var workspaceViewID: String { "rune-forge." + workspaceMode }
+
+    private func workspacePanel(_ id: String, _ visible: Bool) -> AnyView {
+        switch id {
+        case "rune-controls": AnyView(runeControls)
+        case "rune-navigation": AnyView(navigationList)
+        case "rune-authority": AnyView(VStack(alignment: .leading, spacing: 18) { overviewHeading; governingPolicyPanel })
+        case "rune-health": AnyView(policyHealthPanel)
+        case "rune-limitations": AnyView(policyLimitationsPanel)
+        case "rune-events": AnyView(VStack(alignment: .leading, spacing: 16) { policyFeedHeading; policyEvents; policyFeedCount })
+        case "rune-evaluations": AnyView(policyEvaluations)
+        default: AnyView(selectedWorkspaceDetail(id))
+        }
+    }
+
+    @ViewBuilder
+    private func selectedWorkspaceDetail(_ id: String) -> some View {
+        if let source = selectedSource {
+            switch id {
+            case "rune-source-actions": VStack(alignment: .leading, spacing: 16) { sourceHeading(source); sourceActions(source) }
+            case "rune-source-identity": sourceIdentity(source)
+            case "rune-source-path": sourceInterpretation(source)
+            default: EmptyView()
+            }
+        } else if let item = selectedViolation {
+            switch id {
+            case "rune-violation-identity": VStack(alignment: .leading, spacing: 16) { violationHeading(item); violationIdentity(item) }
+            case "rune-violation-evidence": violationEvidence(item)
+            case "rune-violation-history": violationHistory(item)
+            default: EmptyView()
+            }
+        }
+    }
+
+    private var defaultContent: some View {
         VStack(alignment: .leading, spacing: 12) {
-            header
-            if let notice = viewModel.noticeMessage {
-                OperatorNoticeBanner(message: notice)
-            }
-            if let error = viewModel.errorMessage {
-                OperatorErrorBanner(message: error, retry: viewModel.refresh)
-            }
+            runeControls
             HSplitView {
                 navigationList
                     .frame(minWidth: 230, idealWidth: 280, maxWidth: 360)
@@ -49,8 +112,19 @@ struct RuneForgeOperatorView: View {
         }
         .padding(20)
         .background(GraphitePalette.canvas)
-        .task { viewModel.start() }
-        .onDisappear { viewModel.stop() }
+    }
+
+    @ViewBuilder
+    private var runeControls: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            header
+            if let notice = viewModel.noticeMessage {
+                OperatorNoticeBanner(message: notice)
+            }
+            if let error = viewModel.errorMessage {
+                OperatorErrorBanner(message: error, retry: viewModel.refresh)
+            }
+        }
     }
 
     private var header: some View {
@@ -262,55 +336,75 @@ struct RuneForgeOperatorView: View {
     private var policyFeed: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                detailHeading(
-                    "Policy Feed",
-                    subtitle: "Newest-first, bounded Stjornarvald policy events"
-                )
+                policyFeedHeading
+                policyEvents
+                policyEvaluations
+                policyFeedCount
 
-                if viewModel.events.isEmpty {
-                    ContentUnavailableView(
-                        "No Recorded Violations",
-                        systemImage: "checkmark.shield",
-                        description: Text(
-                            "No violation events are present in the newest snapshot. This is not proof that all policy requirements have passed. Evaluation activity appears below."
-                        )
-                    )
-                    .frame(maxWidth: .infinity, minHeight: 220)
-                } else {
-                    LazyVStack(alignment: .leading, spacing: 12) {
-                        ForEach(viewModel.events) { event in
-                            policyEventCard(event)
-                        }
-                    }
-                }
-
-                Text("Policy evaluation activity").font(.headline)
-                ForEach(viewModel.evaluationActivity) { activity in
-                    GraphitePanel {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(activity.summary).textSelection(.enabled)
-                            Text("\(activity.evaluatedAt) · \(activity.findingCount) findings · \(activity.detectorFaultCount) detector faults")
-                                .font(.caption).foregroundStyle(GraphitePalette.textSecondary)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .accessibilityElement(children: .contain)
-                    .accessibilityIdentifier("rune-policy-evaluation-\(activity.id)")
-                }
-                ForEach(viewModel.limitations, id: \.self) { limitation in
-                    Text(limitation).font(.caption).foregroundStyle(GraphitePalette.textSecondary)
-                }
-
-                Text(
-                    "Showing \(viewModel.events.count) of at most "
-                        + "\(RuneForgeViewModel.maximumEvents) cached events"
-                )
-                .font(.caption)
-                .foregroundStyle(GraphitePalette.textSecondary)
             }
             .padding(20)
         }
         .accessibilityIdentifier("rune-policy-feed")
+    }
+
+    @ViewBuilder
+    private var policyFeedHeading: some View {
+        detailHeading(
+            "Policy Feed",
+            subtitle: "Newest-first, bounded Stjornarvald policy events"
+        )
+    }
+
+    @ViewBuilder
+    private var policyEvents: some View {
+        if viewModel.events.isEmpty {
+            ContentUnavailableView(
+                "No Recorded Violations",
+                systemImage: "checkmark.shield",
+                description: Text(
+                    "No violation events are present in the newest snapshot. This is not proof that all policy requirements have passed. Evaluation activity appears below."
+                )
+            )
+            .frame(maxWidth: .infinity, minHeight: 220)
+        } else {
+            LazyVStack(alignment: .leading, spacing: 12) {
+                ForEach(viewModel.events) { event in
+                    policyEventCard(event)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var policyEvaluations: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Policy evaluation activity").font(.headline)
+            ForEach(viewModel.evaluationActivity) { activity in
+                GraphitePanel {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(activity.summary).textSelection(.enabled)
+                        Text("\(activity.evaluatedAt) · \(activity.findingCount) findings · \(activity.detectorFaultCount) detector faults")
+                            .font(.caption).foregroundStyle(GraphitePalette.textSecondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("rune-policy-evaluation-\(activity.id)")
+            }
+            ForEach(viewModel.limitations, id: \.self) { limitation in
+                Text(limitation).font(.caption).foregroundStyle(GraphitePalette.textSecondary)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var policyFeedCount: some View {
+        Text(
+            "Showing \(viewModel.events.count) of at most "
+                + "\(RuneForgeViewModel.maximumEvents) cached events"
+        )
+        .font(.caption)
+        .foregroundStyle(GraphitePalette.textSecondary)
     }
 
     private func policyEventCard(_ event: PolicyViolationEvent) -> some View {
@@ -418,175 +512,241 @@ struct RuneForgeOperatorView: View {
     private var overview: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                detailHeading(
-                    "Development Policy",
-                    subtitle: "Observes and reports policy issues without stopping development"
-                )
-                GraphitePanel(title: "Governing policy") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        detailRow("Authority", viewModel.governingPolicy?.authority ?? "Raven Forge Development")
-                        detailRow("Version", viewModel.governingPolicy?.version ?? "Loading")
-                        detailRow("Revision", viewModel.governingPolicy?.revision ?? "Loading")
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                GraphitePanel(title: "Stjornarvald health") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        detailRow("State", healthTitle)
-                        detailRow("Active policy sources", "\(viewModel.sources.filter(\.active).count)")
-                        detailRow("Current violations", "\(viewModel.violations.count)")
-                        detailRow("Development status", "Continuing")
-                        if viewModel.isDegraded {
-                            Text("Cached policy information remains available while the Manager reconnects.")
-                                .font(.system(size: 13))
-                            .fixedSize(horizontal: false, vertical: true)
-                                .foregroundStyle(GraphitePalette.textSecondary)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                if !viewModel.limitations.isEmpty {
-                    GraphitePanel(title: "Current limitations") {
-                        VStack(alignment: .leading, spacing: 6) {
-                            ForEach(viewModel.limitations, id: \.self) { limitation in
-                                Label(limitation, systemImage: "info.circle")
-                                    .font(.system(size: 13))
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                }
+                overviewHeading
+                governingPolicyPanel
+                policyHealthPanel
+                policyLimitationsPanel
+
             }
             .padding(20)
+        }
+    }
+
+    @ViewBuilder
+    private var overviewHeading: some View {
+        detailHeading(
+            "Development Policy",
+            subtitle: "Observes and reports policy issues without stopping development"
+        )
+    }
+
+    @ViewBuilder
+    private var governingPolicyPanel: some View {
+        GraphitePanel(title: "Governing policy") {
+            VStack(alignment: .leading, spacing: 8) {
+                detailRow("Authority", viewModel.governingPolicy?.authority ?? "Raven Forge Development")
+                detailRow("Version", viewModel.governingPolicy?.version ?? "Loading")
+                detailRow("Revision", viewModel.governingPolicy?.revision ?? "Loading")
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    @ViewBuilder
+    private var policyHealthPanel: some View {
+        GraphitePanel(title: "Stjornarvald health") {
+            VStack(alignment: .leading, spacing: 8) {
+                detailRow("State", healthTitle)
+                detailRow("Active policy sources", "\(viewModel.sources.filter(\.active).count)")
+                detailRow("Current violations", "\(viewModel.violations.count)")
+                detailRow("Development status", "Continuing")
+                if viewModel.isDegraded {
+                    Text("Cached policy information remains available while the Manager reconnects.")
+                        .font(.system(size: 13))
+                    .fixedSize(horizontal: false, vertical: true)
+                        .foregroundStyle(GraphitePalette.textSecondary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    @ViewBuilder
+    private var policyLimitationsPanel: some View {
+        if !viewModel.limitations.isEmpty {
+            GraphitePanel(title: "Current limitations") {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(viewModel.limitations, id: \.self) { limitation in
+                        Label(limitation, systemImage: "info.circle")
+                            .font(.system(size: 13))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
     }
 
     private func sourceDetail(_ source: RuneForgeSourceItem) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                detailHeading(
-                    source.displayName,
-                    subtitle: source.origin == .builtInRavenForge
-                        ? "Built-in Raven Forge Development baseline"
-                        : "Active policy source"
-                )
-                HStack {
-                    Button("Refresh Source", systemImage: "arrow.clockwise") {
-                        viewModel.refreshSource(source)
-                    }
-                    .buttonStyle(GraphiteButtonStyle(kind: .secondary))
-                    .disabled(source.sourceID == nil)
-                    .accessibilityIdentifier("rune-policy-source-refresh")
-                    Button("Remove Source", systemImage: "minus.circle", role: .destructive) {
-                        viewModel.removeSource(source)
-                        selection = .overview
-                    }
-                    .buttonStyle(GraphiteButtonStyle(kind: .destructive))
-                    .disabled(source.origin == .builtInRavenForge)
-                    .accessibilityIdentifier("rune-policy-source-remove")
-                }
-                GraphitePanel(title: "Source identity") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        detailRow("State", RuneForgeViewModel.sourceStateTitle(source.interpretationState))
-                        detailRow("Source ID", source.sourceID?.description ?? "Manager confirmation pending")
-                        detailRow("Kind", source.rootKind.rawValue.replacingOccurrences(of: "_", with: " "))
-                        detailRow("Added", source.addedAt.formatted(date: .abbreviated, time: .standard))
-                        detailRow("Revision", source.latestRevisionID?.description ?? "Not indexed yet")
-                        detailRow("Catalog cursor", source.lastIndexCursor ?? "Not available")
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                GraphitePanel(title: "Path and interpretation") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        detailRow("Selected path", source.selectedPath)
-                        detailRow("Standardized path", source.standardizedPath)
-                        if let observation = source.latestObservation {
-                            detailRow("Interpretation observation", observation)
-                        }
-                        Text("Every file and folder format is accepted. Unsupported or opaque content remains active with metadata-only or partial interpretation.")
-                            .font(.system(size: 13))
-                            .fixedSize(horizontal: false, vertical: true)
-                            .foregroundStyle(GraphitePalette.textSecondary)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
+                sourceHeading(source)
+                sourceActions(source)
+                sourceIdentity(source)
+                sourceInterpretation(source)
+
             }
             .padding(20)
         }
     }
 
+    @ViewBuilder
+    private func sourceHeading(_ source: RuneForgeSourceItem) -> some View {
+        detailHeading(
+            source.displayName,
+            subtitle: source.origin == .builtInRavenForge
+                ? "Built-in Raven Forge Development baseline"
+                : "Active policy source"
+        )
+    }
+
+    @ViewBuilder
+    private func sourceActions(_ source: RuneForgeSourceItem) -> some View {
+        HStack {
+            Button("Refresh Source", systemImage: "arrow.clockwise") {
+                viewModel.refreshSource(source)
+            }
+            .buttonStyle(GraphiteButtonStyle(kind: .secondary))
+            .disabled(source.sourceID == nil)
+            .accessibilityIdentifier("rune-policy-source-refresh")
+            Button("Remove Source", systemImage: "minus.circle", role: .destructive) {
+                viewModel.removeSource(source)
+                selection = .overview
+            }
+            .buttonStyle(GraphiteButtonStyle(kind: .destructive))
+            .disabled(source.origin == .builtInRavenForge)
+            .accessibilityIdentifier("rune-policy-source-remove")
+        }
+    }
+
+    @ViewBuilder
+    private func sourceIdentity(_ source: RuneForgeSourceItem) -> some View {
+        GraphitePanel(title: "Source identity") {
+            VStack(alignment: .leading, spacing: 8) {
+                detailRow("State", RuneForgeViewModel.sourceStateTitle(source.interpretationState))
+                detailRow("Source ID", source.sourceID?.description ?? "Manager confirmation pending")
+                detailRow("Kind", source.rootKind.rawValue.replacingOccurrences(of: "_", with: " "))
+                detailRow("Added", source.addedAt.formatted(date: .abbreviated, time: .standard))
+                detailRow("Revision", source.latestRevisionID?.description ?? "Not indexed yet")
+                detailRow("Catalog cursor", source.lastIndexCursor ?? "Not available")
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    @ViewBuilder
+    private func sourceInterpretation(_ source: RuneForgeSourceItem) -> some View {
+        GraphitePanel(title: "Path and interpretation") {
+            VStack(alignment: .leading, spacing: 8) {
+                detailRow("Selected path", source.selectedPath)
+                detailRow("Standardized path", source.standardizedPath)
+                if let observation = source.latestObservation {
+                    detailRow("Interpretation observation", observation)
+                }
+                Text("Every file and folder format is accepted. Unsupported or opaque content remains active with metadata-only or partial interpretation.")
+                    .font(.system(size: 13))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .foregroundStyle(GraphitePalette.textSecondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
     private func violationDetail(_ item: StjornarvaldViolationPageItem) -> some View {
-        let violation = item.violation
-        let event = viewModel.latestEvent(for: violation.id)
-        let history = viewModel.eventHistory(for: violation.id)
-        return ScrollView {
+        ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                detailHeading(
-                    RuneForgeViewModel.violationStateTitle(violation.state),
-                    subtitle: violation.latestSummary
-                )
-                GraphitePanel(title: "Violation identity and history") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        detailRow("Violation ID", violation.id.description)
-                        detailRow("State", RuneForgeViewModel.violationStateTitle(violation.state))
-                        detailRow("Rule", violation.ruleID.description)
-                        detailRow("Policy revision", violation.policyRevision)
-                        detailRow("Occurrences", "\(violation.occurrenceCount)")
-                        detailRow("First observed", violation.firstObservedAt.formatted(date: .abbreviated, time: .standard))
-                        detailRow("Last observed", violation.lastObservedAt.formatted(date: .abbreviated, time: .standard))
-                        detailRow("Latest event sequence", "\(item.latestEventSequence)")
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                GraphitePanel(title: "Evidence and interpretation") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        detailRow("Summary", violation.latestSummary)
-                        detailRow("Suggested correction", violation.latestSuggestedCorrection)
-                        if let event {
-                            detailRow("Policy source", event.candidate.rule.source.path)
-                            detailRow("Source locator", event.candidate.rule.source.locator)
-                            detailRow("Explanation", event.candidate.explanation)
-                            detailRow("Confidence", event.candidate.confidence.formatted(.percent.precision(.fractionLength(0))))
-                            detailRow("Delivery", event.noticeState.replacingOccurrences(of: "_", with: " "))
-                            if !event.candidate.evidenceReferences.isEmpty {
-                                detailRow("Observed evidence", event.candidate.evidenceReferences.joined(separator: "\n"))
-                            }
-                            if !event.candidate.assumptions.isEmpty {
-                                detailRow("Assumptions", event.candidate.assumptions.joined(separator: "\n"))
-                            }
-                            if !event.candidate.alternatives.isEmpty {
-                                detailRow("Alternatives", event.candidate.alternatives.joined(separator: "\n"))
-                            }
-                        }
-                        detailRow("Development status", "Continuing; no tool, run, or queue was restricted")
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                GraphitePanel(title: "Occurrence history") {
-                    VStack(alignment: .leading, spacing: 10) {
-                        if history.isEmpty {
-                            Text("No occurrence events are present in the bounded manager snapshot.")
-                                .font(.caption)
-                                .foregroundStyle(GraphitePalette.textSecondary)
-                        }
-                        ForEach(history) { historyEvent in
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(RuneForgeViewModel.eventStateTitle(historyEvent.type))
-                                    .font(.callout.weight(.semibold))
-                                Text(historyEvent.occurredAt.formatted(date: .abbreviated, time: .standard))
-                                    .font(.caption)
-                                    .foregroundStyle(GraphitePalette.textSecondary)
-                                Text(historyEvent.candidate.summary)
-                                    .font(.caption)
-                            }
-                            .accessibilityElement(children: .combine)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
+                violationHeading(item)
+                violationIdentity(item)
+                violationEvidence(item)
+                violationHistory(item)
+
             }
             .padding(20)
+        }
+    }
+
+    @ViewBuilder
+    private func violationHeading(_ item: StjornarvaldViolationPageItem) -> some View {
+        let violation = item.violation
+        detailHeading(
+            RuneForgeViewModel.violationStateTitle(violation.state),
+            subtitle: violation.latestSummary
+        )
+    }
+
+    @ViewBuilder
+    private func violationIdentity(_ item: StjornarvaldViolationPageItem) -> some View {
+        let violation = item.violation
+        GraphitePanel(title: "Violation identity and history") {
+            VStack(alignment: .leading, spacing: 8) {
+                detailRow("Violation ID", violation.id.description)
+                detailRow("State", RuneForgeViewModel.violationStateTitle(violation.state))
+                detailRow("Rule", violation.ruleID.description)
+                detailRow("Policy revision", violation.policyRevision)
+                detailRow("Occurrences", "\(violation.occurrenceCount)")
+                detailRow("First observed", violation.firstObservedAt.formatted(date: .abbreviated, time: .standard))
+                detailRow("Last observed", violation.lastObservedAt.formatted(date: .abbreviated, time: .standard))
+                detailRow("Latest event sequence", "\(item.latestEventSequence)")
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    @ViewBuilder
+    private func violationEvidence(_ item: StjornarvaldViolationPageItem) -> some View {
+        let violation = item.violation
+        let event = viewModel.latestEvent(for: violation.id)
+        GraphitePanel(title: "Evidence and interpretation") {
+            VStack(alignment: .leading, spacing: 8) {
+                detailRow("Summary", violation.latestSummary)
+                detailRow("Suggested correction", violation.latestSuggestedCorrection)
+                if let event {
+                    detailRow("Policy source", event.candidate.rule.source.path)
+                    detailRow("Source locator", event.candidate.rule.source.locator)
+                    detailRow("Explanation", event.candidate.explanation)
+                    detailRow("Confidence", event.candidate.confidence.formatted(.percent.precision(.fractionLength(0))))
+                    detailRow("Delivery", event.noticeState.replacingOccurrences(of: "_", with: " "))
+                    if !event.candidate.evidenceReferences.isEmpty {
+                        detailRow("Observed evidence", event.candidate.evidenceReferences.joined(separator: "\n"))
+                    }
+                    if !event.candidate.assumptions.isEmpty {
+                        detailRow("Assumptions", event.candidate.assumptions.joined(separator: "\n"))
+                    }
+                    if !event.candidate.alternatives.isEmpty {
+                        detailRow("Alternatives", event.candidate.alternatives.joined(separator: "\n"))
+                    }
+                }
+                detailRow("Development status", "Continuing; no tool, run, or queue was restricted")
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    @ViewBuilder
+    private func violationHistory(_ item: StjornarvaldViolationPageItem) -> some View {
+        let violation = item.violation
+        let history = viewModel.eventHistory(for: violation.id)
+        GraphitePanel(title: "Occurrence history") {
+            VStack(alignment: .leading, spacing: 10) {
+                if history.isEmpty {
+                    Text("No occurrence events are present in the bounded manager snapshot.")
+                        .font(.caption)
+                        .foregroundStyle(GraphitePalette.textSecondary)
+                }
+                ForEach(history) { historyEvent in
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(RuneForgeViewModel.eventStateTitle(historyEvent.type))
+                            .font(.callout.weight(.semibold))
+                        Text(historyEvent.occurredAt.formatted(date: .abbreviated, time: .standard))
+                            .font(.caption)
+                            .foregroundStyle(GraphitePalette.textSecondary)
+                        Text(historyEvent.candidate.summary)
+                            .font(.caption)
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 

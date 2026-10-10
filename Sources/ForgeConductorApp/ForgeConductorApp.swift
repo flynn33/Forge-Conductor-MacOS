@@ -39,6 +39,7 @@ struct ForgeConductorGUIApp: App {
                 .environmentObject(model)
                 .environmentObject(appDelegate.workbench)
                 .environmentObject(appDelegate.guidedMode)
+                .environment(\.nativeWorkspacePreferences, appDelegate.workspaces)
                 .frame(minWidth: 760, idealWidth: 900, minHeight: 560, idealHeight: 700)
                 .graphiteWorkbench()
                 .background(ForgeSettingsWindowSizing().allowsHitTesting(false).accessibilityHidden(true))
@@ -158,6 +159,9 @@ final class ForgeApplicationDelegate: NSObject, NSApplicationDelegate, Observabl
     let model = AppModel()
     let workbench = WorkbenchPreferences()
     let guidedMode = GuidedModeCoordinator()
+    let workspaces = NativeWorkspacePreferences(
+        knownPanelIDsByView: NativeWorkspaceCatalog.knownPanelIDsByView,
+        panelSizeBoundsByView: NativeWorkspaceCatalog.sizeBoundsByView)
 
     private var modelObservation: AnyCancellable?
     private var workbenchObservation: AnyCancellable?
@@ -206,7 +210,8 @@ final class ForgeApplicationDelegate: NSObject, NSApplicationDelegate, Observabl
             return
         }
 
-        let controller = ForgeMainWindowController(model: model, workbench: workbench, guidedMode: guidedMode)
+        let controller = ForgeMainWindowController(model: model, workbench: workbench,
+                                                  guidedMode: guidedMode, workspaces: workspaces)
         mainWindowController = controller
         controller.showWindow(nil)
         controller.window?.makeKeyAndOrderFront(nil)
@@ -216,11 +221,13 @@ final class ForgeApplicationDelegate: NSObject, NSApplicationDelegate, Observabl
 
 @MainActor
 private final class ForgeMainWindowController: NSWindowController {
-    init(model: AppModel, workbench: WorkbenchPreferences, guidedMode: GuidedModeCoordinator) {
+    init(model: AppModel, workbench: WorkbenchPreferences, guidedMode: GuidedModeCoordinator,
+         workspaces: NativeWorkspacePreferences) {
         let content = ContentView()
             .environmentObject(model)
             .environmentObject(workbench)
             .environmentObject(guidedMode)
+            .environment(\.nativeWorkspacePreferences, workspaces)
             .frame(minWidth: 1100, minHeight: 720)
         let hostingController = NSHostingController(rootView: content)
         let testing = ProcessInfo.processInfo.arguments.contains("--uitesting")

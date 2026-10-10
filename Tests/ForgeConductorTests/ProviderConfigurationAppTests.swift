@@ -1148,6 +1148,81 @@ final class ProviderConfigurationAppTests: XCTestCase {
     }
 
     @MainActor
+    func testProviderOperationAcceptedAfterObservationStopsDoesNotRestartPolling() async throws {
+        let client = try LegacyLMProviderSelectionClient(simulateLostSelectionResponse: true)
+        let viewModel = ProviderViewModel(client: client,
+            providerOperationPollIntervalNanoseconds: 10_000_000)
+        viewModel.load()
+        for _ in 0..<500 {
+            if !viewModel.isLoading && !viewModel.isLoadingProviderRegistry { break }
+            try await Task.sleep(for: .milliseconds(1))
+        }
+        XCTAssertFalse(viewModel.isLoading)
+        XCTAssertFalse(viewModel.isLoadingProviderRegistry)
+
+        viewModel.stopObservingProviderOperation()
+        viewModel.setProvider(.codexDesktop, enabled: true)
+        for _ in 0..<500 {
+            if !viewModel.isSubmittingProviderMutation { break }
+            try await Task.sleep(for: .milliseconds(1))
+        }
+        XCTAssertFalse(viewModel.isSubmittingProviderMutation)
+        try await Task.sleep(for: .milliseconds(100))
+
+        let requestCount = await client.selectionRequests.count
+        let pollCount = await client.providerOperationPollCount
+        XCTAssertEqual(requestCount, 1)
+        XCTAssertEqual(pollCount, 0, "A late accepted operation must not restart hidden-page polling")
+        XCTAssertTrue(viewModel.hasPendingProviderOperation)
+    }
+
+    @MainActor
+    func testHiddenProviderObservationResumesWithoutDiscardingLMStudioDraft() async throws {
+        let client = try LegacyLMProviderSelectionClient(simulateLostSelectionResponse: true)
+        let viewModel = ProviderViewModel(client: client,
+            providerOperationPollIntervalNanoseconds: 100_000_000)
+        defer { viewModel.stopObservingProviderOperation() }
+        viewModel.load()
+        for _ in 0..<500 {
+            if !viewModel.isLoading && !viewModel.isLoadingProviderRegistry { break }
+            try await Task.sleep(for: .milliseconds(1))
+        }
+        XCTAssertFalse(viewModel.isLoading)
+        XCTAssertFalse(viewModel.isLoadingProviderRegistry)
+        viewModel.setProvider(.codexDesktop, enabled: true)
+        for _ in 0..<500 {
+            if !viewModel.isSubmittingProviderMutation && viewModel.hasPendingProviderOperation { break }
+            try await Task.sleep(for: .milliseconds(1))
+        }
+        XCTAssertTrue(viewModel.hasPendingProviderOperation)
+
+        viewModel.endpoint = "http://127.0.0.1:2345"
+        viewModel.modelKey = "workspace/unsaved-model"
+        viewModel.maximumOutputTokens = 8_192
+        viewModel.token = "unsaved-test-token"
+        viewModel.setProviderOperationObservationActive(false)
+        try await Task.sleep(for: .milliseconds(200))
+        let hiddenPollCount = await client.providerOperationPollCount
+        XCTAssertEqual(hiddenPollCount, 0)
+        XCTAssertTrue(viewModel.hasPendingProviderOperation)
+
+        viewModel.setProviderOperationObservationActive(true)
+        for _ in 0..<500 {
+            if viewModel.currentProviderOperation?.isTerminal == true { break }
+            try await Task.sleep(for: .milliseconds(1))
+        }
+        let resumedPollCount = await client.providerOperationPollCount
+        let mutationCount = await client.selectionRequests.count
+        XCTAssertEqual(resumedPollCount, 1)
+        XCTAssertEqual(mutationCount, 1)
+        XCTAssertEqual(viewModel.currentProviderOperation?.phase, .active)
+        XCTAssertEqual(viewModel.endpoint, "http://127.0.0.1:2345")
+        XCTAssertEqual(viewModel.modelKey, "workspace/unsaved-model")
+        XCTAssertEqual(viewModel.maximumOutputTokens, 8_192)
+        XCTAssertEqual(viewModel.token, "unsaved-test-token")
+    }
+
+    @MainActor
     func testAcceptedProviderOperationIsObservedAfterMutationResponseIsLost() async throws {
         let client = try LegacyLMProviderSelectionClient(
             simulateLostSelectionResponse: true

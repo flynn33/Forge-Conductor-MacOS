@@ -25,90 +25,119 @@ struct ToolsView: View {
     }
 
     var body: some View {
+        NativeWorkspaceView(viewID: "tools", descriptors: NativeWorkspaceCatalog.tools,
+                            defaultContent: { defaultContent }, panelContent: workspacePanel)
+    }
+
+    private func workspacePanel(_ id: String, _ visible: Bool) -> AnyView {
+        switch id {
+        case "tools-controls": AnyView(toolsControls)
+        case "tools-outcome-legend": AnyView(outcomeLegend)
+        case "tools-catalog": AnyView(toolCatalog)
+        default: AnyView(EmptyView())
+        }
+    }
+
+    private var defaultContent: some View {
         VStack(alignment: .leading, spacing: 16) {
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .top, spacing: 16) {
-                    pageHeader
-                    Spacer(minLength: 16)
-                    filterField
-                }
-                VStack(alignment: .leading, spacing: 12) {
-                    pageHeader
-                    filterField
-                }
-            }
-            HStack(alignment: .top, spacing: 8) {
-                Image(systemName: "info.circle")
-                    .foregroundStyle(GraphitePalette.info)
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("READY means the tool is registered. IDLE is normal until a model invokes it.")
-                    Text("ERR is an execution failure, DEN is an authorization-policy outcome, and WARN is a maintenance advisory. DEN and WARN do not raise the operational error rate.")
-                }
-                .font(.callout)
-                .lineSpacing(2)
-                .foregroundStyle(GraphitePalette.textSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: 760, alignment: .leading)
-            }
-            if filtered.isEmpty {
-                GraphitePanel {
-                    ContentUnavailableView(
-                        model.toolCards.isEmpty ? "No tools in the catalog" : "No matching tools",
-                        systemImage: "wrench.and.screwdriver",
-                        description: Text(
-                            model.toolCards.isEmpty
-                                ? "Registered tools and their operational health appear here."
-                                : "Adjust the tool name or pack filter.")
-                    )
-                }
-            } else {
-                VStack(spacing: 0) {
-                    ViewThatFits(in: .horizontal) {
-                        HStack(spacing: 14) {
-                            Text("Tool / pack").frame(minWidth: 180, maxWidth: .infinity, alignment: .leading)
-                                .accessibilityIdentifier("tools-column-name")
-                            Text("Outcomes").frame(minWidth: 132, alignment: .trailing)
-                                .fixedSize(horizontal: true, vertical: false)
-                                .accessibilityIdentifier("tools-column-outcomes")
-                            Text("State").frame(width: 62, alignment: .leading)
-                                .accessibilityIdentifier("tools-column-state")
-                            Text("Health").frame(width: 86, alignment: .leading)
-                                .accessibilityIdentifier("tools-column-health")
-                            Text("Activity").frame(width: 120, alignment: .trailing)
-                                .accessibilityIdentifier("tools-column-activity")
-                        }
-                        Text("Tool / pack · state · health · recent activity")
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(GraphitePalette.textSecondary)
-                    .padding(.horizontal, tableHorizontalInset)
-                    .padding(.vertical, 11)
-                    .background(GraphitePalette.panelRaised)
-                    Rectangle().fill(GraphitePalette.separator).frame(height: 1)
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 0) {
-                            ForEach(filtered) { tool in
-                                toolRow(tool)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.horizontal, tableHorizontalInset)
-                                    .padding(.vertical, 5)
-                                    .accessibilityElement(children: .contain)
-                                    .help(toolHelp(tool))
-                                Rectangle().fill(GraphitePalette.separator).frame(height: 1)
-                                    .accessibilityHidden(true)
-                            }
-                        }
-                    }
-                    .contentMargins(.horizontal, 0, for: .scrollContent)
-                }
-                .background(GraphitePalette.panelBottom)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(GraphitePalette.panelBorder, lineWidth: 1))
-            }
+            toolsControls
+            outcomeLegend
+            toolCatalog
         }
         .padding(20)
         .background(GraphitePalette.canvas)
+    }
+
+    @ViewBuilder
+    private var toolsControls: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: 16) {
+                pageHeader
+                Spacer(minLength: 16)
+                filterField
+            }
+            VStack(alignment: .leading, spacing: 12) {
+                pageHeader
+                filterField
+            }
+    }
+    }
+
+    @ViewBuilder
+    private var outcomeLegend: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "info.circle")
+                .foregroundStyle(GraphitePalette.info)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("READY means the tool is registered. IDLE is normal until a model invokes it.")
+                Text("ERR is an execution failure, DEN is an authorization-policy outcome, and WARN is a maintenance advisory. DEN and WARN do not raise the operational error rate.")
+            }
+            .font(.callout)
+            .lineSpacing(2)
+            .foregroundStyle(GraphitePalette.textSecondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: 760, alignment: .leading)
+    }
+    }
+
+    @ViewBuilder
+    private var toolCatalog: some View {
+        if filtered.isEmpty {
+            GraphitePanel {
+                ContentUnavailableView(
+                    model.toolCards.isEmpty ? "No tools in the catalog" : "No matching tools",
+                    systemImage: "wrench.and.screwdriver",
+                    description: Text(
+                        model.toolCards.isEmpty
+                            ? "Registered tools and their operational health appear here."
+                            : "Adjust the tool name or pack filter.")
+                )
+            }
+        } else {
+            VStack(spacing: 0) {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 14) {
+                        Text("Tool / pack").frame(minWidth: 180, maxWidth: .infinity, alignment: .leading)
+                            .accessibilityIdentifier("tools-column-name")
+                        Text("Outcomes").frame(minWidth: 132, alignment: .trailing)
+                            .fixedSize(horizontal: true, vertical: false)
+                            .accessibilityIdentifier("tools-column-outcomes")
+                        Text("State").frame(width: 62, alignment: .leading)
+                            .accessibilityIdentifier("tools-column-state")
+                        Text("Health").frame(width: 86, alignment: .leading)
+                            .accessibilityIdentifier("tools-column-health")
+                        Text("Activity").frame(width: 120, alignment: .trailing)
+                            .accessibilityIdentifier("tools-column-activity")
+                    }
+                    Text("Tool / pack · state · health · recent activity")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(GraphitePalette.textSecondary)
+                .padding(.horizontal, tableHorizontalInset)
+                .padding(.vertical, 11)
+                .background(GraphitePalette.panelRaised)
+                Rectangle().fill(GraphitePalette.separator).frame(height: 1)
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        ForEach(filtered) { tool in
+                            toolRow(tool)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, tableHorizontalInset)
+                                .padding(.vertical, 5)
+                                .accessibilityElement(children: .contain)
+                                .help(toolHelp(tool))
+                            Rectangle().fill(GraphitePalette.separator).frame(height: 1)
+                                .accessibilityHidden(true)
+                        }
+                    }
+                }
+                .contentMargins(.horizontal, 0, for: .scrollContent)
+            }
+            .background(GraphitePalette.panelBottom)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(GraphitePalette.panelBorder, lineWidth: 1))
+    }
     }
 
     private var pageHeader: some View {

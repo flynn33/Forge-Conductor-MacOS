@@ -1,4 +1,10 @@
-# Context and agent continuity (v0.43.0)
+# Context and agent continuity (v0.44.0)
+
+<a id="context-and-agent-continuity-v0430"></a>
+
+Current source documentation targets 0.44.0 (60). Per-view layouts store only local presentation state. Page-owned project selection, instruction queues and continuity actions remain outside rearranged panel roots. Workspace checks add no successor-session or handoff qualification. Remaining new capability implementations are deferred while the owner prioritizes UI completion. [Workspace contract](NATIVE-WORKSPACES.md).
+
+## Preceding 0.43.0 (59) qualification
 
 <a id="context-and-agent-continuity-v0420"></a>
 

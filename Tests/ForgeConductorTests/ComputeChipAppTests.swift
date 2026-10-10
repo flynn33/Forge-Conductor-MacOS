@@ -865,6 +865,112 @@ final class ComputeChipNativeLifecycleTests: XCTestCase, @unchecked Sendable {
         retain("background-power-state-delivery-and-detach", fixture.diagnostics.snapshot())
     }
 
+    func testSharedNestedClipBoundsLeasesSurviveDetachAndReparentAndRestoreOriginalFlags() async throws {
+        let baselineEntries = ComputeChipMetalView.clipBoundsObservationEntryCount
+        let baselineGeometryEntries = ComputeChipMetalView.geometryObservationEntryCount
+        var records: [[String: Any]] = []
+        for originalFlag in [false, true] {
+            let fixture = ComputeSharedClipFixture(originalFlag: originalFlag)
+            defer { fixture.close() }
+            fixture.window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            fixture.window.displayIfNeeded()
+            await require { fixture.firstDiagnostics.snapshot().completedCommands > 0
+                && fixture.secondDiagnostics.snapshot().completedCommands > 0
+                && fixture.secondDiagnostics.snapshot().inFlightSlots == 0 }
+            XCTAssertEqual(ComputeChipMetalView.clipBoundsObservationEntryCount, baselineEntries + 2)
+            XCTAssertEqual(ComputeChipMetalView.geometryObservationEntryCount, baselineGeometryEntries + fixture.geometryAncestors.count)
+            XCTAssertTrue(fixture.geometryAncestors.allSatisfy { $0.postsFrameChangedNotifications })
+            XCTAssertTrue(fixture.outer.contentView.postsBoundsChangedNotifications)
+            XCTAssertTrue(fixture.inner.contentView.postsBoundsChangedNotifications)
+            weak var first = fixture.first
+            fixture.releaseFirst()
+            // A duplicate shutdown must neither release the surviving owner's lease nor restore its flags.
+            first?.removeLifecycleObservations()
+            first?.removeLifecycleObservations()
+            XCTAssertTrue(fixture.outer.contentView.postsBoundsChangedNotifications)
+            XCTAssertTrue(fixture.inner.contentView.postsBoundsChangedNotifications)
+            XCTAssertEqual(ComputeChipMetalView.clipBoundsObservationEntryCount, baselineEntries + 2)
+            XCTAssertEqual(ComputeChipMetalView.geometryObservationEntryCount, baselineGeometryEntries + fixture.geometryAncestors.count)
+            XCTAssertTrue(fixture.geometryAncestors.allSatisfy { $0.postsFrameChangedNotifications })
+            await require { first == nil && fixture.firstDiagnostics.snapshot().activeSurfaces == 0
+                && fixture.firstDiagnostics.snapshot().inFlightSlots == 0
+                && fixture.firstDiagnostics.snapshot().ownedBuffers == 0 }
+
+            weak var second = fixture.second
+            var rounds: [[String: Any]] = []
+            do {
+                let survivingSurface = try XCTUnwrap(fixture.second)
+                let renderer = try XCTUnwrap(survivingSurface.renderer)
+                for phase in ["post-first-detach", "after-reparent"] {
+                    if phase == "after-reparent" {
+                        survivingSurface.removeFromSuperview()
+                        XCTAssertEqual(ComputeChipMetalView.clipBoundsObservationEntryCount, baselineEntries)
+                        XCTAssertEqual(ComputeChipMetalView.geometryObservationEntryCount, baselineGeometryEntries)
+                        XCTAssertTrue(fixture.geometryAncestors.allSatisfy { $0.postsFrameChangedNotifications == originalFlag })
+                        XCTAssertEqual(fixture.outer.contentView.postsBoundsChangedNotifications, originalFlag)
+                        XCTAssertEqual(fixture.inner.contentView.postsBoundsChangedNotifications, originalFlag)
+                        fixture.innerDocument.addSubview(survivingSurface)
+                    }
+                    XCTAssertEqual(ComputeChipMetalView.clipBoundsObservationEntryCount, baselineEntries + 2)
+                    XCTAssertEqual(ComputeChipMetalView.geometryObservationEntryCount, baselineGeometryEntries + fixture.geometryAncestors.count)
+                    XCTAssertTrue(fixture.geometryAncestors.allSatisfy { $0.postsFrameChangedNotifications })
+                    XCTAssertTrue(fixture.outer.contentView.postsBoundsChangedNotifications)
+                    XCTAssertTrue(fixture.inner.contentView.postsBoundsChangedNotifications)
+                    let sameSurvivingRenderer = survivingSurface.renderer === renderer
+                    XCTAssertTrue(sameSurvivingRenderer)
+                    fixture.outer.contentView.scroll(to: NSPoint(x: 0, y: 1_200))
+                    fixture.outer.reflectScrolledClipView(fixture.outer.contentView)
+                    await require { !survivingSurface.isRenderingEligible
+                        && fixture.secondDiagnostics.snapshot().inFlightSlots == 0 }
+                    let off = fixture.secondDiagnostics.snapshot()
+                    await events(0.15)
+                    XCTAssertEqual(fixture.secondDiagnostics.snapshot().submissions, off.submissions)
+                    fixture.outer.contentView.scroll(to: .zero)
+                    fixture.outer.reflectScrolledClipView(fixture.outer.contentView)
+                    await require { survivingSurface.isRenderingEligible
+                        && fixture.secondDiagnostics.snapshot().completedCommands > off.completedCommands }
+                    let resumed = fixture.secondDiagnostics.snapshot()
+                    XCTAssertEqual(resumed.activeSurfaces, 1)
+                    XCTAssertEqual(resumed.activeClocks, 0, "Paused typed input must remain paused while native bounds events redraw it.")
+                    XCTAssertEqual(resumed.failedCommands, 0)
+                    rounds.append(["phase": phase, "off_submissions": off.submissions,
+                        "resumed_commands": resumed.completedCommands,
+                        "surviving_renderer_retained": sameSurvivingRenderer])
+                }
+            }
+            fixture.releaseSecond()
+            XCTAssertEqual(ComputeChipMetalView.clipBoundsObservationEntryCount, baselineEntries)
+            XCTAssertEqual(ComputeChipMetalView.geometryObservationEntryCount, baselineGeometryEntries)
+            XCTAssertTrue(fixture.geometryAncestors.allSatisfy { $0.postsFrameChangedNotifications == originalFlag })
+            XCTAssertEqual(fixture.outer.contentView.postsBoundsChangedNotifications, originalFlag)
+            XCTAssertEqual(fixture.inner.contentView.postsBoundsChangedNotifications, originalFlag)
+            await require { second == nil && fixture.secondDiagnostics.snapshot().activeSurfaces == 0
+                && fixture.secondDiagnostics.snapshot().inFlightSlots == 0
+                && fixture.secondDiagnostics.snapshot().ownedBuffers == 0 }
+            XCTAssertEqual(rounds.count, 2)
+            records.append(["original_flag": originalFlag, "registry_baseline": baselineEntries,
+                "registry_after_last_detach": ComputeChipMetalView.clipBoundsObservationEntryCount,
+                "geometry_registry_baseline": baselineGeometryEntries, "geometry_ancestor_count": fixture.geometryAncestors.count,
+                "geometry_registry_after_last_detach": ComputeChipMetalView.geometryObservationEntryCount,
+                "all_original_frame_flags_restored": fixture.geometryAncestors.allSatisfy { $0.postsFrameChangedNotifications == originalFlag },
+                "outer_flag_after_last_detach": fixture.outer.contentView.postsBoundsChangedNotifications,
+                "inner_flag_after_last_detach": fixture.inner.contentView.postsBoundsChangedNotifications,
+                "first_surface_released": first == nil, "second_surface_released": second == nil,
+                "scroll_rounds": rounds])
+        }
+        XCTAssertEqual(ComputeChipMetalView.clipBoundsObservationEntryCount, baselineEntries)
+        XCTAssertEqual(ComputeChipMetalView.geometryObservationEntryCount, baselineGeometryEntries)
+        let data = try JSONSerialization.data(withJSONObject: ["scope": "Two real paused Compute surfaces, two shared native clips and bounded shared frame ancestors, false/true initial flags, no input update during scroll", "records": records],
+                                             options: [.prettyPrinted, .sortedKeys])
+        XCTAssertLessThanOrEqual(data.count, 64 * 1_024)
+        try directEvidence.save(data, name: "compute-shared-clip-bounds-leases", extension: "json")
+        if !directEvidence.isEnabled {
+            let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+            attachment.name = "compute-shared-clip-bounds-leases"; attachment.lifetime = .keepAlways; add(attachment)
+        }
+    }
+
     private func mount(paused: Bool) -> ComputeNativeFixture {
         let fixture = ComputeNativeFixture(paused: paused)
         self.fixture = fixture
@@ -986,5 +1092,80 @@ private final class ComputeNativeFixture {
         renderer.detach(from: surface); window.orderOut(nil); window.close()
     }
 }
+@MainActor
+private final class ComputeSharedClipFixture {
+    let window: NSWindow
+    let outer: NSScrollView
+    let inner: NSScrollView
+    let outerDocument: NSView
+    let innerDocument: NSView
+    let firstDiagnostics = ComputeChipDiagnostics(), secondDiagnostics = ComputeChipDiagnostics()
+    let firstRenderer: ComputeChipRenderer
+    let secondRenderer: ComputeChipRenderer
+    var first: ComputeChipMetalView?
+    var second: ComputeChipMetalView?
+    private(set) var geometryAncestors: [NSView] = []
+
+    init(originalFlag: Bool) {
+        window = NSWindow(contentRect: NSRect(x: 180, y: 140, width: 900, height: 600),
+                          styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        outer = NSScrollView(frame: NSRect(x: 0, y: 0, width: 900, height: 600))
+        inner = NSScrollView(frame: NSRect(x: 0, y: 0, width: 900, height: 560))
+        outer.hasVerticalScroller = true; inner.hasVerticalScroller = true
+        outerDocument = ComputeFlippedDocument(frame: NSRect(x: 0, y: 0, width: 900, height: 2_200))
+        innerDocument = ComputeFlippedDocument(frame: NSRect(x: 0, y: 0, width: 900, height: 1_900))
+        inner.documentView = innerDocument; outerDocument.addSubview(inner); outer.documentView = outerDocument
+        outer.contentView.postsBoundsChangedNotifications = originalFlag
+        inner.contentView.postsBoundsChangedNotifications = originalFlag
+        firstRenderer = ComputeChipRenderer(diagnostics: firstDiagnostics)
+        secondRenderer = ComputeChipRenderer(diagnostics: secondDiagnostics)
+        first = ComputeChipMetalView(frame: NSRect(x: 0, y: 0, width: 430, height: 500))
+        second = ComputeChipMetalView(frame: NSRect(x: 450, y: 0, width: 430, height: 500))
+        window.contentView = outer
+        var ancestor: NSView? = innerDocument
+        while let candidate = ancestor, geometryAncestors.count < 64 {
+            candidate.postsFrameChangedNotifications = originalFlag
+            geometryAncestors.append(candidate)
+            ancestor = candidate.superview
+        }
+        XCTAssertNil(ancestor, "The real shared fixture ancestry must fit the production 64-ancestor bound.")
+        if let first { innerDocument.addSubview(first) }
+        if let second { innerDocument.addSubview(second) }
+        let now = Date().timeIntervalSince1970
+        let snapshot = ComputeChipSnapshot(cpu: .init(name: "Shared clip CPU", quality: .measured, observedAt: now,
+            activity: [0.35, 0, 0.2, 0], logicalCount: 4),
+            gpu: .init(name: "Shared clip GPU", quality: .measured, observedAt: now,
+            activity: Array(repeating: 0.35, count: 16), logicalCount: 0))
+        if let first {
+            firstRenderer.attach(first)
+            firstRenderer.update(snapshot: snapshot, autoRefresh: false, reduceMotion: false, increasedContrast: false)
+        }
+        if let second {
+            secondRenderer.attach(second)
+            secondRenderer.update(snapshot: snapshot, autoRefresh: false, reduceMotion: false, increasedContrast: false)
+        }
+    }
+
+    func releaseFirst() {
+        guard let surface = first else { return }
+        firstRenderer.detach(from: surface)
+        surface.removeLifecycleObservations(); surface.removeLifecycleObservations()
+        surface.removeFromSuperview(); first = nil
+    }
+
+    func releaseSecond() {
+        guard let surface = second else { return }
+        secondRenderer.detach(from: surface)
+        surface.removeLifecycleObservations(); surface.removeLifecycleObservations()
+        surface.removeFromSuperview(); second = nil
+    }
+
+    func close() {
+        releaseFirst(); releaseSecond(); window.orderOut(nil)
+        window.contentView = nil; window.close()
+    }
+}
+
 @MainActor private final class ComputeFlippedDocument: NSView { override var isFlipped: Bool { true } }
 #endif

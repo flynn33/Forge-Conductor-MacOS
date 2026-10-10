@@ -76,6 +76,7 @@ final class ProviderViewModel: ObservableObject {
     private var providerMutationTask: Task<Void, Never>?
     private var probeTask: Task<Void, Never>?
     private var configurationTask: Task<Void, Never>?
+    private var isProviderOperationObservationActive = true
     private var legacyLoadGeneration = 0
     private var registryLoadGeneration = 0
 
@@ -325,7 +326,7 @@ final class ProviderViewModel: ObservableObject {
 
     private func observeProviderOperation(_ operation: ProviderIntegrationOperationSnapshot) {
         providerOperationObservationTask?.cancel()
-        guard !operation.isTerminal else { return }
+        guard isProviderOperationObservationActive, !operation.isTerminal else { return }
         let operationID = operation.operationID
         providerOperationObservationTask = Task { [weak self] in
             guard let self else { return }
@@ -420,8 +421,18 @@ final class ProviderViewModel: ObservableObject {
 
     /// Stops only local observation. The manager-owned setup operation remains durable.
     func stopObservingProviderOperation() {
+        setProviderOperationObservationActive(false)
+    }
+
+    func setProviderOperationObservationActive(_ active: Bool) {
+        guard active != isProviderOperationObservationActive else { return }
+        isProviderOperationObservationActive = active
         providerOperationObservationTask?.cancel()
         providerOperationObservationTask = nil
+        if active {
+            // Registry reconciliation resumes durable operations without reloading drafts.
+            loadProviderRegistry()
+        }
     }
 
     private func apply(_ value: ProviderConfigurationSnapshot) {

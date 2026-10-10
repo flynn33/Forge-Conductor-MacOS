@@ -52,43 +52,67 @@ struct ManagerSettingsView: View {
     }
 
     var body: some View {
+        NativeWorkspaceView(viewID: "manager." + selectedSection.rawValue,
+                            descriptors: NativeWorkspaceCatalog.managerPanels(for: selectedSection.rawValue),
+                            defaultContent: { defaultContent }, panelContent: workspacePanel)
+        .onAppear {
+            if !model.hasLoadedInitialSettings {
+                model.loadSettingsFromConfig()
+            }
+            model.refreshSecureFilesystemServiceStatus()
+        }
+    }
+
+    private func workspacePanel(_ id: String, _ visible: Bool) -> AnyView {
+        switch id {
+        case "manager-navigation": AnyView(sectionNavigationContent)
+        case "manager-header": AnyView(managerHeader)
+        case "manager-status": AnyView(managerStatus)
+        case "manager-settings-actions": AnyView(settingsActions)
+        case "manager-workbench-navigation": AnyView(WorkbenchSettingsView(section: .navigation))
+        case "manager-workbench-guidance": AnyView(WorkbenchSettingsView(section: .guidance))
+        case "manager-workbench-controls": AnyView(WorkbenchSettingsView(section: .controls))
+        default: AnyView(managerWorkspaceContent(id))
+        }
+    }
+
+    @ViewBuilder
+    private func managerWorkspaceContent(_ id: String) -> some View {
+        switch id {
+        case "manager-folder-context": GraphitePanel { folderContext }
+        case "manager-folders": GraphitePanel { folderChoices }
+        case "manager-service": GraphitePanel { serviceContent }
+        case "manager-service-notes": GraphitePanel(title: "Service behavior") { notesContent }
+        case "manager-runtime-identity": GraphitePanel { runtimeIdentity }
+        case "manager-runtime-telemetry": GraphitePanel { runtimeTelemetry }
+        case "manager-dashboard-settings": GraphitePanel { dashboardSettings }.disabled(!model.hasLoadedInitialSettings)
+        case "manager-service-settings": GraphitePanel { serviceSettings }.disabled(!model.hasLoadedInitialSettings)
+        case "manager-continuity-settings": GraphitePanel { ContinuityRolloverSettingsControl(toolCalls: $model.setContinuityRolloverToolCalls) }.disabled(!model.hasLoadedInitialSettings)
+        case "manager-shell-policy": GraphitePanel { shellSettings }
+        case "manager-shell-runtimes": GraphitePanel { shellCapabilities }
+        case "manager-shell-migration": GraphitePanel { shellMigration }
+        case "manager-filesystem-status": GraphitePanel { filesystemStatus }
+        case "manager-filesystem-policy": GraphitePanel { filesystemPolicy }
+        case "manager-filesystem-actions": GraphitePanel { filesystemActions }
+        case "manager-telemetry-actions": GraphitePanel { telemetryMaintenance }
+        case "manager-maintenance": GraphitePanel { sessionMaintenance }
+        case "manager-doctor-actions": GraphitePanel(title: "Health checks") { doctorControls }
+        case "manager-doctor-report":
+            if doctorJSON.isEmpty { Text("Run doctor to produce a report.").foregroundStyle(GraphitePalette.textSecondary) }
+            else { GraphitePanel(title: doctorResultHeading) { doctorContent } }
+        default: EmptyView()
+        }
+    }
+
+    private var defaultContent: some View {
         HStack(spacing: 0) {
             sectionNavigation
             Rectangle().fill(GraphitePalette.separator).frame(width: 1)
             VStack(alignment: .leading, spacing: 0) {
-                GraphitePageHeader(
-                    title: selectedSection.title,
-                    subtitle: selectedSection == .workbench
-                        ? "Appearance and interface preferences" : "Manager configuration and native services"
-                )
-                    .accessibilityIdentifier("detail-manager")
-                    .padding(20)
+                managerHeader
                 ScrollView {
                     VStack(alignment: .leading, spacing: 14) {
-                        if !model.hasLoadedInitialSettings {
-                            GraphitePanel(title: "Startup") { startupContent }
-                        }
-                        if let notice = model.managerVersionNotice, selectedSection != .runtime {
-                            Label(notice, systemImage: "exclamationmark.triangle.fill")
-                                .font(.callout)
-                                .foregroundStyle(GraphitePalette.warning)
-                                .accessibilityIdentifier("manager-version-mismatch")
-                        }
-                        if model.secureFilesystemServiceLifecycleState.blocksLifecycleMutation,
-                            selectedSection != .filesystem
-                        {
-                            Button {
-                                selectedSection = .filesystem
-                            } label: {
-                                Label(
-                                    "Protected filesystem has a pending lifecycle action",
-                                    systemImage: "lock.trianglebadge.exclamationmark"
-                                )
-                                .fixedSize(horizontal: false, vertical: true)
-                            }
-                            .buttonStyle(GraphiteButtonStyle(kind: .secondary))
-                            .accessibilityIdentifier("manager-filesystem-attention")
-                        }
+                        managerStatusContent
                         selectedContent
                     }
                     .padding(.horizontal, 20)
@@ -103,15 +127,59 @@ struct ManagerSettingsView: View {
         .background(GraphitePalette.canvas)
         .textFieldStyle(GraphiteFieldStyle())
         .buttonStyle(GraphiteButtonStyle(kind: .secondary))
-        .onAppear {
-            if !model.hasLoadedInitialSettings {
-                model.loadSettingsFromConfig()
+    }
+
+    @ViewBuilder
+    private var managerHeader: some View {
+        GraphitePageHeader(
+            title: selectedSection.title,
+            subtitle: selectedSection == .workbench
+                ? "Appearance and interface preferences" : "Manager configuration and native services"
+        )
+            .accessibilityIdentifier("detail-manager")
+            .padding(20)
+    }
+
+    @ViewBuilder
+    private var managerStatus: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            managerStatusContent
+        }
+    }
+
+    @ViewBuilder
+    private var managerStatusContent: some View {
+        if !model.hasLoadedInitialSettings {
+            GraphitePanel(title: "Startup") { startupContent }
+        }
+        if let notice = model.managerVersionNotice, selectedSection != .runtime {
+            Label(notice, systemImage: "exclamationmark.triangle.fill")
+                .font(.callout)
+                .foregroundStyle(GraphitePalette.warning)
+                .accessibilityIdentifier("manager-version-mismatch")
+        }
+        if model.secureFilesystemServiceLifecycleState.blocksLifecycleMutation,
+            selectedSection != .filesystem
+        {
+            Button {
+                selectedSection = .filesystem
+            } label: {
+                Label(
+                    "Protected filesystem has a pending lifecycle action",
+                    systemImage: "lock.trianglebadge.exclamationmark"
+                )
+                .fixedSize(horizontal: false, vertical: true)
             }
-            model.refreshSecureFilesystemServiceStatus()
+            .buttonStyle(GraphiteButtonStyle(kind: .secondary))
+            .accessibilityIdentifier("manager-filesystem-attention")
         }
     }
 
     private var sectionNavigation: some View {
+        sectionNavigationContent.frame(width: 184)
+    }
+
+    private var sectionNavigationContent: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("MANAGER")
                 .font(.system(size: 11, weight: .semibold))
@@ -172,7 +240,6 @@ struct ManagerSettingsView: View {
             }
             .padding(14)
         }
-        .frame(width: 184)
         .background(GraphitePalette.sidebar)
     }
 
@@ -190,17 +257,27 @@ struct ManagerSettingsView: View {
         case .filesystem: GraphitePanel { filesystemContent }
         case .maintenance: GraphitePanel { maintenanceContent }
         case .doctor:
-            GraphitePanel(title: doctorJSON.isEmpty ? "Health checks" : "Doctor \(doctorOK == true ? "OK" : "ISSUES")")
+            GraphitePanel(title: doctorResultHeading)
             {
-                Button("Run doctor") { runDoctor() }
-                    .buttonStyle(GraphiteButtonStyle(kind: .primary))
-                if doctorJSON.isEmpty {
-                    Text("Run doctor to inspect the current native service, runtime and LM Studio integration health.")
-                        .font(.callout)
-                        .foregroundStyle(GraphitePalette.textSecondary)
-                } else {
-                    doctorContent
-                }
+                doctorControls
+                if !doctorJSON.isEmpty { doctorContent }
+            }
+        }
+    }
+
+    private var doctorResultHeading: String {
+        doctorJSON.isEmpty ? "Health checks" : "Doctor \(doctorOK == true ? "OK" : "ISSUES")"
+    }
+
+    @ViewBuilder
+    private var doctorControls: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Button("Run doctor") { runDoctor() }
+                .buttonStyle(GraphiteButtonStyle(kind: .primary))
+            if doctorJSON.isEmpty {
+                Text("Run doctor to inspect the current native service, runtime and LM Studio integration health.")
+                    .font(.callout)
+                    .foregroundStyle(GraphitePalette.textSecondary)
             }
         }
     }
@@ -244,6 +321,16 @@ struct ManagerSettingsView: View {
     private var foldersContent: some View {
         VStack(alignment: .leading, spacing: 14) {
 
+            folderContext
+            folderChoices
+
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private var folderContext: some View {
+        VStack(alignment: .leading, spacing: 14) {
             Text(
                 "These folders establish registered project identities and the default working context. They do not restrict native filesystem, Git, or shell access. Choose folders here, then select Save settings."
             )
@@ -252,7 +339,12 @@ struct ManagerSettingsView: View {
             .foregroundStyle(GraphitePalette.textSecondary)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: 720, alignment: .leading)
+        }
+    }
 
+    @ViewBuilder
+    private var folderChoices: some View {
+        VStack(alignment: .leading, spacing: 14) {
             if model.setAllowedRoots.isEmpty {
                 Text("No project folders selected")
                     .foregroundStyle(GraphitePalette.textSecondary)
@@ -299,9 +391,7 @@ struct ManagerSettingsView: View {
                     .foregroundStyle(GraphitePalette.textSecondary)
                     .accessibilityIdentifier("settings-allowed-roots-message")
             }
-
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder
@@ -338,6 +428,16 @@ struct ManagerSettingsView: View {
     private var runtimeContent: some View {
         VStack(alignment: .leading, spacing: 14) {
 
+            runtimeIdentity
+            if model.updated != nil { runtimeTelemetry }
+
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private var runtimeIdentity: some View {
+        VStack(alignment: .leading, spacing: 14) {
             LabeledContent("App version", value: model.version)
                 .labeledContentStyle(ManagerValueRowStyle())
             LabeledContent("Manager version", value: model.managerRuntimeVersion)
@@ -352,6 +452,12 @@ struct ManagerSettingsView: View {
                 .labeledContentStyle(ManagerValueRowStyle())
             LabeledContent("Product", value: ForgeApp.productName)
                 .labeledContentStyle(ManagerValueRowStyle())
+        }
+    }
+
+    @ViewBuilder
+    private var runtimeTelemetry: some View {
+        VStack(alignment: .leading, spacing: 14) {
             if let updated = model.updated {
                 LabeledContent("Host telemetry", value: model.telemetryModeLabel)
                     .labeledContentStyle(ManagerValueRowStyle())
@@ -360,13 +466,22 @@ struct ManagerSettingsView: View {
                 LabeledContent("Dashboard HTML poll", value: "\(model.setRefresh)s (not host telemetry)")
                     .labeledContentStyle(ManagerValueRowStyle())
             }
+        }
+    }
+
+    @ViewBuilder
+    private var settingsContent: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            dashboardSettings
+            serviceSettings
+            continuitySettings
 
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder
-    private var settingsContent: some View {
+    private var dashboardSettings: some View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Dashboard host").font(.callout.weight(.medium))
@@ -378,6 +493,12 @@ struct ManagerSettingsView: View {
                 TextField("Dashboard port", value: $model.setPort, format: .number.grouping(.never))
             }
             .frame(width: 200, alignment: .leading)
+        }
+    }
+
+    @ViewBuilder
+    private var serviceSettings: some View {
+        VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 6) {
                 Text("UI refresh (sec)").font(.callout.weight(.medium))
                 TextField("UI refresh (sec)", value: $model.setRefresh, format: .number.grouping(.never))
@@ -394,16 +515,32 @@ struct ManagerSettingsView: View {
             }
             .frame(width: 200, alignment: .leading)
             Toggle("Auto-restart HTTP if it drops", isOn: $model.setAutoRestart)
+        }
+    }
+
+    @ViewBuilder
+    private var continuitySettings: some View {
+        VStack(alignment: .leading, spacing: 16) {
             Divider()
             ContinuityRolloverSettingsControl(toolCalls: $model.setContinuityRolloverToolCalls)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder
     private var shellContent: some View {
         VStack(alignment: .leading, spacing: 14) {
 
+            shellSettings
+            shellCapabilities
+            shellMigration
+
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private var shellSettings: some View {
+        VStack(alignment: .leading, spacing: 14) {
             Toggle("Enable project shell tools", isOn: $model.setShellEnabled)
                 .accessibilityIdentifier("settings-shell-enabled")
                 .disabled(!model.hasLoadedInitialSettings)
@@ -424,12 +561,22 @@ struct ManagerSettingsView: View {
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: 720, alignment: .leading)
             .accessibilityIdentifier("shell-effective-policy")
+        }
+    }
 
+    @ViewBuilder
+    private var shellCapabilities: some View {
+        VStack(alignment: .leading, spacing: 14) {
             runtimeRow("zsh", id: "zsh", path: model.shellRuntimeCapabilities.zsh)
             runtimeRow("Bash", id: "bash", path: model.shellRuntimeCapabilities.bash)
             runtimeRow("Python", id: "python", path: model.shellRuntimeCapabilities.python)
             runtimeRow("PowerShell", id: "powershell", path: model.shellRuntimeCapabilities.powershell)
+        }
+    }
 
+    @ViewBuilder
+    private var shellMigration: some View {
+        VStack(alignment: .leading, spacing: 14) {
             LabeledContent("Policy origin", value: model.shellPolicyOrigin)
                 .labeledContentStyle(ManagerValueRowStyle())
             LabeledContent(
@@ -440,15 +587,24 @@ struct ManagerSettingsView: View {
             )
             .labeledContentStyle(ManagerValueRowStyle())
             .accessibilityIdentifier("shell-policy-migration-status")
-
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder
     private var filesystemContent: some View {
         VStack(alignment: .leading, spacing: 14) {
 
+            filesystemStatus
+            filesystemPolicy
+            filesystemActions
+
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private var filesystemStatus: some View {
+        VStack(alignment: .leading, spacing: 14) {
             LabeledContent(
                 "Registration",
                 value: model.secureFilesystemServiceStatusLabel
@@ -483,7 +639,12 @@ struct ManagerSettingsView: View {
             )
             .labeledContentStyle(ManagerValueRowStyle())
             .accessibilityIdentifier("settings-filesystem-lifecycle-fence-status")
+        }
+    }
 
+    @ViewBuilder
+    private var filesystemPolicy: some View {
+        VStack(alignment: .leading, spacing: 14) {
             if model.secureFilesystemServiceLifecycleState.blocksLifecycleMutation {
                 Label(
                     "Service lifecycle changes are blocked until the pending macOS lifecycle action is resolved.",
@@ -531,7 +692,12 @@ struct ManagerSettingsView: View {
                     .foregroundStyle(GraphitePalette.textSecondary)
                     .accessibilityIdentifier("settings-filesystem-service-message")
             }
+        }
+    }
 
+    @ViewBuilder
+    private var filesystemActions: some View {
+        VStack(alignment: .leading, spacing: 14) {
             LazyVGrid(
                 columns: [GridItem(.adaptive(minimum: 132), spacing: 10)],
                 alignment: .leading,
@@ -589,26 +755,38 @@ struct ManagerSettingsView: View {
                 }
             }
             .padding(.vertical, 2)
-
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder
     private var maintenanceContent: some View {
         VStack(alignment: .leading, spacing: 14) {
 
+            telemetryMaintenance
+            sessionMaintenance
+
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private var telemetryMaintenance: some View {
+        VStack(alignment: .leading, spacing: 14) {
             Toggle("Auto-refresh telemetry", isOn: $model.autoRefresh)
             Button("Refresh telemetry now") { model.refresh(force: true) }
+        }
+    }
+
+    @ViewBuilder
+    private var sessionMaintenance: some View {
+        VStack(alignment: .leading, spacing: 14) {
             Button("Prune stale presence") { model.prunePresence() }
             Button("Prune idle sessions") { model.pruneSessions() }
             Button("Run doctor") {
                 runDoctor()
                 selectedSection = .doctor
             }
-
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder

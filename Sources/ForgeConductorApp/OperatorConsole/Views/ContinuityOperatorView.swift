@@ -17,55 +17,8 @@ struct ContinuityOperatorView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Continuity")
-                    .font(.system(size: 24, weight: .bold))
-                    .accessibilityIdentifier("detail-continuity")
-                Text("Automatic continuity packets by project")
-                    .font(.system(size: 13))
-                    .fixedSize(horizontal: false, vertical: true)
-                    .foregroundStyle(GraphitePalette.textSecondary)
-                    .accessibilityIdentifier("continuity-operator-view")
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 20)
-            .padding(.top, 18)
-            .padding(.bottom, 14)
-
-            Divider()
-
-            VStack(alignment: .leading, spacing: 14) {
-                if let error = viewModel.errorMessage {
-                    OperatorErrorBanner(message: error, retry: viewModel.load)
-                }
-                if let error = viewModel.commandErrorMessage {
-                    Label {
-                        Text(error).font(.system(size: 13))
-                            .fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
-                    } icon: {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundStyle(GraphitePalette.warning)
-                    }
-                    .padding(12)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(GraphitePalette.panelRaised, in: RoundedRectangle(cornerRadius: 9))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 9)
-                            .stroke(GraphitePalette.warning.opacity(0.5), lineWidth: 1)
-                    }
-                    .accessibilityIdentifier("continuity-delete-error")
-                }
-                if let notice = viewModel.notice { OperatorNoticeBanner(message: notice) }
-
-                actions
-                packetBrowser
-            }
-            .padding(20)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(GraphitePalette.canvas)
+        NativeWorkspaceView(viewID: "continuity", descriptors: NativeWorkspaceCatalog.continuity,
+                            defaultContent: { defaultContent }, panelContent: workspacePanel)
         .onAppear {
             selectedPacketIDs = viewModel.selectedPacketIDs
         }
@@ -108,19 +61,105 @@ struct ContinuityOperatorView: View {
         }
     }
 
+    private func workspacePanel(_ id: String, _ visible: Bool) -> AnyView {
+        switch id {
+        case "continuity-controls": AnyView(continuityControls)
+        case "continuity-status": AnyView(continuityStatus)
+        case "continuity-projects": AnyView(continuityProjects)
+        case "continuity-packets": AnyView(continuityPackets)
+        default: AnyView(EmptyView())
+        }
+    }
+
+    private var defaultContent: some View {
+        VStack(spacing: 0) {
+            continuityHeader
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 14) {
+                continuityStatusContent
+                actions
+                packetBrowser
+            }
+            .padding(20)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(GraphitePalette.canvas)
+    }
+
+    @ViewBuilder
+    private var continuityHeader: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text("Continuity")
+                .font(.system(size: 24, weight: .bold))
+                .accessibilityIdentifier("detail-continuity")
+            Text("Automatic continuity packets by project")
+                .font(.system(size: 13))
+                .fixedSize(horizontal: false, vertical: true)
+                .foregroundStyle(GraphitePalette.textSecondary)
+                .accessibilityIdentifier("continuity-operator-view")
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 20)
+        .padding(.top, 18)
+        .padding(.bottom, 14)
+    }
+
+    @ViewBuilder
+    private var continuityStatus: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            continuityStatusContent
+        }
+    }
+
+    @ViewBuilder
+    private var continuityStatusContent: some View {
+            if let error = viewModel.errorMessage {
+                OperatorErrorBanner(message: error, retry: viewModel.load)
+            }
+            if let error = viewModel.commandErrorMessage {
+                Label {
+                    Text(error).font(.system(size: 13))
+                        .fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
+                } icon: {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(GraphitePalette.warning)
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(GraphitePalette.panelRaised, in: RoundedRectangle(cornerRadius: 9))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 9)
+                        .stroke(GraphitePalette.warning.opacity(0.5), lineWidth: 1)
+                }
+                .accessibilityIdentifier("continuity-delete-error")
+            }
+            if let notice = viewModel.notice { OperatorNoticeBanner(message: notice) }
+    }
+
+    private var continuityControls: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            continuityHeader
+            actions
+        }
+    }
+
+    private var continuityProjects: some View {
+        GraphitePanel(title: "Project IDs") { projectList }
+            .accessibilityIdentifier("continuity-project-frame")
+    }
+
+    private var continuityPackets: some View {
+        GraphitePanel(title: "Continuity packets") { packetList }
+            .accessibilityIdentifier("continuity-packet-frame")
+    }
+
     private var packetBrowser: some View {
         HSplitView {
-            GraphitePanel(title: "Project IDs") {
-                projectList
-            }
-            .frame(minWidth: 240, idealWidth: 280, maxWidth: 360)
-            .accessibilityIdentifier("continuity-project-frame")
-
-            GraphitePanel(title: "Continuity packets") {
-                packetList
-            }
-            .frame(minWidth: 420, maxWidth: .infinity)
-            .accessibilityIdentifier("continuity-packet-frame")
+            continuityProjects.frame(minWidth: 240, idealWidth: 280, maxWidth: 360)
+            continuityPackets.frame(minWidth: 420, maxWidth: .infinity)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

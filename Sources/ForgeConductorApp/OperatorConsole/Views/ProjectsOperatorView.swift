@@ -16,6 +16,8 @@ struct ProjectsOperatorView: View {
     @State private var clearMode: OperatorProjectContentClearMode = .memory
     @State private var showClearCacheConfirmation = false
     @State private var expandedInstructionPackageIDs: Set<String> = []
+    @State private var workspaceIsActive = true
+    @State private var repositoryLocation = ""
 
     init(
         client: any OperatorManagerClientProtocol,
@@ -26,201 +28,9 @@ struct ProjectsOperatorView: View {
     }
 
     var body: some View {
-        HSplitView {
-            VStack(spacing: 0) {
-                HStack {
-                    Text("Registered projects")
-                        .font(.system(size: 15, weight: .semibold))
-                    Spacer()
-                    Text("\(viewModel.projects.count)")
-                        .font(.system(size: 12, design: .monospaced))
-                        .foregroundStyle(GraphitePalette.textSecondary)
-                }
-                .padding(16)
-                if viewModel.projects.isEmpty {
-                    VStack(spacing: 10) {
-                        if viewModel.isLoading {
-                            ProgressView("Loading projects…")
-                        } else {
-                            Image(systemName: "folder.badge.plus")
-                                .font(.system(size: 28))
-                                .foregroundStyle(GraphitePalette.info)
-                            Text(viewModel.errorMessage == nil ? "No registered projects" : "Projects unavailable")
-                                .font(.system(size: 13, weight: .semibold))
-                            Text("Add project folders or enter an absolute project path below.")
-                                .font(.system(size: 12))
-                                .foregroundStyle(GraphitePalette.textSecondary)
-                                .multilineTextAlignment(.center)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                    .padding(20)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .accessibilityElement(children: .contain)
-                    .accessibilityIdentifier("projects-empty-sidebar")
-                } else {
-                    List(selection: $viewModel.selectedProjectID) {
-                        ForEach(viewModel.projects) { project in
-                            HStack(spacing: 10) {
-                                Image(systemName: "folder.fill")
-                                    .foregroundStyle(GraphitePalette.info)
-                                    .frame(width: 20)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(project.displayName).lineLimit(1)
-                                    Text("Generation \(project.projectGeneration) · \(project.lifecycleState)")
-                                        .font(.caption)
-                                        .foregroundStyle(GraphitePalette.textSecondary)
-                                        .lineLimit(1)
-                                }
-                            }
-                            .padding(.vertical, 4)
-                            .tag(project.projectID)
-                            .accessibilityIdentifier("project-row-\(project.projectID)")
-                            .contextMenu {
-                                Button("Remove Project…", role: .destructive) {
-                                    viewModel.selectedProjectID = project.projectID
-                                    requestSelectedProjectRemoval()
-                                }
-                                .disabled(viewModel.isLoading || project.lifecycleState != "active")
-                            }
-                        }
-                    }
-                    .listStyle(.sidebar)
-                    .scrollContentBackground(.hidden)
-                }
-                Divider()
-                VStack(spacing: 8) {
-                    Button {
-                        chooseProjectFolder()
-                    } label: {
-                        Label("Add Project Folders…", systemImage: "plus")
-                            .frame(width: 196, height: 20)
-                    }
-                    .buttonStyle(GraphiteButtonStyle(kind: .primary))
-                    .accessibilityIdentifier("project-register")
-                    Button {
-                        registrationDraft = ProjectRegistrationDraft(
-                            path: "", name: "", allowsPathEntry: true
-                        )
-                    } label: {
-                        Text("Enter Project Path…")
-                            .frame(width: 196, height: 20)
-                    }
-                    .buttonStyle(GraphiteButtonStyle(kind: .secondary))
-                    .accessibilityIdentifier("project-register-by-path")
-                    Button(role: .destructive) {
-                        requestSelectedProjectRemoval()
-                    } label: {
-                        Label("Remove Selected Project…", systemImage: "minus")
-                            .frame(width: 196, height: 20)
-                    }
-                    .buttonStyle(GraphiteButtonStyle(kind: .destructive))
-                    .disabled(
-                        viewModel.isLoading
-                            || viewModel.selectedProject?.lifecycleState != "active"
-                    )
-                    .help("Remove the selected registration while preserving durable memory and history.")
-                    .accessibilityIdentifier("project-remove-sidebar")
-                }
-                .padding(10)
-            }
-            .background(GraphitePalette.sidebar)
-            .frame(minWidth: 240, idealWidth: 280, maxWidth: 360)
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    OperatorHeader(
-                        title: "Projects",
-                        subtitle: "Durable identity, generation, bindings, memory, and continuity",
-                        isLoading: viewModel.isLoading,
-                        titleAccessibilityIdentifier: "detail-projects",
-                        subtitleAccessibilityIdentifier: "projects-operator-view",
-                        onRefresh: viewModel.load
-                    )
-                    if let error = viewModel.errorMessage {
-                        OperatorErrorBanner(message: error, retry: viewModel.load, title: "Project request failed")
-                    }
-                    if let error = registrationPickerErrorMessage {
-                        Text(error)
-                            .font(.callout)
-                            .foregroundStyle(GraphitePalette.textSecondary)
-                            .accessibilityIdentifier("project-picker-error")
-                    }
-                    if let notice = viewModel.notice {
-                        OperatorNoticeBanner(message: notice)
-                    }
-                    if viewModel.selectedProject == nil {
-                        projectWorkflowActions
-                    }
-                    if let pendingPath = viewModel.pendingRegistrationPath {
-                        GroupBox("Registration reconciliation") {
-                            VStack(alignment: .leading, spacing: 10) {
-                                Text(
-                                    viewModel.pendingRegistrationProjectID == nil
-                                        ? "Both bounded registration attempts lost their response. The outcome is unknown; replaying the exact request is idempotent."
-                                        : "The manager retained this exact registration after a partial transition. When its project is in maintenance, normal work remains fenced. The request is reconstructed after restart."
-                                )
-                                .font(.system(size: 13))
-                                .lineSpacing(2)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .foregroundStyle(GraphitePalette.textSecondary)
-                                LabeledContent("Pending path") {
-                                    OperatorIdentifier(pendingPath)
-                                }
-                                if let projectID = viewModel.pendingRegistrationProjectID {
-                                    LabeledContent("Project UUID") {
-                                        OperatorIdentifier(projectID)
-                                    }
-                                }
-                                if let message = viewModel.pendingRegistrationMessage {
-                                    Text(message)
-                                        .font(.system(size: 13))
-                                        .fixedSize(horizontal: false, vertical: true)
-                                        .foregroundStyle(GraphitePalette.textSecondary)
-                                }
-                                HStack {
-                                    Button("Reconcile Registration") {
-                                        viewModel.reconcilePendingRegistration()
-                                    }
-                                    .buttonStyle(.borderedProminent)
-                                    .disabled(viewModel.isLoading)
-                                    .accessibilityIdentifier("project-registration-reconcile")
-                                    if viewModel.canDiscardPendingRegistration {
-                                        Button("Dismiss") {
-                                            viewModel.discardPendingRegistration()
-                                        }
-                                        .disabled(viewModel.isLoading)
-                                        .accessibilityIdentifier(
-                                            "project-registration-reconcile-dismiss"
-                                        )
-                                    }
-                                }
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .accessibilityIdentifier("project-registration-reconciliation")
-                    }
-                    if let project = viewModel.selectedProject {
-                        projectDetail(project)
-                    } else if viewModel.errorMessage == nil, !viewModel.isLoading {
-                        GroupBox("Instruction packages") {
-                            Text("Select or add a project to add, reorder, and delete instruction packages.")
-                                .font(.caption)
-                                .foregroundStyle(GraphitePalette.textSecondary)
-                                .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
-                        }
-                        .accessibilityIdentifier("project-instruction-packages")
-                        ContentUnavailableView(
-                            "No Registered Projects",
-                            systemImage: "folder.badge.questionmark",
-                            description: Text("Register a project through the manager to establish its durable identity.")
-                        )
-                        .frame(maxWidth: .infinity, minHeight: 300)
-                    }
-                }
-                .padding(20)
-            }
-        }
+        NativeWorkspaceView(viewID: "projects", descriptors: NativeWorkspaceCatalog.projects,
+                            defaultContent: { defaultContent }, panelContent: workspacePanel,
+                            activityChanged: { workspaceIsActive = $0 })
         .background(GraphitePalette.canvas)
         .sheet(item: $registrationDraft, onDismiss: releaseRegistrationHelpContext) { draft in
             ProjectRegistrationSheet(draft: draft, viewModel: viewModel)
@@ -283,7 +93,14 @@ struct ProjectsOperatorView: View {
             Text("This removes disposable Forge cache files only. Project files, instruction packages, continuity, policy logs, settings, and credentials remain.")
         }
         .task { viewModel.load() }
-        .task(id: viewModel.selectedProjectID) {
+        .onChange(of: selectedRepositoryIdentity, initial: true) { _, _ in
+            repositoryLocation = viewModel.selectedProject?.githubRepositoryURL ?? ""
+        }
+        .onChange(of: viewModel.selectedProject?.githubRepositoryURL) { _, location in
+            repositoryLocation = location ?? ""
+        }
+        .task(id: "\(viewModel.selectedProjectID ?? ""):\(workspaceIsActive)") {
+            guard workspaceIsActive else { return }
             while !Task.isCancelled {
                 viewModel.loadInstructionQueue()
                 do {
@@ -295,217 +112,528 @@ struct ProjectsOperatorView: View {
         }
     }
 
-    private func projectDetail(_ project: OperatorProject) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            GraphitePanel {
-                HStack(alignment: .top, spacing: 16) {
-                    Image(systemName: "folder.fill")
-                        .font(.system(size: 38))
-                        .foregroundStyle(GraphitePalette.info)
-                        .padding(.top, 2)
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text(project.displayName)
-                            .font(.system(size: 20, weight: .semibold))
-                        OperatorIdentifier(project.canonicalRoot)
-                            .accessibilityIdentifier("project-canonical-root")
-                        HStack(spacing: 16) {
-                            Text("Generation \(project.projectGeneration)")
-                                .font(.system(size: 12))
-                                .foregroundStyle(GraphitePalette.textSecondary)
-                                .accessibilityIdentifier("project-generation")
-                            OperatorStateBadge(state: project.lifecycleState)
+    private func workspacePanel(_ id: String, _: Bool) -> AnyView {
+        AnyView(workspacePanelContent(id).padding(12))
+    }
+
+    @ViewBuilder
+    private func workspacePanelContent(_ id: String) -> some View {
+        switch id {
+        case "projects-sidebar": projectSidebar
+        case "projects-status": VStack(alignment: .leading, spacing: 16) { projectStatus }
+        case "projects-registration-reconciliation": registrationReconciliation
+        case "projects-workflow": projectWorkflowActions
+        case "projects-instructions":
+            if let project = viewModel.selectedProject {
+                instructionPackages(project)
+            } else if viewModel.errorMessage == nil, !viewModel.isLoading {
+                instructionPackagesEmptyState
+            }
+        default:
+            if let project = viewModel.selectedProject {
+                switch id {
+                case "projects-summary": projectSummary(project)
+                case "projects-identity": projectIdentity(project)
+                case "projects-repository": projectRepository(project)
+                case "projects-bindings": projectBindings(project)
+                case "projects-memory": projectMemory(project)
+                case "projects-continuity": projectContinuity(project)
+                case "projects-migration-warnings": projectMigrationWarnings(project)
+                case "projects-reset-receipt": projectResetReceipt(project)
+                case "projects-relink-reconciliation": projectRelinkReconciliation(project)
+                case "projects-clear-content": projectClearContent(project)
+                case "projects-lifecycle": projectLifecycleActions(project)
+                default: EmptyView()
+                }
+            } else if id == "projects-summary", viewModel.errorMessage == nil, !viewModel.isLoading {
+                projectEmptyState
+            }
+        }
+    }
+
+    private var selectedRepositoryIdentity: String? {
+        guard let project = viewModel.selectedProject else { return nil }
+        return "\(project.projectID):\(project.projectGeneration)"
+    }
+
+    private var defaultContent: some View {
+        HSplitView {
+            projectSidebar
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    projectStatus
+                    if viewModel.selectedProject == nil {
+                        projectWorkflowActions
+                    }
+                    registrationReconciliation
+                    if let project = viewModel.selectedProject {
+                        projectDetail(project)
+                    } else if viewModel.errorMessage == nil, !viewModel.isLoading {
+                        instructionPackagesEmptyState
+                        projectEmptyState
+                    }
+                }
+                .padding(20)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var projectSidebar: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("Registered projects")
+                    .font(.system(size: 15, weight: .semibold))
+                Spacer()
+                Text("\(viewModel.projects.count)")
+                    .font(.system(size: 12, design: .monospaced))
+                    .foregroundStyle(GraphitePalette.textSecondary)
+            }
+            .padding(16)
+            if viewModel.projects.isEmpty {
+                VStack(spacing: 10) {
+                    if viewModel.isLoading {
+                        ProgressView("Loading projects…")
+                    } else {
+                        Image(systemName: "folder.badge.plus")
+                            .font(.system(size: 28))
+                            .foregroundStyle(GraphitePalette.info)
+                        Text(viewModel.errorMessage == nil ? "No registered projects" : "Projects unavailable")
+                            .font(.system(size: 13, weight: .semibold))
+                        Text("Add project folders or enter an absolute project path below.")
+                            .font(.system(size: 12))
+                            .foregroundStyle(GraphitePalette.textSecondary)
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .padding(20)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("projects-empty-sidebar")
+            } else {
+                List(selection: $viewModel.selectedProjectID) {
+                    ForEach(viewModel.projects) { project in
+                        HStack(spacing: 10) {
+                            Image(systemName: "folder.fill")
+                                .foregroundStyle(GraphitePalette.info)
+                                .frame(width: 20)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(project.displayName).lineLimit(1)
+                                Text("Generation \(project.projectGeneration) · \(project.lifecycleState)")
+                                    .font(.caption)
+                                    .foregroundStyle(GraphitePalette.textSecondary)
+                                    .lineLimit(1)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                        .tag(project.projectID)
+                        .accessibilityIdentifier("project-row-\(project.projectID)")
+                        .contextMenu {
+                            Button("Remove Project…", role: .destructive) {
+                                viewModel.selectedProjectID = project.projectID
+                                requestSelectedProjectRemoval()
+                            }
+                            .disabled(viewModel.isLoading || project.lifecycleState != "active")
                         }
                     }
-                    Spacer(minLength: 0)
+                }
+                .listStyle(.sidebar)
+                .scrollContentBackground(.hidden)
+            }
+            Divider()
+            VStack(spacing: 8) {
+                Button {
+                    chooseProjectFolder()
+                } label: {
+                    Label("Add Project Folders…", systemImage: "plus")
+                        .frame(width: 196, height: 20)
+                }
+                .buttonStyle(GraphiteButtonStyle(kind: .primary))
+                .accessibilityIdentifier("project-register")
+                Button {
+                    registrationDraft = ProjectRegistrationDraft(
+                        path: "", name: "", allowsPathEntry: true
+                    )
+                } label: {
+                    Text("Enter Project Path…")
+                        .frame(width: 196, height: 20)
+                }
+                .buttonStyle(GraphiteButtonStyle(kind: .secondary))
+                .accessibilityIdentifier("project-register-by-path")
+                Button(role: .destructive) {
+                    requestSelectedProjectRemoval()
+                } label: {
+                    Label("Remove Selected Project…", systemImage: "minus")
+                        .frame(width: 196, height: 20)
+                }
+                .buttonStyle(GraphiteButtonStyle(kind: .destructive))
+                .disabled(
+                    viewModel.isLoading
+                        || viewModel.selectedProject?.lifecycleState != "active"
+                )
+                .help("Remove the selected registration while preserving durable memory and history.")
+                .accessibilityIdentifier("project-remove-sidebar")
+            }
+            .padding(10)
+        }
+        .background(GraphitePalette.sidebar)
+        .frame(minWidth: 240, idealWidth: 280, maxWidth: 360)
+    }
+
+    @ViewBuilder
+    private var projectStatus: some View {
+        OperatorHeader(
+            title: "Projects",
+            subtitle: "Durable identity, generation, bindings, memory, and continuity",
+            isLoading: viewModel.isLoading,
+            titleAccessibilityIdentifier: "detail-projects",
+            subtitleAccessibilityIdentifier: "projects-operator-view",
+            onRefresh: viewModel.load
+        )
+        if let error = viewModel.errorMessage {
+            OperatorErrorBanner(message: error, retry: viewModel.load, title: "Project request failed")
+        }
+        if let error = registrationPickerErrorMessage {
+            Text(error)
+                .font(.callout)
+                .foregroundStyle(GraphitePalette.textSecondary)
+                .accessibilityIdentifier("project-picker-error")
+        }
+        if let notice = viewModel.notice {
+            OperatorNoticeBanner(message: notice)
+        }
+    }
+
+    @ViewBuilder
+    private var registrationReconciliation: some View {
+        if let pendingPath = viewModel.pendingRegistrationPath {
+            GroupBox("Registration reconciliation") {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(
+                        viewModel.pendingRegistrationProjectID == nil
+                            ? "Both bounded registration attempts lost their response. The outcome is unknown; replaying the exact request is idempotent."
+                            : "The manager retained this exact registration after a partial transition. When its project is in maintenance, normal work remains fenced. The request is reconstructed after restart."
+                    )
+                    .font(.system(size: 13))
+                    .lineSpacing(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .foregroundStyle(GraphitePalette.textSecondary)
+                    LabeledContent("Pending path") {
+                        OperatorIdentifier(pendingPath)
+                    }
+                    if let projectID = viewModel.pendingRegistrationProjectID {
+                        LabeledContent("Project UUID") {
+                            OperatorIdentifier(projectID)
+                        }
+                    }
+                    if let message = viewModel.pendingRegistrationMessage {
+                        Text(message)
+                            .font(.system(size: 13))
+                            .fixedSize(horizontal: false, vertical: true)
+                            .foregroundStyle(GraphitePalette.textSecondary)
+                    }
+                    HStack {
+                        Button("Reconcile Registration") {
+                            viewModel.reconcilePendingRegistration()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(viewModel.isLoading)
+                        .accessibilityIdentifier("project-registration-reconcile")
+                        if viewModel.canDiscardPendingRegistration {
+                            Button("Dismiss") {
+                                viewModel.discardPendingRegistration()
+                            }
+                            .disabled(viewModel.isLoading)
+                            .accessibilityIdentifier(
+                                "project-registration-reconcile-dismiss"
+                            )
+                        }
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .accessibilityIdentifier("project-registration-reconciliation")
+        }
+    }
 
+    @ViewBuilder
+    private var instructionPackagesEmptyState: some View {
+        GroupBox("Instruction packages") {
+            Text("Select or add a project to add, reorder, and delete instruction packages.")
+                .font(.caption)
+                .foregroundStyle(GraphitePalette.textSecondary)
+                .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
+        }
+        .accessibilityIdentifier("project-instruction-packages")
+    }
+
+    @ViewBuilder
+    private var projectEmptyState: some View {
+        ContentUnavailableView(
+            "No Registered Projects",
+            systemImage: "folder.badge.questionmark",
+            description: Text("Register a project through the manager to establish its durable identity.")
+        )
+        .frame(maxWidth: .infinity, minHeight: 300)
+    }
+
+    private func projectDetail(_ project: OperatorProject) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            projectSummary(project)
             projectWorkflowActions
             instructionPackages(project)
+            projectIdentity(project)
+            projectRepository(project)
+            projectBindings(project)
+            projectMemory(project)
+            projectContinuity(project)
+            projectMigrationWarnings(project)
+            projectResetReceipt(project)
+            projectRelinkReconciliation(project)
+            projectClearContent(project)
+            projectLifecycleActions(project)
+        }
+    }
 
-            GroupBox("Identity") {
-                LabeledContent("Project UUID") { OperatorIdentifier(project.projectID) }
-            }
-
-            ProjectRepositoryEditor(project: project, viewModel: viewModel)
-                .id("\(project.projectID):\(project.projectGeneration)")
-
-            GroupBox("Active bindings") {
-                if project.bindings.isEmpty {
-                    Text("No active binding records were published.")
-                        .foregroundStyle(GraphitePalette.textSecondary)
-                } else {
-                    ForEach(project.bindings) { binding in
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(binding.ownerKind.replacingOccurrences(of: "_", with: " "))
-                                OperatorIdentifier(binding.ownerID)
-                            }
-                            Spacer()
-                            OperatorStateBadge(state: binding.active ? "active" : "inactive")
-                        }
-                        .padding(.vertical, 3)
+    @ViewBuilder
+    private func projectSummary(_ project: OperatorProject) -> some View {
+        GraphitePanel {
+            HStack(alignment: .top, spacing: 16) {
+                Image(systemName: "folder.fill")
+                    .font(.system(size: 38))
+                    .foregroundStyle(GraphitePalette.info)
+                    .padding(.top, 2)
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(project.displayName)
+                        .font(.system(size: 20, weight: .semibold))
+                    OperatorIdentifier(project.canonicalRoot)
+                        .accessibilityIdentifier("project-canonical-root")
+                    HStack(spacing: 16) {
+                        Text("Generation \(project.projectGeneration)")
+                            .font(.system(size: 12))
+                            .foregroundStyle(GraphitePalette.textSecondary)
+                            .accessibilityIdentifier("project-generation")
+                        OperatorStateBadge(state: project.lifecycleState)
                     }
                 }
+                Spacer(minLength: 0)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
 
-            GroupBox("Project memory") {
-                if let memory = project.memory {
-                    VStack(alignment: .leading, spacing: 8) {
-                        LabeledContent("Health") { OperatorStateBadge(state: memory.state) }
-                        LabeledContent("Database size", value: OperatorFormat.bytes(memory.databaseBytes))
-                        LabeledContent("Records", value: OperatorFormat.integer(memory.recordCount))
-                        LabeledContent("Last integrity check", value: memory.lastIntegrityCheck ?? "Unavailable")
-                        if let detail = memory.detail { Text(detail).font(.caption).foregroundStyle(GraphitePalette.textSecondary) }
-                    }
-                } else {
-                    Text("Memory database health was not published by this manager.")
-                        .foregroundStyle(GraphitePalette.textSecondary)
-                }
-            }
+    @ViewBuilder
+    private func projectIdentity(_ project: OperatorProject) -> some View {
+        GroupBox("Identity") {
+            LabeledContent("Project UUID") { OperatorIdentifier(project.projectID) }
+        }
+    }
 
-            GroupBox("Continuity") {
-                if let continuity = project.continuity {
-                    VStack(alignment: .leading, spacing: 8) {
-                        LabeledContent("State") { OperatorStateBadge(state: continuity.state) }
-                        LabeledContent("Latest valid handoff") { OperatorIdentifier(continuity.latestHandoffID) }
-                        LabeledContent("Handoff checksum") { OperatorIdentifier(continuity.latestHandoffSHA256) }
-                        LabeledContent("Migration", value: continuity.migrationState ?? "Unavailable")
-                    }
-                } else {
-                    Text("No project-scoped continuity projection was published.")
-                        .foregroundStyle(GraphitePalette.textSecondary)
-                }
-            }
+    @ViewBuilder
+    private func projectRepository(_ project: OperatorProject) -> some View {
+        ProjectRepositoryEditor(project: project, viewModel: viewModel, location: $repositoryLocation)
+            .id("\(project.projectID):\(project.projectGeneration)")
+    }
 
-            if !project.migrationWarnings.isEmpty {
-                GroupBox("Migration and quarantine warnings") {
-                    ForEach(project.migrationWarnings, id: \.self) { warning in
-                        Label(warning, systemImage: "exclamationmark.triangle.fill")
-                            .foregroundStyle(GraphitePalette.warning)
-                            .accessibilityIdentifier("project-migration-warning")
-                    }
-                }
-            }
-
-            if let receipt = project.resetReceipt {
-                GroupBox("Latest reset receipt") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        LabeledContent("Prior generation", value: "\(receipt.priorGeneration)")
-                        LabeledContent("New generation", value: "\(receipt.newGeneration)")
-                        LabeledContent("Fenced bindings", value: "\(receipt.invalidatedBindingCount)")
-                        LabeledContent("Completed", value: receipt.completedAt ?? "Unavailable")
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .accessibilityIdentifier("project-reset-receipt")
-            }
-
-            if let pendingPath = viewModel.pendingRelinkPath {
-                GraphitePanel {
+    @ViewBuilder
+    private func projectBindings(_ project: OperatorProject) -> some View {
+        GroupBox("Active bindings") {
+            if project.bindings.isEmpty {
+                Text("No active binding records were published.")
+                    .foregroundStyle(GraphitePalette.textSecondary)
+            } else {
+                ForEach(project.bindings) { binding in
                     HStack {
-                        Text("Relink reconciliation").font(.system(size: 15, weight: .semibold))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(binding.ownerKind.replacingOccurrences(of: "_", with: " "))
+                            OperatorIdentifier(binding.ownerID)
+                        }
                         Spacer()
-                        GuidedHelpButton(context: .projectRelink)
+                        OperatorStateBadge(state: binding.active ? "active" : "inactive")
                     }
-                    Divider()
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text(
-                            "The last relink did not return a confirmed receipt. "
-                                + "Replaying the exact project, generation, and path is idempotent "
-                                + "and lets the manager reconcile a commit whose response was lost."
-                        )
-                        .font(.system(size: 13))
-                        .lineSpacing(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .foregroundStyle(GraphitePalette.textSecondary)
-                        LabeledContent("Pending path") {
-                            OperatorIdentifier(pendingPath)
-                        }
-                        HStack {
-                            Button("Reconcile Relink") {
-                                viewModel.reconcilePendingRelink()
-                            }
-                            .buttonStyle(GraphiteButtonStyle(kind: .primary))
-                            .disabled(viewModel.isLoading)
-                            .accessibilityIdentifier("project-relink-reconcile")
-                            if viewModel.canDiscardPendingRelink {
-                                Button("Dismiss") {
-                                    viewModel.discardPendingRelink()
-                                    }
-                                .disabled(viewModel.isLoading)
-                                .accessibilityIdentifier("project-relink-reconcile-dismiss")
-                            }
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 3)
                 }
-                .accessibilityIdentifier("project-relink-reconciliation")
             }
+        }
+    }
 
+    @ViewBuilder
+    private func projectMemory(_ project: OperatorProject) -> some View {
+        GroupBox("Project memory") {
+            if let memory = project.memory {
+                VStack(alignment: .leading, spacing: 8) {
+                    LabeledContent("Health") { OperatorStateBadge(state: memory.state) }
+                    LabeledContent("Database size", value: OperatorFormat.bytes(memory.databaseBytes))
+                    LabeledContent("Records", value: OperatorFormat.integer(memory.recordCount))
+                    LabeledContent("Last integrity check", value: memory.lastIntegrityCheck ?? "Unavailable")
+                    if let detail = memory.detail { Text(detail).font(.caption).foregroundStyle(GraphitePalette.textSecondary) }
+                }
+            } else {
+                Text("Memory database health was not published by this manager.")
+                    .foregroundStyle(GraphitePalette.textSecondary)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func projectContinuity(_ project: OperatorProject) -> some View {
+        GroupBox("Continuity") {
+            if let continuity = project.continuity {
+                VStack(alignment: .leading, spacing: 8) {
+                    LabeledContent("State") { OperatorStateBadge(state: continuity.state) }
+                    LabeledContent("Latest valid handoff") { OperatorIdentifier(continuity.latestHandoffID) }
+                    LabeledContent("Handoff checksum") { OperatorIdentifier(continuity.latestHandoffSHA256) }
+                    LabeledContent("Migration", value: continuity.migrationState ?? "Unavailable")
+                }
+            } else {
+                Text("No project-scoped continuity projection was published.")
+                    .foregroundStyle(GraphitePalette.textSecondary)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func projectMigrationWarnings(_ project: OperatorProject) -> some View {
+        if !project.migrationWarnings.isEmpty {
+            GroupBox("Migration and quarantine warnings") {
+                ForEach(project.migrationWarnings, id: \.self) { warning in
+                    Label(warning, systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(GraphitePalette.warning)
+                        .accessibilityIdentifier("project-migration-warning")
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func projectResetReceipt(_ project: OperatorProject) -> some View {
+        if let receipt = project.resetReceipt {
+            GroupBox("Latest reset receipt") {
+                VStack(alignment: .leading, spacing: 8) {
+                    LabeledContent("Prior generation", value: "\(receipt.priorGeneration)")
+                    LabeledContent("New generation", value: "\(receipt.newGeneration)")
+                    LabeledContent("Fenced bindings", value: "\(receipt.invalidatedBindingCount)")
+                    LabeledContent("Completed", value: receipt.completedAt ?? "Unavailable")
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .accessibilityIdentifier("project-reset-receipt")
+        }
+    }
+
+    @ViewBuilder
+    private func projectRelinkReconciliation(_ project: OperatorProject) -> some View {
+        if let pendingPath = viewModel.pendingRelinkPath {
             GraphitePanel {
                 HStack {
-                    Text("Clear project content").font(.system(size: 15, weight: .semibold))
+                    Text("Relink reconciliation").font(.system(size: 15, weight: .semibold))
                     Spacer()
-                    GuidedHelpButton(context: .projectContentClear)
+                    GuidedHelpButton(context: .projectRelink)
                 }
                 Divider()
                 VStack(alignment: .leading, spacing: 10) {
-                    Picker("Scope", selection: $clearMode) {
-                        ForEach(OperatorProjectContentClearMode.allCases) { mode in
-                            Text(mode.title).tag(mode)
-                        }
+                    Text(
+                        "The last relink did not return a confirmed receipt. "
+                            + "Replaying the exact project, generation, and path is idempotent "
+                            + "and lets the manager reconcile a commit whose response was lost."
+                    )
+                    .font(.system(size: 13))
+                    .lineSpacing(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .foregroundStyle(GraphitePalette.textSecondary)
+                    LabeledContent("Pending path") {
+                        OperatorIdentifier(pendingPath)
                     }
-                    .pickerStyle(.menu)
-                    .accessibilityIdentifier("project-clear-mode")
-                    Text(clearMode.effectDescription)
-                        .font(.system(size: 13))
-                        .fixedSize(horizontal: false, vertical: true)
-                        .foregroundStyle(GraphitePalette.textSecondary)
-                    Text("Clearing removes selected content from active application retrieval. SQLite pages, backups, and snapshots are governed by their separate retention policy; this is not secure physical erasure.")
-                        .font(.system(size: 13))
-                        .lineSpacing(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .foregroundStyle(GraphitePalette.textSecondary)
                     HStack {
-                        Button("Clear \(clearMode.title)…", role: .destructive) {
-                            clearConfirmation = viewModel.clearConfirmationForSelectedProject(
-                                mode: clearMode
-                            )
+                        Button("Reconcile Relink") {
+                            viewModel.reconcilePendingRelink()
                         }
-                        .buttonStyle(GraphiteButtonStyle(kind: .destructive))
-                        .disabled(viewModel.isLoading || project.lifecycleState != "active")
-                        .accessibilityIdentifier("project-clear-content")
-                        if viewModel.pendingClearConfirmation?.projectID.caseInsensitiveCompare(
-                            project.projectID
-                        ) == .orderedSame {
-                            Button("Reconcile Pending Clear") {
-                                viewModel.reconcilePendingContentClear()
-                            }
+                        .buttonStyle(GraphiteButtonStyle(kind: .primary))
+                        .disabled(viewModel.isLoading)
+                        .accessibilityIdentifier("project-relink-reconcile")
+                        if viewModel.canDiscardPendingRelink {
+                            Button("Dismiss") {
+                                viewModel.discardPendingRelink()
+                                }
                             .disabled(viewModel.isLoading)
-                            .accessibilityIdentifier("project-clear-reconcile")
+                            .accessibilityIdentifier("project-relink-reconcile-dismiss")
                         }
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .accessibilityIdentifier("project-relink-reconciliation")
+        }
+    }
 
+    @ViewBuilder
+    private func projectClearContent(_ project: OperatorProject) -> some View {
+        GraphitePanel {
             HStack {
-                Button("Remove Project…", role: .destructive) {
-                    requestSelectedProjectRemoval()
-                }
-                .buttonStyle(GraphiteButtonStyle(kind: .destructive))
-                .disabled(viewModel.isLoading || project.lifecycleState != "active")
-                .accessibilityIdentifier("project-remove")
-                Button("Relink…") {
-                    chooseRelinkFolder(for: project)
-                }
-                .disabled(viewModel.isLoading || project.lifecycleState != "active")
-                .help("Choose another location for this same Git repository.")
-                .accessibilityIdentifier("project-relink")
-                GuidedHelpButton(context: .projectRelink)
+                Text("Clear project content").font(.system(size: 15, weight: .semibold))
+                Spacer()
+                GuidedHelpButton(context: .projectContentClear)
             }
+            Divider()
+            VStack(alignment: .leading, spacing: 10) {
+                Picker("Scope", selection: $clearMode) {
+                    ForEach(OperatorProjectContentClearMode.allCases) { mode in
+                        Text(mode.title).tag(mode)
+                    }
+                }
+                .pickerStyle(.menu)
+                .accessibilityIdentifier("project-clear-mode")
+                Text(clearMode.effectDescription)
+                    .font(.system(size: 13))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .foregroundStyle(GraphitePalette.textSecondary)
+                Text("Clearing removes selected content from active application retrieval. SQLite pages, backups, and snapshots are governed by their separate retention policy; this is not secure physical erasure.")
+                    .font(.system(size: 13))
+                    .lineSpacing(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .foregroundStyle(GraphitePalette.textSecondary)
+                HStack {
+                    Button("Clear \(clearMode.title)…", role: .destructive) {
+                        clearConfirmation = viewModel.clearConfirmationForSelectedProject(
+                            mode: clearMode
+                        )
+                    }
+                    .buttonStyle(GraphiteButtonStyle(kind: .destructive))
+                    .disabled(viewModel.isLoading || project.lifecycleState != "active")
+                    .accessibilityIdentifier("project-clear-content")
+                    if viewModel.pendingClearConfirmation?.projectID.caseInsensitiveCompare(
+                        project.projectID
+                    ) == .orderedSame {
+                        Button("Reconcile Pending Clear") {
+                            viewModel.reconcilePendingContentClear()
+                        }
+                        .disabled(viewModel.isLoading)
+                        .accessibilityIdentifier("project-clear-reconcile")
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    @ViewBuilder
+    private func projectLifecycleActions(_ project: OperatorProject) -> some View {
+        HStack {
+            Button("Remove Project…", role: .destructive) {
+                requestSelectedProjectRemoval()
+            }
+            .buttonStyle(GraphiteButtonStyle(kind: .destructive))
+            .disabled(viewModel.isLoading || project.lifecycleState != "active")
+            .accessibilityIdentifier("project-remove")
+            Button("Relink…") {
+                chooseRelinkFolder(for: project)
+            }
+            .disabled(viewModel.isLoading || project.lifecycleState != "active")
+            .help("Choose another location for this same Git repository.")
+            .accessibilityIdentifier("project-relink")
+            GuidedHelpButton(context: .projectRelink)
         }
     }
 
@@ -909,13 +1037,7 @@ struct ProjectsOperatorView: View {
 private struct ProjectRepositoryEditor: View {
     let project: OperatorProject
     @ObservedObject var viewModel: ProjectsViewModel
-    @State private var location: String
-
-    init(project: OperatorProject, viewModel: ProjectsViewModel) {
-        self.project = project
-        self.viewModel = viewModel
-        _location = State(initialValue: project.githubRepositoryURL ?? "")
-    }
+    @Binding var location: String
 
     var body: some View {
         GroupBox("GitHub repository") {
@@ -950,7 +1072,6 @@ private struct ProjectRepositoryEditor: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .disabled(viewModel.isLoading || project.lifecycleState != "active")
         }
-        .onChange(of: project.githubRepositoryURL) { _, url in location = url ?? "" }
         .accessibilityIdentifier("project-github-repository")
     }
 
