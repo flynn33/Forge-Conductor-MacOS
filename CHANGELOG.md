@@ -63,6 +63,10 @@ Product versions do not by themselves claim shipment.
 - Verify shared queued geometry for 21 real page/Manager namespaces in v106 and actual Source/Violation/Feed selection plus three Rune detail-panel gestures in v108. Across separate inputs this covers 24 representative namespaces, with exact saved-state/restoration and host guards; every panel, original naming/ordinary and broader UI gates remain open. No production repair.
 - Add a separate validated application-content semantic check: v110 passes all 104 page/size/layout pairs, with all 104 native caches visually reviewed; the unchanged whole-window v111 gate fails during AXRole discovery. Cropping, transient differences, content beyond the captured viewport and scrolling actions remain limits. Test-only; no production, version or full UI closure.
 
+- Record v113’s separate outcomes: original whole-window and formal horizontal scroller FAIL, scoped 104-phase PASS; retain cached copied-lineage equality without identity/cause inference and complete visual coverage with 90 exact prior reuses/14 original inspections. Current ordinary v8 candidate input/artifact/signature readback passes; older v6 current-source mismatch remains preserved. Test-only; scrolling and broader UI gates stay open, with capabilities deferred.
+
+- Record v114’s four-method result: three FAIL/one scoped 104-phase PASS. Typed Zoom/FullScreen equality identifies only a copied ancestor; formal horizontal increment returns false, and the read-only advertisement probe fails its existing receipt-byte bound with zero actions. Preserve v113 and all original errors/bounds; no production repair or broader UI closure. The compact v115 native rerun still fails the unchanged half-second observation deadline with zero actions.
+
 #### Earlier UI checks before the naming repair
 
 - Verify the post-Compute ordinary Debug candidate, strict signature and CLI/app product links. Candidate Dashboard startup was observed. The later whole native Canvas selection passed 11 of 13 methods; both draft cases, Projects desktop navigation and Rune naming qualification remain open. The installed 0.18.0 (28) app was not replaced.

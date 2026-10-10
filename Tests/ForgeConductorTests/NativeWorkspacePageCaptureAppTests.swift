@@ -256,6 +256,103 @@ final class NativeWorkspacePageCaptureAppTests: XCTestCase, @unchecked Sendable 
     }
 
 
+    /// Read-only public advertisements on exact outer scrollers; no action dispatch or scroll preparation.
+    func testNativeProjectsCustomCanvasPublicScrollerAdvertisementsAtMinimumSize() async throws {
+        let deadline = ProcessInfo.processInfo.systemUptime + 45
+        do {
+            try directEvidence.configure(testName: name + "-scroller-advertisements")
+            try await prepareHost()
+            guard deadline - ProcessInfo.processInfo.systemUptime > 10 else {
+                throw NativeWorkspacePageCaptureFailure("Projects advertisement case lacks bounded presentation time")
+            }
+            let viewport = NSSize(width: 1_100, height: 720)
+            let owned = try NativeWorkspacePageCaptureFixture(contentSize: viewport)
+            fixture = owned; owned.route.page = .projects
+            try await presentPhysicalCache(owned, expectedContentSize: viewport)
+            let layout = try owned.customize("projects")
+            guard deadline - ProcessInfo.processInfo.systemUptime > 5 else {
+                throw NativeWorkspacePageCaptureFailure("Projects advertisement case lacks bounded canvas time")
+            }
+            try await requireCanvas(layout, in: owned)
+            try await nativeProjectsScrollerAdvertisements(layout, in: owned,
+                expectedContentSize: viewport, deadline: deadline)
+            guard deadline - ProcessInfo.processInfo.systemUptime > 5 else {
+                throw NativeWorkspacePageCaptureFailure("Projects advertisement case lacks bounded reset time")
+            }
+            try owned.preferences.reset("projects")
+            try await waitUntil("Projects advertisement canvas did not dismantle after explicit reset",
+                timeout: min(5, deadline - ProcessInfo.processInfo.systemUptime)) {
+                owned.hosting.layoutSubtreeIfNeeded()
+                return !self.nativeViews(owned.hosting).contains { $0 is NativeWorkspaceDocumentView }
+            }
+            guard owned.preferences.activeLayout(for: "projects") == nil,
+                  self.physicalCachePresentationIsReady(owned, expectedContentSize: viewport),
+                  ProcessInfo.processInfo.systemUptime < deadline else {
+                throw NativeWorkspacePageCaptureFailure("Projects advertisement reset changed its owner or exceeded the case deadline")
+            }
+            await owned.close(); fixture = nil
+            await restoreHost()
+            try Task.checkCancellation()
+            guard ProcessInfo.processInfo.systemUptime < deadline else {
+                throw NativeWorkspacePageCaptureFailure("Projects advertisement case exceeded its deadline during cleanup")
+            }
+        } catch {
+            do { try retainFailure(error) }
+            catch { XCTFail("Could not retain Projects advertisement terminal failure: \(scrollerActionBoundedString(String(reflecting: error), bytes: 2_048))") }
+            await restoreHost()
+            throw error
+        }
+    }
+
+
+    /// Exact outer scroller semantic actions only; no direct scroll preparation or pointer input.
+    func testNativeProjectsCustomCanvasScrollerActionsExposeOffscreenResizeCenterAtMinimumSize() async throws {
+        let deadline = ProcessInfo.processInfo.systemUptime + 45
+        do {
+            try directEvidence.configure(testName: name + "-native-scroller-actions")
+            try await prepareHost()
+            guard deadline - ProcessInfo.processInfo.systemUptime > 10 else {
+                throw NativeWorkspacePageCaptureFailure("Projects scroller case lacks bounded presentation time")
+            }
+            let viewport = NSSize(width: 1_100, height: 720)
+            let owned = try NativeWorkspacePageCaptureFixture(contentSize: viewport)
+            fixture = owned; owned.route.page = .projects
+            try await presentPhysicalCache(owned, expectedContentSize: viewport)
+            let layout = try owned.customize("projects")
+            guard deadline - ProcessInfo.processInfo.systemUptime > 5 else {
+                throw NativeWorkspacePageCaptureFailure("Projects scroller case lacks bounded canvas time")
+            }
+            try await requireCanvas(layout, in: owned)
+            try await nativeProjectsScrollerActions(layout, in: owned,
+                expectedContentSize: viewport, deadline: deadline)
+            guard deadline - ProcessInfo.processInfo.systemUptime > 5 else {
+                throw NativeWorkspacePageCaptureFailure("Projects scroller case lacks bounded reset time")
+            }
+            try owned.preferences.reset("projects")
+            try await waitUntil("Projects scroller action canvas did not dismantle after explicit reset",
+                timeout: min(5, deadline - ProcessInfo.processInfo.systemUptime)) {
+                owned.hosting.layoutSubtreeIfNeeded()
+                return !self.nativeViews(owned.hosting).contains { $0 is NativeWorkspaceDocumentView }
+            }
+            guard owned.preferences.activeLayout(for: "projects") == nil,
+                  self.physicalCachePresentationIsReady(owned, expectedContentSize: viewport),
+                  ProcessInfo.processInfo.systemUptime < deadline else {
+                throw NativeWorkspacePageCaptureFailure("Projects scroller reset changed its owner or exceeded the case deadline")
+            }
+            await owned.close(); fixture = nil
+            await restoreHost()
+            try Task.checkCancellation()
+            guard ProcessInfo.processInfo.systemUptime < deadline else {
+                throw NativeWorkspacePageCaptureFailure("Projects scroller case exceeded its deadline during cleanup")
+            }
+        } catch {
+            do { try retainFailure(error) }
+            catch { XCTFail("Could not retain Projects scroller terminal failure: \(scrollerActionBoundedString(String(reflecting: error), bytes: 2_048))") }
+            await restoreHost()
+            throw error
+        }
+    }
+
     func testRealCatalogViewsQueuedMoveResizePersistsGeometry() async throws {
         let deadline = ProcessInfo.processInfo.systemUptime + 120
         try await prepareHost()
@@ -1516,6 +1613,12 @@ final class NativeWorkspacePageCaptureAppTests: XCTestCase, @unchecked Sendable 
                 report["fresh_error"] = String(String(describing: error).prefix(4_096))
             }
             report["fresh_scope_progress"] = fresh.diagnosticProgress
+            if observationScope == .wholeWindow {
+                report["typed_zoom_post_failure_diagnostic"] = originalScope.typedZoomPostFailureRelationships(
+                    comparedTo: fresh, deadline: deadline, requiredIdentifiers: requiredIdentifiers,
+                    ownerUnchanged: ownerUnchanged)
+                report["copied_child_reference_witnesses"] = originalScope.copiedFailureIdentityWitnesses(comparedTo: fresh)
+            }
             report["owner_route_layout_geometry_valid_after_attempt"] = ownerUnchanged()
         } catch {
             report["diagnostic_prerequisite_error"] = String(String(describing: error).prefix(4_096))
@@ -1780,6 +1883,709 @@ final class NativeWorkspacePageCaptureAppTests: XCTestCase, @unchecked Sendable 
         try element.performPress()
         // The caller waits for the exact selected section controls and heading.
         // Legacy public actions return Void; dispatch alone is not success proof.
+    }
+
+    private func nativeProjectsScrollerAdvertisements(_ layout: NativeWorkspaceLayout,
+                                                      in owned: NativeWorkspacePageCaptureFixture,
+                                                      expectedContentSize: NSSize,
+                                                      deadline: TimeInterval) async throws {
+        var stage = "owner", rows: [[String: Any]] = []
+        var observationDeadline: TimeInterval?
+        var report: [String: Any] = [
+            "classification": "Read-only public advertisements on exact isolated Projects outer scrollers; no scroll action or input qualification",
+            "view_id": "projects", "target_identifier": "workspace-resize-projects-summary",
+            "viewport": scrollerActionBoundedString(NSStringFromSize(expectedContentSize), bytes: 512),
+            "execution_completed": false, "actions_invoked": 0, "value_setters_invoked": 0,
+            "direct_scroll_preparation": false, "pointer_input": false, "exported_ax_traversal": false,
+            "maximum_case_seconds": 45, "case_deadline_uptime": deadline,
+            "maximum_observation_seconds": 0.5, "maximum_total_objects": 64, "maximum_child_depth": 4,
+            "maximum_parent_chain": 64, "maximum_actions_per_object": 64, "maximum_attributes_per_object": 256,
+            "maximum_json_bytes": 64 * 1_024, "maximum_retained_rows_json_bytes": 48 * 1_024,
+            "maximum_observation_receipt_bytes": 56 * 1_024, "reserved_failure_receipt_bytes": 8 * 1_024,
+            "application_active": NSApp.isActive, "window_key": owned.window.isKeyWindow,
+        ]
+        func checkObservation() throws {
+            try Task.checkCancellation()
+            let now = ProcessInfo.processInfo.systemUptime
+            guard now < deadline, observationDeadline.map({ now < $0 }) ?? true else {
+                throw NativeWorkspacePageCaptureFailure("Projects advertisement observation exceeded its case or 0.5-second deadline")
+            }
+        }
+        func put(_ fields: [String: Any], in slot: Int) throws {
+            var candidate = rows
+            if slot == candidate.count { candidate.append(fields) }
+            else { candidate[slot].merge(fields) { _, value in value } }
+            let data = try JSONSerialization.data(withJSONObject: candidate, options: [.sortedKeys])
+            var candidateReport = report; candidateReport["objects"] = candidate
+            let completeData = try JSONSerialization.data(withJSONObject: candidateReport, options: [.sortedKeys])
+            guard candidate.count <= 64, data.count <= 48 * 1_024, completeData.count <= 56 * 1_024 else {
+                report["row_budget_rejected_slot"] = slot
+                report["row_budget_rejected_bytes"] = data.count
+                report["receipt_budget_rejected_bytes"] = completeData.count
+                throw NativeWorkspacePageCaptureFailure("Projects advertisement rows exceeded their reserved JSON byte bound")
+            }
+            rows = candidate
+            try checkObservation()
+        }
+        func textFields(_ value: String?, key: String, bytes: Int) -> [String: Any] {
+            guard let value else { return [key: NSNull(), key + "_unknown": true] }
+            return [key: scrollerActionBoundedString(value, bytes: bytes),
+                    key + "_utf8_bytes": value.utf8.count, key + "_truncated": value.utf8.count > bytes]
+        }
+        func exactNames(_ values: [String], maximum: Int) throws -> [String] {
+            guard values.count <= maximum, values.allSatisfy({ $0.utf8.count <= 128 }) else {
+                throw NativeWorkspacePageCaptureFailure("Projects advertisement name count or exact UTF8 identity exceeded its bound")
+            }
+            return values
+        }
+        func objectBridge(_ value: Any) throws -> NSObject {
+            guard Swift.type(of: value) is AnyClass, let object = value as? NSObject else {
+                report["unsupported_bridge_type"] = scrollerActionBoundedString(String(reflecting: type(of: value)), bytes: 256)
+                throw NativeWorkspacePageCaptureFailure("Projects advertised child/parent did not expose an actual NSObject reference")
+            }
+            return object
+        }
+        func retainReport(_ suffix: String) throws {
+            report["last_stage"] = scrollerActionBoundedString(stage, bytes: 128)
+            report["objects"] = rows; report["object_count"] = rows.count
+            report["within_case_deadline"] = ProcessInfo.processInfo.systemUptime < deadline
+            var data = try JSONSerialization.data(withJSONObject: report, options: [.sortedKeys])
+            if data.count > 64 * 1_024, suffix == "failed-diagnostic" {
+                // Keep every retained row; escaped error text can consume more JSON bytes than UTF8 bytes.
+                report["diagnostic_error_text_reduced_for_json_budget"] = true
+                for key in ["original_error", "original_error_type", "failure_cache_error"] {
+                    if let value = report[key] as? String {
+                        report[key] = scrollerActionBoundedString(value, bytes: 128)
+                        report[key + "_truncated_for_json_budget"] = value.utf8.count > 128
+                    }
+                }
+                data = try JSONSerialization.data(withJSONObject: report, options: [.sortedKeys])
+            }
+            guard rows.count <= 64, data.count <= 64 * 1_024 else {
+                throw NativeWorkspacePageCaptureFailure("Projects advertisement receipt exceeded its object/JSON bound")
+            }
+            let receiptName = "projects-native-scroller-advertisements-" + suffix
+            let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+            attachment.name = receiptName; attachment.lifetime = .keepAlways; add(attachment)
+            try directEvidence.save(data, name: receiptName, extension: "json")
+        }
+        do {
+            guard ProcessInfo.processInfo.systemUptime < deadline, layout.viewID == "projects",
+                  owned.route.page == .projects, layout.panels.count > 0, layout.panels.count <= 64,
+                  layout.panels.allSatisfy(\.isVisible) else {
+                throw NativeWorkspacePageCaptureFailure("Projects advertisement layout is not the bounded all-visible Projects fixture")
+            }
+            owned.hosting.layoutSubtreeIfNeeded()
+            let documents = nativeViews(owned.hosting).compactMap { $0 as? NativeWorkspaceDocumentView }
+            guard documents.count == 1, let document = documents.first,
+                  let scroll = document.enclosingScrollView, scroll.documentView === document,
+                  document.superview === scroll.contentView, document.isFlipped,
+                  scroll.hasHorizontalScroller, scroll.hasVerticalScroller,
+                  let horizontal = scroll.horizontalScroller, let vertical = scroll.verticalScroller,
+                  horizontal !== vertical, let panel = document.panelHosts["projects-summary"] else {
+                throw NativeWorkspacePageCaptureFailure("Projects advertisement exact document/panel/scrollers are absent")
+            }
+            let identities = document.panelHosts.mapValues { ObjectIdentifier($0) }
+            let documentFrame = document.frame, documentBounds = document.bounds
+            let canvasSize = NSSize(width: layout.canvas.width, height: layout.canvas.height)
+            let panelFrames = document.panelHosts.mapValues(\.frame)
+            let hostingIdentities = document.panelHosts.mapValues { ObjectIdentifier($0.hostingView) }
+            guard Set(identities.keys) == Set(layout.panels.map(\.id)),
+                  documentFrame.size == canvasSize, documentBounds.origin == .zero,
+                  documentBounds.size == canvasSize, layout.panels.allSatisfy({ placement in
+                    document.panelHosts[placement.id]?.frame == NSRect(x: placement.frame.x, y: placement.frame.y,
+                        width: placement.frame.width, height: placement.frame.height)
+                  }) else {
+                throw NativeWorkspacePageCaptureFailure("Projects advertisement catalog membership/frames/canvas differ from its layout")
+            }
+            panel.layoutSubtreeIfNeeded()
+            let matches = nativeViews(panel).filter { $0.accessibilityIdentifier() == "workspace-resize-projects-summary" }
+            guard matches.count == 1, let control = matches.first,
+                  control.superview === panel, control.window === owned.window,
+                  !control.isHiddenOrHasHiddenAncestor, control.bounds.width >= 8, control.bounds.height >= 8 else {
+                throw NativeWorkspacePageCaptureFailure("Projects advertisement unique resize control is absent")
+            }
+            let controlFrame = control.frame, controlBounds = control.bounds
+            let targetBounds = document.convert(control.bounds, from: control)
+            let target = NSRect(x: targetBounds.midX - 4, y: targetBounds.midY - 4, width: 8, height: 8)
+            let baseline = owned.preferences.collection
+            let beforeBytes = try XCTUnwrap(owned.defaults.data(forKey: NativeWorkspacePreferences.storageKey))
+            let initialClip = scroll.contentView.bounds, initialVisible = document.visibleRect
+            guard beforeBytes.count <= NativeWorkspaceLimits.maximumStoredBytes,
+                  try JSONDecoder().decode(NativeWorkspaceCollection.self, from: beforeBytes) == baseline,
+                  owned.preferences.activeLayout(for: "projects") == layout,
+                  [targetBounds.minX, targetBounds.minY, targetBounds.width, targetBounds.height,
+                   initialClip.minX, initialClip.minY, initialClip.width, initialClip.height].allSatisfy({ $0.isFinite }),
+                  initialClip.width > 0, initialClip.height > 0, document.bounds.contains(target),
+                  target.minX > initialVisible.maxX, target.minY > initialVisible.maxY else {
+                throw NativeWorkspacePageCaptureFailure("Projects advertisement baseline storage or initially offscreen target is invalid")
+            }
+            func nativeParentChain(_ view: NSView, to owner: NSView) throws -> [String] {
+                var current: NSView? = view, seen = Set<ObjectIdentifier>(), types: [String] = []
+                while let next = current {
+                    try checkObservation()
+                    guard types.count < 64, seen.insert(ObjectIdentifier(next)).inserted,
+                          next.window === owned.window else {
+                        throw NativeWorkspacePageCaptureFailure("Projects advertisement native ancestry exceeded its bound or exact window")
+                    }
+                    types.append(scrollerActionBoundedString(String(reflecting: type(of: next)), bytes: 256))
+                    if next === owner { return types }
+                    current = next.superview
+                }
+                throw NativeWorkspacePageCaptureFailure("Projects advertisement native ancestry did not reach its exact owner")
+            }
+            func requireOwner() throws {
+                try checkObservation()
+                guard self.physicalCachePresentationIsReady(owned, expectedContentSize: expectedContentSize),
+                      owned.route.page == .projects, document.window === owned.window,
+                      scroll.window === owned.window, document.enclosingScrollView === scroll,
+                      scroll.documentView === document, document.superview === scroll.contentView,
+                      document.frame == documentFrame, document.frame.size == canvasSize,
+                      document.bounds == documentBounds, document.bounds.origin == .zero,
+                      document.bounds.size == canvasSize,
+                      scroll.horizontalScroller === horizontal, scroll.verticalScroller === vertical,
+                      document.panelHosts.mapValues({ ObjectIdentifier($0) }) == identities,
+                      document.panelHosts.mapValues(\.frame) == panelFrames,
+                      document.panelHosts.mapValues({ ObjectIdentifier($0.hostingView) }) == hostingIdentities,
+                      panel.superview === document, !panel.isHiddenOrHasHiddenAncestor,
+                      control.superview === panel, control.window === owned.window,
+                      !control.isHiddenOrHasHiddenAncestor, control.frame == controlFrame, control.bounds == controlBounds,
+                      document.convert(control.bounds, from: control) == targetBounds,
+                      scroll.contentView.bounds == initialClip, document.visibleRect == initialVisible,
+                      owned.model.app == nil, owned.model.manager == nil, owned.model.remoteManager == nil,
+                      !owned.model.hasLoadedInitialSettings, owned.preferences.collection == baseline,
+                      owned.defaults.data(forKey: NativeWorkspacePreferences.storageKey) == beforeBytes else {
+                    throw NativeWorkspacePageCaptureFailure("Projects advertisement owner/geometry/preferences changed")
+                }
+                _ = try nativeParentChain(horizontal, to: scroll); _ = try nativeParentChain(vertical, to: scroll)
+                _ = try nativeParentChain(scroll, to: owned.hosting)
+                try checkObservation()
+            }
+            func publicParentChain(_ child: NSObject, to root: NSScroller, slot: Int) throws -> [[String: Any]] {
+                var current = child, seen = Set<ObjectIdentifier>(), chain: [[String: Any]] = []
+                while true {
+                    try checkObservation()
+                    guard chain.count < 64, seen.insert(ObjectIdentifier(current)).inserted else {
+                        throw NativeWorkspacePageCaptureFailure("Projects advertisement public parent chain cycled or exceeded 64 objects")
+                    }
+                    if let view = current as? NSView, view.window !== owned.window {
+                        throw NativeWorkspacePageCaptureFailure("Projects advertisement child/parent NSView belongs to another window")
+                    }
+                    chain.append(["type": scrollerActionBoundedString(String(reflecting: type(of: current)), bytes: 256),
+                                  "actual_identity": scrollerActionBoundedString(String(describing: ObjectIdentifier(current)), bytes: 128)])
+                    try put(["public_parent_chain": chain], in: slot)
+                    if current === root { try checkObservation(); return chain }
+                    let parent: Any?
+                    if let formal = current as? any NSAccessibilityProtocol {
+                        parent = formal.accessibilityParent()
+                    } else {
+                        let attributes = current.accessibilityAttributeNames()
+                        try checkObservation()
+                        guard attributes.count <= 256 else {
+                            throw NativeWorkspacePageCaptureFailure("Projects public parent attributes exceeded 256 names")
+                        }
+                        _ = try exactNames(attributes.map(\.rawValue), maximum: 256)
+                        guard attributes.contains(.parent) else {
+                            throw NativeWorkspacePageCaptureFailure("Projects advertised child has no supported public parent attribute")
+                        }
+                        try checkObservation()
+                        parent = current.accessibilityAttributeValue(.parent)
+                    }
+                    try checkObservation()
+                    guard let parent else {
+                        throw NativeWorkspacePageCaptureFailure("Projects advertised child's public parent is unknown before its exact scroller")
+                    }
+                    current = try objectBridge(parent)
+                }
+            }
+            try requireOwner()
+            report["document_frame"] = scrollerActionBoundedString(NSStringFromRect(documentFrame), bytes: 512)
+            report["document_bounds"] = scrollerActionBoundedString(NSStringFromRect(documentBounds), bytes: 512)
+            report["initial_clip_bounds"] = scrollerActionBoundedString(NSStringFromRect(initialClip), bytes: 512)
+            report["initial_document_visible"] = scrollerActionBoundedString(NSStringFromRect(initialVisible), bytes: 512)
+            report["target_center_rect"] = scrollerActionBoundedString(NSStringFromRect(target), bytes: 512)
+            report["control_bounds_in_document"] = scrollerActionBoundedString(NSStringFromRect(targetBounds), bytes: 512)
+            report["horizontal_native_parent_chain"] = try nativeParentChain(horizontal, to: scroll)
+            report["vertical_native_parent_chain"] = try nativeParentChain(vertical, to: scroll)
+            report["outer_scroll_native_parent_chain"] = try nativeParentChain(scroll, to: owned.hosting)
+            report["stored_bytes"] = beforeBytes.count; report["baseline_layout_count"] = baseline.layouts.count
+            stage = "before-observation"
+            try retainReport("before")
+            try capturePhysicalCache(owned, expectedContentSize: expectedContentSize, name: "projects-native-scroller-advertisements-before")
+            try requireOwner()
+            let started = ProcessInfo.processInfo.systemUptime
+            let boundedObservationDeadline = min(deadline, started + 0.5)
+            observationDeadline = boundedObservationDeadline
+            report["observation_started_uptime"] = started
+            report["observation_deadline_uptime"] = boundedObservationDeadline
+            var pending: [(object: NSObject, root: NSScroller, axis: String, depth: Int)] = [
+                (horizontal, horizontal, "horizontal", 0), (vertical, vertical, "vertical", 0)]
+            var enqueued: [ObjectIdentifier: ObjectIdentifier] = [
+                ObjectIdentifier(horizontal): ObjectIdentifier(horizontal), ObjectIdentifier(vertical): ObjectIdentifier(vertical)]
+            var cursor = 0
+            while cursor < pending.count {
+                try requireOwner()
+                let node = pending[cursor], slot = rows.count
+                stage = node.axis + ".object-\(slot).advertisements"
+                try put(["object_index": slot, "axis": node.axis, "depth": node.depth,
+                    "type": scrollerActionBoundedString(String(reflecting: type(of: node.object)), bytes: 256),
+                    "actual_identity": scrollerActionBoundedString(String(describing: ObjectIdentifier(node.object)), bytes: 128),
+                    "exact_root_scroller": node.object === node.root, "public_parent_chain_verified": node.object === node.root,
+                    "observation_started_uptime": ProcessInfo.processInfo.systemUptime], in: slot)
+                if node.object !== node.root {
+                    let chain = try publicParentChain(node.object, to: node.root, slot: slot)
+                    try put(["public_parent_chain": chain, "public_parent_chain_verified": true], in: slot)
+                }
+                let actions = node.object.accessibilityActionNames()
+                try put(["informal_action_count": actions.count], in: slot)
+                guard actions.count <= 64 else {
+                    throw NativeWorkspacePageCaptureFailure("Projects public actions exceeded 64 names")
+                }
+                try put(["informal_action_names": try exactNames(actions.map(\.rawValue), maximum: 64)], in: slot)
+                let attributes = node.object.accessibilityAttributeNames()
+                try put(["informal_attribute_count": attributes.count], in: slot)
+                guard attributes.count <= 256 else {
+                    throw NativeWorkspacePageCaptureFailure("Projects public attributes exceeded 256 names")
+                }
+                try put(["informal_attribute_names": try exactNames(attributes.map(\.rawValue), maximum: 256)], in: slot)
+                var lists: [[Any]] = []
+                if let formal = node.object as? any NSAccessibilityProtocol {
+                    try put(["formal_bridge": true], in: slot)
+                    try put(textFields(formal.accessibilityRole()?.rawValue, key: "formal_role", bytes: 128), in: slot)
+                    try put(textFields(formal.accessibilitySubrole()?.rawValue, key: "formal_subrole", bytes: 128), in: slot)
+                    try put(textFields(formal.accessibilityIdentifier(), key: "formal_identifier", bytes: 128), in: slot)
+                    try put(textFields(formal.accessibilityTitle(), key: "formal_title", bytes: 256), in: slot)
+                    try put(textFields(formal.accessibilityLabel(), key: "formal_label", bytes: 256), in: slot)
+                    let orientation = formal.accessibilityOrientation()
+                    try checkObservation()
+                    try put(["formal_orientation_raw": orientation.rawValue,
+                             "formal_orientation_known": orientation == .horizontal || orientation == .vertical,
+                             "formal_accessibility_enabled": formal.isAccessibilityEnabled()], in: slot)
+                    for spelling in ["accessibilityPerformIncrement", "accessibilityPerformDecrement", "accessibilityPerformPress"] {
+                        try put([spelling + "_selector_allowed": formal.isAccessibilitySelectorAllowed(NSSelectorFromString(spelling))], in: slot)
+                    }
+                    let children = formal.accessibilityChildren()
+                    try put(["formal_children_unknown": children == nil,
+                             "formal_child_count": children.map { $0.count as Any } ?? NSNull()], in: slot)
+                    if let children {
+                        guard children.count <= 64 else {
+                            throw NativeWorkspacePageCaptureFailure("Projects formal public children exceeded 64 entries")
+                        }
+                        lists.append(children)
+                    }
+                } else {
+                    try put(["formal_bridge": false, "formal_role": NSNull(), "formal_subrole": NSNull(),
+                             "formal_orientation_raw": NSNull(), "formal_metadata_unknown": true], in: slot)
+                }
+                if let native = node.object as? NSControl {
+                    try put(["native_enabled": native.isEnabled, "native_hidden_or_hidden_ancestor": native.isHiddenOrHasHiddenAncestor], in: slot)
+                }
+                for (attribute, key, bytes) in [(NSAccessibility.Attribute.role, "informal_role", 128),
+                    (.subrole, "informal_subrole", 128), (.identifier, "informal_identifier", 128),
+                    (.title, "informal_title", 256), (.description, "informal_description", 256)] {
+                    guard attributes.contains(attribute) else {
+                        try put([key: NSNull(), key + "_advertised": false], in: slot); continue
+                    }
+                    let raw = node.object.accessibilityAttributeValue(attribute)
+                    try checkObservation()
+                    let text: String?
+                    if let raw {
+                        if let string = raw as? String { text = string }
+                        else if attribute == .role, let role = raw as? NSAccessibility.Role { text = role.rawValue }
+                        else if attribute == .subrole, let subrole = raw as? NSAccessibility.Subrole { text = subrole.rawValue }
+                        else {
+                            try put([key + "_unsupported_type": scrollerActionBoundedString(String(reflecting: type(of: raw)), bytes: 256)], in: slot)
+                            throw NativeWorkspacePageCaptureFailure("Projects advertised public text metadata had an unsupported type")
+                        }
+                    } else { text = nil }
+                    var fields = textFields(text, key: key, bytes: bytes); fields[key + "_advertised"] = true
+                    try put(fields, in: slot)
+                }
+                if attributes.contains(.children) {
+                    let raw = node.object.accessibilityAttributeValue(.children)
+                    try checkObservation()
+                    try put(["informal_children_advertised": true, "informal_children_unknown": raw == nil], in: slot)
+                    if let raw {
+                        guard let children = raw as? [Any] else {
+                            try put(["informal_children_unsupported_type": scrollerActionBoundedString(String(reflecting: type(of: raw)), bytes: 256)], in: slot)
+                            throw NativeWorkspacePageCaptureFailure("Projects advertised public children did not expose an array")
+                        }
+                        try put(["informal_child_count": children.count], in: slot)
+                        guard children.count <= 64 else {
+                            throw NativeWorkspacePageCaptureFailure("Projects informal public children exceeded 64 entries")
+                        }
+                        lists.append(children)
+                    }
+                } else { try put(["informal_children_advertised": false, "informal_children_unknown": true], in: slot) }
+                var union: [NSObject] = [], seen = Set<ObjectIdentifier>()
+                for list in lists {
+                    guard list.count <= 64 else {
+                        throw NativeWorkspacePageCaptureFailure("Projects public child list exceeded 64 entries")
+                    }
+                    for raw in list {
+                        try checkObservation()
+                        let child = try objectBridge(raw)
+                        if seen.insert(ObjectIdentifier(child)).inserted { union.append(child) }
+                        guard union.count <= 64 else {
+                            throw NativeWorkspacePageCaptureFailure("Projects public child union exceeded 64 objects")
+                        }
+                    }
+                }
+                try put(["union_child_count": union.count,
+                         "union_children_actual_identities": union.map {
+                            scrollerActionBoundedString(String(describing: ObjectIdentifier($0)), bytes: 128)
+                         }], in: slot)
+                guard union.isEmpty || node.depth < 4 else {
+                    throw NativeWorkspacePageCaptureFailure("Projects advertised child tree exceeded depth four")
+                }
+                for child in union {
+                    let identity = ObjectIdentifier(child), rootIdentity = ObjectIdentifier(node.root)
+                    if let previousRoot = enqueued[identity] {
+                        guard previousRoot == rootIdentity else {
+                            throw NativeWorkspacePageCaptureFailure("Projects public child was advertised by both exact scrollers")
+                        }
+                        continue
+                    }
+                    guard pending.count < 64 else {
+                        throw NativeWorkspacePageCaptureFailure("Projects advertisement exceeded its total 64-object bound")
+                    }
+                    enqueued[identity] = rootIdentity
+                    pending.append((child, node.root, node.axis, node.depth + 1))
+                }
+                try put(["observation_finished_uptime": ProcessInfo.processInfo.systemUptime,
+                         "metadata_complete": true], in: slot)
+                try requireOwner(); cursor += 1
+            }
+            try requireOwner()
+            let completed = ProcessInfo.processInfo.systemUptime
+            guard completed < boundedObservationDeadline else {
+                throw NativeWorkspacePageCaptureFailure("Projects advertisement completion sample crossed its 0.5-second deadline")
+            }
+            report["observation_completed_uptime"] = completed
+            report["observation_within_deadline"] = true
+            observationDeadline = nil
+            stage = "final-storage-and-isolation"
+            let fresh = NativeWorkspacePreferences(knownPanelIDsByView: NativeWorkspaceCatalog.knownPanelIDsByView,
+                panelSizeBoundsByView: NativeWorkspaceCatalog.sizeBoundsByView, defaults: owned.defaults)
+            let mutations = await owned.client.mutationNames()
+            guard fresh.restorationError == nil, fresh.collection == baseline,
+                  owned.defaults.data(forKey: NativeWorkspacePreferences.storageKey) == beforeBytes,
+                  mutations.isEmpty, owned.model.app == nil, owned.model.manager == nil,
+                  owned.model.remoteManager == nil, !owned.model.hasLoadedInitialSettings else {
+                throw NativeWorkspacePageCaptureFailure("Projects advertisement fresh storage/fixture isolation proof failed")
+            }
+            try requireOwner()
+            report["same_panel_hosts_and_panel_frames"] = true
+            report["same_target_control_frame_and_bounds"] = true
+            report["same_inner_hosting_view_identities"] = true
+            report["same_clip_and_document_visible_rect"] = true
+            report["complete_preferences_and_bytes_unchanged"] = true
+            report["fresh_preferences_restoration_unchanged"] = true; report["fixture_mutations"] = mutations
+            report["target_center_visible_after"] = document.visibleRect.contains(target)
+            stage = "complete"; report["execution_completed"] = true
+            try capturePhysicalCache(owned, expectedContentSize: expectedContentSize, name: "projects-native-scroller-advertisements-after")
+            try requireOwner(); try retainReport("after")
+        } catch {
+            report["execution_completed"] = false
+            report["original_error"] = scrollerActionBoundedString(String(reflecting: error), bytes: 2_048)
+            report["original_error_type"] = scrollerActionBoundedString(String(reflecting: type(of: error)), bytes: 256)
+            report["failure_uptime"] = ProcessInfo.processInfo.systemUptime
+            report["failure_cache_attempted"] = self.physicalCachePresentationIsReady(owned, expectedContentSize: expectedContentSize)
+            if self.physicalCachePresentationIsReady(owned, expectedContentSize: expectedContentSize) {
+                do { try capturePhysicalCache(owned, expectedContentSize: expectedContentSize, name: "projects-native-scroller-advertisements-failed-diagnostic") }
+                catch { report["failure_cache_error"] = scrollerActionBoundedString(String(reflecting: error), bytes: 2_048) }
+            }
+            do { try retainReport("failed-diagnostic") }
+            catch { XCTFail("Could not retain bounded Projects advertisement diagnostic: \(scrollerActionBoundedString(String(reflecting: error), bytes: 2_048))") }
+            throw error
+        }
+    }
+
+
+    private func scrollerActionBoundedString(_ value: String, bytes maximumBytes: Int) -> String {
+        var prefix = Array(value.utf8.prefix(maximumBytes))
+        // A Swift string has valid UTF8; at most three tail bytes can split one scalar.
+        for _ in 0..<4 {
+            if let result = String(bytes: prefix, encoding: .utf8) { return result }
+            guard !prefix.isEmpty else { return "" }
+            prefix.removeLast()
+        }
+        return ""
+    }
+
+    private func nativeProjectsScrollerActions(_ layout: NativeWorkspaceLayout,
+                                               in owned: NativeWorkspacePageCaptureFixture,
+                                               expectedContentSize: NSSize,
+                                               deadline: TimeInterval) async throws {
+        var stage = "owner", actions: [[String: Any]] = [], invoked = 0
+        var report: [String: Any] = [
+            "classification": "Exact isolated Projects outer NSScroller semantic action and native geometry experiment; XCTest outcome determines qualification",
+            "view_id": "projects", "target_identifier": "workspace-resize-projects-summary",
+            "viewport": scrollerActionBoundedString(NSStringFromSize(expectedContentSize), bytes: 512), "execution_completed": false,
+            "maximum_actions": 64, "case_deadline_uptime": deadline, "maximum_case_seconds": 45,
+            "maximum_action_settle_seconds": 0.5, "poll_milliseconds": 20,
+            "direct_scroll_fallback": false, "pointer_input": false,
+            "application_active": NSApp.isActive, "window_key": owned.window.isKeyWindow,
+        ]
+        func retainReport(_ suffix: String) throws {
+            report["last_stage"] = scrollerActionBoundedString(stage, bytes: 128); report["action_attempts"] = actions
+            report["invoked_actions"] = invoked; report["within_case_deadline"] = ProcessInfo.processInfo.systemUptime < deadline
+            let data = try JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys])
+            guard actions.count <= 64, data.count <= 512 * 1_024 else {
+                throw NativeWorkspacePageCaptureFailure("Projects scroller receipt exceeded its row/JSON byte bound")
+            }
+            let receiptName = "projects-native-scroller-actions-" + suffix
+            let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+            attachment.name = receiptName; attachment.lifetime = .keepAlways; add(attachment)
+            try directEvidence.save(data, name: receiptName, extension: "json")
+        }
+        do {
+            guard ProcessInfo.processInfo.systemUptime < deadline, layout.viewID == "projects",
+                  owned.route.page == .projects, layout.panels.count > 0, layout.panels.count <= 64,
+                  layout.panels.allSatisfy(\.isVisible) else {
+                throw NativeWorkspacePageCaptureFailure("Projects scroller exact all-visible layout or case deadline is absent")
+            }
+            let documents = nativeViews(owned.hosting).compactMap { $0 as? NativeWorkspaceDocumentView }
+            guard documents.count == 1, let document = documents.first,
+                  let scroll = document.enclosingScrollView, scroll.documentView === document,
+                  document.superview === scroll.contentView, document.isFlipped,
+                  scroll.hasHorizontalScroller, scroll.hasVerticalScroller,
+                  let horizontal = scroll.horizontalScroller, let vertical = scroll.verticalScroller,
+                  horizontal !== vertical, let panel = document.panelHosts["projects-summary"] else {
+                throw NativeWorkspacePageCaptureFailure("Projects scroller exact native document/panel/scrollers are absent")
+            }
+            let identities = document.panelHosts.mapValues { ObjectIdentifier($0) }
+            let documentFrame = document.frame, documentBounds = document.bounds
+            let canvasSize = NSSize(width: layout.canvas.width, height: layout.canvas.height)
+            let panelFrames = document.panelHosts.mapValues(\.frame)
+            let hostingIdentities = document.panelHosts.mapValues { ObjectIdentifier($0.hostingView) }
+            guard Set(identities.keys) == Set(layout.panels.map(\.id)),
+                  documentFrame.size == canvasSize, documentBounds.origin == .zero,
+                  documentBounds.size == canvasSize, layout.panels.allSatisfy({ placement in
+                    document.panelHosts[placement.id]?.frame == NSRect(x: placement.frame.x, y: placement.frame.y,
+                        width: placement.frame.width, height: placement.frame.height)
+                  }) else {
+                throw NativeWorkspacePageCaptureFailure("Projects scroller catalog membership/frames/canvas differ from its layout")
+            }
+            panel.layoutSubtreeIfNeeded()
+            let matches = nativeViews(panel).filter { $0.accessibilityIdentifier() == "workspace-resize-projects-summary" }
+            guard matches.count == 1, let control = matches.first,
+                  control.superview === panel, control.window === owned.window,
+                  !control.isHiddenOrHasHiddenAncestor, control.bounds.width >= 8, control.bounds.height >= 8 else {
+                throw NativeWorkspacePageCaptureFailure("Projects scroller unique resize control is absent")
+            }
+            let controlFrame = control.frame, controlBounds = control.bounds
+            let targetBounds = document.convert(control.bounds, from: control)
+            let target = NSRect(x: targetBounds.midX - 4, y: targetBounds.midY - 4, width: 8, height: 8)
+            let baseline = owned.preferences.collection
+            let beforeBytes = try XCTUnwrap(owned.defaults.data(forKey: NativeWorkspacePreferences.storageKey))
+            guard beforeBytes.count <= NativeWorkspaceLimits.maximumStoredBytes,
+                  try JSONDecoder().decode(NativeWorkspaceCollection.self, from: beforeBytes) == baseline,
+                  owned.preferences.activeLayout(for: "projects") == layout,
+                  [targetBounds.minX, targetBounds.minY, targetBounds.width, targetBounds.height].allSatisfy({ $0.isFinite }),
+                  document.bounds.contains(target) else {
+                throw NativeWorkspacePageCaptureFailure("Projects scroller baseline storage/layout/control geometry is invalid")
+            }
+            func parentChain(_ view: NSView, to owner: NSView) throws -> [String] {
+                var current: NSView? = view, seen = Set<ObjectIdentifier>(), types: [String] = []
+                while let next = current {
+                    guard types.count < 64, seen.insert(ObjectIdentifier(next)).inserted,
+                          next.window === owned.window, ProcessInfo.processInfo.systemUptime < deadline else {
+                        throw NativeWorkspacePageCaptureFailure("Projects scroller parent chain exceeded its bound or exact window")
+                    }
+                    types.append(scrollerActionBoundedString(String(reflecting: type(of: next)), bytes: 256))
+                    if next === owner { return types }
+                    current = next.superview
+                }
+                throw NativeWorkspacePageCaptureFailure("Projects scroller parent chain did not reach its exact native owner")
+            }
+            func requireOwner() throws {
+                try Task.checkCancellation()
+                guard ProcessInfo.processInfo.systemUptime < deadline,
+                      self.physicalCachePresentationIsReady(owned, expectedContentSize: expectedContentSize),
+                      owned.route.page == .projects, document.window === owned.window,
+                      scroll.window === owned.window, document.enclosingScrollView === scroll,
+                      scroll.documentView === document, document.superview === scroll.contentView,
+                      document.frame == documentFrame, document.frame.size == canvasSize,
+                      document.bounds == documentBounds, document.bounds.origin == .zero,
+                      document.bounds.size == canvasSize,
+                      scroll.horizontalScroller === horizontal, scroll.verticalScroller === vertical,
+                      document.panelHosts.mapValues({ ObjectIdentifier($0) }) == identities,
+                      document.panelHosts.mapValues(\.frame) == panelFrames,
+                      document.panelHosts.mapValues({ ObjectIdentifier($0.hostingView) }) == hostingIdentities,
+                      panel.superview === document, !panel.isHiddenOrHasHiddenAncestor,
+                      control.superview === panel, control.window === owned.window,
+                      !control.isHiddenOrHasHiddenAncestor, control.frame == controlFrame, control.bounds == controlBounds,
+                      document.convert(control.bounds, from: control) == targetBounds,
+                      owned.preferences.collection == baseline,
+                      owned.defaults.data(forKey: NativeWorkspacePreferences.storageKey) == beforeBytes else {
+                    throw NativeWorkspacePageCaptureFailure("Projects scroller owner/frame/preferences changed or its case deadline elapsed")
+                }
+                _ = try parentChain(horizontal, to: scroll); _ = try parentChain(vertical, to: scroll)
+                _ = try parentChain(scroll, to: owned.hosting)
+                guard ProcessInfo.processInfo.systemUptime < deadline else {
+                    throw NativeWorkspacePageCaptureFailure("Projects scroller case deadline elapsed during ownership validation")
+                }
+            }
+            func scrollerMetadata(_ scroller: NSScroller) -> [String: Any] {
+                ["type": scrollerActionBoundedString(String(reflecting: type(of: scroller)), bytes: 256),
+                 "role": scroller.accessibilityRole().map { scrollerActionBoundedString($0.rawValue, bytes: 128) as Any } ?? NSNull(),
+                 "orientation_raw": scroller.accessibilityOrientation().rawValue,
+                 "enabled": scroller.isEnabled, "accessibility_enabled": scroller.isAccessibilityEnabled(),
+                 "hidden_or_hidden_ancestor": scroller.isHiddenOrHasHiddenAncestor,
+                 "increment_selector_allowed": scroller.isAccessibilitySelectorAllowed(NSSelectorFromString("accessibilityPerformIncrement")),
+                 "decrement_selector_allowed": scroller.isAccessibilitySelectorAllowed(NSSelectorFromString("accessibilityPerformDecrement"))]
+            }
+            try requireOwner()
+            let initialVisible = document.visibleRect
+            report["initial_document_visible"] = scrollerActionBoundedString(NSStringFromRect(initialVisible), bytes: 512)
+            report["document_bounds"] = scrollerActionBoundedString(NSStringFromRect(document.bounds), bytes: 512)
+            report["control_bounds_in_document"] = scrollerActionBoundedString(NSStringFromRect(targetBounds), bytes: 512)
+            report["target_center_rect"] = scrollerActionBoundedString(NSStringFromRect(target), bytes: 512)
+            report["horizontal_scroller"] = scrollerMetadata(horizontal)
+            report["vertical_scroller"] = scrollerMetadata(vertical)
+            report["horizontal_parent_chain"] = try parentChain(horizontal, to: scroll)
+            report["vertical_parent_chain"] = try parentChain(vertical, to: scroll)
+            report["outer_scroll_parent_chain"] = try parentChain(scroll, to: owned.hosting)
+            report["stored_bytes"] = beforeBytes.count; report["baseline_layout_count"] = baseline.layouts.count
+            stage = "initial-offscreen-prerequisite"
+            guard target.minX > initialVisible.maxX, target.minY > initialVisible.maxY else {
+                throw NativeWorkspacePageCaptureFailure("Projects resize center is not initially beyond both right and lower viewport edges")
+            }
+            try retainReport("before")
+            try capturePhysicalCache(owned, expectedContentSize: expectedContentSize, name: "projects-native-scroller-actions-before")
+            try requireOwner()
+            for (axis, scroller) in [("horizontal", horizontal), ("vertical", vertical)] {
+                func axisContainsTarget() -> Bool {
+                    let visible = document.visibleRect
+                    return axis == "horizontal" ? visible.minX <= target.minX && visible.maxX >= target.maxX
+                        : visible.minY <= target.minY && visible.maxY >= target.maxY
+                }
+                while !axisContainsTarget() {
+                    try requireOwner()
+                    guard actions.count < 64 else {
+                        throw NativeWorkspacePageCaptureFailure("Projects scroller exhausted its total 64-action budget")
+                    }
+                    let before = scroll.contentView.bounds
+                    guard [before.minX, before.minY, before.width, before.height].allSatisfy({ $0.isFinite }),
+                          before.width > 0, before.height > 0 else {
+                        throw NativeWorkspacePageCaptureFailure("Projects scroller pre-action clip geometry is invalid")
+                    }
+                    let slot = actions.count
+                    stage = axis + ".attempt-\(slot + 1)"
+                    let allowed = scroller.isAccessibilitySelectorAllowed(NSSelectorFromString("accessibilityPerformIncrement"))
+                    actions.append(["axis": axis, "attempt": slot + 1, "action": "accessibilityPerformIncrement",
+                        "selector_allowed": allowed, "invoked": false, "actual_return": NSNull(),
+                        "attempt_uptime": ProcessInfo.processInfo.systemUptime,
+                        "before_clip_bounds": scrollerActionBoundedString(NSStringFromRect(before), bytes: 512), "scroller": scrollerMetadata(scroller),
+                        "outcome": "selector-observed"])
+                    defer {
+                        actions[slot]["after_clip_bounds"] = scrollerActionBoundedString(NSStringFromRect(scroll.contentView.bounds), bytes: 512)
+                        actions[slot]["after_document_visible"] = scrollerActionBoundedString(NSStringFromRect(document.visibleRect), bytes: 512)
+                        actions[slot]["axis_target_visible_after"] = axisContainsTarget()
+                        actions[slot]["finished_uptime"] = ProcessInfo.processInfo.systemUptime
+                    }
+                    guard allowed else {
+                        actions[slot]["outcome"] = "selector-denied"
+                        throw NativeWorkspacePageCaptureFailure("Projects \(axis) scroller does not permit the public increment selector")
+                    }
+                    guard scroller.accessibilityRole() == .scrollBar,
+                          scroller.accessibilityOrientation() == (axis == "horizontal" ? .horizontal : .vertical),
+                          scroller.isEnabled, scroller.isAccessibilityEnabled() else {
+                        actions[slot]["outcome"] = "runtime-role-or-orientation-or-enabled-prerequisite-failed"
+                        throw NativeWorkspacePageCaptureFailure("Projects \(axis) scroller runtime role/orientation/enabled prerequisite failed")
+                    }
+                    do { try requireOwner() }
+                    catch {
+                        actions[slot]["outcome"] = "dispatch-owner-or-deadline-failed"
+                        throw error
+                    }
+                    actions[slot]["invoked"] = true; invoked += 1
+                    actions[slot]["dispatch_uptime"] = ProcessInfo.processInfo.systemUptime
+                    let returned = scroller.accessibilityPerformIncrement()
+                    actions[slot]["actual_return"] = returned
+                    actions[slot]["returned_uptime"] = ProcessInfo.processInfo.systemUptime
+                    actions[slot]["outcome"] = returned ? "returned-true-awaiting-progress" : "returned-false"
+                    guard returned else {
+                        throw NativeWorkspacePageCaptureFailure("Projects \(axis) scroller public increment returned false")
+                    }
+                    let settleDeadline = min(deadline, ProcessInfo.processInfo.systemUptime + 0.5)
+                    actions[slot]["settle_deadline_uptime"] = settleDeadline
+                    var progressed = false
+                    while ProcessInfo.processInfo.systemUptime < settleDeadline {
+                        try requireOwner(); owned.hosting.layoutSubtreeIfNeeded(); try requireOwner()
+                        let after = scroll.contentView.bounds
+                        guard [after.minX, after.minY, after.width, after.height].allSatisfy({ $0.isFinite }),
+                              abs(after.width - before.width) <= 0.1, abs(after.height - before.height) <= 0.1 else {
+                            actions[slot]["outcome"] = "invalid-or-resized-clip"
+                            throw NativeWorkspacePageCaptureFailure("Projects scroller changed to invalid or resized clip geometry")
+                        }
+                        let delta = axis == "horizontal" ? after.minX - before.minX : after.minY - before.minY
+                        let otherDelta = axis == "horizontal" ? after.minY - before.minY : after.minX - before.minX
+                        guard delta.isFinite, otherDelta.isFinite else {
+                            actions[slot]["outcome"] = "nonfinite-clip-delta"
+                            throw NativeWorkspacePageCaptureFailure("Projects scroller clip delta is nonfinite")
+                        }
+                        actions[slot]["observed_axis_delta"] = delta; actions[slot]["observed_other_axis_delta"] = otherDelta
+                        guard delta >= -0.1, abs(otherDelta) <= 0.1 else {
+                            actions[slot]["outcome"] = "opposite-or-other-axis-movement"
+                            throw NativeWorkspacePageCaptureFailure("Projects scroller moved in an unexpected axis/direction")
+                        }
+                        let sampleUptime = ProcessInfo.processInfo.systemUptime
+                        actions[slot]["progress_sample_uptime"] = sampleUptime
+                        guard sampleUptime < settleDeadline else {
+                            actions[slot]["outcome"] = "settle-sample-deadline-exceeded"
+                            throw NativeWorkspacePageCaptureFailure("Projects scroller progress sample crossed its 0.5-second settle deadline")
+                        }
+                        if delta > 0.1 { progressed = true; break }
+                        try await Task.sleep(for: .milliseconds(20))
+                    }
+                    guard progressed, ProcessInfo.processInfo.systemUptime < deadline else {
+                        actions[slot]["outcome"] = "stationary-or-deadline"
+                        throw NativeWorkspacePageCaptureFailure("Projects \(axis) scroller did not progress within its 0.5-second settle bound")
+                    }
+                    actions[slot]["outcome"] = "progress-observed"; try requireOwner()
+                }
+            }
+            stage = "final-center-and-storage"
+            try requireOwner()
+            let fresh = NativeWorkspacePreferences(knownPanelIDsByView: NativeWorkspaceCatalog.knownPanelIDsByView,
+                panelSizeBoundsByView: NativeWorkspaceCatalog.sizeBoundsByView, defaults: owned.defaults)
+            let mutations = await owned.client.mutationNames()
+            guard document.visibleRect.contains(target), invoked > 0, invoked <= 64,
+                  actions.contains(where: { $0["axis"] as? String == "horizontal" && $0["outcome"] as? String == "progress-observed" }),
+                  actions.contains(where: { $0["axis"] as? String == "vertical" && $0["outcome"] as? String == "progress-observed" }),
+                  owned.hosting.hitTest(document.convert(NSPoint(x: target.midX, y: target.midY), to: owned.hosting.superview)) === control,
+                  fresh.restorationError == nil, fresh.collection == baseline,
+                  owned.defaults.data(forKey: NativeWorkspacePreferences.storageKey) == beforeBytes,
+                  mutations.isEmpty, owned.model.app == nil, owned.model.manager == nil,
+                  owned.model.remoteManager == nil, !owned.model.hasLoadedInitialSettings else {
+                throw NativeWorkspacePageCaptureFailure("Projects scroller final hit-test/fresh storage/fixture isolation proof failed")
+            }
+            try requireOwner()
+            report["final_document_visible"] = scrollerActionBoundedString(NSStringFromRect(document.visibleRect), bytes: 512)
+            report["target_center_visible"] = true; report["exact_control_hit_test"] = true
+            report["same_panel_hosts_and_panel_frames"] = true
+            report["same_target_control_frame_and_bounds"] = true
+            report["same_inner_hosting_view_identities"] = true
+            report["complete_preferences_and_bytes_unchanged"] = true
+            report["fresh_preferences_restoration_unchanged"] = true; report["fixture_mutations"] = mutations
+            stage = "complete"; report["execution_completed"] = true
+            try capturePhysicalCache(owned, expectedContentSize: expectedContentSize, name: "projects-native-scroller-actions-after")
+            try requireOwner(); try retainReport("after")
+        } catch {
+            report["execution_completed"] = false
+            report["original_error"] = scrollerActionBoundedString(String(reflecting: error), bytes: 2_048)
+            report["original_error_type"] = scrollerActionBoundedString(String(reflecting: type(of: error)), bytes: 256)
+            report["failure_cache_attempted"] = self.physicalCachePresentationIsReady(owned, expectedContentSize: expectedContentSize)
+            if self.physicalCachePresentationIsReady(owned, expectedContentSize: expectedContentSize) {
+                do { try capturePhysicalCache(owned, expectedContentSize: expectedContentSize, name: "projects-native-scroller-actions-failed-diagnostic") }
+                catch { report["failure_cache_error"] = scrollerActionBoundedString(String(reflecting: error), bytes: 2_048) }
+            }
+            do { try retainReport("failed-diagnostic") }
+            catch { XCTFail("Could not retain bounded Projects scroller diagnostic: \(scrollerActionBoundedString(String(reflecting: error), bytes: 2_048))") }
+            throw error
+        }
     }
 
     private func nativeScrollReachability(_ layout: NativeWorkspaceLayout,
@@ -2138,6 +2944,19 @@ private final class NativeWorkspacePageCaptureAXScope {
     private var exportedWindow: AXUIElement?
     private(set) var diagnosticProgress: [String: Any] = [:]
 
+    // Records are local to one walk; only its bounded caught-node witnesses survive until reporting.
+    private struct CopiedChildRecord {
+        let parentRecordIndex: Int?
+        let copiedChildIndex: Int?
+        var completedMetadata: [String: Any]?
+    }
+    private struct CopiedChildFailureWitness {
+        let reference: AXUIElement
+        let ancestorReferences: [AXUIElement]
+        let copiedChildIndices: [Int]
+    }
+    private var copiedChildFailureWitness: CopiedChildFailureWitness?
+
     init(window: NSWindow, hosting: NSView) {
         self.window = window; self.hosting = hosting; title = window.title
     }
@@ -2378,12 +3197,245 @@ private final class NativeWorkspacePageCaptureAXScope {
         return zoom
     }
 
+    private static func cachedMetadataText(_ text: String?) -> Any {
+        guard let text else { return NSNull() }
+        var bytes = Array(text.utf8.prefix(128))
+        while !bytes.isEmpty {
+            if let decoded = String(bytes: bytes, encoding: .utf8) { return decoded }
+            bytes.removeLast()
+        }
+        return ""
+    }
+
+    private func retainCopiedChildFailureContext(records: [CopiedChildRecord], seen: [AXUIElement],
+                                                 currentRecordIndex: Int?) {
+        // This describes copied AXChildren edges only; it makes no additional AX query.
+        diagnosticProgress["copied_child_failure_context"] = [
+            "available": false,
+            "classification": "No active bounded copied-child record at the fatal traversal exit; original progress/error remain authoritative",
+        ]
+        guard let currentRecordIndex, records.count == seen.count, records.count <= 4_096,
+              records.indices.contains(currentRecordIndex) else { return }
+        var reverseLineage: [Int] = [], cursor = currentRecordIndex
+        while reverseLineage.count < 65 {
+            guard records.indices.contains(cursor), seen.indices.contains(cursor) else { return }
+            reverseLineage.append(cursor)
+            guard let parent = records[cursor].parentRecordIndex else { break }
+            guard parent >= 0, parent < cursor else { return }
+            cursor = parent
+        }
+        guard let root = reverseLineage.last, root == 0,
+              records[root].parentRecordIndex == nil, records[root].copiedChildIndex == nil else { return }
+        let lineage = Array(reverseLineage.reversed())
+        var copiedChildIndices: [Int] = []
+        for index in lineage.dropFirst() {
+            guard let childIndex = records[index].copiedChildIndex, childIndex >= 0,
+                  childIndex < 4_096 else { return }
+            copiedChildIndices.append(childIndex)
+        }
+        guard copiedChildIndices.count <= 64 else { return }
+        let ancestors = Array(lineage.dropLast())
+        let exportedAncestors = ancestors.suffix(8).map { index -> [String: Any] in
+            ["run_local_record_index": index,
+             "copied_child_index": records[index].copiedChildIndex.map { $0 as Any } ?? NSNull(),
+             "metadata_completed": records[index].completedMetadata != nil,
+             "completed_metadata": records[index].completedMetadata.map { $0 as Any } ?? NSNull()]
+        }
+        diagnosticProgress["copied_child_failure_context"] = [
+            "available": true,
+            "classification": "Cached original AXChildren copy lineage for the node active when traversal threw; not an observed AXParent chain or a child identity/cause diagnosis",
+            "current_run_local_record_index": currentRecordIndex,
+            "parent_run_local_record_index": records[currentRecordIndex].parentRecordIndex.map { $0 as Any } ?? NSNull(),
+            "copied_child_index_path": copiedChildIndices,
+            "copied_child_index_path_complete_to_exported_root": true,
+            "copied_child_indices_are_zero_based": true,
+            "current_metadata_completed": records[currentRecordIndex].completedMetadata != nil,
+            "current_completed_metadata": records[currentRecordIndex].completedMetadata.map { $0 as Any } ?? NSNull(),
+            "metadata_source": "Only already-returned complete metadata calls; partial current metadata remains solely in original progress",
+            "metadata_field_UTF8_byte_limit": 128,
+            "cached_record_count": records.count, "cached_record_limit": 4_096,
+            "copied_lineage_edge_limit": 64,
+            "copied_ancestor_count": ancestors.count,
+            "nearest_ancestor_metadata_root_ordered": exportedAncestors,
+            "ancestor_metadata_export_limit": 8,
+            "ancestor_metadata_export_complete": ancestors.count <= 8,
+        ]
+        copiedChildFailureWitness = .init(reference: seen[currentRecordIndex],
+            ancestorReferences: ancestors.map { seen[$0] }, copiedChildIndices: copiedChildIndices)
+    }
+
+    func typedZoomPostFailureRelationships(comparedTo fresh: NativeWorkspacePageCaptureAXScope,
+        deadline: TimeInterval, requiredIdentifiers: Set<String>, ownerUnchanged: @MainActor () -> Bool) -> [String: Any] {
+        let started = ProcessInfo.processInfo.systemUptime
+        let savedProgress = diagnosticProgress
+        defer { diagnosticProgress = savedProgress }
+        diagnosticProgress = [:]
+        let originalWitness = copiedChildFailureWitness, freshWitness = fresh.copiedChildFailureWitness
+        var report: [String: Any] = [
+            "classification": "Post-failure typed public Zoom reference diagnostic only; no query to retained caught children, traversal replacement, stable identity, provider/native class or cause inference",
+            "typed_zoom_validation_completed": false,
+            "original_caught_node_reference_available": originalWitness != nil,
+            "fresh_caught_node_reference_available": freshWitness != nil,
+            "copied_ancestor_comparison_limit_per_scope": 64,
+            "parent_edge_limit_per_reference": 64,
+            "uses_existing_diagnostic_deadline": true,
+            "expected_own_pid": pid,
+        ]
+        func diagnosticCheck() throws {
+            try check(deadline)
+            _ = try fresh.ownedWindow()
+            guard ownerUnchanged(), window === fresh.window, hosting === fresh.hosting, pid == fresh.pid else {
+                throw NativeWorkspacePageCaptureFailure("Typed Zoom diagnostic lost its original route/layout/geometry or exact native owners")
+            }
+        }
+        func rejectCaughtChild(_ reference: AXUIElement) throws {
+            guard !(originalWitness.map { CFEqual(reference, $0.reference) } ?? false),
+                  !(freshWitness.map { CFEqual(reference, $0.reference) } ?? false) else {
+                throw NativeWorkspacePageCaptureFailure("Typed Zoom diagnostic refused an extra query to a retained caught child")
+            }
+        }
+        func checkedPrepare(_ reference: AXUIElement) throws {
+            try diagnosticCheck(); try rejectCaughtChild(reference)
+            try prepare(reference, deadline: deadline)
+            try diagnosticCheck()
+        }
+        func checkedAttribute(_ reference: AXUIElement, _ name: String) throws -> CFTypeRef? {
+            try diagnosticCheck(); try rejectCaughtChild(reference)
+            let value = try attribute(reference, name, deadline: deadline)
+            try diagnosticCheck()
+            return value
+        }
+        func checkedString(_ reference: AXUIElement, _ name: String) throws -> String? {
+            guard let value = try checkedAttribute(reference, name) else { return nil }
+            guard let text = value as? String else {
+                throw NativeWorkspacePageCaptureFailure("Typed Zoom diagnostic attribute was not a string")
+            }
+            return text
+        }
+        func parentEdgesToRoot(_ reference: AXUIElement, root: AXUIElement) throws -> Int {
+            try checkedPrepare(reference)
+            var current = reference, seen: [AXUIElement] = [reference], edges = 0
+            while !CFEqual(current, root) {
+                try diagnosticCheck()
+                guard edges < 64, let raw = try checkedAttribute(current, kAXParentAttribute),
+                      CFGetTypeID(raw) == AXUIElementGetTypeID() else {
+                    throw NativeWorkspacePageCaptureFailure("Typed Zoom diagnostic parent chain lacked a typed reference within 64 edges")
+                }
+                let parent = raw as! AXUIElement
+                try checkedPrepare(parent)
+                guard !seen.contains(where: { CFEqual($0, parent) }) else {
+                    throw NativeWorkspacePageCaptureFailure("Typed Zoom diagnostic parent chain repeated before its exact owned root")
+                }
+                seen.append(parent); current = parent; edges += 1
+            }
+            try diagnosticCheck()
+            return edges
+        }
+        func relationships(_ zoom: AXUIElement, witness: CopiedChildFailureWitness?) throws -> [String: Any] {
+            guard let witness else { return ["available": false] }
+            guard witness.ancestorReferences.count <= 64, witness.copiedChildIndices.count <= 64 else {
+                throw NativeWorkspacePageCaptureFailure("Typed Zoom diagnostic cached witness exceeded its existing bound")
+            }
+            return [
+                "available": true, "caught_reference_CFEqual_zoom": CFEqual(witness.reference, zoom),
+                "copied_child_index_path": witness.copiedChildIndices,
+                "root_first_copied_ancestor_CFEqual_zoom": witness.ancestorReferences.map { CFEqual($0, zoom) },
+                "comparison_count": witness.ancestorReferences.count + 1,
+                "classification": "Equality to retained copied-child positions; these positions are not an observed AXParent chain of the caught child",
+            ]
+        }
+        do {
+            try diagnosticCheck()
+            guard originalWitness != nil, let root = exportedWindow, let freshRoot = fresh.exportedWindow,
+                  CFEqual(root, freshRoot) else {
+                throw NativeWorkspacePageCaptureFailure("Typed Zoom diagnostic requires retained caught context and equal exact original/fresh owned roots")
+            }
+            report["original_fresh_exported_roots_CFEqual"] = true
+            guard let rawZoom = try checkedAttribute(root, kAXZoomButtonAttribute),
+                  CFGetTypeID(rawZoom) == AXUIElementGetTypeID() else {
+                throw NativeWorkspacePageCaptureFailure("Typed Zoom diagnostic lacks a typed public Zoom reference")
+            }
+            let zoom = rawZoom as! AXUIElement
+            report["zoom_parent_edges_to_exact_root"] = try parentEdgesToRoot(zoom, root: root)
+            let role = try checkedString(zoom, kAXRoleAttribute)
+            let subrole = try checkedString(zoom, kAXSubroleAttribute)
+            report["zoom_role"] = Self.cachedMetadataText(role)
+            report["zoom_subrole"] = Self.cachedMetadataText(subrole)
+            guard role == kAXButtonRole, let subrole,
+                  subrole == kAXZoomButtonSubrole || subrole == kAXFullScreenButtonSubrole else {
+                throw NativeWorkspacePageCaptureFailure("Typed Zoom diagnostic requires an owned standard Zoom/Full Screen AXButton")
+            }
+            if subrole == kAXFullScreenButtonSubrole {
+                guard let rawFullScreen = try checkedAttribute(root, kAXFullScreenButtonAttribute),
+                      CFGetTypeID(rawFullScreen) == AXUIElementGetTypeID() else {
+                    throw NativeWorkspacePageCaptureFailure("Typed Zoom diagnostic lacks a typed public Full Screen reference")
+                }
+                let fullScreen = rawFullScreen as! AXUIElement
+                report["full_screen_parent_edges_to_exact_root"] = try parentEdgesToRoot(fullScreen, root: root)
+                let fullScreenMatches = CFEqual(fullScreen, zoom)
+                report["full_screen_reference_CFEqual_zoom"] = fullScreenMatches
+                guard fullScreenMatches else {
+                    throw NativeWorkspacePageCaptureFailure("Typed Zoom diagnostic public Full Screen and Zoom references differ")
+                }
+            }
+            let identifier = try checkedString(zoom, kAXIdentifierAttribute)
+            report["zoom_identifier"] = Self.cachedMetadataText(identifier)
+            guard identifier.map({ !requiredIdentifiers.contains($0) }) ?? true else {
+                throw NativeWorkspacePageCaptureFailure("Typed Zoom diagnostic public reference matches a requested Forge identifier")
+            }
+            try diagnosticCheck()
+            report["original_copied_reference_relationships"] = try relationships(zoom, witness: originalWitness)
+            report["fresh_copied_reference_relationships"] = try relationships(zoom, witness: freshWitness)
+            try diagnosticCheck()
+            report["typed_zoom_validation_completed"] = true
+        } catch {
+            report["post_failure_diagnostic_error"] = String(String(describing: error).prefix(4_096))
+        }
+        report["post_failure_query_progress"] = diagnosticProgress
+        report["elapsed_seconds"] = ProcessInfo.processInfo.systemUptime - started
+        report["finished_before_existing_deadline"] = ProcessInfo.processInfo.systemUptime < deadline
+        return report
+    }
+
+    func copiedFailureIdentityWitnesses(comparedTo fresh: NativeWorkspacePageCaptureAXScope) -> [String: Any] {
+        // Release both run-local reference sets after their pure comparison, before JSON retention.
+        defer { copiedChildFailureWitness = nil; fresh.copiedChildFailureWitness = nil }
+        var report: [String: Any] = [
+            "classification": "Run-local CFEqual witnesses on retained original/fresh copied-child references; no additional AX query, stable identity, AXParent proof, Zoom classification or cause inference",
+            "original_caught_node_reference_available": copiedChildFailureWitness != nil,
+            "fresh_caught_node_reference_available": fresh.copiedChildFailureWitness != nil,
+            "current_references_CFEqual": NSNull(),
+            "ancestor_comparison_limit": 64,
+            "ancestor_alignment": "Root-first copied-child positions only; matching positions are not assumed to be homologous nodes",
+            "false_witness_interpretation": "Non-equivalence does not exclude logical-control recreation",
+        ]
+        guard let original = copiedChildFailureWitness, let renewed = fresh.copiedChildFailureWitness else {
+            report["comparison_available"] = false
+            return report
+        }
+        let count = min(64, min(original.ancestorReferences.count, renewed.ancestorReferences.count))
+        report["comparison_available"] = true
+        report["current_references_CFEqual"] = CFEqual(original.reference, renewed.reference)
+        report["original_copied_child_index_path"] = original.copiedChildIndices
+        report["fresh_copied_child_index_path"] = renewed.copiedChildIndices
+        report["copied_child_index_paths_equal"] = original.copiedChildIndices == renewed.copiedChildIndices
+        report["original_copied_ancestor_count"] = original.ancestorReferences.count
+        report["fresh_copied_ancestor_count"] = renewed.ancestorReferences.count
+        report["ancestor_comparison_count"] = count
+        report["root_first_positional_ancestor_CFEqual"] = (0..<count).map {
+            CFEqual(original.ancestorReferences[$0], renewed.ancestorReferences[$0])
+        }
+        report["total_CFEqual_comparison_count"] = count + 1
+        return report
+    }
+
     func observe(deadline requestedDeadline: TimeInterval? = nil,
                  scope: NativeWorkspacePageCaptureObservationScope = .wholeWindow,
                  requiredIdentifiers: Set<String> = [],
                  frameFailure: (([String: Any]) -> Void)? = nil) throws -> [NativeWorkspacePageCaptureSemantic] {
         let deadline = min(ProcessInfo.processInfo.systemUptime + 5, requestedDeadline ?? .infinity)
         diagnosticProgress = ["visited_node_count": 0, "completed_semantic_count": 0]
+        copiedChildFailureWitness = nil
         let owned = try ownedWindow()
         let application = AXUIElementCreateApplication(pid)
         let windows = try elements(application, kAXWindowsAttribute, limit: 32, deadline: deadline)
@@ -2405,45 +3457,74 @@ private final class NativeWorkspacePageCaptureAXScope {
             excludedZoom = try validatedApplicationContentZoom(match, deadline: deadline,
                 requiredIdentifiers: requiredIdentifiers)
         } else { excludedZoom = nil }
-        var pending: [(AXUIElement, [String], Int)] = [(match, [], 0)]
+        var pending: [(AXUIElement, [String], Int, Int?, Int?)] = [(match, [], 0, nil, nil)]
         var seen: [AXUIElement] = [], result: [NativeWorkspacePageCaptureSemantic] = []
-        while let (reference, pathAncestors, depth) = pending.popLast() {
-            try check(deadline)
-            guard !seen.contains(where: { CFEqual($0, reference) }) else { continue }
-            guard seen.count < 4_096, depth <= 64 else {
-                throw NativeWorkspacePageCaptureFailure("Public AX tree exceeded its explicit node/depth bound")
-            }
-            seen.append(reference)
-            diagnosticProgress["visited_node_count"] = seen.count
-            diagnosticProgress["completed_semantic_count"] = result.count
-            diagnosticProgress["pending_node_count"] = pending.count
-            diagnosticProgress["current_node_depth"] = depth
-            diagnosticProgress["current_node_identifier"] = NSNull()
-            diagnosticProgress["current_node_role"] = NSNull()
-            let observed = try metadata(reference, deadline: deadline, frameFailure: frameFailure)
-            let identifier = observed.identifier ?? "", title = observed.title ?? "", label = observed.label ?? ""
-            let value = (observed.value as? String) ?? (observed.value as? NSNumber)?.stringValue ?? ""
-            var lineage = pathAncestors
-            for id in try ancestors(reference, deadline: deadline) where !lineage.contains(id) { lineage.append(id) }
-            guard lineage.count <= 64 else { throw NativeWorkspacePageCaptureFailure("Public AX identifier ancestry exceeded its bound") }
-            if !identifier.isEmpty || !title.isEmpty || !label.isEmpty || !value.isEmpty || observed.unknownGeometry != nil {
-                let element = NativeWorkspacePageCaptureElement.publicAX(.init(reference, metadata: observed, scope: self))
-                result.append(.init(element: element, identifier: String(identifier.prefix(128)),
-                    role: observed.role ?? "", title: String(title.prefix(512)), label: String(label.prefix(512)),
-                    value: String(value.prefix(512)), ancestors: lineage, frame: observed.frame,
-                    exposed: nil, enabled: observed.enabled))
-            }
-            if let excludedZoom, CFEqual(reference, excludedZoom) {
-                guard !requiredIdentifiers.contains(identifier) else {
-                    throw NativeWorkspacePageCaptureFailure("The validated standard Zoom changed into a requested Forge target")
+        var copiedChildRecords: [CopiedChildRecord] = [], currentRecordIndex: Int? = nil
+        do {
+            while let (reference, pathAncestors, depth, parentRecordIndex, copiedChildIndex) = pending.popLast() {
+                currentRecordIndex = nil
+                try check(deadline)
+                guard !seen.contains(where: { CFEqual($0, reference) }) else { continue }
+                guard seen.count < 4_096, depth <= 64 else {
+                    throw NativeWorkspacePageCaptureFailure("Public AX tree exceeded its explicit node/depth bound")
                 }
-                diagnosticProgress["standard_zoom_descendant_expansion_omitted"] = true
-                continue
+                seen.append(reference)
+                if scope == .wholeWindow {
+                    currentRecordIndex = copiedChildRecords.count
+                    copiedChildRecords.append(.init(parentRecordIndex: parentRecordIndex,
+                        copiedChildIndex: copiedChildIndex, completedMetadata: nil))
+                }
+                diagnosticProgress["visited_node_count"] = seen.count
+                diagnosticProgress["completed_semantic_count"] = result.count
+                diagnosticProgress["pending_node_count"] = pending.count
+                diagnosticProgress["current_node_depth"] = depth
+                diagnosticProgress["current_node_identifier"] = NSNull()
+                diagnosticProgress["current_node_role"] = NSNull()
+                let observed = try metadata(reference, deadline: deadline, frameFailure: frameFailure)
+                if let currentRecordIndex {
+                    copiedChildRecords[currentRecordIndex].completedMetadata = [
+                        "role": Self.cachedMetadataText(observed.role),
+                        "identifier": Self.cachedMetadataText(observed.identifier),
+                        "title": Self.cachedMetadataText(observed.title),
+                    ]
+                }
+                let identifier = observed.identifier ?? "", title = observed.title ?? "", label = observed.label ?? ""
+                let value = (observed.value as? String) ?? (observed.value as? NSNumber)?.stringValue ?? ""
+                var lineage = pathAncestors
+                for id in try ancestors(reference, deadline: deadline) where !lineage.contains(id) { lineage.append(id) }
+                guard lineage.count <= 64 else { throw NativeWorkspacePageCaptureFailure("Public AX identifier ancestry exceeded its bound") }
+                if !identifier.isEmpty || !title.isEmpty || !label.isEmpty || !value.isEmpty || observed.unknownGeometry != nil {
+                    let element = NativeWorkspacePageCaptureElement.publicAX(.init(reference, metadata: observed, scope: self))
+                    result.append(.init(element: element, identifier: String(identifier.prefix(128)),
+                        role: observed.role ?? "", title: String(title.prefix(512)), label: String(label.prefix(512)),
+                        value: String(value.prefix(512)), ancestors: lineage, frame: observed.frame,
+                        exposed: nil, enabled: observed.enabled))
+                }
+                if let excludedZoom, CFEqual(reference, excludedZoom) {
+                    guard !requiredIdentifiers.contains(identifier) else {
+                        throw NativeWorkspacePageCaptureFailure("The validated standard Zoom changed into a requested Forge target")
+                    }
+                    diagnosticProgress["standard_zoom_descendant_expansion_omitted"] = true
+                    continue
+                }
+                let nextAncestors = identifier.isEmpty ? pathAncestors : pathAncestors + [identifier]
+                let children = try elements(reference, kAXChildrenAttribute,
+                    limit: 4_096 - seen.count - pending.count, deadline: deadline)
+                if scope == .wholeWindow {
+                    for (childIndex, child) in children.enumerated().reversed() {
+                        pending.append((child, nextAncestors, depth + 1, currentRecordIndex, childIndex))
+                    }
+                } else {
+                    for child in children.reversed() { pending.append((child, nextAncestors, depth + 1, nil, nil)) }
+                }
+                currentRecordIndex = nil
             }
-            let nextAncestors = identifier.isEmpty ? pathAncestors : pathAncestors + [identifier]
-            let children = try elements(reference, kAXChildrenAttribute,
-                limit: 4_096 - seen.count - pending.count, deadline: deadline)
-            for child in children.reversed() { pending.append((child, nextAncestors, depth + 1)) }
+        } catch {
+            if scope == .wholeWindow {
+                retainCopiedChildFailureContext(records: copiedChildRecords, seen: seen,
+                    currentRecordIndex: currentRecordIndex)
+            }
+            throw error
         }
         try check(deadline)
         diagnosticProgress["visited_node_count"] = seen.count

@@ -46,6 +46,14 @@ Native v106 retains the 21 representative page/Manager routes through a shared q
 
 V110 passes a separate read-only application-content check across 13 pages, two sizes and four layout states (104 native PNG/JSON pairs), omitting only descendants of the freshly validated standard Zoom/FullScreen control. All 104 native caches were visually reviewed; cropping and transient differences remain recorded. V111 preserves the original whole-window failure. Content beyond the captured viewport, scrolling actions and full UI remain unqualified; new implementations stay deferred.
 
+V113 retains two failed gates beside a separate 104-phase application-content PASS: the original whole-window lookup fails at Agents restored, and an allowed horizontal scroller increment returns false before any vertical action. Cached reference equality does not establish the caught child’s identity, Zoom relationship or cause. All 104 scoped caches are accounted for by 90 exact V110 visual reuses and 14 newly inspected originals; Rig status differences and viewport crops remain recorded. Original/ordinary, scrolling, desktop/installed, lifetime and full UI gates stay open; new implementations remain deferred.
+
+A fresh current-source readback verifies the existing ordinary v8 Debug candidate’s 320 product/build inputs, seven artifacts and Info 0.44.0 (60); strict signature verification also passes. The older v6 current-source comparison fails at two UI files and remains preserved with its historical results. Candidate launch and installed operation remain unverified.
+
+V114 keeps the original whole-window and formal scroller failures, and the new read-only advertisement probe fails its receipt-byte bound with zero actions. The typed Zoom/FullScreen reference matches a copied ancestor, not the caught child; the caught child’s AXParent, native class and error cause remain unknown. The separate 104-phase application-content method passes again. These are test-only observations; scrolling, original/ordinary, desktop/installed, lifetime and full UI gates stay open, and new implementations stay deferred.
+
+V115 changes only advertisement JSON whitespace after a lossless Foundation measurement. Its native rerun still fails the unchanged half-second observation deadline, with zero actions; the probe remains unqualified.
+
 The post-naming v6 ordinary Debug build, strict signature and seven-artifact/Info 0.44.0 (60) readback passed against 320 product/build inputs. This qualifies candidate compilation and file identities; candidate launch, installed operation and full UI remain unverified. Remaining new capability implementations stay deferred. [Current gates](docs/QUALIFICATION-STATUS.md).
 
 ## Earlier UI checks before the naming repair
