@@ -12,6 +12,8 @@ Product versions do not by themselves claim shipment.
 
 ### `0.44.0 (60)` custom layouts within each view
 
+- Verify existing Tools Default menu selection and saved-layout reselection in v153/v154. Add the broader 126-placement/21-namespace queued-geometry check without changing prior tests; its pre-input presentation failures remain unresolved. V152 selected zero tests and is NONPASS. No production repair or complete UI acceptance is claimed.
+
 - Correct the Rune native-menu test driver to use and record public `NSMenu.cancelTrackingWithoutAnimation()`, retaining every assertion, owner/item/storage guard and existing deadline. V148 passes repeated Rename/Save As; v149 passes it plus both fresh naming regressions. V145/v147 original-dismissal failures remain historical. No production repair or wider UI qualification is claimed.
 
 - Fix Customize Layout name generation to use the validator’s Unicode case folding with en_US_POSIX. A saved `Cuſtom` now produces `Custom 2`, retaining all prior layouts and fresh stored restoration; the native regression passed twice, with 18 preferences and two normal Rune naming cases also passing in each invocation. Wheel host aborts keep both aggregate runs NONPASS. Fresh v123 ordinary Debug/strict signature pass (25.642/0.282 s), Info 0.44.0 (60); unchanged graph/verified source membership, candidate-only.

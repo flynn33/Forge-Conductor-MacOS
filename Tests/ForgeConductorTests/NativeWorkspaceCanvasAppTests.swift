@@ -2502,6 +2502,259 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
         return nodes
     }
 
+    func testProductionToolsExportedApplicationContentDefaultMenuPreservesAndReselectsSavedLayout() async throws {
+        let identifierRoute: ToolsSharedControlIdentifierRoute = .exportedApplicationContent
+        continueAfterFailure = true
+        let deadline = ProcessInfo.processInfo.systemUptime + 45
+        let suite = "forge.workspace.default-menu.tests.\(UUID().uuidString)"
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent("forge-workspace-default-menu-\(UUID().uuidString)")
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer {
+            defaults.removePersistentDomain(forName: suite)
+            try? FileManager.default.removeItem(at: home)
+        }
+        let preferences = NativeWorkspacePreferences(knownPanelIDsByView: NativeWorkspaceCatalog.knownPanelIDsByView,
+            panelSizeBoundsByView: NativeWorkspaceCatalog.sizeBoundsByView, defaults: defaults)
+        func seed(_ viewID: String, _ name: String) -> NativeWorkspaceLayout {
+            let panels = NativeWorkspaceCatalog.panelsByView[viewID] ?? []
+            return .init(id: UUID(), viewID: viewID, name: name,
+                canvas: .init(width: max(1_280, panels.map { $0.defaultFrame.x + $0.defaultFrame.width + 20 }.max() ?? 0),
+                              height: max(900, panels.map { $0.defaultFrame.y + $0.defaultFrame.height + 20 }.max() ?? 0)),
+                panels: panels.map { .init(id: $0.id, frame: $0.defaultFrame, isVisible: true) })
+        }
+        // Fixture setup only. Every tested layout/visibility change below is a native UI action.
+        let marker = seed("tools", "Tools marker \(UUID().uuidString)")
+        let independent = seed("diagnostics", "Independent \(UUID().uuidString)")
+        try preferences.save(marker, activate: false)
+        try preferences.save(independent)
+        var expected = preferences.collection
+        let workbench = WorkbenchPreferences(defaults: defaults)
+        let guidedMode = GuidedModeCoordinator(defaults: defaults)
+        let bootstrap = AppBootstrapOperation(factory: { throw CancellationError() }, pluginStatus: { _ in nil })
+        let model = AppModel(bootstrapOperation: bootstrap, diagnosticPaths: AppPaths(home: home))
+        model.autoRefresh = false
+        let hosting = NSHostingView(rootView: AnyView(ToolsView()
+            .environment(\.nativeWorkspacePreferences, preferences)
+            .environmentObject(model).environmentObject(workbench).environmentObject(guidedMode).graphiteWorkbench()))
+        let owned = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 1_240, height: 900),
+            styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+        owned.isReleasedWhenClosed = false
+        let ownedTitle = "Tools Default menu \(UUID().uuidString)"
+        owned.title = ownedTitle; owned.contentView = hosting
+        window = owned
+        var stage = "fixture-created", records: [[String: Any]] = [], menus: [[String: Any]] = []
+        var latestControlDiscovery: [String: Any] = [:]
+        let menuLifecycle = identifierRoute == .exportedApplicationContent
+            ? WorkspaceSharedControlsMenuLifecycleObservation(window: owned, hosting: hosting) : nil
+        defer {
+            nativeDraftRetainMeasurement(["classification": identifierRoute == .ordinary
+                    ? "Separate real Tools shared native controls route; runtime assertions determine qualification, no all-view/desktop claim"
+                    : "Separate actual Tools layout-menu Default and saved reselection; exported application-content route, no ordinary/whole-window/desktop qualification",
+                "identifier_route": identifierRoute == .ordinary ? "ordinary-native-tree" : "exported-application-content",
+                "stage": stage, "view_id": "tools", "flow_deadline_seconds": 45,
+                "stage_record_limit": 16, "records": records, "menu_record_limit": 8, "menus": menus,
+                "latest_control_discovery": latestControlDiscovery,
+                "first_native_menu_lifecycle_observation": menuLifecycle.map { $0.evidence as Any } ?? NSNull(),
+                "original_naming_whole_window_and_desktop_gates": "unchanged/open"], name: "workspace-tools-default-layout-menu")
+        }
+        defer { menuLifecycle?.stop() }
+        func close() async {
+            owned.endEditing(for: nil); _ = owned.makeFirstResponder(nil)
+            hosting.rootView = AnyView(EmptyView()); hosting.layoutSubtreeIfNeeded()
+            owned.orderOut(nil); owned.contentView = nil; owned.close(); window = nil
+            await model.stopBootstrap(); model.telemetryBinding.detach()
+        }
+        func requireOwner() throws {
+            guard ProcessInfo.processInfo.systemUptime < deadline,
+                  owned.contentView === hosting, hosting.window === owned, owned.isVisible,
+                  !hosting.isHiddenOrHasHiddenAncestor, owned.title == ownedTitle,
+                  NSApp.windows.filter({ $0.title == ownedTitle }).count == 1 else {
+                throw WorkspaceCanvasFixtureFailure("The shared controls lost their exact finite Tools window/hosting owner.")
+            }
+        }
+        func control(_ identifier: String, menu: Bool = false) async throws -> NativeWorkspaceDraftAccessibilityNode {
+            let end = min(deadline, ProcessInfo.processInfo.systemUptime + 3)
+            var progress: [String: Any] = [:]
+            defer {
+                latestControlDiscovery = progress
+                latestControlDiscovery["identifier_route"] = "exported-application-content"
+            }
+            try requireOwner()
+            let node = try await nativeDraftObserveAXElement(identifier, window: owned, hosting: hosting,
+                deadline: end, scope: .applicationContent, progress: &progress)
+            try requireOwner()
+            progress["matched_target_snapshot"] = [
+                "classification": "Cached exported target snapshot only; no new native getters or role acceptance",
+                "identifier_utf8_prefix": node.identifier.map { String(decoding: $0.utf8.prefix(256), as: UTF8.self) as Any } ?? NSNull(),
+                "role_utf8_prefix": node.role.map { String(decoding: $0.rawValue.utf8.prefix(128), as: UTF8.self) as Any } ?? NSNull(),
+                "enabled": node.enabled.map { $0 as Any } ?? NSNull(),
+                "exported_element_available": node.exportedAX != nil,
+                "exported_owner_context_available": node.exportedContext != nil,
+            ]
+            guard node.exportedAX != nil, node.exportedContext != nil, node.identifier == identifier,
+                  node.enabled == true, node.role?.rawValue == (menu ? kAXMenuButtonRole : kAXButtonRole) else {
+                throw WorkspaceCanvasFixtureFailure("Shared control is not an enabled exact exported button/menu opener.")
+            }
+            return node
+        }
+        func settled(_ message: String, _ condition: () throws -> Bool) async throws {
+            let remaining = min(3, deadline - ProcessInfo.processInfo.systemUptime)
+            guard remaining > 0 else { throw WorkspaceCanvasFixtureFailure("Shared controls exceeded their 45-second flow admission bound.") }
+            try await waitUntil(message, timeout: remaining) { try requireOwner(); hosting.layoutSubtreeIfNeeded(); return try condition() }
+        }
+        func requireState(_ label: String) throws {
+            try requireOwner()
+            let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
+            let storedBytes = try XCTUnwrap(defaults.data(forKey: NativeWorkspacePreferences.storageKey))
+            let decoded = try JSONDecoder().decode(NativeWorkspaceCollection.self, from: storedBytes)
+            XCTAssertEqual(decoded, expected)
+            let restored = NativeWorkspacePreferences(knownPanelIDsByView: NativeWorkspaceCatalog.knownPanelIDsByView,
+                panelSizeBoundsByView: NativeWorkspaceCatalog.sizeBoundsByView, defaults: defaults)
+            XCTAssertEqual(preferences.collection, expected)
+            XCTAssertEqual(defaults.data(forKey: NativeWorkspacePreferences.storageKey), try encoder.encode(expected))
+            XCTAssertNil(restored.restorationError); XCTAssertEqual(restored.collection, expected)
+            XCTAssertEqual(preferences.activeLayout(for: "diagnostics"), independent)
+            guard preferences.collection == expected, restored.collection == expected, decoded == expected,
+                  defaults.data(forKey: NativeWorkspacePreferences.storageKey) == (try encoder.encode(expected)),
+                  restored.restorationError == nil, records.count < 16 else {
+                throw WorkspaceCanvasFixtureFailure("The shared native action changed unexpected persisted state: " + label)
+            }
+            records.append(["stage": label, "complete_collection_and_bytes_exact": true,
+                "fresh_owner_restoration_exact": true, "stored_collection_decode_exact": true, "saved_layout_count": expected.layouts.count])
+        }
+        func choose(_ command: String, panels: Bool) async throws {
+            guard menus.count < 8 else { throw WorkspaceCanvasFixtureFailure("Shared native menu calls exceeded eight attempts.") }
+            let opener = try await control(panels ? "workspace-panels-menu-tools" : "workspace-layout-menu-tools", menu: true)
+            let titles = panels ? NativeWorkspaceCatalog.tools.map(\.title)
+                : ["Default"] + preferences.layouts(for: "tools").map(\.name) + ["Save Layout As…", "Rename Layout…", "Delete Layout"]
+            var states: [String: NSControl.StateValue] = [:]
+            if panels {
+                guard let layout = preferences.activeLayout(for: "tools") else { throw WorkspaceCanvasFixtureFailure("Panels requires the actual active Tools layout.") }
+                for descriptor in NativeWorkspaceCatalog.tools {
+                    states[descriptor.title] = layout.panels.first { $0.id == descriptor.id }?.isVisible == true ? .on : .off
+                }
+            }
+            let capture = WorkspaceSharedControlsMenuCapture(window: owned, hosting: hosting,
+                preferences: preferences, expectedCollection: expected, command: command, titles: titles,
+                states: states, deadline: min(deadline, ProcessInfo.processInfo.systemUptime + 3))
+            if let menuLifecycle { capture.observeLifecycle(menuLifecycle, attemptOrdinal: menus.count + 1) }
+            if identifierRoute == .exportedApplicationContent { capture.observeExactTrackingEnd() }
+            NotificationCenter.default.addObserver(capture, selector: #selector(WorkspaceSharedControlsMenuCapture.didBegin(_:)),
+                name: NSMenu.didBeginTrackingNotification, object: nil)
+            let timer = Timer(timeInterval: 0.02, target: capture, selector: #selector(WorkspaceSharedControlsMenuCapture.fire(_:)), userInfo: nil, repeats: true)
+            RunLoop.main.add(timer, forMode: .default); RunLoop.main.add(timer, forMode: .eventTracking)
+            defer { timer.invalidate(); capture.stop(); menus.append(capture.receipt) }
+            capture.armed = true
+            if identifierRoute == .exportedApplicationContent {
+                guard let element = opener.exportedAX, let context = opener.exportedContext else {
+                    throw WorkspaceCanvasFixtureFailure("The exact shared exported opener lost its owner context.")
+                }
+                try context.requireOwnedAncestor(element)
+            }
+            guard opener.identifier == (panels ? "workspace-panels-menu-tools" : "workspace-layout-menu-tools"), opener.enabled == true else {
+                throw WorkspaceCanvasFixtureFailure("The exact shared native opener changed before activation.")
+            }
+            if identifierRoute == .exportedApplicationContent {
+                guard let element = opener.exportedAX, let context = opener.exportedContext else {
+                    throw WorkspaceCanvasFixtureFailure("The exact shared exported opener lost its owner context.")
+                }
+                menuLifecycle?.noteSecondAction(returned: false, attemptOrdinal: menus.count + 1,
+                    captureDeadline: capture.deadline, actionDeadline: context.deadline)
+                try context.pressToolsMenu(element, requestedIdentifier: panels ? "workspace-panels-menu-tools" : "workspace-layout-menu-tools")
+                menuLifecycle?.noteSecondAction(returned: true, attemptOrdinal: menus.count + 1,
+                    captureDeadline: capture.deadline, actionDeadline: context.deadline)
+            } else {
+                try opener.press()
+            }
+            while !capture.isFinished {
+                guard ProcessInfo.processInfo.systemUptime < capture.deadline else { throw WorkspaceCanvasFixtureFailure("The exact shared native menu did not complete its finite action.") }
+                try await Task.sleep(for: .milliseconds(10))
+            }
+            try XCTUnwrap(capture.result).get(); try requireOwner()
+            if identifierRoute == .exportedApplicationContent {
+                while capture.exactTrackingEndedAt == nil {
+                    guard ProcessInfo.processInfo.systemUptime < capture.deadline else {
+                        throw WorkspaceCanvasFixtureFailure("The exact captured shared native menu did not report tracking end within its original deadline.")
+                    }
+                    try await Task.sleep(for: .milliseconds(10))
+                }
+                guard let endedAt = capture.exactTrackingEndedAt, endedAt < capture.deadline,
+                      ProcessInfo.processInfo.systemUptime < capture.deadline else {
+                    throw WorkspaceCanvasFixtureFailure("The exact captured shared native menu did not report tracking end within its original deadline.")
+                }
+            }
+        }
+        do {
+            try await waitUntil("The isolated Tools startup did not settle.") { !model.isBootstrapping }
+            XCTAssertNil(model.app); XCTAssertNil(model.manager); XCTAssertNil(model.remoteManager)
+            NSApp.activate(ignoringOtherApps: true); owned.makeKeyAndOrderFront(nil); owned.orderFrontRegardless()
+            try requireState("default-baseline")
+            stage = "customize"
+            let customize = try await control("workspace-customize-tools"); try customize.press()
+            try await settled("Actual Customize Layout did not select its new Tools layout.") { preferences.activeLayout(for: "tools") != nil }
+            let custom = try XCTUnwrap(preferences.activeLayout(for: "tools"))
+            XCTAssertNotEqual(custom.id, marker.id); XCTAssertNotEqual(custom.id, independent.id)
+            var seeded = seed("tools", "Custom")
+            seeded = .init(id: custom.id, viewID: seeded.viewID, name: seeded.name, canvas: seeded.canvas, panels: seeded.panels)
+            expected.layouts.append(seeded); expected.activeLayoutIDs["tools"] = custom.id
+            try requireState("customize")
+            func optionalDocument() throws -> NativeWorkspaceDocumentView? {
+                let documents = descendants(hosting).compactMap { $0 as? NativeWorkspaceDocumentView }
+                guard documents.count <= 1, documents.allSatisfy({ $0.window === owned }) else {
+                    throw WorkspaceCanvasFixtureFailure("Tools has duplicate or foreign native documents.")
+                }
+                return documents.first
+            }
+            func document() throws -> NativeWorkspaceDocumentView {
+                try XCTUnwrap(optionalDocument(), "Tools has no mounted native document.")
+            }
+            try await settled("Tools Customize did not mount all three real panels.") {
+                try optionalDocument()?.panelHosts.count == 3
+            }
+            let firstCanvas = try document()
+            let savedLayouts = expected.layouts
+            stage = "layout-menu-default"
+            try await choose("Default", panels: false)
+            expected.activeLayoutIDs["tools"] = nil
+            try await settled("Actual layout-menu Default did not dismantle Tools custom canvas.") {
+                try optionalDocument() == nil && preferences.activeLayout(for: "tools") == nil
+            }
+            guard firstCanvas.panelHosts.isEmpty, preferences.collection.layouts == savedLayouts,
+                  preferences.layouts(for: "tools").contains(where: { $0.id == custom.id && $0 == custom }) else {
+                throw WorkspaceCanvasFixtureFailure("Layout-menu Default did not dismantle the old canvas or preserve its saved layouts.")
+            }
+            try requireState(stage)
+            _ = try await control("workspace-customize-tools")
+            stage = "select-saved-after-menu-default"
+            try await choose(custom.name, panels: false)
+            expected.activeLayoutIDs["tools"] = custom.id
+            try await settled("Saved menu selection after Default did not restore all three Tools panels.") {
+                try optionalDocument()?.panelHosts.count == custom.panels.count
+                    && preferences.activeLayout(for: "tools") == custom
+            }
+            let reselectedCanvas = try document()
+            guard reselectedCanvas !== firstCanvas, reselectedCanvas.window === owned,
+                  Set(reselectedCanvas.panelHosts.keys) == Set(custom.panels.map(\.id)),
+                  reselectedCanvas.panelHosts.values.allSatisfy({ !$0.isHidden && $0.window === owned }),
+                  preferences.collection.layouts == savedLayouts else {
+                throw WorkspaceCanvasFixtureFailure("Saved menu reselection did not recreate the exact owned visible Tools canvas with unchanged saved layouts.")
+            }
+            try requireState(stage)
+            guard menus.count == 2,
+                  menus.map({ $0["actual_command"] as? String }) == ["Default", custom.name],
+                  menus.allSatisfy({ $0["native_dispatch_returned"] as? Bool == true
+                    && $0["exact_tracking_end_uptime"] != nil
+                    && $0["exact_tracking_end_observer_removed"] as? Bool == true }) else {
+                throw WorkspaceCanvasFixtureFailure("Default and saved selection did not retain both exact native commands and end/removal witnesses.")
+            }
+            stage = "completed"
+            await close()
+        } catch {
+            records.append(["stage": stage, "failure": String(String(describing: error).prefix(1_024))])
+            await close(); throw error
+        }
+    }
+
     private enum ToolsSharedControlIdentifierRoute: Equatable { case ordinary, exportedApplicationContent }
 
     func testProductionToolsNativeSharedControlsRecoverPanelsRestoreSelectAndDelete() async throws {

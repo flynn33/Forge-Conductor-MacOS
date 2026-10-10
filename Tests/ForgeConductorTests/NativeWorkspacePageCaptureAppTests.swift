@@ -861,6 +861,98 @@ final class NativeWorkspacePageCaptureAppTests: XCTestCase, @unchecked Sendable 
         }
     }
 
+    func testAllPanelsAcrossTwentyOneMountedNamespacesQueuedMoveResizePersistsGeometry() async throws {
+        let deadline = ProcessInfo.processInfo.systemUptime + 120
+        try await prepareHost()
+        var completed = Set<String>()
+        do {
+            let routes: [(NativeWorkspaceCapturePage, ManagerSettingsView.ManagementSection?)] =
+                NativeWorkspaceCapturePage.allCases.filter { $0 != .manager }.map { ($0, nil) }
+                + ManagerSettingsView.ManagementSection.allCases.map { (.manager, Optional($0)) }
+            let namespaces = routes.map { page, section in section.map { "manager." + $0.rawValue } ?? page.viewID }
+            let detailNamespaces: Set<String> = ["rune-forge.source", "rune-forge.violation", "rune-forge.feed"]
+            guard routes.count == 21, Set(namespaces).count == routes.count,
+                  Set(namespaces) == Set(NativeWorkspaceCatalog.panelsByView.keys).subtracting(detailNamespaces) else {
+                throw NativeWorkspacePageCaptureFailure("The all-panel route table omitted or duplicated a mounted namespace.")
+            }
+            let expected = Set(namespaces.flatMap { viewID in
+                (NativeWorkspaceCatalog.panelsByView[viewID] ?? []).map { viewID + "::" + $0.id }
+            })
+            guard !expected.isEmpty, expected.count <= 256 else {
+                throw NativeWorkspacePageCaptureFailure("The all-panel case exceeded its finite placement bound.")
+            }
+            for (routeIndex, route) in routes.enumerated() {
+                try Task.checkCancellation()
+                guard deadline - ProcessInfo.processInfo.systemUptime > 15 else {
+                    throw NativeWorkspacePageCaptureFailure("The all-panel case lacks bounded presentation time.")
+                }
+                let (page, section) = route
+                let viewID = namespaces[routeIndex]
+                try directEvidence.configure(testName: name + "-all-panels-" + viewID)
+                let owned = try NativeWorkspacePageCaptureFixture(contentSize: NSSize(width: 1_440, height: 900),
+                    initialManagerSection: section ?? .folders)
+                fixture = owned; owned.route.page = page
+                try await present(owned)
+                let otherID = viewID == "feed" ? "tools" : "feed"
+                let independent = try owned.customize(otherID)
+                var layout = try owned.customize(viewID)
+                layout.canvas.width += 80; layout.canvas.height += 80
+                try owned.preferences.save(layout)
+                try await requireCanvas(layout, in: owned)
+                let panelIDs = try XCTUnwrap(NativeWorkspaceCatalog.panelsByView[viewID]).map(\.id)
+                guard !panelIDs.isEmpty, panelIDs.count <= 64, Set(panelIDs).count == panelIDs.count else {
+                    throw NativeWorkspacePageCaptureFailure("The all-panel catalog is empty, duplicated or oversized.")
+                }
+                for (panelIndex, panelID) in panelIDs.enumerated() {
+                    try Task.checkCancellation()
+                    let key = viewID + "::" + panelID
+                    guard expected.contains(key), !completed.contains(key),
+                          ProcessInfo.processInfo.systemUptime < deadline else {
+                        throw NativeWorkspacePageCaptureFailure("The all-panel input escaped its exact placement or deadline.")
+                    }
+                    try owned.preferences.bringToFront(panelID, in: viewID)
+                    let current = try XCTUnwrap(owned.preferences.activeLayout(for: viewID))
+                    guard current.id == layout.id, current.viewID == viewID else {
+                        throw NativeWorkspacePageCaptureFailure("The all-panel input lost its originating custom layout.")
+                    }
+                    try await queuedRealPanelGeometry(current, panelID: panelID, in: owned, deadline: deadline,
+                        receiptName: "all-panels-\(routeIndex)-\(panelIndex)-\(viewID)-\(panelID)")
+                    completed.insert(key)
+                }
+                let mutations = await owned.client.mutationNames()
+                guard owned.preferences.layouts(for: otherID) == [independent],
+                      owned.preferences.activeLayout(for: otherID) == independent,
+                      mutations.isEmpty, owned.model.app == nil, owned.model.manager == nil,
+                      owned.model.remoteManager == nil, !owned.model.hasLoadedInitialSettings else {
+                    throw NativeWorkspacePageCaptureFailure("The all-panel case changed another namespace, backend or bootstrap contract.")
+                }
+                await owned.close(); fixture = nil
+                guard ProcessInfo.processInfo.systemUptime < deadline else {
+                    throw NativeWorkspacePageCaptureFailure("The all-panel case exceeded its deadline during cleanup.")
+                }
+            }
+            guard completed == expected else {
+                throw NativeWorkspacePageCaptureFailure("The all-panel case did not complete every mounted catalog placement.")
+            }
+            let data = try JSONSerialization.data(withJSONObject: [
+                "classification": "Every panel in21 isolated mounted namespaces; API-seeded layouts/front order and prepared scrolling, actual six-event move/resize. Rune detail modes, menus, desktop input and installed operation remain separate.",
+                "namespace_count": namespaces.count, "placement_count": expected.count,
+                "completed_placements": completed.sorted(), "total_posted_events": completed.count * 6,
+                "case_deadline_seconds": 120, "placement_limit": 256,
+            ], options: [.sortedKeys])
+            guard data.count <= 64 * 1_024 else {
+                throw NativeWorkspacePageCaptureFailure("The complete all-panel receipt exceeded its byte bound.")
+            }
+            let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+            attachment.name = "all-mounted-panels-complete"; attachment.lifetime = .keepAlways; add(attachment)
+        } catch { try? retainFailure(error); await restoreHost(); throw error }
+        await restoreHost()
+        try Task.checkCancellation()
+        guard ProcessInfo.processInfo.systemUptime < deadline else {
+            throw NativeWorkspacePageCaptureFailure("The all-panel case exceeded its shared deadline.")
+        }
+    }
+
     private func queuedRealPanelGeometry(_ layout: NativeWorkspaceLayout, panelID: String,
                                          in owned: NativeWorkspacePageCaptureFixture, deadline: TimeInterval,
                                          receiptName: String) async throws {
