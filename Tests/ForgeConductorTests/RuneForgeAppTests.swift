@@ -3741,7 +3741,8 @@ private final class RuneWorkspaceNativeNamingMenuCapture: NSObject {
             if requestedCommand == "Rename Layout…" { record["native_rename_dispatch_returned"] = true }
             record["native_command_dispatch_returned"] = true
             recordTrackingEndStage(.nativeActionReturned)
-            menu.cancelTracking()
+            record["native_menu_dismissal_API"] = "NSMenu.cancelTrackingWithoutAnimation()"
+            menu.cancelTrackingWithoutAnimation()
             record["qualified_native_menu_cancel_tracking_returned"] = true
             recordTrackingEndStage(.cancelReturned)
             result = .success(()); timer.invalidate()
