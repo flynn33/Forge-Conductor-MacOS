@@ -49,6 +49,8 @@ Product versions do not by themselves claim shipment.
 
 - Record the separate Tools shared-controls v77 NONPASS: native Customize identifier lookup fails before button/menu actions after exact default-state readback. Cause remains unknown; no product repair or UI gate closure. [Qualification](docs/QUALIFICATION-STATUS.md).
 
+- Record Tools discovery v79–v81 NONPASS before Customize actions and the separate attached-sheet Rune v82 NONPASS. V82 completes the scoped Rename subflow with actual Save AXPress status 0 and restored saved state, then fails the second whole-window opener before Save As. Later bridge observations and fixture styling establish no product cause or repair; original gates stay open. [Qualification](docs/QUALIFICATION-STATUS.md).
+
 #### Earlier UI checks before the naming repair
 
 - Verify the post-Compute ordinary Debug candidate, strict signature and CLI/app product links. Candidate Dashboard startup was observed. The later whole native Canvas selection passed 11 of 13 methods; both draft cases, Projects desktop navigation and Rune naming qualification remain open. The installed 0.18.0 (28) app was not replaced.

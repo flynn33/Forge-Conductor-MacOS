@@ -24,6 +24,10 @@ Naming requests retain a unique dialog identifier and their originating view and
 
 ## Verification
 
+Tools discovery v79–v81 still fails before Customize actions: latest retained native trees contain three/three/two nodes with nil identifiers. Later paired formal/informal reads do not recover a Customize identifier; v81 adds only the production root style to its isolated fixture. No control absence, provider cause or product repair follows.
+
+The separate attached-sheet Rune v82 test completes Rename: actual menu/editor input, a complete six-node Save walk, fresh retained-target validation, AXPress status 0, dismissal and original identity/full-collection/fresh-restoration guards. It then fails the second unchanged whole-window menu-opener lookup at AXIdentifier −25211 before Save As. This is a completed subflow within one failed test; native/exported sheet correspondence is a uniqueness-under-exact-parent inference. Original whole-window, ordinary Save, repeated-menu and complete UI gates remain open. [Qualification](QUALIFICATION-STATUS.md).
+
 The separate mounted Tools shared-controls v77 case reaches exact isolated default collection, sorted bytes and fresh-owner restoration, then fails ordinary native lookup of `workspace-customize-tools` before any button press or menu action. This does not establish control absence or a product defect; actual shared-control actions remain unverified. Original naming/UI gates and implementation deferrals remain. [Qualification and prior evidence](QUALIFICATION-STATUS.md).
 
 Required-call diagnostics v71/v72 fail before Save; isolated Save As v73 passes exact copy/collection/restoration guards, while combined v74 fails at the first Rename Save lookup. Before/after boundaries record trust=false/event-tracking in both PASS and FAIL, so neither alone distinguishes them. The failed lookup stops at AXIdentifier −25211/node 100/path `[2,0,0]`; cached AXGroup is the parent. V74’s single post-failure held-child Role read also returns −25211, leaving the child’s role unknown. It was not executed in v73’s pass. No cause, repair or original-gate closure follows. [Qualification](QUALIFICATION-STATUS.md).

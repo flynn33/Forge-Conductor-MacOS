@@ -2081,6 +2081,57 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
         return nodes
     }
 
+    private func nativeDraftControlBridgeFailureDiagnostic(_ receipts: [NativeWorkspaceDraftWeakBridgeReceipt]) -> [String: Any] {
+        let started = ProcessInfo.processInfo.systemUptime, end = started + 0.02
+        var rows: [[String: Any]] = [], nativeCalls = 0
+        func observed(_ value: Any?) -> [String: Any] {
+            ["attempted": true, "is_nil": value == nil,
+             "raw_type_utf8_prefix": value.map { String(decoding: String(reflecting: type(of: $0)).utf8.prefix(128), as: UTF8.self) as Any } ?? NSNull(),
+             "string_utf8_prefix": (value as? String).map { String(decoding: $0.utf8.prefix(128), as: UTF8.self) as Any } ?? NSNull(),
+             "array_count": (value as? [Any]).map { $0.count as Any } ?? NSNull()]
+        }
+        for receipt in receipts.prefix(64) {
+            var row: [String: Any] = ["original_node_ordinal": receipt.ordinal,
+                "cached_original_identifier_utf8_prefix": receipt.identifierPrefix as Any? ?? NSNull(),
+                "object_available": false, "formal_protocol": NSNull(), "informal_nsobject": NSNull(),
+                "formal_identifier": ["attempted": false], "formal_children": ["attempted": false],
+                "informal_names": ["attempted": false], "informal_identifier": ["attempted": false],
+                "informal_children": ["attempted": false], "identifier_advertised": NSNull(), "children_advertised": NSNull()]
+            guard let object = receipt.object else { rows.append(row); continue }
+            row["object_available"] = true
+            let formal = object as? any NSAccessibilityProtocol, informal = object as? NSObject
+            row["formal_protocol"] = formal != nil; row["informal_nsobject"] = informal != nil
+            if let formal, ProcessInfo.processInfo.systemUptime < end {
+                nativeCalls += 1; row["formal_identifier"] = observed(formal.accessibilityIdentifier())
+            }
+            if let formal, ProcessInfo.processInfo.systemUptime < end {
+                nativeCalls += 1; row["formal_children"] = observed(formal.accessibilityChildren())
+            }
+            if let informal, ProcessInfo.processInfo.systemUptime < end {
+                nativeCalls += 1
+                let names = informal.accessibilityAttributeNames()
+                row["informal_names"] = ["attempted": true, "count": names.count, "within_128_limit": names.count <= 128]
+                if names.count <= 128 {
+                    let identifierAdvertised = names.contains(.identifier), childrenAdvertised = names.contains(.children)
+                    row["identifier_advertised"] = identifierAdvertised; row["children_advertised"] = childrenAdvertised
+                    if identifierAdvertised, ProcessInfo.processInfo.systemUptime < end {
+                        nativeCalls += 1; row["informal_identifier"] = observed(informal.accessibilityAttributeValue(.identifier))
+                    }
+                    if childrenAdvertised, ProcessInfo.processInfo.systemUptime < end {
+                        nativeCalls += 1; row["informal_children"] = observed(informal.accessibilityAttributeValue(.children))
+                    }
+                }
+            }
+            rows.append(row)
+        }
+        let finished = ProcessInfo.processInfo.systemUptime
+        return ["classification": "Later failure-only paired bridge observations on original weak nodes; no traversal, matching or action",
+                "node_record_limit": 64, "string_utf8_input_prefix_limit": 128, "informal_name_limit": 128,
+                "per_live_node_native_call_limit": 5, "total_native_call_limit": 320, "native_calls": nativeCalls,
+                "cooperative_budget_seconds": 0.02, "started_uptime": started, "finished_uptime": finished,
+                "elapsed_seconds": finished - started, "budget_expired": finished >= end, "nodes": rows]
+    }
+
     private func nativeDraftAccessibilityTree(_ root: AnyObject, deadline: TimeInterval,
                                                limit: Int = 2_048) throws -> [NativeWorkspaceDraftAccessibilityNode] {
         var pending: [(NativeWorkspaceDraftAccessibilityNode, Int)] = [(try NativeWorkspaceDraftAccessibilityNode(root), 0)]
@@ -2139,7 +2190,7 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
         model.autoRefresh = false
         let hosting = NSHostingView(rootView: AnyView(ToolsView()
             .environment(\.nativeWorkspacePreferences, preferences)
-            .environmentObject(model).environmentObject(workbench).environmentObject(guidedMode)))
+            .environmentObject(model).environmentObject(workbench).environmentObject(guidedMode).graphiteWorkbench()))
         let owned = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 1_240, height: 900),
             styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
         owned.isReleasedWhenClosed = false
@@ -2147,10 +2198,12 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
         owned.title = ownedTitle; owned.contentView = hosting
         window = owned
         var stage = "fixture-created", records: [[String: Any]] = [], menus: [[String: Any]] = []
+        var latestControlDiscovery: [String: Any] = [:]
         defer {
             nativeDraftRetainMeasurement(["classification": "Separate real Tools shared native controls route; runtime assertions determine qualification, no all-view/desktop claim",
                 "stage": stage, "view_id": "tools", "flow_deadline_seconds": 45,
                 "stage_record_limit": 16, "records": records, "menu_record_limit": 8, "menus": menus,
+                "latest_control_discovery": latestControlDiscovery,
                 "original_naming_whole_window_and_desktop_gates": "unchanged/open"], name: "workspace-tools-shared-controls")
         }
         func close() async {
@@ -2190,9 +2243,42 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
         }
         func control(_ identifier: String, menu: Bool = false) async throws -> NativeWorkspaceDraftAccessibilityNode {
             let end = min(deadline, ProcessInfo.processInfo.systemUptime + 3)
+            var attempt = 0
+            var latestOriginalNodes: [NativeWorkspaceDraftWeakBridgeReceipt] = []
             repeat {
                 try requireOwner(); hosting.layoutSubtreeIfNeeded()
-                let matches = try nativeDraftAccessibilityTree(hosting, deadline: end, limit: 512).filter { $0.identifier == identifier }
+                attempt += 1
+                latestOriginalNodes.removeAll(keepingCapacity: true)
+                latestControlDiscovery = ["classification": "Original native tree and Identifier predicate only; no extra queries or acceptance route",
+                    "requested_identifier_utf8_prefix": String(decoding: identifier.utf8.prefix(128), as: UTF8.self),
+                    "attempt": attempt, "operation_deadline": end, "phase": "original-tree-start", "node_limit": 512,
+                    "node_record_limit": 64, "identifier_utf8_input_prefix_limit": 128, "type_utf8_input_prefix_limit": 128]
+                let matches: [NativeWorkspaceDraftAccessibilityNode]
+                do {
+                    let tree = try nativeDraftAccessibilityTree(hosting, deadline: end, limit: 512)
+                    var identified = 0, emptyIdentifiers = 0, ordinal = 0, nodeRows: [[String: Any]] = []
+                    matches = tree.filter {
+                        let actual = $0.identifier
+                        ordinal += 1
+                        if actual != nil { identified += 1 }
+                        if actual?.isEmpty == true { emptyIdentifiers += 1 }
+                        if nodeRows.count < 64 {
+                            latestOriginalNodes.append(NativeWorkspaceDraftWeakBridgeReceipt(object: $0.object,
+                                ordinal: ordinal, identifier: actual))
+                            nodeRows.append(["node_ordinal": ordinal,
+                                "object_type_utf8_prefix": String(decoding: String(reflecting: type(of: $0.object)).utf8.prefix(128), as: UTF8.self),
+                                "identifier_utf8_prefix": actual.map { String(decoding: $0.utf8.prefix(128), as: UTF8.self) as Any } ?? NSNull()])
+                        }
+                        return actual == identifier
+                    }
+                    latestControlDiscovery["phase"] = "original-filter-complete"
+                    latestControlDiscovery["returned_tree_nodes"] = tree.count
+                    latestControlDiscovery["nil_identifiers"] = tree.count - identified
+                    latestControlDiscovery["empty_identifiers"] = emptyIdentifiers
+                    latestControlDiscovery["non_empty_identifiers"] = identified - emptyIdentifiers
+                    latestControlDiscovery["nodes_first64"] = nodeRows
+                    latestControlDiscovery["exact_matches"] = matches.count
+                }
                 guard matches.count <= 1 else { throw WorkspaceCanvasFixtureFailure("Duplicate shared-control native identifier: " + identifier) }
                 if let match = matches.first {
                     try requireAncestor(match.object, before: end)
@@ -2204,6 +2290,7 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
                 }
                 try await Task.sleep(for: .milliseconds(20))
             } while ProcessInfo.processInfo.systemUptime < end
+            latestControlDiscovery["post_failure_paired_bridge"] = nativeDraftControlBridgeFailureDiagnostic(latestOriginalNodes)
             throw WorkspaceCanvasFixtureFailure("The owned Tools native bridge did not expose " + identifier)
         }
         func settled(_ message: String, _ condition: () throws -> Bool) async throws {
@@ -4278,6 +4365,17 @@ private final class NativeWorkspaceDraftExportedFieldOwner {
         report["visited_native_nodes"] = visited
         report["elapsed_seconds"] = ProcessInfo.processInfo.systemUptime - started
         return report
+    }
+}
+
+@MainActor
+private final class NativeWorkspaceDraftWeakBridgeReceipt {
+    weak var object: AnyObject?
+    let ordinal: Int
+    let identifierPrefix: String?
+    init(object: AnyObject, ordinal: Int, identifier: String?) {
+        self.object = object; self.ordinal = ordinal
+        identifierPrefix = identifier.map { String(decoding: $0.utf8.prefix(128), as: UTF8.self) }
     }
 }
 

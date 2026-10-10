@@ -30,6 +30,8 @@ The separate mounted Tools shared-controls test v77 fails at Customize identifie
 
 Required-call diagnostics v71/v72 fail before Save. Later isolated Save As v73 passes, while combined naming v74 again fails at the first Rename Save lookup. Trust=false/event-tracking boundary values occur in both PASS and FAIL, so neither alone distinguishes them. The failure-only Role read also fails; cached AXGroup is the parent and the child’s role remains unknown. Original naming/UI gates stay open. [Exact outcomes](docs/QUALIFICATION-STATUS.md).
 
+The later Tools discovery checks v79–v81 remain NONPASS before Customize press or menu actions. A separate attached-sheet Rune test v82 completes Rename through its actual menu/editor, six-node sheet Save action and identity/collection/restoration guards, then fails the second unchanged whole-window menu-opener lookup before Save As. The overall test remains NONPASS; no product cause, repair or original UI-gate closure follows. [Qualification](docs/QUALIFICATION-STATUS.md).
+
 The post-naming v6 ordinary Debug build, strict signature and seven-artifact/Info 0.44.0 (60) readback passed against 320 product/build inputs. This qualifies candidate compilation and file identities; candidate launch, installed operation and full UI remain unverified. Remaining new capability implementations stay deferred. [Current gates](docs/QUALIFICATION-STATUS.md).
 
 ## Earlier UI checks before the naming repair
