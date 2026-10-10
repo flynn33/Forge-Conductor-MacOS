@@ -13,6 +13,7 @@ Product versions do not by themselves claim shipment.
 ### `0.44.2 (62)`
 
 - Route discrete horizontal wheels over vertical custom-panel bodies to their canvas. Preserve vertical wheels, nested horizontal content, saved layouts and window ownership; remove the local monitor on detach/dismantle/deinit. Gesture and momentum events retain AppKit dispatch. The final 0.44.2 native selection passes four scrolling/lifecycle cases; CLI/app, ordinary Debug and strict signature checks pass. Broader UI and gesture gates remain open. [Qualification](docs/QUALIFICATION-STATUS.md).
+- Verify two current-source Manager/Projects edited-draft flows using owned native input and literal editors. Preserve the unexplained QoS warning and open whole-window/full UI gates. Synthetic gesture comparisons remain NONPASS, including their direct AppKit control; no production gesture correction follows. [Qualification](docs/QUALIFICATION-STATUS.md).
 
 ### `0.44.1 (61)`
 
