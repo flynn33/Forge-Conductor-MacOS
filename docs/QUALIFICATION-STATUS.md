@@ -2,6 +2,8 @@
 
 Current source target **0.44.1, build 61** corrects saved-layout menu label ambiguity while retaining custom layouts within each existing view. All 13 main views use the shared native workspace owner; 24 bounded namespaces include Manager sections and Rune Forge detail modes. [Workspace contract](NATIVE-WORKSPACES.md).
 
+V171 ordinary candidate observation remains NONPASS for navigation/quit: current 0.44.1 (61), 320 product inputs and seven artifacts verified, strict codesign exit 0, isolated home/three fresh defaults suites and --uitesting with Manager disabled. Exact-path computer use sees Dashboard/13 tabs/86 tools, then the Projects action/readback and a second state read each return “Sky Computer Use native pipe closed before response”; outcome/cause unknown. Cleanup verifies exact owned PID 99016 before SIGTERM; native exit −15 after 36.036 s, without ordinary GUI quit. Helper exit 0 is separate. Four guarded config/preferences/registration fingerprints remain unchanged. No native test is rerun, and prior all-140 placement evidence remains retained; no product defect/repair or general desktop/full UI acceptance follows. Other capabilities remain deferred.
+
 Scoped native checks retain their separate tested inputs:
 
 | Gate | Observed state |
