@@ -481,6 +481,33 @@ final class ProjectsViewModelResetTests: XCTestCase {
         XCTAssertEqual(clearedCalls, [FakeOperatorClient.RepositoryCall(projectID: Self.projectID, generation: 1, location: nil)])
     }
 
+    func testGitHubRepositoryRejectedEditClearsPriorSuccessNoticeWithoutWriting() async throws {
+        let savedJSON = Self.projectJSON(generation: 1, withReceipt: false)
+            .replacingOccurrences(of: "\"reset_receipt\": null", with: "\"github_repository_url\": \"https://github.com/owner/repository\", \"reset_receipt\": null")
+        for staleGeneration in [false, true] {
+            let client = FakeOperatorClient(
+                snapshot: try Self.fixture(OperatorSnapshot.self, from: "{\"projects\":[\(savedJSON)]}"),
+                statusProject: try Self.fixture(OperatorProject.self, from: savedJSON)
+            )
+            let viewModel = await settledViewModel(client: client)
+            viewModel.saveGitHubRepository(projectID: Self.projectID, generation: 1,
+                                          location: "git@github.com:owner/repository.git")
+            await waitUntilIdle(viewModel)
+            XCTAssertNil(viewModel.errorMessage)
+            XCTAssertEqual(viewModel.notice, "Saved the GitHub repository for Fixture Project.")
+            viewModel.saveGitHubRepository(projectID: Self.projectID,
+                                          generation: staleGeneration ? 2 : 1,
+                                          location: staleGeneration ? nil : "https://example.invalid/owner/repository")
+            XCTAssertNotNil(viewModel.errorMessage)
+            XCTAssertNil(viewModel.notice, "A rejected edit must not retain feedback from the preceding successful Save.")
+            XCTAssertEqual(viewModel.selectedProject?.githubRepositoryURL, "https://github.com/owner/repository")
+            let calls = await client.repositoryCalls
+            XCTAssertEqual(calls, [FakeOperatorClient.RepositoryCall(
+                projectID: Self.projectID, generation: 1, location: "https://github.com/owner/repository"
+            )])
+        }
+    }
+
     func testInstructionPackageArrowOrderingMovesExactlyOnePosition() {
         XCTAssertEqual(
             ProjectsViewModel.reorderedPackageIDs(

@@ -1278,6 +1278,99 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
         }
     }
 
+    func testProductionProjectsResizedRepositoryPanelSaveRejectAndClearUpdatesFeedback() async throws {
+        continueAfterFailure = true
+        let deadline = ProcessInfo.processInfo.systemUptime + 45
+        let fixture = try NativeWorkspaceDraftFixture(page: .projects, repositoryUpdatesEnabled: true)
+        draftFixture = fixture
+        try await exposeNativeDraftFixture(fixture)
+        try nativeOwnedRequireOwner(fixture, deadline: deadline, requireKey: true)
+        let layout = NativeWorkspaceLayout(id: UUID(), viewID: "projects", name: "Repository feedback",
+            canvas: .init(width: 1_460, height: 3_600), panels: NativeWorkspaceCatalog.projects.map {
+                let frame: NativeWorkspaceFrame
+                switch $0.id {
+                case "projects-status": frame = .init(x: 40, y: 20, width: 980, height: 300)
+                case "projects-repository": frame = .init(x: 40, y: 340, width: 980, height: 300)
+                default: frame = $0.defaultFrame
+                }
+                return NativeWorkspacePanelPlacement(id: $0.id, frame: frame,
+                    isVisible: $0.id == "projects-status" || $0.id == "projects-repository")
+            })
+        try fixture.preferences.save(layout)
+        let document = try await nativeOwnedDocument(fixture, panelID: "projects-repository", deadline: deadline)
+        let panel = try XCTUnwrap(document.panelHosts["projects-repository"])
+        let resized = NativeWorkspaceFrame(x: 40, y: 340, width: 640, height: 260)
+        try fixture.preferences.setFrame(resized, for: "projects-repository", in: "projects")
+        try await nativeOwnedWait("The repository panel did not reach the prepared resized geometry.", deadline: deadline) {
+            panel.frame == resized.nativeRect
+        }
+        let collection = fixture.preferences.collection
+        let layoutBytes = try XCTUnwrap(fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey))
+        let field = try await nativeExportObservedField(in: panel.hostingView,
+            identifier: "project-github-repository-location", placeholder: "https://github.com/owner/repository",
+            expectedLabel: "GitHub repository location", fixture: fixture, deadline: deadline)
+        func status(_ phase: String) async throws -> [NativeWorkspaceDraftAccessibilityNode] {
+            let root = try await nativeDraftAXElement("workspace-panel-projects-status", in: fixture,
+                deadline: deadline, scope: .applicationContent)
+            let nodes = try nativeDraftExportedAXTree(root, deadline: deadline, limit: 64)
+            try nativeOwnedRecord([
+                "classification": "Complete native status-panel subtree; fixture transport only, not live backend or desktop acceptance",
+                "phase": phase, "node_count": nodes.count, "complete": true,
+                "nodes": nodes.map { ["identifier": String(($0.identifier ?? "").prefix(256)),
+                    "role": $0.role?.rawValue ?? "", "title": String(($0.title ?? "").prefix(512)),
+                    "value": ($0.value as? String).map { String($0.prefix(1_024)) as Any } ?? NSNull()] },
+            ], name: "projects-repository-feedback-" + phase)
+            return nodes
+        }
+        let canonical = "https://github.com/fixture/native-panel"
+        try nativeOwnedEditField(field, value: "git@github.com:fixture/native-panel.git", in: fixture.window,
+                                fixture: fixture, deadline: deadline)
+        try await nativeExportOwnedPress("project-github-repository-save", in: fixture, deadline: deadline)
+        try await nativeOwnedWait("Successful native Save did not publish the canonical repository value.", deadline: deadline) {
+            try field.stringValue == canonical
+        }
+        _ = try await nativeDraftAXElement("operator-notice", in: fixture, deadline: deadline, scope: .applicationContent)
+        let saved = try await status("saved")
+        XCTAssertEqual(saved.filter { $0.identifier == "operator-notice" }.count, 1)
+        XCTAssertFalse(saved.contains { $0.identifier == "operator-unavailable" })
+        let savedRequests = await fixture.client.repositoryRequests()
+        XCTAssertEqual(savedRequests, [.init(projectID: NativeWorkspaceDraftClient.projectID, generation: 4, location: canonical)])
+
+        try nativeOwnedEditField(field, value: "https://example.invalid/fixture/native-panel", in: fixture.window,
+                                fixture: fixture, deadline: deadline)
+        try await nativeExportOwnedPress("project-github-repository-save", in: fixture, deadline: deadline)
+        _ = try await nativeDraftAXElement("operator-unavailable", in: fixture, deadline: deadline, scope: .applicationContent)
+        let rejected = try await status("rejected")
+        XCTAssertEqual(rejected.filter { $0.identifier == "operator-unavailable" }.count, 1)
+        XCTAssertFalse(rejected.contains { $0.identifier == "operator-notice" },
+                       "The rejected native Save must remove the previous Saved success banner.")
+        let rejectedRequests = await fixture.client.repositoryRequests()
+        XCTAssertEqual(rejectedRequests, savedRequests, "Invalid input must not dispatch another repository write.")
+        let linked = try await fixture.client.projectStatus(projectID: NativeWorkspaceDraftClient.projectID)
+        XCTAssertEqual(linked.githubRepositoryURL, canonical)
+
+        try await nativeExportOwnedPress("project-github-repository-clear", in: fixture, deadline: deadline)
+        try await nativeOwnedWait("Native Clear did not clear the repository editor.", deadline: deadline) { try field.stringValue == "" }
+        _ = try await nativeDraftAXElement("operator-notice", in: fixture, deadline: deadline, scope: .applicationContent)
+        let cleared = try await status("cleared")
+        XCTAssertEqual(cleared.filter { $0.identifier == "operator-notice" }.count, 1)
+        XCTAssertFalse(cleared.contains { $0.identifier == "operator-unavailable" })
+        let requests = await fixture.client.repositoryRequests()
+        XCTAssertEqual(requests, savedRequests + [.init(projectID: NativeWorkspaceDraftClient.projectID, generation: 4, location: nil)])
+        let project = try await fixture.client.projectStatus(projectID: NativeWorkspaceDraftClient.projectID)
+        XCTAssertNil(project.githubRepositoryURL)
+        XCTAssertEqual(project.projectGeneration, 4)
+        XCTAssertEqual(fixture.preferences.collection, collection)
+        XCTAssertEqual(fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey), layoutBytes)
+        XCTAssertEqual(panel.frame, resized.nativeRect)
+        let observations = await fixture.client.observations()
+        XCTAssertEqual(observations.snapshots, 1)
+        XCTAssertEqual(observations.repositoryWrites, 2)
+        XCTAssertEqual(observations.otherMutations, 0)
+        XCTAssertEqual(fixture.recorder.creations, 1)
+        try nativeOwnedRequireOwner(fixture, deadline: deadline, requireKey: true)
+    }
+
     private func nativeExportObservedField(in root: NSView, identifier: String, placeholder: String,
                                            expectedLabel: String? = nil, fixture: NativeWorkspaceDraftFixture,
                                            deadline: TimeInterval) async throws -> NativeWorkspaceDraftField {
@@ -6431,11 +6524,11 @@ private final class NativeWorkspaceDraftFixture {
     let hosting: NSHostingView<AnyView>
     let window: NSWindow
 
-    init(page: Page) throws {
+    init(page: Page, repositoryUpdatesEnabled: Bool = false) throws {
         let suiteName = "forge.workspace.positive-draft.tests.\(UUID().uuidString)"
         let homeURL = FileManager.default.temporaryDirectory.appendingPathComponent("forge-native-workspace-positive-\(UUID().uuidString)")
         let localDefaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
-        let clientOwner = try NativeWorkspaceDraftClient()
+        let clientOwner = try NativeWorkspaceDraftClient(repositoryUpdatesEnabled: repositoryUpdatesEnabled)
         let preferencesOwner = NativeWorkspacePreferences(knownPanelIDsByView: NativeWorkspaceCatalog.knownPanelIDsByView,
             panelSizeBoundsByView: NativeWorkspaceCatalog.sizeBoundsByView, defaults: localDefaults)
         let workbenchOwner = WorkbenchPreferences(defaults: localDefaults)
@@ -6489,17 +6582,27 @@ private final class NativeWorkspaceDraftBootstrapRecorder: @unchecked Sendable {
 }
 
 private actor NativeWorkspaceDraftClient: OperatorManagerClientProtocol {
+    struct RepositoryCall: Sendable, Equatable {
+        let projectID: String
+        let generation: UInt64
+        let location: String?
+    }
     static let projectID = "11111111-1111-4111-8111-111111111111"
     static let projectRoot = "/tmp/native-workspace-fixture-project"
-    private let snapshotValue: OperatorSnapshot
+    private var snapshotValue: OperatorSnapshot
+    private let projectTemplate: Data
+    private let repositoryUpdatesEnabled: Bool
+    private var repositoryCalls: [RepositoryCall] = []
     private let queueValue: OperatorInstructionQueue
     private var snapshots = 0
     private var repositoryWrites = 0
     private var otherMutations = 0
-    init() throws {
+    init(repositoryUpdatesEnabled: Bool = false) throws {
         let project = """
         {"project_id":"11111111-1111-4111-8111-111111111111","display_name":"Native Draft Project","canonical_root":"/tmp/native-workspace-fixture-project","project_generation":4,"lifecycle_state":"active","bindings":[],"memory":{"state":"healthy","database_bytes":0,"record_count":0},"continuity":{"state":"ready","migration_state":"not_required"},"migration_warnings":[],"github_repository_url":null}
         """
+        projectTemplate = Data(project.utf8)
+        self.repositoryUpdatesEnabled = repositoryUpdatesEnabled
         snapshotValue = try JSONDecoder().decode(OperatorSnapshot.self, from: Data("{\"projects\":[\(project)]}".utf8))
         queueValue = try JSONDecoder().decode(OperatorInstructionQueue.self, from: Data("{\"project_id\":\"11111111-1111-4111-8111-111111111111\",\"project_generation\":4,\"revision\":0,\"running\":false,\"packages\":[]}".utf8))
     }
@@ -6509,7 +6612,21 @@ private actor NativeWorkspaceDraftClient: OperatorManagerClientProtocol {
         guard projectID == Self.projectID, generation == 4 else { throw unsupported }
         return queueValue
     }
-    func updateProjectRepository(projectID: String, generation: UInt64, location: String?) async throws -> OperatorProject { repositoryWrites += 1; throw unsupported }
+    func repositoryRequests() -> [RepositoryCall] { repositoryCalls }
+    func updateProjectRepository(projectID: String, generation: UInt64, location: String?) async throws -> OperatorProject {
+        repositoryWrites += 1
+        guard repositoryUpdatesEnabled, repositoryCalls.count < 2,
+              projectID == Self.projectID, generation == 4,
+              var project = try JSONSerialization.jsonObject(with: projectTemplate) as? [String: Any] else {
+            throw unsupported
+        }
+        project["github_repository_url"] = location
+        let data = try JSONSerialization.data(withJSONObject: ["projects": [project]], options: [.sortedKeys])
+        guard data.count <= 64 * 1_024 else { throw unsupported }
+        snapshotValue = try JSONDecoder().decode(OperatorSnapshot.self, from: data)
+        repositoryCalls.append(.init(projectID: projectID, generation: generation, location: location))
+        return snapshotValue.projects[0]
+    }
     func autonomyStatus() async throws -> OperatorAutonomySummary { throw unsupported }
     func settings() async throws -> ManagerSettings { throw unsupported }
     func updateSettings(_ patch: ManagerSettingsPatch) async throws -> ManagerSettings { otherMutations += 1; throw unsupported }

@@ -1,6 +1,8 @@
 # Forge Conductor user guide
 
-Version **0.44.2**, build **62** retains custom layouts within each existing view and displays saved menu entries as `Layout: <name>`. Stored names and layout identities are unchanged.
+Version **0.44.3**, build **63** retains custom layouts within each existing view and displays saved menu entries as `Layout: <name>`. Stored names and layout identities are unchanged.
+
+In Projects, a new repository save attempt clears the previous success message before validation. If the project selection or repository URL is invalid, the current error appears without the earlier **Saved** notice.
 
 1. Open a view and select **Customize Layout**.
 2. Drag a panel's header to move it. Drag its lower-right grip to resize it.

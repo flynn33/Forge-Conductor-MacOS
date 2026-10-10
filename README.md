@@ -1,5 +1,11 @@
 # Forge Conductor for macOS
 
+Current source target **0.44.3 (63)** clears stale repository success feedback when a new Save or Clear is rejected. Movable, resizable, show/hide panels and named layouts remain within each existing view. [Workspace guide](docs/NATIVE-WORKSPACES.md).
+
+V198 reproduces and corrects the feedback bug in unit and native resized-panel tests. All 22 Projects view-model tests and the existing native Projects draft check pass. CLI/app compilation, ordinary Debug build and strict signature checks pass; desktop/full UI and gesture qualification remain open, and other implementations remain deferred. [Current evidence](docs/QUALIFICATION-STATUS.md).
+
+## Preceding UI evidence
+
 Current source target **0.44.2 (62)** corrects discrete horizontal wheel routing over vertical custom-panel bodies. Saved menu entries retain **Layout: …**, stored names and UUIDs. Movable, resizable, show/hide panels and named layouts remain within each existing view. Use **Customize Layout**, drag a panel header or resize grip, and select visible panels in **Panels**. **Restore Default** returns to the original composition while retaining saved layouts. [Workspace guide](docs/NATIVE-WORKSPACES.md).
 
 Four focused native scrolling/lifecycle cases pass on the final 0.44.2 source; CLI/app and ordinary Debug compilation and strict signature checks pass. The Projects body-wheel regression now pans the canvas while inner scrolling and saved layouts are preserved. Broader desktop/full UI and gesture qualification remain open. [Current evidence](docs/QUALIFICATION-STATUS.md).
@@ -1063,8 +1069,8 @@ continuity. The user does not start project work through a Forge Managed Run.
 
 | | |
 |---|---|
-| **Version** | **0.44.2** |
-| **Build** | **62** |
+| **Version** | **0.44.3** |
+| **Build** | **63** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |

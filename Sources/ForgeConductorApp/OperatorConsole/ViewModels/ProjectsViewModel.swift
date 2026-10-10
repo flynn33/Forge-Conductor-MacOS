@@ -213,6 +213,7 @@ final class ProjectsViewModel: ObservableObject {
 
     func saveGitHubRepository(projectID: String, generation: UInt64, location: String?) {
         guard !isLoading else { return }
+        notice = nil
         guard let project = selectedProject,
               project.projectID.caseInsensitiveCompare(projectID) == .orderedSame,
               project.projectGeneration == generation,
@@ -228,7 +229,6 @@ final class ProjectsViewModel: ObservableObject {
         }
         isLoading = true
         errorMessage = nil
-        notice = nil
         Task { [weak self] in
             guard let self else { return }
             do {

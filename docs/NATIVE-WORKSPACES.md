@@ -1,6 +1,8 @@
 # Native custom workspaces
 
-Source target: **0.44.2 (62)**. Custom layouts belong to each existing view. They do not combine panels from different views.
+Source target: **0.44.3 (63)**. Custom layouts belong to each existing view. They do not combine panels from different views.
+
+V198 corrects stale Projects repository feedback: a rejected Save no longer displays the preceding Saved notice beside the error. Save, invalid-input refusal and Clear pass through literal native field editing and actual owned button events in a 640×260 repository panel. Resize is prepared through the layout API; the transport is isolated and in-memory. The same native method first failed on the old behavior, then passed (0.848154 test/12.427 result s, no warnings), with all 3,293 run inputs and five protected hashes unchanged. All 22 Projects view-model methods and the existing native Projects draft case pass. CLI/app compilation, ordinary Debug and strict signature/identity readback pass on stable 3,293-input maps; seven binary artifacts and Info identify 0.44.3 (63). This adds no desktop, physical resize, durable backend reopen or installed-build proof.
 
 V193 passes the unchanged Projects draft-plus-move/resize regression on source `1bcd6bed`: one actual method, zero failures/skips/runtime warnings, 0.724469 test seconds and a separate 12.354-second result interval. Six owned queued events move the panel from (340, 220) to (360, 240) and resize it from 980×300 to 1020×330. Literal editor observations retain the unsaved repository draft; executed assertions check final draft, complete saved collection, fresh geometry restoration and Feed isolation. Eight raw JSON attachments include two complete application-content walks. No production or test change was needed.
 
