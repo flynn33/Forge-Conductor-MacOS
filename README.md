@@ -26,6 +26,8 @@ Mixed pointer/keyboard editing now keeps arrows transient, retains their displac
 
 The test-only Rune tracking diagnostic leaves naming open: v67 failed; v68 passed Fresh Rename but failed Fresh Save As and the combined case. All four captured menus lack an exact didEnd receipt before capture stop, including the pass, so this observation does not distinguish failure. Fatal AXIdentifier reads still stop Save discovery; no naming repair or broader UI qualification follows. [Exact outcomes](docs/QUALIFICATION-STATUS.md).
 
+The separate mounted Tools shared-controls test v77 fails at Customize identifier discovery, before any button press or menu action. Its isolated default collection/bytes/restoration baseline passes; the lookup failure does not establish an absent control or product defect. Shared-control actions and broader UI gates remain open. [Qualification](docs/QUALIFICATION-STATUS.md).
+
 Required-call diagnostics v71/v72 fail before Save. Later isolated Save As v73 passes, while combined naming v74 again fails at the first Rename Save lookup. Trust=false/event-tracking boundary values occur in both PASS and FAIL, so neither alone distinguishes them. The failure-only Role read also fails; cached AXGroup is the parent and the child’s role remains unknown. Original naming/UI gates stay open. [Exact outcomes](docs/QUALIFICATION-STATUS.md).
 
 The post-naming v6 ordinary Debug build, strict signature and seven-artifact/Info 0.44.0 (60) readback passed against 320 product/build inputs. This qualifies candidate compilation and file identities; candidate launch, installed operation and full UI remain unverified. Remaining new capability implementations stay deferred. [Current gates](docs/QUALIFICATION-STATUS.md).

@@ -47,6 +47,8 @@ Product versions do not by themselves claim shipment.
 
 - Add bounded test-only required-call trust/mode and same-held-child Role diagnostics without changing original fatal checks. V71/v72 and combined v74 fail before Save; isolated Save As v73 passes. Trust=false/event-tracking boundaries occur in both outcomes, and the failed child’s role remains unknown after its Role read also fails. No cause or naming repair follows; original gates stay open. [Qualification](docs/QUALIFICATION-STATUS.md).
 
+- Record the separate Tools shared-controls v77 NONPASS: native Customize identifier lookup fails before button/menu actions after exact default-state readback. Cause remains unknown; no product repair or UI gate closure. [Qualification](docs/QUALIFICATION-STATUS.md).
+
 #### Earlier UI checks before the naming repair
 
 - Verify the post-Compute ordinary Debug candidate, strict signature and CLI/app product links. Candidate Dashboard startup was observed. The later whole native Canvas selection passed 11 of 13 methods; both draft cases, Projects desktop navigation and Rune naming qualification remain open. The installed 0.18.0 (28) app was not replaced.

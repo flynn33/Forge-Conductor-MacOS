@@ -2107,6 +2107,238 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
         return nodes
     }
 
+    func testProductionToolsNativeSharedControlsRecoverPanelsRestoreSelectAndDelete() async throws {
+        continueAfterFailure = true
+        let deadline = ProcessInfo.processInfo.systemUptime + 45
+        let suite = "forge.workspace.controls.tests.\(UUID().uuidString)"
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent("forge-workspace-controls-\(UUID().uuidString)")
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer {
+            defaults.removePersistentDomain(forName: suite)
+            try? FileManager.default.removeItem(at: home)
+        }
+        let preferences = NativeWorkspacePreferences(knownPanelIDsByView: NativeWorkspaceCatalog.knownPanelIDsByView,
+            panelSizeBoundsByView: NativeWorkspaceCatalog.sizeBoundsByView, defaults: defaults)
+        func seed(_ viewID: String, _ name: String) -> NativeWorkspaceLayout {
+            let panels = NativeWorkspaceCatalog.panelsByView[viewID] ?? []
+            return .init(id: UUID(), viewID: viewID, name: name,
+                canvas: .init(width: max(1_280, panels.map { $0.defaultFrame.x + $0.defaultFrame.width + 20 }.max() ?? 0),
+                              height: max(900, panels.map { $0.defaultFrame.y + $0.defaultFrame.height + 20 }.max() ?? 0)),
+                panels: panels.map { .init(id: $0.id, frame: $0.defaultFrame, isVisible: true) })
+        }
+        // Fixture setup only. Every tested layout/visibility change below is a native UI action.
+        let marker = seed("tools", "Tools marker \(UUID().uuidString)")
+        let independent = seed("diagnostics", "Independent \(UUID().uuidString)")
+        try preferences.save(marker, activate: false)
+        try preferences.save(independent)
+        var expected = preferences.collection
+        let workbench = WorkbenchPreferences(defaults: defaults)
+        let guidedMode = GuidedModeCoordinator(defaults: defaults)
+        let bootstrap = AppBootstrapOperation(factory: { throw CancellationError() }, pluginStatus: { _ in nil })
+        let model = AppModel(bootstrapOperation: bootstrap, diagnosticPaths: AppPaths(home: home))
+        model.autoRefresh = false
+        let hosting = NSHostingView(rootView: AnyView(ToolsView()
+            .environment(\.nativeWorkspacePreferences, preferences)
+            .environmentObject(model).environmentObject(workbench).environmentObject(guidedMode)))
+        let owned = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 1_240, height: 900),
+            styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+        owned.isReleasedWhenClosed = false
+        let ownedTitle = "Tools shared controls \(UUID().uuidString)"
+        owned.title = ownedTitle; owned.contentView = hosting
+        window = owned
+        var stage = "fixture-created", records: [[String: Any]] = [], menus: [[String: Any]] = []
+        defer {
+            nativeDraftRetainMeasurement(["classification": "Separate real Tools shared native controls route; runtime assertions determine qualification, no all-view/desktop claim",
+                "stage": stage, "view_id": "tools", "flow_deadline_seconds": 45,
+                "stage_record_limit": 16, "records": records, "menu_record_limit": 8, "menus": menus,
+                "original_naming_whole_window_and_desktop_gates": "unchanged/open"], name: "workspace-tools-shared-controls")
+        }
+        func close() async {
+            owned.endEditing(for: nil); _ = owned.makeFirstResponder(nil)
+            hosting.rootView = AnyView(EmptyView()); hosting.layoutSubtreeIfNeeded()
+            owned.orderOut(nil); owned.contentView = nil; owned.close(); window = nil
+            await model.stopBootstrap(); model.telemetryBinding.detach()
+        }
+        func requireOwner() throws {
+            guard ProcessInfo.processInfo.systemUptime < deadline,
+                  owned.contentView === hosting, hosting.window === owned, owned.isVisible,
+                  !hosting.isHiddenOrHasHiddenAncestor, owned.title == ownedTitle,
+                  NSApp.windows.filter({ $0.title == ownedTitle }).count == 1 else {
+                throw WorkspaceCanvasFixtureFailure("The shared controls lost their exact finite Tools window/hosting owner.")
+            }
+        }
+        func requireAncestor(_ object: AnyObject, before end: TimeInterval) throws {
+            var cursor = object, seen = Set<ObjectIdentifier>()
+            for _ in 0..<48 {
+                try requireOwner()
+                guard ProcessInfo.processInfo.systemUptime < end else { throw WorkspaceCanvasFixtureFailure("Shared-control native ancestry exceeded its operation deadline.") }
+                guard seen.insert(ObjectIdentifier(cursor)).inserted else { throw WorkspaceCanvasFixtureFailure("Shared-control native ancestry repeated an object.") }
+                if cursor === owned { return }
+                guard !(cursor is NSWindow) else { throw WorkspaceCanvasFixtureFailure("Shared control belongs to another native window.") }
+                let raw: Any?
+                if let formal = cursor as? any NSAccessibilityProtocol { raw = formal.accessibilityParent() }
+                else if let legacy = cursor as? NSObject {
+                    let names = legacy.accessibilityAttributeNames()
+                    guard names.count <= 128, names.contains(.parent) else { throw WorkspaceCanvasFixtureFailure("Shared-control native parent is unavailable/unbounded.") }
+                    raw = legacy.accessibilityAttributeValue(.parent)
+                } else { throw WorkspaceCanvasFixtureFailure("Shared-control native parent bridge is unavailable.") }
+                if let formal = raw as? any NSAccessibilityProtocol { cursor = formal as AnyObject }
+                else if let native = raw as? NSObject { cursor = native }
+                else { throw WorkspaceCanvasFixtureFailure("Shared-control native ancestry does not reach its owned window.") }
+            }
+            throw WorkspaceCanvasFixtureFailure("Shared-control native ancestry exceeded 48 objects.")
+        }
+        func control(_ identifier: String, menu: Bool = false) async throws -> NativeWorkspaceDraftAccessibilityNode {
+            let end = min(deadline, ProcessInfo.processInfo.systemUptime + 3)
+            repeat {
+                try requireOwner(); hosting.layoutSubtreeIfNeeded()
+                let matches = try nativeDraftAccessibilityTree(hosting, deadline: end, limit: 512).filter { $0.identifier == identifier }
+                guard matches.count <= 1 else { throw WorkspaceCanvasFixtureFailure("Duplicate shared-control native identifier: " + identifier) }
+                if let match = matches.first {
+                    try requireAncestor(match.object, before: end)
+                    guard match.enabled == true, match.role?.rawValue == kAXButtonRole
+                        || (menu && match.role?.rawValue == kAXPopUpButtonRole) else {
+                        throw WorkspaceCanvasFixtureFailure("Shared control is not an enabled native button/menu opener.")
+                    }
+                    return match
+                }
+                try await Task.sleep(for: .milliseconds(20))
+            } while ProcessInfo.processInfo.systemUptime < end
+            throw WorkspaceCanvasFixtureFailure("The owned Tools native bridge did not expose " + identifier)
+        }
+        func settled(_ message: String, _ condition: () throws -> Bool) async throws {
+            let remaining = min(3, deadline - ProcessInfo.processInfo.systemUptime)
+            guard remaining > 0 else { throw WorkspaceCanvasFixtureFailure("Shared controls exceeded their 45-second flow admission bound.") }
+            try await waitUntil(message, timeout: remaining) { try requireOwner(); hosting.layoutSubtreeIfNeeded(); return try condition() }
+        }
+        func requireState(_ label: String) throws {
+            try requireOwner()
+            let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
+            let restored = NativeWorkspacePreferences(knownPanelIDsByView: NativeWorkspaceCatalog.knownPanelIDsByView,
+                panelSizeBoundsByView: NativeWorkspaceCatalog.sizeBoundsByView, defaults: defaults)
+            XCTAssertEqual(preferences.collection, expected)
+            XCTAssertEqual(defaults.data(forKey: NativeWorkspacePreferences.storageKey), try encoder.encode(expected))
+            XCTAssertNil(restored.restorationError); XCTAssertEqual(restored.collection, expected)
+            XCTAssertEqual(preferences.activeLayout(for: "diagnostics"), independent)
+            guard preferences.collection == expected, restored.collection == expected,
+                  defaults.data(forKey: NativeWorkspacePreferences.storageKey) == (try encoder.encode(expected)),
+                  restored.restorationError == nil, records.count < 16 else {
+                throw WorkspaceCanvasFixtureFailure("The shared native action changed unexpected persisted state: " + label)
+            }
+            records.append(["stage": label, "complete_collection_and_bytes_exact": true,
+                "fresh_owner_restoration_exact": true, "saved_layout_count": expected.layouts.count])
+        }
+        func choose(_ command: String, panels: Bool) async throws {
+            guard menus.count < 8 else { throw WorkspaceCanvasFixtureFailure("Shared native menu calls exceeded eight attempts.") }
+            let opener = try await control(panels ? "workspace-panels-menu-tools" : "workspace-layout-menu-tools", menu: true)
+            let titles = panels ? NativeWorkspaceCatalog.tools.map(\.title)
+                : ["Default"] + preferences.layouts(for: "tools").map(\.name) + ["Save Layout As…", "Rename Layout…", "Delete Layout"]
+            var states: [String: NSControl.StateValue] = [:]
+            if panels {
+                guard let layout = preferences.activeLayout(for: "tools") else { throw WorkspaceCanvasFixtureFailure("Panels requires the actual active Tools layout.") }
+                for descriptor in NativeWorkspaceCatalog.tools {
+                    states[descriptor.title] = layout.panels.first { $0.id == descriptor.id }?.isVisible == true ? .on : .off
+                }
+            }
+            let capture = WorkspaceSharedControlsMenuCapture(window: owned, hosting: hosting,
+                preferences: preferences, expectedCollection: expected, command: command, titles: titles,
+                states: states, deadline: min(deadline, ProcessInfo.processInfo.systemUptime + 3))
+            NotificationCenter.default.addObserver(capture, selector: #selector(WorkspaceSharedControlsMenuCapture.didBegin(_:)),
+                name: NSMenu.didBeginTrackingNotification, object: nil)
+            let timer = Timer(timeInterval: 0.02, target: capture, selector: #selector(WorkspaceSharedControlsMenuCapture.fire(_:)), userInfo: nil, repeats: true)
+            RunLoop.main.add(timer, forMode: .default); RunLoop.main.add(timer, forMode: .eventTracking)
+            defer { timer.invalidate(); capture.stop(); menus.append(capture.receipt) }
+            capture.armed = true
+            try requireAncestor(opener.object, before: capture.deadline)
+            guard opener.identifier == (panels ? "workspace-panels-menu-tools" : "workspace-layout-menu-tools"), opener.enabled == true else {
+                throw WorkspaceCanvasFixtureFailure("The exact shared native opener changed before activation.")
+            }
+            try opener.press()
+            while !capture.isFinished {
+                guard ProcessInfo.processInfo.systemUptime < capture.deadline else { throw WorkspaceCanvasFixtureFailure("The exact shared native menu did not complete its finite action.") }
+                try await Task.sleep(for: .milliseconds(10))
+            }
+            try XCTUnwrap(capture.result).get(); try requireOwner()
+        }
+        do {
+            try await waitUntil("The isolated Tools startup did not settle.") { !model.isBootstrapping }
+            XCTAssertNil(model.app); XCTAssertNil(model.manager); XCTAssertNil(model.remoteManager)
+            NSApp.activate(ignoringOtherApps: true); owned.makeKeyAndOrderFront(nil); owned.orderFrontRegardless()
+            try requireState("default-baseline")
+            stage = "customize"
+            let customize = try await control("workspace-customize-tools"); try customize.press()
+            try await settled("Actual Customize Layout did not select its new Tools layout.") { preferences.activeLayout(for: "tools") != nil }
+            let custom = try XCTUnwrap(preferences.activeLayout(for: "tools"))
+            XCTAssertNotEqual(custom.id, marker.id); XCTAssertNotEqual(custom.id, independent.id)
+            var seeded = seed("tools", "Custom")
+            seeded = .init(id: custom.id, viewID: seeded.viewID, name: seeded.name, canvas: seeded.canvas, panels: seeded.panels)
+            expected.layouts.append(seeded); expected.activeLayoutIDs["tools"] = custom.id
+            try requireState("customize")
+            func optionalDocument() throws -> NativeWorkspaceDocumentView? {
+                let documents = descendants(hosting).compactMap { $0 as? NativeWorkspaceDocumentView }
+                guard documents.count <= 1, documents.allSatisfy({ $0.window === owned }) else {
+                    throw WorkspaceCanvasFixtureFailure("Tools has duplicate or foreign native documents.")
+                }
+                return documents.first
+            }
+            func document() throws -> NativeWorkspaceDocumentView {
+                try XCTUnwrap(optionalDocument(), "Tools has no mounted native document.")
+            }
+            try await settled("Tools Customize did not mount all three real panels.") {
+                try optionalDocument()?.panelHosts.count == 3
+            }
+            let canvas = try document(), panel = try XCTUnwrap(canvas.panelHosts["tools-controls"]), panelHosting = panel.hostingView
+            func setExpectedShown(_ id: String, _ visible: Bool) throws {
+                let layoutIndex = try XCTUnwrap(expected.layouts.firstIndex { $0.id == custom.id && $0.viewID == "tools" })
+                let panelIndex = try XCTUnwrap(expected.layouts[layoutIndex].panels.firstIndex { $0.id == id })
+                expected.layouts[layoutIndex].panels[panelIndex].isVisible = visible
+            }
+            for shown in [false, true] {
+                stage = shown ? "panels-show" : "panels-hide"
+                try await choose("Tools and Filter", panels: true); try setExpectedShown("tools-controls", shown)
+                try await settled("Actual Panels menu did not apply Tools visibility.") { panel.isHidden == !shown }
+                XCTAssertTrue(canvas.panelHosts["tools-controls"] === panel); XCTAssertTrue(panel.hostingView === panelHosting)
+                try requireState(stage)
+            }
+            for descriptor in NativeWorkspaceCatalog.tools {
+                stage = "hide-all-" + descriptor.id
+                try await choose(descriptor.title, panels: true); try setExpectedShown(descriptor.id, false)
+                try await settled("Actual Panels command did not hide its Tools panel.") { canvas.panelHosts[descriptor.id]?.isHidden == true }
+                try requireState(stage)
+            }
+            XCTAssertTrue(canvas.panelHosts.values.allSatisfy(\.isHidden))
+            stage = "recover-all-hidden"
+            try await choose("Tools and Filter", panels: true); try setExpectedShown("tools-controls", true)
+            try await settled("The all-hidden workspace did not recover through its Panels menu.") { !panel.isHidden }
+            XCTAssertTrue(canvas.panelHosts["tools-controls"] === panel); XCTAssertTrue(panel.hostingView === panelHosting)
+            try requireState(stage)
+            stage = "restore-default"
+            let restore = try await control("workspace-restore-default-tools"); try restore.press()
+            expected.activeLayoutIDs["tools"] = nil
+            try await settled("Actual Restore Default did not dismantle Tools custom canvas.") { try optionalDocument() == nil }
+            XCTAssertTrue(canvas.panelHosts.isEmpty); try requireState(stage)
+            stage = "select-saved"
+            try await choose(custom.name, panels: false); expected.activeLayoutIDs["tools"] = custom.id
+            try await settled("Actual saved selection did not restore its Tools canvas.") {
+                try optionalDocument()?.panelHosts["tools-controls"]?.isHidden == false
+            }
+            XCTAssertEqual(try document().panelHosts.count, 1, "Previously hidden panels must stay unconstructed on this new canvas.")
+            try requireState(stage)
+            stage = "delete-selected"
+            try await choose("Delete Layout", panels: false)
+            expected.layouts.removeAll { $0.id == custom.id }; expected.activeLayoutIDs["tools"] = nil
+            try await settled("Actual Delete Layout did not restore the Tools default composition.") { try optionalDocument() == nil }
+            _ = try await control("workspace-customize-tools")
+            try requireState(stage)
+            XCTAssertEqual(preferences.layouts(for: "tools"), [marker])
+            stage = "completed"
+            await close()
+        } catch {
+            records.append(["stage": stage, "failure": String(String(describing: error).prefix(1_024))])
+            await close(); throw error
+        }
+    }
+
     func testHeaderPointerMoveCommitsOnlyAtMouseUpAndKeepsIdentityDuringReorder() throws {
         let document = mountDocument()
         var commits: [NativeWorkspaceFrame] = []
@@ -3447,6 +3679,117 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
             try await Task.sleep(for: .milliseconds(20))
         }
         guard try condition() else { throw WorkspaceCanvasFixtureFailure(message) }
+    }
+}
+
+@MainActor
+private final class WorkspaceSharedControlsMenuCapture: NSObject {
+    private weak var window: NSWindow?
+    private weak var hosting: NSView?
+    private weak var preferences: NativeWorkspacePreferences?
+    private let expectedCollection: NativeWorkspaceCollection
+    private let command: String
+    private let titles: [String]
+    private let states: [String: NSControl.StateValue]
+    let deadline: TimeInterval
+    var armed = false
+    private var roots = 0, ticks = 0
+    private var querying = false, cancellationRequested = false
+    private var menu: NSMenu?
+    private var provenMenu = false
+    private(set) var result: Result<Void, Error>?
+    private(set) var receipt: [String: Any] = ["classification": "One exact armed native opener and captured literal menu; no desktop or enclosing-loop unwind claim",
+        "item_limit": 64, "tick_limit": 160, "native_dispatch_requested": false,
+        "native_dispatch_returned": false, "cancel_tracking_requested": false]
+    var isFinished: Bool { if case .some = result { return true }; return false }
+    init(window: NSWindow, hosting: NSView, preferences: NativeWorkspacePreferences,
+         expectedCollection: NativeWorkspaceCollection, command: String, titles: [String],
+         states: [String: NSControl.StateValue], deadline: TimeInterval) {
+        self.window = window; self.hosting = hosting; self.preferences = preferences
+        self.expectedCollection = expectedCollection; self.command = command
+        self.titles = titles; self.states = states; self.deadline = deadline
+        super.init()
+    }
+    @objc func didBegin(_ notification: Notification) {
+        guard armed, !isFinished else { return }
+        roots += 1
+        receipt["captured_roots"] = roots
+        guard roots == 1, let captured = notification.object as? NSMenu else {
+            result = .failure(WorkspaceCanvasFixtureFailure("The armed shared-control opener did not produce exactly one native menu root.")); return
+        }
+        menu = captured
+    }
+    @objc func fire(_ timer: Timer) {
+        guard armed, !isFinished else { timer.invalidate(); return }
+        guard !querying else { return }
+        querying = true
+        defer { querying = false }
+        ticks += 1
+        receipt["ticks"] = ticks
+        do {
+            guard ProcessInfo.processInfo.systemUptime < deadline, ticks <= 160,
+                  let window, let hosting, let preferences, window.isVisible,
+                  window.contentView === hosting, hosting.window === window,
+                  !hosting.isHiddenOrHasHiddenAncestor, preferences.collection == expectedCollection else {
+                throw WorkspaceCanvasFixtureFailure("Shared native menu lost its finite exact owner or originating collection.")
+            }
+            guard let menu else { return }
+            guard roots == 1, menu.numberOfItems > 0, menu.numberOfItems <= 64 else {
+                throw WorkspaceCanvasFixtureFailure("Shared native menu root/items exceeded the bound.")
+            }
+            let items = menu.items, leaves = items.filter { !$0.isSeparatorItem }
+            guard items.count == menu.numberOfItems, leaves.count == titles.count,
+                  items.allSatisfy({ $0.menu === menu && $0.title.utf8.count <= 4_096 }),
+                  Set(leaves.map(\.title)) == Set(titles), Set(titles).count == titles.count,
+                  titles.allSatisfy({ title in leaves.filter { $0.title == title }.count == 1 }),
+                  states.allSatisfy({ title, state in leaves.first { $0.title == title }?.state == state }),
+                  let index = items.firstIndex(where: { $0.title == command }),
+                  items[index].isEnabled, !items[index].isHidden, !items[index].isSeparatorItem,
+                  items[index].submenu == nil, items[index].action != nil else {
+                throw WorkspaceCanvasFixtureFailure("Shared native menu did not prove its exact literal items, toggle states and enabled requested command.")
+            }
+            provenMenu = true
+            receipt["actual_command"] = command; receipt["actual_command_index"] = index
+            receipt["exact_literal_items_and_toggle_states"] = true
+            receipt["actual_items"] = leaves.map { ["title": $0.title, "state": $0.state.rawValue, "enabled": $0.isEnabled] as [String: Any] }
+            let fresh = menu.items
+            guard fresh.count == items.count, zip(fresh, items).allSatisfy({ $0.0 === $0.1 }),
+                  menu.item(at: index) === items[index], items[index].menu === menu,
+                  items[index].title == command, items[index].isEnabled,
+                  !items[index].isHidden, items[index].submenu == nil, items[index].action != nil,
+                  states.allSatisfy({ title, state in fresh.first { $0.title == title }?.state == state }),
+                  window.contentView === hosting, hosting.window === window, window.isVisible,
+                  preferences.collection == expectedCollection, ProcessInfo.processInfo.systemUptime < deadline else {
+                throw WorkspaceCanvasFixtureFailure("Shared native command changed before its actual dispatch.")
+            }
+            receipt["native_dispatch_requested"] = true
+            menu.performActionForItem(at: index)
+            receipt["native_dispatch_returned"] = true
+            cancelProvenTracking()
+            if let callbackResult = result { try callbackResult.get() }
+            guard roots == 1, !isFinished else {
+                throw WorkspaceCanvasFixtureFailure("Shared native menu violated its one-root contract during dispatch or tracking cancellation.")
+            }
+            result = .success(()); timer.invalidate()
+        } catch {
+            cancelProvenTracking()
+            if case .none = result { result = .failure(error) }
+            if case .failure(let retainedFailure) = result {
+                receipt["failure"] = String(String(describing: retainedFailure).prefix(1_024))
+            }
+            timer.invalidate()
+        }
+    }
+    func stop() {
+        armed = false
+        NotificationCenter.default.removeObserver(self, name: NSMenu.didBeginTrackingNotification, object: nil)
+        cancelProvenTracking()
+        menu = nil
+    }
+    private func cancelProvenTracking() {
+        guard provenMenu, !cancellationRequested else { return }
+        cancellationRequested = true; receipt["cancel_tracking_requested"] = true
+        menu?.cancelTracking()
     }
 }
 

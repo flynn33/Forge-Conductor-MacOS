@@ -24,6 +24,8 @@ Naming requests retain a unique dialog identifier and their originating view and
 
 ## Verification
 
+The separate mounted Tools shared-controls v77 case reaches exact isolated default collection, sorted bytes and fresh-owner restoration, then fails ordinary native lookup of `workspace-customize-tools` before any button press or menu action. This does not establish control absence or a product defect; actual shared-control actions remain unverified. Original naming/UI gates and implementation deferrals remain. [Qualification and prior evidence](QUALIFICATION-STATUS.md).
+
 Required-call diagnostics v71/v72 fail before Save; isolated Save As v73 passes exact copy/collection/restoration guards, while combined v74 fails at the first Rename Save lookup. Before/after boundaries record trust=false/event-tracking in both PASS and FAIL, so neither alone distinguishes them. The failed lookup stops at AXIdentifier −25211/node 100/path `[2,0,0]`; cached AXGroup is the parent. V74’s single post-failure held-child Role read also returns −25211, leaving the child’s role unknown. It was not executed in v73’s pass. No cause, repair or original-gate closure follows. [Qualification](QUALIFICATION-STATUS.md).
 
 The additive Rune exact-menu tracking diagnostic leaves the original gates open. V67 fails one method; v68 passes Fresh Rename but fails Fresh Save As and combined naming at the fatal required-Save AXIdentifier read before activation. All four captured menus lack an exact didEnd receipt before capture stop, including the pass; this does not distinguish failure or establish later notification absence, enclosing unwind, release or cause. [Qualification](QUALIFICATION-STATUS.md).
