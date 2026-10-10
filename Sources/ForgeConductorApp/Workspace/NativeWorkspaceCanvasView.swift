@@ -128,6 +128,8 @@ final class NativeWorkspacePanelHost: NSView {
     private(set) var isManipulating = false
     private var gestureStart = NSPoint.zero
     private var gestureFrame = NSRect.zero
+    private var gestureAnchorFrame = NSRect.zero
+    private var gestureLastPoint = NSPoint.zero
     override var isFlipped: Bool { true }
 
     init(descriptor: NativeWorkspacePanelDescriptor, content: AnyView) {
@@ -179,7 +181,7 @@ final class NativeWorkspacePanelHost: NSView {
     func beginGesture(_ event: NSEvent) {
         guard let parent = superview else { return }
         isManipulating = true; gestureStart = parent.convert(event.locationInWindow, from: nil)
-        gestureFrame = frame
+        gestureFrame = frame; gestureAnchorFrame = frame; gestureLastPoint = gestureStart
         bringToFront?()
     }
 
@@ -187,7 +189,8 @@ final class NativeWorkspacePanelHost: NSView {
         guard isManipulating, let parent = superview else { return }
         let point = parent.convert(event.locationInWindow, from: nil)
         let dx = point.x - gestureStart.x, dy = point.y - gestureStart.y
-        frame = boundedFrame(start: gestureFrame, dx: dx, dy: dy, resizing: resizing)
+        frame = boundedFrame(start: gestureAnchorFrame, dx: dx, dy: dy, resizing: resizing)
+        gestureLastPoint = point
     }
 
     func endGesture() {
@@ -202,7 +205,11 @@ final class NativeWorkspacePanelHost: NSView {
 
     func nudge(dx: CGFloat, dy: CGFloat, resizing: Bool) {
         frame = boundedFrame(start: frame, dx: dx, dy: dy, resizing: resizing)
-        publishFrame()
+        if isManipulating {
+            gestureStart = gestureLastPoint; gestureAnchorFrame = frame
+        } else {
+            publishFrame()
+        }
     }
 
     private func boundedFrame(start: NSRect, dx: CGFloat, dy: CGFloat, resizing: Bool) -> NSRect {

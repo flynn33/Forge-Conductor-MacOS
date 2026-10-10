@@ -2675,6 +2675,382 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
         }
     }
 
+    func testMovePointerArrowAndEscapePreserveSavedGeometryAndHosts() async throws {
+        try await requireMixedPointerKeyboardCancellation(resizing: false)
+    }
+
+    func testResizePointerArrowAndEscapePreserveSavedGeometryAndHosts() async throws {
+        try await requireMixedPointerKeyboardCancellation(resizing: true)
+    }
+
+    private func requireMixedPointerKeyboardCancellation(resizing: Bool) async throws {
+        continueAfterFailure = true
+        let fixture = try await mountScope()
+        let document = try await mountedDocument(fixture)
+        let panel = try XCTUnwrap(document.panelHosts["alpha"])
+        defer { panel.cancelGesture() }
+        let hosting = panel.hostingView
+        let handle = try gestureHandle("workspace-\(resizing ? "resize" : "move")-alpha", in: panel)
+        let original = panel.frame
+        let start = handle.convert(NSPoint(x: handle.bounds.midX, y: handle.bounds.midY), to: document)
+        let end = NSPoint(x: start.x + 50, y: start.y + 30)
+        var report: [String: Any] = [
+            "classification": "Owned native pointer callbacks and own-window key dispatch; no desktop or app-queued pointer delivery claim",
+            "resizing": resizing, "original_frame": NSStringFromRect(original), "stage": "before-down",
+            "saved_baseline": "After actual down's explicit bringToFront, before transient geometry",
+        ]
+        defer { nativeDraftRetainMeasurement(report, name: "workspace-mixed-pointer-keyboard-" + (resizing ? "resize" : "move")) }
+        func requireOwner() throws {
+            guard fixture.window.isVisible, fixture.window.isKeyWindow,
+                  fixture.window.contentView === fixture.hosting, fixture.hosting.window === fixture.window,
+                  document.window === fixture.window, panel.window === fixture.window,
+                  handle.window === fixture.window, !handle.isHiddenOrHasHiddenAncestor,
+                  document.panelHosts["alpha"] === panel, panel.hostingView === hosting,
+                  fixture.preferences.activeLayout(for: "fixture")?.id == fixture.layoutA.id else {
+                throw WorkspaceCanvasFixtureFailure("The mixed gesture escaped its exact visible fixture and retained hosts.")
+            }
+        }
+        func sendOwnedKey(_ code: UInt16) throws {
+            try requireOwner()
+            guard fixture.window.makeFirstResponder(handle), fixture.window.firstResponder === handle else {
+                throw WorkspaceCanvasFixtureFailure("The owned gesture handle did not retain native keyboard focus.")
+            }
+            let event = try key(code, flags: [], window: fixture.window)
+            guard event.window === fixture.window, event.windowNumber == fixture.window.windowNumber else {
+                throw WorkspaceCanvasFixtureFailure("The mixed key event escaped its exact owned window.")
+            }
+            fixture.window.sendEvent(event)
+        }
+        try requireOwner()
+        handle.mouseDown(with: try pointer(.leftMouseDown, at: start, in: document))
+        let saved = fixture.preferences.collection
+        let savedBytes = try XCTUnwrap(fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey))
+        handle.mouseDragged(with: try pointer(.leftMouseDragged, at: end, in: document))
+        guard panel.isManipulating, panel.frame != original else {
+            throw WorkspaceCanvasFixtureFailure("The mixed fixture did not reach a pending native pointer edit.")
+        }
+        XCTAssertEqual(fixture.preferences.collection, saved)
+        XCTAssertEqual(fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey), savedBytes)
+        let dragged = panel.frame
+        report["stage"] = "before-arrow"
+        try sendOwnedKey(124)
+        report["frame_after_arrow"] = NSStringFromRect(panel.frame)
+        report["manipulating_after_arrow"] = panel.isManipulating
+        report["collection_unchanged_after_arrow"] = fixture.preferences.collection == saved
+        report["bytes_unchanged_after_arrow"] = fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey) == savedBytes
+        guard panel.isManipulating, panel.frame != dragged else {
+            throw WorkspaceCanvasFixtureFailure("The own-window arrow did not reach the still-pending native gesture.")
+        }
+        XCTAssertEqual(fixture.preferences.collection, saved, "A keyboard nudge inside a pending pointer gesture must remain transient.")
+        XCTAssertEqual(fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey), savedBytes)
+        report["stage"] = "before-escape"
+        try sendOwnedKey(53)
+        handle.mouseUp(with: try pointer(.leftMouseUp, at: end, in: document))
+        report["frame_after_escape_and_late_up"] = NSStringFromRect(panel.frame)
+        report["manipulating_after_escape_and_late_up"] = panel.isManipulating
+        report["collection_unchanged_after_escape"] = fixture.preferences.collection == saved
+        report["bytes_unchanged_after_escape"] = fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey) == savedBytes
+        XCTAssertEqual(panel.frame, original)
+        XCTAssertFalse(panel.isManipulating)
+        XCTAssertEqual(fixture.preferences.collection, saved, "Escape must preserve the full saved state after mixed input.")
+        XCTAssertEqual(fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey), savedBytes)
+        XCTAssertTrue(document.panelHosts["alpha"] === panel)
+        XCTAssertTrue(panel.hostingView === hosting)
+        let beforeFreshKey = panel.frame
+        try sendOwnedKey(124)
+        let keyed = resizing
+            ? NativeWorkspaceFrame(x: beforeFreshKey.minX, y: beforeFreshKey.minY, width: beforeFreshKey.width + 10, height: beforeFreshKey.height)
+            : NativeWorkspaceFrame(x: beforeFreshKey.minX + 10, y: beforeFreshKey.minY, width: beforeFreshKey.width, height: beforeFreshKey.height)
+        XCTAssertEqual(fixture.preferences.activeLayout(for: "fixture")?.panels.first { $0.id == "alpha" }?.frame, keyed)
+        XCTAssertEqual(panel.frame, keyed.nativeRect)
+        let freshStart = handle.convert(NSPoint(x: handle.bounds.midX, y: handle.bounds.midY), to: document)
+        try drag(handle, in: document, from: freshStart, to: NSPoint(x: freshStart.x + 20, y: freshStart.y + 10))
+        let pointed = resizing
+            ? NativeWorkspaceFrame(x: keyed.x, y: keyed.y, width: keyed.width + 20, height: keyed.height + 10)
+            : NativeWorkspaceFrame(x: keyed.x + 20, y: keyed.y + 10, width: keyed.width, height: keyed.height)
+        XCTAssertEqual(fixture.preferences.activeLayout(for: "fixture")?.panels.first { $0.id == "alpha" }?.frame, pointed)
+        XCTAssertEqual(panel.frame, pointed.nativeRect)
+        XCTAssertFalse(panel.isManipulating)
+        XCTAssertTrue(document.panelHosts["alpha"] === panel)
+        XCTAssertTrue(panel.hostingView === hosting)
+        report["same_hosts_after_fresh_keyboard_and_pointer"] = document.panelHosts["alpha"] === panel && panel.hostingView === hosting
+        report["stage"] = "fresh-completed-inputs"
+        await fixture.close(); scopeFixture = nil
+    }
+
+    func testMoveCompletedPointerAndRepeatedArrowsRetainBothDisplacements() async throws {
+        try await requireCompletedMixedPointerKeyboardGesture(resizing: false)
+    }
+
+    func testResizeCompletedPointerAndRepeatedArrowsRetainBothDisplacements() async throws {
+        try await requireCompletedMixedPointerKeyboardGesture(resizing: true)
+    }
+
+    private func requireCompletedMixedPointerKeyboardGesture(resizing: Bool) async throws {
+        continueAfterFailure = true
+        let fixture = try await mountScope()
+        let document = try await mountedDocument(fixture)
+        let panel = try XCTUnwrap(document.panelHosts["alpha"])
+        defer { panel.cancelGesture() }
+        let hosting = panel.hostingView
+        let handle = try gestureHandle("workspace-\(resizing ? "resize" : "move")-alpha", in: panel)
+        let original = panel.frame
+        let start = handle.convert(NSPoint(x: handle.bounds.midX, y: handle.bounds.midY), to: document)
+        let first = NSPoint(x: start.x + 50, y: start.y + 30)
+        let last = NSPoint(x: start.x + 70, y: start.y + 40)
+        func frame(dx: CGFloat, dy: CGFloat) -> NativeWorkspaceFrame {
+            resizing
+                ? .init(x: original.minX, y: original.minY, width: original.width + dx, height: original.height + dy)
+                : .init(x: original.minX + dx, y: original.minY + dy, width: original.width, height: original.height)
+        }
+        let completed = frame(dx: 90, dy: 50)
+        guard completed.x >= 0, completed.y >= 0,
+              completed.x + completed.width <= Double(panel.canvasSize.width),
+              completed.y + completed.height <= Double(panel.canvasSize.height),
+              completed.width >= Double(panel.descriptor.minimumSize.width),
+              completed.height >= Double(panel.descriptor.minimumSize.height),
+              completed.width <= Double(panel.descriptor.maximumSize.width),
+              completed.height <= Double(panel.descriptor.maximumSize.height) else {
+            throw WorkspaceCanvasFixtureFailure("The completed mixed fixture lacks unclamped room for both displacements.")
+        }
+        var report: [String: Any] = [
+            "classification": "Owned native pointer callbacks and own-window key dispatch; no desktop or app-queued pointer claim",
+            "resizing": resizing, "original_frame": NSStringFromRect(original), "stage": "before-down",
+            "pointer_total_delta": [70, 40], "arrow_total_delta": [20, 10],
+            "expected_completed_frame": NSStringFromRect(completed.nativeRect), "pending_arrow_dispatch_limit": 3, "total_key_dispatch_limit": 4,
+            "saved_baseline": "After actual down's explicit bringToFront, before transient geometry",
+        ]
+        defer { nativeDraftRetainMeasurement(report, name: "workspace-completed-mixed-" + (resizing ? "resize" : "move")) }
+        func requireOwner() throws {
+            guard fixture.window.isVisible, fixture.window.isKeyWindow,
+                  fixture.window.contentView === fixture.hosting, fixture.hosting.window === fixture.window,
+                  document.window === fixture.window, panel.window === fixture.window,
+                  handle.window === fixture.window, !handle.isHiddenOrHasHiddenAncestor,
+                  document.panelHosts["alpha"] === panel, panel.hostingView === hosting,
+                  fixture.preferences.activeLayout(for: "fixture")?.id == fixture.layoutA.id else {
+                throw WorkspaceCanvasFixtureFailure("The completed mixed gesture escaped its exact visible fixture and retained hosts.")
+            }
+        }
+        func sendOwnedKey(_ code: UInt16) throws {
+            try requireOwner()
+            guard fixture.window.makeFirstResponder(handle), fixture.window.firstResponder === handle else {
+                throw WorkspaceCanvasFixtureFailure("The completed mixed handle did not retain native keyboard focus.")
+            }
+            let event = try key(code, flags: [], window: fixture.window)
+            guard event.window === fixture.window, event.windowNumber == fixture.window.windowNumber else {
+                throw WorkspaceCanvasFixtureFailure("The completed mixed key escaped its exact owned window.")
+            }
+            fixture.window.sendEvent(event)
+        }
+        try requireOwner()
+        handle.mouseDown(with: try pointer(.leftMouseDown, at: start, in: document))
+        let saved = fixture.preferences.collection
+        let savedBytes = try XCTUnwrap(fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey))
+        func expectedCollection(_ value: NativeWorkspaceFrame) throws -> NativeWorkspaceCollection {
+            var expected = saved
+            let layoutIndex = try XCTUnwrap(expected.layouts.firstIndex { $0.id == fixture.layoutA.id && $0.viewID == "fixture" })
+            let panelIndex = try XCTUnwrap(expected.layouts[layoutIndex].panels.firstIndex { $0.id == "alpha" })
+            expected.layouts[layoutIndex].panels[panelIndex].frame = value
+            return expected
+        }
+        func assertSaved(_ value: NativeWorkspaceFrame) throws {
+            let expected = try expectedCollection(value)
+            let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
+            XCTAssertEqual(fixture.preferences.collection, expected)
+            XCTAssertEqual(fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey), try encoder.encode(expected))
+        }
+        handle.mouseDragged(with: try pointer(.leftMouseDragged, at: first, in: document))
+        guard panel.isManipulating, panel.frame != original else {
+            throw WorkspaceCanvasFixtureFailure("The completed mixed fixture did not reach a pending pointer gesture.")
+        }
+        XCTAssertEqual(panel.frame, frame(dx: 50, dy: 30).nativeRect)
+        for (index, code) in ([UInt16(124), 124, 125]).enumerated() {
+            let before = panel.frame
+            try sendOwnedKey(code)
+            guard panel.isManipulating, panel.frame != before else {
+                throw WorkspaceCanvasFixtureFailure("A repeated arrow did not reach the pending completed mixed gesture.")
+            }
+            XCTAssertEqual(panel.frame, frame(dx: index == 0 ? 60 : 70, dy: index == 2 ? 40 : 30).nativeRect)
+        }
+        report["stage"] = "after-repeated-arrows"
+        report["frame_after_arrows"] = NSStringFromRect(panel.frame)
+        report["collection_unchanged_after_arrows"] = fixture.preferences.collection == saved
+        report["bytes_unchanged_after_arrows"] = fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey) == savedBytes
+        XCTAssertEqual(fixture.preferences.collection, saved, "Mixed arrows remain transient until mouse-up.")
+        XCTAssertEqual(fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey), savedBytes)
+        try requireOwner()
+        handle.mouseDragged(with: try pointer(.leftMouseDragged, at: last, in: document))
+        XCTAssertTrue(panel.isManipulating)
+        XCTAssertEqual(panel.frame, completed.nativeRect, "A later pointer event must retain accumulated arrow displacement.")
+        XCTAssertEqual(fixture.preferences.collection, saved)
+        XCTAssertEqual(fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey), savedBytes)
+        report["frame_after_second_drag"] = NSStringFromRect(panel.frame)
+        handle.mouseUp(with: try pointer(.leftMouseUp, at: last, in: document))
+        XCTAssertFalse(panel.isManipulating)
+        XCTAssertEqual(panel.frame, completed.nativeRect, "Mouse-up must preserve pointer and keyboard displacement together.")
+        try assertSaved(completed)
+        report["stage"] = "completed"
+        report["frame_after_mouse_up"] = NSStringFromRect(panel.frame)
+        report["completed_collection_exact"] = fixture.preferences.collection == (try expectedCollection(completed))
+        try sendOwnedKey(123)
+        let freshKeyed = frame(dx: 80, dy: 50)
+        XCTAssertEqual(panel.frame, freshKeyed.nativeRect)
+        try assertSaved(freshKeyed)
+        let freshStart = handle.convert(NSPoint(x: handle.bounds.midX, y: handle.bounds.midY), to: document)
+        try drag(handle, in: document, from: freshStart, to: NSPoint(x: freshStart.x + 20, y: freshStart.y + 10))
+        let freshPointed = frame(dx: 100, dy: 60)
+        XCTAssertEqual(panel.frame, freshPointed.nativeRect)
+        try assertSaved(freshPointed)
+        XCTAssertFalse(panel.isManipulating)
+        XCTAssertTrue(document.panelHosts["alpha"] === panel)
+        XCTAssertTrue(panel.hostingView === hosting)
+        report["stage"] = "fresh-completed-inputs"
+        report["same_hosts"] = document.panelHosts["alpha"] === panel && panel.hostingView === hosting
+        await fixture.close(); scopeFixture = nil
+    }
+
+    func testPendingMoveOptionResizeSurvivesPointerCompletionAndEscape() async throws {
+        try await requireMixedBoundsAndOptionParity(resizing: false, optionMove: true)
+    }
+
+    func testPendingMoveClampedArrowUsesActualFrameForLaterPointerCompletion() async throws {
+        try await requireMixedBoundsAndOptionParity(resizing: false, optionMove: false)
+    }
+
+    func testPendingResizeClampedArrowUsesActualFrameForLaterPointerCompletion() async throws {
+        try await requireMixedBoundsAndOptionParity(resizing: true, optionMove: false)
+    }
+
+    private func requireMixedBoundsAndOptionParity(resizing: Bool, optionMove: Bool) async throws {
+        continueAfterFailure = true
+        let fixture = try await mountScope()
+        let document = try await mountedDocument(fixture)
+        let panel = try XCTUnwrap(document.panelHosts["alpha"])
+        defer { panel.cancelGesture() }
+        let hosting = panel.hostingView
+        let handle = try gestureHandle("workspace-\(resizing ? "resize" : "move")-alpha", in: panel)
+        let original = panel.frame
+        guard !(resizing && optionMove), original == NSRect(x: 100, y: 120, width: 400, height: 240),
+              panel.canvasSize == NSSize(width: 1_200, height: 800),
+              panel.descriptor.maximumSize == CGSize(width: 960, height: 640) else {
+            throw WorkspaceCanvasFixtureFailure("The mixed bounds fixture differs from its exact recorded canvas/panel geometry.")
+        }
+        let start = handle.convert(NSPoint(x: handle.bounds.midX, y: handle.bounds.midY), to: document)
+        let first = optionMove ? NSPoint(x: start.x + 50, y: start.y + 30)
+            : NSPoint(x: start.x + (resizing ? 560 : 700), y: start.y + (resizing ? 400 : 30))
+        let last = optionMove ? NSPoint(x: start.x + 70, y: start.y + 40)
+            : NSPoint(x: first.x - 20, y: first.y + (resizing ? -10 : 10))
+        let firstFrame = optionMove ? NativeWorkspaceFrame(x: 150, y: 150, width: 400, height: 240)
+            : resizing ? .init(x: 100, y: 120, width: 960, height: 640) : .init(x: 800, y: 150, width: 400, height: 240)
+        let completed = optionMove ? NativeWorkspaceFrame(x: 170, y: 160, width: 410, height: 250)
+            : resizing ? .init(x: 100, y: 120, width: 940, height: 630) : .init(x: 780, y: 160, width: 400, height: 240)
+        var report: [String: Any] = [
+            "classification": "Owned native pointer callbacks and own-window key dispatch; no desktop or queued-pointer claim",
+            "resizing": resizing, "option_move": optionMove, "stage": "before-down",
+            "original_frame": NSStringFromRect(original), "expected_completed_frame": NSStringFromRect(completed.nativeRect),
+            "key_dispatch_limit": optionMove ? 4 : 1, "pointer_callback_limit": optionMove ? 8 : 4,
+            "saved_baseline": "After each down's explicit bringToFront, before transient geometry",
+        ]
+        defer { nativeDraftRetainMeasurement(report, name: "workspace-mixed-" + (optionMove ? "option-move" : resizing ? "clamped-resize" : "clamped-move")) }
+        func requireOwner() throws {
+            guard fixture.window.isVisible, fixture.window.isKeyWindow,
+                  fixture.window.contentView === fixture.hosting, fixture.hosting.window === fixture.window,
+                  document.window === fixture.window, panel.window === fixture.window,
+                  handle.window === fixture.window, !handle.isHiddenOrHasHiddenAncestor,
+                  document.panelHosts["alpha"] === panel, panel.hostingView === hosting,
+                  fixture.preferences.activeLayout(for: "fixture")?.id == fixture.layoutA.id else {
+                throw WorkspaceCanvasFixtureFailure("The mixed bounds/Option flow escaped its exact visible fixture and hosts.")
+            }
+        }
+        func sendOwnedKey(_ code: UInt16, flags: NSEvent.ModifierFlags = []) throws {
+            try requireOwner()
+            guard fixture.window.makeFirstResponder(handle), fixture.window.firstResponder === handle else {
+                throw WorkspaceCanvasFixtureFailure("The mixed bounds/Option handle did not retain native keyboard focus.")
+            }
+            let event = try key(code, flags: flags, window: fixture.window)
+            guard event.window === fixture.window, event.windowNumber == fixture.window.windowNumber,
+                  event.modifierFlags.contains(.option) == flags.contains(.option) else {
+                throw WorkspaceCanvasFixtureFailure("The mixed bounds/Option key escaped its exact window or modifier state.")
+            }
+            fixture.window.sendEvent(event)
+        }
+        try requireOwner()
+        handle.mouseDown(with: try pointer(.leftMouseDown, at: start, in: document))
+        let saved = fixture.preferences.collection
+        let savedBytes = try XCTUnwrap(fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey))
+        func requirePendingStorage() {
+            XCTAssertTrue(panel.isManipulating)
+            XCTAssertEqual(fixture.preferences.collection, saved)
+            XCTAssertEqual(fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey), savedBytes)
+        }
+        handle.mouseDragged(with: try pointer(.leftMouseDragged, at: first, in: document))
+        guard panel.isManipulating, panel.frame != original else {
+            throw WorkspaceCanvasFixtureFailure("The mixed bounds/Option fixture did not reach a pending pointer edit.")
+        }
+        XCTAssertEqual(panel.frame, firstFrame.nativeRect)
+        requirePendingStorage()
+        report["stage"] = "before-arrow"
+        try sendOwnedKey(124, flags: optionMove ? [.option] : [])
+        if optionMove {
+            XCTAssertEqual(panel.frame, NSRect(x: 150, y: 150, width: 410, height: 240))
+            requirePendingStorage()
+            try sendOwnedKey(125, flags: [.option])
+            XCTAssertEqual(panel.frame, NSRect(x: 150, y: 150, width: 410, height: 250))
+        } else {
+            XCTAssertEqual(panel.frame, firstFrame.nativeRect, "A right arrow at the bound has zero actual displacement.")
+        }
+        requirePendingStorage()
+        report["frame_after_arrows"] = NSStringFromRect(panel.frame)
+        report["collection_unchanged_after_arrows"] = fixture.preferences.collection == saved
+        report["bytes_unchanged_after_arrows"] = fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey) == savedBytes
+        try requireOwner()
+        handle.mouseDragged(with: try pointer(.leftMouseDragged, at: last, in: document))
+        XCTAssertEqual(panel.frame, completed.nativeRect, "Later pointer input must retain Option geometry and actual bounded arrow displacement.")
+        requirePendingStorage()
+        report["frame_after_later_pointer"] = NSStringFromRect(panel.frame)
+        handle.mouseUp(with: try pointer(.leftMouseUp, at: last, in: document))
+        XCTAssertFalse(panel.isManipulating)
+        XCTAssertEqual(panel.frame, completed.nativeRect)
+        var expected = saved
+        let layoutIndex = try XCTUnwrap(expected.layouts.firstIndex { $0.id == fixture.layoutA.id && $0.viewID == "fixture" })
+        let panelIndex = try XCTUnwrap(expected.layouts[layoutIndex].panels.firstIndex { $0.id == "alpha" })
+        expected.layouts[layoutIndex].panels[panelIndex].frame = completed
+        let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
+        XCTAssertEqual(fixture.preferences.collection, expected)
+        XCTAssertEqual(fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey), try encoder.encode(expected))
+        report["stage"] = "completed"
+        report["frame_after_mouse_up"] = NSStringFromRect(panel.frame)
+        report["completed_collection_exact"] = fixture.preferences.collection == expected
+        if optionMove {
+            let rollback = panel.frame
+            let freshStart = handle.convert(NSPoint(x: handle.bounds.midX, y: handle.bounds.midY), to: document)
+            let freshEnd = NSPoint(x: freshStart.x + 20, y: freshStart.y + 10)
+            handle.mouseDown(with: try pointer(.leftMouseDown, at: freshStart, in: document))
+            let cancelSaved = fixture.preferences.collection
+            let cancelBytes = try XCTUnwrap(fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey))
+            handle.mouseDragged(with: try pointer(.leftMouseDragged, at: freshEnd, in: document))
+            try sendOwnedKey(124, flags: [.option])
+            XCTAssertTrue(panel.isManipulating)
+            XCTAssertEqual(panel.frame, NSRect(x: rollback.minX + 20, y: rollback.minY + 10,
+                                              width: rollback.width + 10, height: rollback.height))
+            XCTAssertEqual(fixture.preferences.collection, cancelSaved)
+            XCTAssertEqual(fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey), cancelBytes)
+            try sendOwnedKey(53)
+            handle.mouseUp(with: try pointer(.leftMouseUp, at: freshEnd, in: document))
+            XCTAssertFalse(panel.isManipulating)
+            XCTAssertEqual(panel.frame, rollback, "Escape rolls back Option resizing inside a pointer move.")
+            XCTAssertEqual(fixture.preferences.collection, cancelSaved)
+            XCTAssertEqual(fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey), cancelBytes)
+            report["stage"] = "option-escape-and-late-up"
+            report["collection_unchanged_after_option_escape"] = fixture.preferences.collection == cancelSaved
+            report["bytes_unchanged_after_option_escape"] = fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey) == cancelBytes
+        }
+        XCTAssertTrue(document.panelHosts["alpha"] === panel)
+        XCTAssertTrue(panel.hostingView === hosting)
+        report["same_hosts"] = document.panelHosts["alpha"] === panel && panel.hostingView === hosting
+        await fixture.close(); scopeFixture = nil
+    }
+
     func testProductionComputeSurfaceStopsWhenLayoutHidesPanelAndResumesSameSurface() async throws {
         guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
             throw WorkspaceCanvasFixtureFailure("The actual Reduce Motion setting prevents this motion-clock qualification.")
