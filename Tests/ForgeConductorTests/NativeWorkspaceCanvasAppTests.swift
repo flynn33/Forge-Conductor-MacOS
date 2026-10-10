@@ -2882,9 +2882,68 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
         try await nativeToolsSharedControls(.exportedApplicationContent)
     }
 
-    private func nativeToolsSharedControls(_ identifierRoute: ToolsSharedControlIdentifierRoute) async throws {
+    func testProductionThirteenViewsExportedSharedMenusRecoverPanelsRestoreSelectAndDelete() async throws {
+        let deadline = ProcessInfo.processInfo.systemUptime + 120
+        let routes: [(viewID: String, root: @MainActor (AppModel) -> AnyView)] = [
+            ("rig", { _ in AnyView(RigDashboardView()) }),
+            ("mcp", { _ in AnyView(MCPServersView()) }),
+            ("agents", { _ in AnyView(AgentsView()) }),
+            ("tools", { _ in AnyView(ToolsView()) }),
+            ("feed", { _ in AnyView(LiveFeedView()) }),
+            ("projects", { AnyView(ProjectsOperatorView(client: $0.operatorManagerClient)) }),
+            ("rune-forge.overview", { AnyView(RuneForgeOperatorView(client: $0.operatorManagerClient)) }),
+            ("continuity", { AnyView(ContinuityOperatorView(client: $0.operatorManagerClient)) }),
+            ("runtimes", { AnyView(RuntimesOperatorView(client: $0.operatorManagerClient)) }),
+            ("provider", { AnyView(ProviderOperatorView(client: $0.operatorManagerClient)) }),
+            ("evidence", { AnyView(EvidenceOperatorView(client: $0.operatorManagerClient)) }),
+            ("diagnostics", { _ in AnyView(DiagnosticsView()) }),
+            ("manager.folders", { _ in AnyView(ManagerSettingsView(initialSection: .folders)) }),
+        ]
+        let admitted = Set(NativeWorkspaceCatalog.panelsByView.keys.filter {
+            !$0.hasPrefix("manager.") && !$0.hasPrefix("rune-forge.")
+        } + ["manager.folders", "rune-forge.overview"])
+        guard routes.count == 13, Set(routes.map(\.viewID)) == admitted else {
+            throw WorkspaceCanvasFixtureFailure("The shared native menu table omitted or duplicated an existing main view.")
+        }
+        var completed: [String] = [], menus = 0, storedStates = 0
+        defer {
+            nativeDraftRetainMeasurement([
+                "classification": "Actual native shared menus on 13 isolated production roots; validated application-content lookup, no sidebar/desktop/live-backend qualification",
+                "completed_view_ids": completed, "expected_view_ids": admitted.sorted(),
+                "native_menu_actions": menus, "complete_stored_state_checks": storedStates,
+                "aggregate_deadline_seconds": 120, "within_deadline": ProcessInfo.processInfo.systemUptime < deadline,
+                "execution_completed": completed.count == 13,
+                "manager_namespace": "manager.folders", "rune_namespace": "rune-forge.overview",
+            ], name: "workspace-thirteen-view-shared-menu-union")
+        }
+        for route in routes {
+            try Task.checkCancellation()
+            guard ProcessInfo.processInfo.systemUptime < deadline else {
+                throw WorkspaceCanvasFixtureFailure("The thirteen-view shared menu flow exceeded its aggregate deadline.")
+            }
+            try await nativeToolsSharedControls(.exportedApplicationContent, viewID: route.viewID,
+                flowDeadline: deadline, makeRoot: route.root)
+            let count = try XCTUnwrap(NativeWorkspaceCatalog.panelsByView[route.viewID]).count
+            completed.append(route.viewID); menus += count + 5; storedStates += count + 8
+        }
+        guard Set(completed) == admitted, completed.count == 13, menus == 145, storedStates == 184,
+              ProcessInfo.processInfo.systemUptime < deadline else {
+            throw WorkspaceCanvasFixtureFailure("The shared main-view action/state union is incomplete or exceeded its deadline.")
+        }
+    }
+
+    private func nativeToolsSharedControls(_ identifierRoute: ToolsSharedControlIdentifierRoute,
+        viewID: String = "tools", flowDeadline: TimeInterval? = nil,
+        makeRoot: (@MainActor (AppModel) -> AnyView)? = nil) async throws {
         continueAfterFailure = true
-        let deadline = ProcessInfo.processInfo.systemUptime + 45
+        let deadline = min(flowDeadline ?? .infinity, ProcessInfo.processInfo.systemUptime + 45)
+        let descriptors = try XCTUnwrap(NativeWorkspaceCatalog.panelsByView[viewID])
+        guard !descriptors.isEmpty, descriptors.count <= 16, Set(descriptors.map(\.id)).count == descriptors.count else {
+            throw WorkspaceCanvasFixtureFailure("Shared-control catalog is empty, duplicated or exceeds the admitted main-view bound.")
+        }
+        let primary = try XCTUnwrap(descriptors.first)
+        let menuLimit = descriptors.count + 5
+        let stateLimit = makeRoot == nil && viewID == "tools" ? 16 : descriptors.count + 8
         let suite = "forge.workspace.controls.tests.\(UUID().uuidString)"
         let home = FileManager.default.temporaryDirectory.appendingPathComponent("forge-workspace-controls-\(UUID().uuidString)")
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
@@ -2902,8 +2961,8 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
                 panels: panels.map { .init(id: $0.id, frame: $0.defaultFrame, isVisible: true) })
         }
         // Fixture setup only. Every tested layout/visibility change below is a native UI action.
-        let marker = seed("tools", "Tools marker \(UUID().uuidString)")
-        let independent = seed("diagnostics", "Independent \(UUID().uuidString)")
+        let marker = seed(viewID, "Tools marker \(UUID().uuidString)")
+        let independent = seed(viewID == "diagnostics" ? "tools" : "diagnostics", "Independent \(UUID().uuidString)")
         try preferences.save(marker, activate: false)
         try preferences.save(independent)
         var expected = preferences.collection
@@ -2912,9 +2971,10 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
         let bootstrap = AppBootstrapOperation(factory: { throw CancellationError() }, pluginStatus: { _ in nil })
         let model = AppModel(bootstrapOperation: bootstrap, diagnosticPaths: AppPaths(home: home))
         model.autoRefresh = false
-        let hosting = NSHostingView(rootView: AnyView(ToolsView()
+        let hosting = NSHostingView(rootView: AnyView((makeRoot?(model) ?? AnyView(ToolsView()))
             .environment(\.nativeWorkspacePreferences, preferences)
             .environmentObject(model).environmentObject(workbench).environmentObject(guidedMode).graphiteWorkbench()))
+        if makeRoot != nil { hosting.sizingOptions = [] }
         let owned = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 1_240, height: 900),
             styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
         owned.isReleasedWhenClosed = false
@@ -2926,21 +2986,24 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
         let menuLifecycle = identifierRoute == .exportedApplicationContent
             ? WorkspaceSharedControlsMenuLifecycleObservation(window: owned, hosting: hosting) : nil
         defer {
-            nativeDraftRetainMeasurement(["classification": identifierRoute == .ordinary
+            nativeDraftRetainMeasurement(["classification": makeRoot != nil
+                    ? "Actual shared controls on one isolated production root; validated application-content lookup, original ordinary/whole-window and desktop gates remain separate"
+                    : identifierRoute == .ordinary
                     ? "Separate real Tools shared native controls route; runtime assertions determine qualification, no all-view/desktop claim"
                     : "Separate real Tools exported application-content controls route; standard Zoom descendants excluded only after exact validation, original ordinary/whole-window gates unchanged/open; no all-view/desktop claim",
                 "identifier_route": identifierRoute == .ordinary ? "ordinary-native-tree" : "exported-application-content",
-                "stage": stage, "view_id": "tools", "flow_deadline_seconds": 45,
-                "stage_record_limit": 16, "records": records, "menu_record_limit": 8, "menus": menus,
+                "stage": stage, "view_id": viewID, "flow_deadline_seconds": 45,
+                "stage_record_limit": stateLimit, "records": records, "menu_record_limit": menuLimit, "menus": menus,
                 "latest_control_discovery": latestControlDiscovery,
                 "first_native_menu_lifecycle_observation": menuLifecycle.map { $0.evidence as Any } ?? NSNull(),
-                "original_naming_whole_window_and_desktop_gates": "unchanged/open"], name: "workspace-tools-shared-controls")
+                "original_naming_whole_window_and_desktop_gates": "unchanged/open"], name: "workspace-" + viewID + "-shared-controls")
         }
         defer { menuLifecycle?.stop() }
         func close() async {
             owned.endEditing(for: nil); _ = owned.makeFirstResponder(nil)
             hosting.rootView = AnyView(EmptyView()); hosting.layoutSubtreeIfNeeded()
             owned.orderOut(nil); owned.contentView = nil; owned.close(); window = nil
+            model.stopRigOperationalMonitoring()
             await model.stopBootstrap(); model.telemetryBinding.detach()
         }
         func requireOwner() throws {
@@ -3061,24 +3124,24 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
             XCTAssertEqual(preferences.collection, expected)
             XCTAssertEqual(defaults.data(forKey: NativeWorkspacePreferences.storageKey), try encoder.encode(expected))
             XCTAssertNil(restored.restorationError); XCTAssertEqual(restored.collection, expected)
-            XCTAssertEqual(preferences.activeLayout(for: "diagnostics"), independent)
+            XCTAssertEqual(preferences.activeLayout(for: independent.viewID), independent)
             guard preferences.collection == expected, restored.collection == expected,
                   defaults.data(forKey: NativeWorkspacePreferences.storageKey) == (try encoder.encode(expected)),
-                  restored.restorationError == nil, records.count < 16 else {
+                  restored.restorationError == nil, records.count < stateLimit else {
                 throw WorkspaceCanvasFixtureFailure("The shared native action changed unexpected persisted state: " + label)
             }
             records.append(["stage": label, "complete_collection_and_bytes_exact": true,
                 "fresh_owner_restoration_exact": true, "saved_layout_count": expected.layouts.count])
         }
         func choose(_ command: String, panels: Bool) async throws {
-            guard menus.count < 8 else { throw WorkspaceCanvasFixtureFailure("Shared native menu calls exceeded eight attempts.") }
-            let opener = try await control(panels ? "workspace-panels-menu-tools" : "workspace-layout-menu-tools", menu: true)
-            let titles = panels ? NativeWorkspaceCatalog.tools.map(\.title)
-                : ["Default"] + preferences.layouts(for: "tools").map { "Layout: " + $0.name } + ["Save Layout As…", "Rename Layout…", "Delete Layout"]
+            guard menus.count < menuLimit else { throw WorkspaceCanvasFixtureFailure("Shared native menu calls exceeded the admitted catalog flow bound.") }
+            let opener = try await control(panels ? "workspace-panels-menu-" + viewID : "workspace-layout-menu-" + viewID, menu: true)
+            let titles = panels ? descriptors.map(\.title)
+                : ["Default"] + preferences.layouts(for: viewID).map { "Layout: " + $0.name } + ["Save Layout As…", "Rename Layout…", "Delete Layout"]
             var states: [String: NSControl.StateValue] = [:]
             if panels {
-                guard let layout = preferences.activeLayout(for: "tools") else { throw WorkspaceCanvasFixtureFailure("Panels requires the actual active Tools layout.") }
-                for descriptor in NativeWorkspaceCatalog.tools {
+                guard let layout = preferences.activeLayout(for: viewID) else { throw WorkspaceCanvasFixtureFailure("Panels requires the actual active Tools layout.") }
+                for descriptor in descriptors {
                     states[descriptor.title] = layout.panels.first { $0.id == descriptor.id }?.isVisible == true ? .on : .off
                 }
             }
@@ -3101,7 +3164,7 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
             } else {
                 try requireAncestor(opener.object, before: capture.deadline)
             }
-            guard opener.identifier == (panels ? "workspace-panels-menu-tools" : "workspace-layout-menu-tools"), opener.enabled == true else {
+            guard opener.identifier == (panels ? "workspace-panels-menu-" + viewID : "workspace-layout-menu-" + viewID), opener.enabled == true else {
                 throw WorkspaceCanvasFixtureFailure("The exact shared native opener changed before activation.")
             }
             if identifierRoute == .exportedApplicationContent {
@@ -3110,7 +3173,12 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
                 }
                 menuLifecycle?.noteSecondAction(returned: false, attemptOrdinal: menus.count + 1,
                     captureDeadline: capture.deadline, actionDeadline: context.deadline)
-                try context.pressToolsMenu(element, requestedIdentifier: panels ? "workspace-panels-menu-tools" : "workspace-layout-menu-tools")
+                if viewID == "tools" {
+                    try context.pressToolsMenu(element, requestedIdentifier: panels ? "workspace-panels-menu-tools" : "workspace-layout-menu-tools")
+                } else {
+                    try context.pressWorkspaceMenu(element, viewID: viewID,
+                        requestedIdentifier: panels ? "workspace-panels-menu-" + viewID : "workspace-layout-menu-" + viewID)
+                }
                 menuLifecycle?.noteSecondAction(returned: true, attemptOrdinal: menus.count + 1,
                     captureDeadline: capture.deadline, actionDeadline: context.deadline)
             } else {
@@ -3140,13 +3208,13 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
             NSApp.activate(ignoringOtherApps: true); owned.makeKeyAndOrderFront(nil); owned.orderFrontRegardless()
             try requireState("default-baseline")
             stage = "customize"
-            let customize = try await control("workspace-customize-tools"); try customize.press()
-            try await settled("Actual Customize Layout did not select its new Tools layout.") { preferences.activeLayout(for: "tools") != nil }
-            let custom = try XCTUnwrap(preferences.activeLayout(for: "tools"))
+            let customize = try await control("workspace-customize-" + viewID); try customize.press()
+            try await settled("Actual Customize Layout did not select its new Tools layout.") { preferences.activeLayout(for: viewID) != nil }
+            let custom = try XCTUnwrap(preferences.activeLayout(for: viewID))
             XCTAssertNotEqual(custom.id, marker.id); XCTAssertNotEqual(custom.id, independent.id)
-            var seeded = seed("tools", "Custom")
+            var seeded = seed(viewID, "Custom")
             seeded = .init(id: custom.id, viewID: seeded.viewID, name: seeded.name, canvas: seeded.canvas, panels: seeded.panels)
-            expected.layouts.append(seeded); expected.activeLayoutIDs["tools"] = custom.id
+            expected.layouts.append(seeded); expected.activeLayoutIDs[viewID] = custom.id
             try requireState("customize")
             func optionalDocument() throws -> NativeWorkspaceDocumentView? {
                 let documents = descendants(hosting).compactMap { $0 as? NativeWorkspaceDocumentView }
@@ -3158,23 +3226,23 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
             func document() throws -> NativeWorkspaceDocumentView {
                 try XCTUnwrap(optionalDocument(), "Tools has no mounted native document.")
             }
-            try await settled("Tools Customize did not mount all three real panels.") {
-                try optionalDocument()?.panelHosts.count == 3
+            try await settled("Customize did not mount every admitted catalog panel.") {
+                try optionalDocument()?.panelHosts.count == descriptors.count
             }
-            let canvas = try document(), panel = try XCTUnwrap(canvas.panelHosts["tools-controls"]), panelHosting = panel.hostingView
+            let canvas = try document(), panel = try XCTUnwrap(canvas.panelHosts[primary.id]), panelHosting = panel.hostingView
             func setExpectedShown(_ id: String, _ visible: Bool) throws {
-                let layoutIndex = try XCTUnwrap(expected.layouts.firstIndex { $0.id == custom.id && $0.viewID == "tools" })
+                let layoutIndex = try XCTUnwrap(expected.layouts.firstIndex { $0.id == custom.id && $0.viewID == viewID })
                 let panelIndex = try XCTUnwrap(expected.layouts[layoutIndex].panels.firstIndex { $0.id == id })
                 expected.layouts[layoutIndex].panels[panelIndex].isVisible = visible
             }
             for shown in [false, true] {
                 stage = shown ? "panels-show" : "panels-hide"
-                try await choose("Tools and Filter", panels: true); try setExpectedShown("tools-controls", shown)
+                try await choose(primary.title, panels: true); try setExpectedShown(primary.id, shown)
                 try await settled("Actual Panels menu did not apply Tools visibility.") { panel.isHidden == !shown }
-                XCTAssertTrue(canvas.panelHosts["tools-controls"] === panel); XCTAssertTrue(panel.hostingView === panelHosting)
+                XCTAssertTrue(canvas.panelHosts[primary.id] === panel); XCTAssertTrue(panel.hostingView === panelHosting)
                 try requireState(stage)
             }
-            for descriptor in NativeWorkspaceCatalog.tools {
+            for descriptor in descriptors {
                 stage = "hide-all-" + descriptor.id
                 try await choose(descriptor.title, panels: true); try setExpectedShown(descriptor.id, false)
                 try await settled("Actual Panels command did not hide its Tools panel.") { canvas.panelHosts[descriptor.id]?.isHidden == true }
@@ -3182,29 +3250,32 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
             }
             XCTAssertTrue(canvas.panelHosts.values.allSatisfy(\.isHidden))
             stage = "recover-all-hidden"
-            try await choose("Tools and Filter", panels: true); try setExpectedShown("tools-controls", true)
+            try await choose(primary.title, panels: true); try setExpectedShown(primary.id, true)
             try await settled("The all-hidden workspace did not recover through its Panels menu.") { !panel.isHidden }
-            XCTAssertTrue(canvas.panelHosts["tools-controls"] === panel); XCTAssertTrue(panel.hostingView === panelHosting)
+            XCTAssertTrue(canvas.panelHosts[primary.id] === panel); XCTAssertTrue(panel.hostingView === panelHosting)
             try requireState(stage)
             stage = "restore-default"
-            let restore = try await control("workspace-restore-default-tools"); try restore.press()
-            expected.activeLayoutIDs["tools"] = nil
+            let restore = try await control("workspace-restore-default-" + viewID); try restore.press()
+            expected.activeLayoutIDs[viewID] = nil
             try await settled("Actual Restore Default did not dismantle Tools custom canvas.") { try optionalDocument() == nil }
             XCTAssertTrue(canvas.panelHosts.isEmpty); try requireState(stage)
             stage = "select-saved"
-            try await choose("Layout: " + custom.name, panels: false); expected.activeLayoutIDs["tools"] = custom.id
+            try await choose("Layout: " + custom.name, panels: false); expected.activeLayoutIDs[viewID] = custom.id
             try await settled("Actual saved selection did not restore its Tools canvas.") {
-                try optionalDocument()?.panelHosts["tools-controls"]?.isHidden == false
+                try optionalDocument()?.panelHosts[primary.id]?.isHidden == false
             }
             XCTAssertEqual(try document().panelHosts.count, 1, "Previously hidden panels must stay unconstructed on this new canvas.")
             try requireState(stage)
             stage = "delete-selected"
             try await choose("Delete Layout", panels: false)
-            expected.layouts.removeAll { $0.id == custom.id }; expected.activeLayoutIDs["tools"] = nil
+            expected.layouts.removeAll { $0.id == custom.id }; expected.activeLayoutIDs[viewID] = nil
             try await settled("Actual Delete Layout did not restore the Tools default composition.") { try optionalDocument() == nil }
-            _ = try await control("workspace-customize-tools")
+            _ = try await control("workspace-customize-" + viewID)
             try requireState(stage)
-            XCTAssertEqual(preferences.layouts(for: "tools"), [marker])
+            XCTAssertEqual(preferences.layouts(for: viewID), [marker])
+            guard menus.count == menuLimit, records.count == descriptors.count + 8 else {
+                throw WorkspaceCanvasFixtureFailure("The shared native control flow omitted a menu action or stored-state check.")
+            }
             stage = "completed"
             await close()
         } catch {
@@ -6192,6 +6263,26 @@ private final class NativeWorkspaceDraftExportedAXContext {
             "exported_ax_bridge": true, "identifier": current.identifier ?? "", "role": current.role?.rawValue ?? "",
             "enabled": current.enabled.map { $0 as Any } ?? NSNull(),
             "advertised_exported_actions": try NativeWorkspaceDraftAXQuery.actions(element, deadline: deadline)]
+    }
+
+    func pressWorkspaceMenu(_ element: AXUIElement, viewID: String, requestedIdentifier: String) throws {
+        guard NativeWorkspaceCatalog.panelsByView[viewID] != nil,
+              requestedIdentifier == "workspace-panels-menu-" + viewID
+                || requestedIdentifier == "workspace-layout-menu-" + viewID else {
+            throw WorkspaceCanvasFixtureFailure("The exported workspace menu is not an exact catalog-bound shared opener.")
+        }
+        try requireOwnedAncestor(element)
+        let current = try snapshot(element)
+        guard current.identifier == requestedIdentifier, current.enabled == true,
+              current.role?.rawValue == kAXMenuButtonRole,
+              try NativeWorkspaceDraftAXQuery.actions(element, deadline: deadline).contains(kAXPressAction) else {
+            throw WorkspaceCanvasFixtureFailure("The exact exported workspace menu is not an enabled AXMenuButton advertising AXPress.")
+        }
+        try NativeWorkspaceDraftAXQuery.prepare(element, deadline: deadline)
+        let status = AXUIElementPerformAction(element, kAXPressAction as CFString)
+        guard status == .success, ProcessInfo.processInfo.systemUptime < deadline else {
+            throw WorkspaceCanvasFixtureFailure("The exact exported workspace menu AXPress failed or exceeded its deadline: AXError \(status.rawValue).")
+        }
     }
 
     func pressToolsMenu(_ element: AXUIElement, requestedIdentifier: String) throws {
