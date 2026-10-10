@@ -16,6 +16,8 @@ A separate v28 trust-state observation still failed both complete-draft methods.
 
 A separate synthetic AppKit/SwiftUI export comparison v31 passed one actual method: both owned fixtures exported exactly one identified AXButton while the test client reported false for accessibility trust. The earlier v29 compile failure executed no method; v30 failed a new direct-role assumption, preserved as NONPASS. Only the added fixture/report checks were corrected. No button action or original Manager/Projects flow was exercised; their v28 two-method failure and complete UI gates remain open.
 
+Separate application-content Manager/Projects checks passed both native draft flows in v38: literal editing, Hide/show and layout retention, Manager section/Save-refusal/Reload actions, and Projects' single page owner. The scope excludes only the validated standard window-control descendant expansion. Layout selection/show/geometry use the preferences API; original whole-window and ordinary-native checks remain unchanged/NONPASS. Backend Save success, layout menus, desktop/installed operation and full UI remain unqualified. [Current gates](docs/QUALIFICATION-STATUS.md).
+
 The post-naming v6 ordinary Debug build, strict signature and seven-artifact/Info 0.44.0 (60) readback passed against 320 product/build inputs. This qualifies candidate compilation and file identities; candidate launch, installed operation and full UI remain unverified. Remaining new capability implementations stay deferred. [Current gates](docs/QUALIFICATION-STATUS.md).
 
 ## Earlier UI checks before the naming repair

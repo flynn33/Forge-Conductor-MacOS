@@ -33,6 +33,8 @@ Product versions do not by themselves claim shipment.
 
 - Record the separate synthetic export comparison: v29 failed compilation with no method executed, v30 failed its added direct NSButton-role assumption, and v31 passed one actual bounded AppKit/SwiftUI comparison after fixture-only corrections. Both fixtures exported one exact identified AXButton with client trust false. Original Manager/Projects actions and all 23 assertions remain unchanged/NONPASS on v28; no permission cause, product repair, control action or full UI qualification follows.
 
+- Add separate native draft checks and bounded exported ancestry diagnostics. V32–v35 remain NONPASS; the removed v33 metadata experiment and v36/v37 scope-guard failures are retained. V38 passed both explicit application-content cases after the new guard was corrected from observed standard-control metadata, preserving all copied draft assertions/actions. Layout transitions use the preferences API; a fresh v39 original whole-window rerun failed both methods, and ordinary-native gates stay unchanged/NONPASS. No backend Save success, production repair or full UI pass follows. [Qualification](docs/QUALIFICATION-STATUS.md).
+
 #### Earlier UI checks before the naming repair
 
 - Verify the post-Compute ordinary Debug candidate, strict signature and CLI/app product links. Candidate Dashboard startup was observed. The later whole native Canvas selection passed 11 of 13 methods; both draft cases, Projects desktop navigation and Rune naming qualification remain open. The installed 0.18.0 (28) app was not replaced.

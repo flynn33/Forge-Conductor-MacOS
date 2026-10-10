@@ -161,6 +161,976 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
         return (report, complete, matchingButtons)
     }
 
+    func testProductionManagerOwnedEventDraftSurvivesWorkspaceAndSectionTransitions() async throws {
+        do {
+            continueAfterFailure = true
+            let flowDeadline = ProcessInfo.processInfo.systemUptime + 45
+            nativeDraftStage("manager.fixture.create")
+            defer { nativeDraftStage("manager.test.return-from-" + nativeDraftCurrentStage) }
+            let fixture = try NativeWorkspaceDraftFixture(page: .manager)
+            draftFixture = fixture
+            nativeDraftStage("bootstrap.await-success")
+            try await exposeNativeDraftFixture(fixture)
+            try nativeOwnedRequireOwner(fixture, deadline: flowDeadline)
+            nativeDraftStage("bootstrap.published-success")
+            let app = try XCTUnwrap(fixture.model.app)
+            let originalConfiguration = try Data(contentsOf: app.paths.configJSON)
+            let originalHost = fixture.model.setHost
+            let draft = "native-workspace-manager-draft.invalid"
+            nativeDraftStage("default.field.lookup")
+            let field = try await nativeOwnedField(in: fixture.hosting, identifier: "Dashboard host",
+                                                   placeholder: "Dashboard host", fixture: fixture, deadline: flowDeadline)
+            try nativeOwnedEditField(field, value: draft, in: fixture.window, fixture: fixture, deadline: flowDeadline)
+            try await nativeOwnedWait("The real Manager field did not update its staged AppModel value.", deadline: flowDeadline) {
+                try fixture.model.setHost == draft && field.stringValue == draft
+            }
+            nativeDraftStage("edit.binding-confirmed.default-to-custom.begin")
+            let layout = nativeDraftLayout(viewID: "manager.settings")
+            try fixture.preferences.save(layout)
+            nativeDraftStage("default-to-custom.preference-saved")
+            let document = try await nativeOwnedDocument(fixture, panelID: "manager-dashboard-settings", deadline: flowDeadline)
+            let panel = try XCTUnwrap(document.panelHosts["manager-dashboard-settings"])
+            let hosting = panel.hostingView
+            nativeDraftStage("custom.field.lookup")
+            let customField = try await nativeOwnedField(in: hosting, identifier: "Dashboard host",
+                                                         placeholder: "Dashboard host", fixture: fixture, deadline: flowDeadline)
+            XCTAssertEqual((try customField.stringValue), draft)
+            nativeDraftStage("custom.hide.begin")
+            try await nativeOwnedHide(panel, fixture: fixture, deadline: flowDeadline)
+            nativeDraftStage("custom.hide.native-action-returned")
+            try await nativeOwnedWait("The actual native Hide action did not hide Manager settings.", deadline: flowDeadline) { panel.isHidden }
+            XCTAssertFalse(try XCTUnwrap(fixture.preferences.activeLayout(for: "manager.settings")?
+                .panels.first { $0.id == "manager-dashboard-settings" }).isVisible)
+            try fixture.preferences.setShown(true, for: "manager-dashboard-settings", in: "manager.settings")
+            try await nativeOwnedWait("Manager settings did not resume from the retained native host.", deadline: flowDeadline) { !panel.isHidden }
+            XCTAssertTrue(panel.hostingView === hosting)
+            XCTAssertEqual((try customField.stringValue), draft)
+            nativeDraftStage("named-layout.save.begin")
+            let named = try fixture.preferences.saveAs(try XCTUnwrap(fixture.preferences.activeLayout(for: "manager.settings")),
+                                                       named: "Manager Native Draft")
+            try await nativeOwnedWait("The named Manager layout did not become active.", deadline: flowDeadline) {
+                fixture.preferences.activeLayout(for: "manager.settings")?.id == named
+            }
+            let namedFrame = NativeWorkspaceFrame(x: 380, y: 60, width: 860, height: 440)
+            try fixture.preferences.setFrame(namedFrame, for: "manager-dashboard-settings", in: "manager.settings")
+            try await nativeOwnedWait("The named Manager geometry did not reach the actual panel.", deadline: flowDeadline) { panel.frame == namedFrame.nativeRect }
+            try fixture.preferences.activate(layout.id, for: "manager.settings")
+            try await nativeOwnedWait("The original Manager layout did not reach the actual panel.", deadline: flowDeadline) {
+                panel.frame == layout.panels.first { $0.id == "manager-dashboard-settings" }?.frame.nativeRect
+            }
+            try fixture.preferences.activate(named, for: "manager.settings")
+            try await nativeOwnedWait("Named layout changes replaced the Manager binding.", deadline: flowDeadline) {
+                try panel.frame == namedFrame.nativeRect && panel.hostingView === hosting
+                    && customField.stringValue == draft && fixture.model.setHost == draft
+            }
+            nativeDraftStage("manager.restore-default.begin")
+            try fixture.preferences.reset("manager.settings")
+            try await nativeOwnedWait("Default restoration did not dismantle Manager's custom canvas.", deadline: flowDeadline) {
+                try self.nativeOwnedViews(fixture.hosting, fixture: fixture, deadline: flowDeadline).allSatisfy { !($0 is NativeWorkspaceDocumentView) }
+            }
+            let defaultField = try await nativeOwnedField(in: fixture.hosting, identifier: "Dashboard host",
+                                                          placeholder: "Dashboard host", fixture: fixture, deadline: flowDeadline)
+            XCTAssertEqual((try defaultField.stringValue), draft)
+            nativeDraftStage("manager.section-transitions.begin")
+            for (section, title) in [("shell", "Project Shell"), ("folders", "Authorized Folders"),
+                                      ("workbench", "Workbench"), ("settings", "Settings")] {
+                nativeDraftStage("manager.section." + section + ".press")
+                try await nativeOwnedPress("manager-section-" + section, in: fixture, deadline: flowDeadline)
+                try await nativeOwnedRequireManagerTitle(title, in: fixture, deadline: flowDeadline)
+            }
+            let resumed = try await nativeOwnedField(in: fixture.hosting, identifier: "Dashboard host",
+                                                     placeholder: "Dashboard host", fixture: fixture, deadline: flowDeadline)
+            XCTAssertEqual((try resumed.stringValue), draft)
+            XCTAssertEqual(fixture.model.setHost, draft)
+            XCTAssertNil(fixture.model.manager)
+            XCTAssertNil(fixture.model.remoteManager)
+            nativeDraftStage("manager.save-refusal.begin")
+            try await nativeOwnedPress("settings-save", in: fixture, deadline: flowDeadline)
+            try await nativeOwnedWait("The queued Save did not reach the actual unavailable-manager result.", deadline: flowDeadline) {
+                fixture.model.managerMessage == "Manager is unavailable"
+            }
+            XCTAssertEqual(fixture.model.managerMessage, "Manager is unavailable")
+            XCTAssertEqual(try Data(contentsOf: app.paths.configJSON), originalConfiguration,
+                           "The isolated native presentation must not turn a staged edit into a backend save.")
+            nativeDraftStage("manager.reload.begin")
+            try await nativeOwnedPress("settings-reload", in: fixture, deadline: flowDeadline)
+            try await nativeOwnedWait("Explicit native Reload did not restore the actual bootstrap configuration.", deadline: flowDeadline) {
+                try !fixture.model.isUpdatingSettings && fixture.model.setHost == originalHost
+                    && resumed.stringValue == originalHost
+            }
+            XCTAssertEqual(fixture.recorder.creations, 1)
+            XCTAssertTrue(fixture.model.app === app)
+            try nativeOwnedRequireOwner(fixture, deadline: flowDeadline)
+            try nativeOwnedRecord(["classification": "Independent real draft route completed execution; actual XCTest assertions determine its outcome, original exported-AX gates stay separate",
+                "test_method": "testProductionManagerOwnedEventDraftSurvivesWorkspaceAndSectionTransitions", "stage": nativeDraftCurrentStage,
+                "bootstrap_creations": fixture.recorder.creations, "event_route": "NSApp.postEvent owned-window pointer pair; actual AppKit editor",
+            ], name: "native-owned-complete-flow-execution")
+        } catch {
+            let actual = error as NSError
+            nativeDraftRetainMeasurement([
+                "classification": "Independent real owned-event draft case failure; identical error rethrown, original exported-AX methods unchanged",
+                "test_method": "testProductionManagerOwnedEventDraftSurvivesWorkspaceAndSectionTransitions",
+                "stage": nativeDraftCurrentStage,
+                "error_type": String(String(reflecting: type(of: error)).prefix(1_024)),
+                "error_description": String(String(describing: error).prefix(4_096)),
+                "NSError_domain": String(actual.domain.prefix(1_024)),
+                "NSError_code": actual.code,
+                "task_cancelled": Task.isCancelled,
+            ], name: "native-owned-complete-flow-boundary-error")
+            throw error
+        }
+    }
+
+    func testProductionProjectsOwnedEventRepositoryDraftSurvivesWorkspaceWithSinglePageOwner() async throws {
+        do {
+            continueAfterFailure = true
+            let flowDeadline = ProcessInfo.processInfo.systemUptime + 45
+            nativeDraftStage("projects.fixture.create")
+            defer { nativeDraftStage("projects.test.return-from-" + nativeDraftCurrentStage) }
+            let fixture = try NativeWorkspaceDraftFixture(page: .projects)
+            draftFixture = fixture
+            nativeDraftStage("bootstrap.await-success")
+            try await exposeNativeDraftFixture(fixture)
+            try nativeOwnedRequireOwner(fixture, deadline: flowDeadline)
+            nativeDraftStage("bootstrap.published-success")
+            let draft = "https://github.com/fixture/native-workspace-unsaved"
+            nativeDraftStage("projects.default-viewport.capture.begin")
+            try nativeDraftRecordViewport(fixture, name: "projects-before-default-field")
+            nativeDraftStage("projects.default-viewport.capture.returned")
+            nativeDraftStage("default.field.lookup")
+            let field = try await nativeOwnedField(in: fixture.hosting,
+                identifier: "project-github-repository-location", placeholder: "https://github.com/owner/repository",
+                expectedLabel: "GitHub repository location", fixture: fixture, deadline: flowDeadline)
+            try nativeOwnedEditField(field, value: draft, in: fixture.window, fixture: fixture, deadline: flowDeadline)
+            try await nativeOwnedWait("The real Projects repository field did not retain the native edit.", deadline: flowDeadline) { (try field.stringValue) == draft }
+            try await nativeOwnedRequireProjectIdentity(fixture, deadline: flowDeadline)
+            nativeDraftStage("edit.binding-confirmed.default-to-custom.begin")
+            let layout = nativeDraftLayout(viewID: "projects")
+            try fixture.preferences.save(layout)
+            nativeDraftStage("default-to-custom.preference-saved")
+            let document = try await nativeOwnedDocument(fixture, panelID: "projects-repository", deadline: flowDeadline)
+            let panel = try XCTUnwrap(document.panelHosts["projects-repository"])
+            let hosting = panel.hostingView
+            nativeDraftStage("custom.field.lookup")
+            let customField = try await nativeOwnedField(in: hosting,
+                identifier: "project-github-repository-location", placeholder: "https://github.com/owner/repository",
+                expectedLabel: "GitHub repository location", fixture: fixture, deadline: flowDeadline)
+            XCTAssertEqual((try customField.stringValue), draft)
+            nativeDraftStage("custom.hide.begin")
+            try await nativeOwnedHide(panel, fixture: fixture, deadline: flowDeadline)
+            nativeDraftStage("custom.hide.native-action-returned")
+            try await nativeOwnedWait("The actual native Hide action did not hide the repository panel.", deadline: flowDeadline) { panel.isHidden }
+            try fixture.preferences.setShown(true, for: "projects-repository", in: "projects")
+            try await nativeOwnedWait("The retained repository host did not resume.", deadline: flowDeadline) { !panel.isHidden }
+            XCTAssertTrue(panel.hostingView === hosting)
+            XCTAssertEqual((try customField.stringValue), draft)
+            nativeDraftStage("named-layout.save.begin")
+            let named = try fixture.preferences.saveAs(try XCTUnwrap(fixture.preferences.activeLayout(for: "projects")),
+                                                       named: "Projects Native Draft")
+            let namedFrame = NativeWorkspaceFrame(x: 360, y: 260, width: 940, height: 320)
+            try fixture.preferences.setFrame(namedFrame, for: "projects-repository", in: "projects")
+            try await nativeOwnedWait("The named repository geometry did not reach the actual panel.", deadline: flowDeadline) { panel.frame == namedFrame.nativeRect }
+            try fixture.preferences.activate(layout.id, for: "projects")
+            try await nativeOwnedWait("The original repository geometry did not reach the actual panel.", deadline: flowDeadline) {
+                panel.frame == layout.panels.first { $0.id == "projects-repository" }?.frame.nativeRect
+            }
+            try fixture.preferences.activate(named, for: "projects")
+            try await nativeOwnedWait("Named layouts lost the unsaved repository binding.", deadline: flowDeadline) {
+                try panel.frame == namedFrame.nativeRect && panel.hostingView === hosting && customField.stringValue == draft
+            }
+            try fixture.preferences.reset("projects")
+            try await nativeOwnedWait("Default restoration did not dismantle Projects' custom canvas.", deadline: flowDeadline) {
+                try self.nativeOwnedViews(fixture.hosting, fixture: fixture, deadline: flowDeadline).allSatisfy { !($0 is NativeWorkspaceDocumentView) }
+            }
+            let restored = try await nativeOwnedField(in: fixture.hosting,
+                identifier: "project-github-repository-location", placeholder: "https://github.com/owner/repository",
+                expectedLabel: "GitHub repository location", fixture: fixture, deadline: flowDeadline)
+            XCTAssertEqual((try restored.stringValue), draft)
+            try await nativeOwnedRequireProjectIdentity(fixture, deadline: flowDeadline)
+            try fixture.preferences.activate(named, for: "projects")
+            let reactivated = try await nativeOwnedField(in: fixture.hosting,
+                identifier: "project-github-repository-location", placeholder: "https://github.com/owner/repository",
+                expectedLabel: "GitHub repository location", fixture: fixture, deadline: flowDeadline)
+            XCTAssertEqual((try reactivated.stringValue), draft)
+            try fixture.preferences.reset("projects")
+            let finalDefault = try await nativeOwnedField(in: fixture.hosting,
+                identifier: "project-github-repository-location", placeholder: "https://github.com/owner/repository",
+                expectedLabel: "GitHub repository location", fixture: fixture, deadline: flowDeadline)
+            XCTAssertEqual((try finalDefault.stringValue), draft)
+            nativeDraftStage("projects.all-transitions-complete.owner-observations")
+            let observations = await fixture.client.observations()
+            XCTAssertEqual(observations.snapshots, 1,
+                           "Layout presentation changes must not recreate/reload the page StateObject.")
+            XCTAssertEqual(observations.repositoryWrites, 0)
+            XCTAssertEqual(observations.otherMutations, 0)
+            XCTAssertEqual(fixture.recorder.creations, 1)
+            try nativeOwnedRequireOwner(fixture, deadline: flowDeadline)
+            try nativeOwnedRecord(["classification": "Independent real draft route completed execution; actual XCTest assertions determine its outcome, original exported-AX gates stay separate",
+                "test_method": "testProductionProjectsOwnedEventRepositoryDraftSurvivesWorkspaceWithSinglePageOwner", "stage": nativeDraftCurrentStage,
+                "bootstrap_creations": fixture.recorder.creations, "event_route": "NSApp.postEvent owned-window pointer pair; actual AppKit editor",
+            ], name: "native-owned-complete-flow-execution")
+        } catch {
+            let actual = error as NSError
+            nativeDraftRetainMeasurement([
+                "classification": "Independent real owned-event draft case failure; identical error rethrown, original exported-AX methods unchanged",
+                "test_method": "testProductionProjectsOwnedEventRepositoryDraftSurvivesWorkspaceWithSinglePageOwner",
+                "stage": nativeDraftCurrentStage,
+                "error_type": String(String(reflecting: type(of: error)).prefix(1_024)),
+                "error_description": String(String(describing: error).prefix(4_096)),
+                "NSError_domain": String(actual.domain.prefix(1_024)),
+                "NSError_code": actual.code,
+                "task_cancelled": Task.isCancelled,
+            ], name: "native-owned-complete-flow-boundary-error")
+            throw error
+        }
+    }
+
+    private func nativeOwnedRequireOwner(_ fixture: NativeWorkspaceDraftFixture, deadline: TimeInterval,
+                                         requireKey: Bool = false) throws {
+        try Task.checkCancellation()
+        guard ProcessInfo.processInfo.systemUptime < deadline,
+              fixture.window.contentView === fixture.hosting, fixture.hosting.window === fixture.window,
+              NSApp.windows.filter({ $0.title == fixture.window.title }).count == 1,
+              !requireKey || (NSApp.isActive && fixture.window.isVisible && fixture.window.isKeyWindow
+                  && NSApp.keyWindow === fixture.window) else {
+            throw WorkspaceCanvasFixtureFailure("The independent native route lost its exact owned host/window, key window or shared deadline.")
+        }
+    }
+
+    private func nativeOwnedWait(_ message: String, deadline: TimeInterval, _ condition: () throws -> Bool) async throws {
+        let end = min(deadline, ProcessInfo.processInfo.systemUptime + 3)
+        while ProcessInfo.processInfo.systemUptime < end {
+            try Task.checkCancellation()
+            if try condition() {
+                guard ProcessInfo.processInfo.systemUptime < end else { throw WorkspaceCanvasFixtureFailure(message) }
+                return
+            }
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        throw WorkspaceCanvasFixtureFailure(message)
+    }
+
+    private func nativeOwnedViews(_ root: NSView, fixture: NativeWorkspaceDraftFixture,
+                                  deadline: TimeInterval) throws -> [NSView] {
+        try nativeOwnedRequireOwner(fixture, deadline: deadline)
+        guard root.window === fixture.window, root === fixture.hosting || root.isDescendant(of: fixture.hosting) else {
+            throw WorkspaceCanvasFixtureFailure("The independent native view root is outside its owned production host.")
+        }
+        var pending: [(NSView, Int)] = [(root, 0)], result: [NSView] = []
+        while let (view, depth) = pending.popLast() {
+            try nativeOwnedRequireOwner(fixture, deadline: deadline)
+            guard result.count < 2_048, depth <= 48,
+                  view.subviews.count <= 2_048 - result.count - pending.count - 1 else {
+                throw WorkspaceCanvasFixtureFailure("The independent native view walk exceeded its 2048-view/48-level bound.")
+            }
+            result.append(view); pending.append(contentsOf: view.subviews.map { ($0, depth + 1) })
+        }
+        return result
+    }
+
+    private func nativeOwnedField(in root: NSView, identifier: String, placeholder: String,
+                                  expectedLabel: String? = nil, fixture: NativeWorkspaceDraftFixture,
+                                  deadline: TimeInterval) async throws -> NativeWorkspaceDraftField {
+        let end = min(deadline, ProcessInfo.processInfo.systemUptime + 3)
+        var observedNativeMetadata = false
+        repeat {
+            root.layoutSubtreeIfNeeded()
+            let fields = try nativeOwnedViews(root, fixture: fixture, deadline: end).compactMap { $0 as? NSTextField }.filter {
+                $0.isEditable && ($0.accessibilityIdentifier() == identifier || $0.accessibilityLabel() == identifier
+                    || (expectedLabel != nil && $0.accessibilityLabel() == expectedLabel) || $0.placeholderString == placeholder)
+            }
+            guard fields.count <= 1 else { throw WorkspaceCanvasFixtureFailure("Duplicate actual AppKit draft field in the independent route.") }
+            if let field = fields.first, field.isEnabled, !field.isHiddenOrHasHiddenAncestor {
+                try nativeOwnedRequireOwner(fixture, deadline: end)
+                return NativeWorkspaceDraftField(node: try NativeWorkspaceDraftAccessibilityNode(field))
+            }
+            if !observedNativeMetadata {
+                // Observe public ordinary metadata once, then still require a real AppKit field/editor.
+                _ = try nativeOwnedTree(root, fixture: fixture, deadline: end)
+                observedNativeMetadata = true
+                continue
+            }
+            try await Task.sleep(for: .milliseconds(20))
+        } while ProcessInfo.processInfo.systemUptime < end
+        throw WorkspaceCanvasFixtureFailure("The independent route did not find one enabled actual AppKit draft field: " + identifier)
+    }
+
+    private func nativeOwnedEditField(_ control: NativeWorkspaceDraftField, value: String, in window: NSWindow,
+                                      fixture: NativeWorkspaceDraftFixture, deadline: TimeInterval) throws {
+        try nativeOwnedRequireOwner(fixture, deadline: deadline, requireKey: true)
+        guard window === fixture.window, let field = control.node.object as? NSTextField,
+              field.window === window, field.isDescendant(of: fixture.hosting), field.isEditable, field.isEnabled,
+              window.makeFirstResponder(field), let editor = field.currentEditor() as? NSTextView,
+              window.firstResponder === editor, editor.window === window else {
+            throw WorkspaceCanvasFixtureFailure("The independent draft route did not own an actual AppKit field editor.")
+        }
+        editor.insertText(value, replacementRange: NSRange(location: 0, length: editor.string.utf16.count))
+        window.endEditing(for: field)
+        guard window.makeFirstResponder(nil) else { throw WorkspaceCanvasFixtureFailure("The actual AppKit edit refused focus-loss commit.") }
+        try nativeOwnedRequireOwner(fixture, deadline: deadline)
+    }
+
+    private func nativeOwnedDocument(_ fixture: NativeWorkspaceDraftFixture, panelID: String,
+                                     deadline: TimeInterval) async throws -> NativeWorkspaceDocumentView {
+        try await nativeOwnedWait("The independent route did not mount its real production panel.", deadline: deadline) {
+            fixture.hosting.layoutSubtreeIfNeeded()
+            return try self.nativeOwnedViews(fixture.hosting, fixture: fixture, deadline: deadline)
+                .compactMap { $0 as? NativeWorkspaceDocumentView }.first?.panelHosts[panelID] != nil
+        }
+        return try XCTUnwrap(nativeOwnedViews(fixture.hosting, fixture: fixture, deadline: deadline)
+            .compactMap { $0 as? NativeWorkspaceDocumentView }.first)
+    }
+
+    private func nativeOwnedTree(_ root: AnyObject, fixture: NativeWorkspaceDraftFixture, deadline: TimeInterval,
+                                 limit: Int = 2_048) throws -> [NativeWorkspaceDraftAccessibilityNode] {
+        try nativeOwnedRequireOwner(fixture, deadline: deadline)
+        var pending: [(NativeWorkspaceDraftAccessibilityNode, Int)] = [(try NativeWorkspaceDraftAccessibilityNode(root), 0)]
+        var seen = Set<ObjectIdentifier>(), nodes: [NativeWorkspaceDraftAccessibilityNode] = []
+        while let (node, depth) = pending.popLast() {
+            try nativeOwnedRequireOwner(fixture, deadline: deadline)
+            guard seen.insert(ObjectIdentifier(node.object)).inserted else { continue }
+            guard nodes.count < limit, depth <= 48, node.exportedAX == nil else {
+                throw WorkspaceCanvasFixtureFailure("The independent public native tree exceeded its bound or used exported AX.")
+            }
+            nodes.append(node)
+            let children = try node.children() // Public ordinary children only; no navigation-order or contents queries.
+            try nativeOwnedRequireOwner(fixture, deadline: deadline)
+            guard children.count <= limit - nodes.count - pending.count else {
+                throw WorkspaceCanvasFixtureFailure("The independent native child list exceeded its remaining bound.")
+            }
+            for child in children {
+                let object: AnyObject
+                if let formal = child as? any NSAccessibilityProtocol { object = formal as AnyObject }
+                else if let native = child as? NSObject { object = native }
+                else { throw WorkspaceCanvasFixtureFailure("A public native child does not provide an actual native object; boxing refused.") }
+                pending.append((try NativeWorkspaceDraftAccessibilityNode(object), depth + 1))
+            }
+        }
+        return nodes
+    }
+
+    private func nativeOwnedNode(_ identifier: String, fixture: NativeWorkspaceDraftFixture,
+                                 deadline: TimeInterval) async throws -> NativeWorkspaceDraftAccessibilityNode {
+        let end = min(deadline, ProcessInfo.processInfo.systemUptime + 3)
+        repeat {
+            fixture.hosting.layoutSubtreeIfNeeded()
+            let nodes = try nativeOwnedTree(fixture.hosting, fixture: fixture, deadline: end)
+            var matches: [NativeWorkspaceDraftAccessibilityNode] = []
+            for node in nodes {
+                try nativeOwnedRequireOwner(fixture, deadline: end)
+                if node.identifier == identifier { matches.append(node) }
+                try nativeOwnedRequireOwner(fixture, deadline: end)
+            }
+            guard matches.count <= 1 else { throw WorkspaceCanvasFixtureFailure("Duplicate independent native identifier: " + identifier) }
+            if let node = matches.first {
+                try nativeOwnedRequireAncestor(node.object, fixture: fixture, deadline: end)
+                return node
+            }
+            try await Task.sleep(for: .milliseconds(20))
+        } while ProcessInfo.processInfo.systemUptime < end
+        throw WorkspaceCanvasFixtureFailure("The independent route did not expose its displayed native identifier: " + identifier)
+    }
+
+    private func nativeOwnedParent(_ object: AnyObject, fixture: NativeWorkspaceDraftFixture,
+                                   deadline: TimeInterval) throws -> AnyObject? {
+        try nativeOwnedRequireOwner(fixture, deadline: deadline)
+        let raw: Any?
+        if let formal = object as? any NSAccessibilityProtocol { raw = formal.accessibilityParent() }
+        else if let native = object as? NSObject {
+            let names = native.accessibilityAttributeNames()
+            guard names.count <= 128 else { throw WorkspaceCanvasFixtureFailure("The public parent attribute list exceeded its bound.") }
+            raw = names.contains(.parent) ? native.accessibilityAttributeValue(.parent) : nil
+        } else { throw WorkspaceCanvasFixtureFailure("The independent parent chain does not provide a public native bridge.") }
+        try nativeOwnedRequireOwner(fixture, deadline: deadline)
+        guard let raw else { return nil }
+        if let formal = raw as? any NSAccessibilityProtocol { return formal as AnyObject }
+        if let native = raw as? NSObject { return native }
+        throw WorkspaceCanvasFixtureFailure("The public native parent does not provide an actual native object.")
+    }
+
+    private func nativeOwnedRequireAncestor(_ object: AnyObject, fixture: NativeWorkspaceDraftFixture,
+                                            deadline: TimeInterval, requiredButton: String? = nil) throws {
+        var cursor = object, retained: [AnyObject] = []
+        var seen = Set<ObjectIdentifier>(), foundButton = requiredButton == nil
+        for _ in 0..<48 {
+            try nativeOwnedRequireOwner(fixture, deadline: deadline)
+            guard seen.insert(ObjectIdentifier(cursor)).inserted else { throw WorkspaceCanvasFixtureFailure("The public native parent chain contains a cycle.") }
+            retained.append(cursor)
+            let node = try NativeWorkspaceDraftAccessibilityNode(cursor)
+            if let requiredButton, node.identifier == requiredButton {
+                guard node.role == .button, node.enabled == true else { throw WorkspaceCanvasFixtureFailure("The semantic hit target is not the enabled identified native button.") }
+                foundButton = true
+            }
+            if cursor === fixture.window {
+                guard foundButton else { throw WorkspaceCanvasFixtureFailure("The public semantic hit does not reach its identified native button.") }
+                return
+            }
+            if cursor is NSWindow { throw WorkspaceCanvasFixtureFailure("The public native target reaches a different window.") }
+            guard let parent = try nativeOwnedParent(cursor, fixture: fixture, deadline: deadline) else {
+                throw WorkspaceCanvasFixtureFailure("The public native target does not reach the exact owned window.")
+            }
+            cursor = parent
+        }
+        throw WorkspaceCanvasFixtureFailure("The public native parent chain exceeded its 48-object bound.")
+    }
+
+    private func nativeOwnedFrame(_ object: AnyObject, fixture: NativeWorkspaceDraftFixture,
+                                  deadline: TimeInterval) throws -> NSRect {
+        try nativeOwnedRequireOwner(fixture, deadline: deadline)
+        let frame: NSRect
+        if let formal = object as? any NSAccessibilityProtocol { frame = formal.accessibilityFrame() }
+        else if let native = object as? NSObject {
+            let names = native.accessibilityAttributeNames()
+            guard names.count <= 128, names.contains(.position), names.contains(.size),
+                  let position = native.accessibilityAttributeValue(.position) as? NSValue,
+                  let size = native.accessibilityAttributeValue(.size) as? NSValue else {
+                throw WorkspaceCanvasFixtureFailure("The public native target does not advertise measured screen geometry.")
+            }
+            frame = NSRect(origin: position.pointValue, size: size.sizeValue)
+        } else { throw WorkspaceCanvasFixtureFailure("The native target has no public frame bridge.") }
+        try nativeOwnedRequireOwner(fixture, deadline: deadline)
+        let viewport = fixture.window.convertToScreen(fixture.hosting.convert(fixture.hosting.visibleRect, to: nil))
+        guard frame.minX.isFinite, frame.minY.isFinite, frame.width.isFinite, frame.height.isFinite,
+              frame.width > 0, frame.height > 0, !NSIntersectionRect(frame, viewport).isEmpty else {
+            throw WorkspaceCanvasFixtureFailure("The native target has no finite displayed screen frame in its owned host.")
+        }
+        return frame
+    }
+
+    private func nativeOwnedQueueClick(at screenPoint: NSPoint, fixture: NativeWorkspaceDraftFixture,
+                                       deadline: TimeInterval, identifier: String, exactHit: NSView? = nil) async throws {
+        try nativeOwnedRequireOwner(fixture, deadline: deadline, requireKey: true)
+        let windowPoint = fixture.window.convertFromScreen(NSRect(origin: screenPoint, size: .zero)).origin
+        let local = fixture.hosting.convert(windowPoint, from: nil)
+        guard screenPoint.x.isFinite, screenPoint.y.isFinite, fixture.hosting.visibleRect.contains(local),
+              let hit = fixture.hosting.hitTest(fixture.hosting.convert(local, to: fixture.hosting.superview)),
+              hit.window === fixture.window, !hit.isHiddenOrHasHiddenAncestor,
+              hit === fixture.hosting || hit.isDescendant(of: fixture.hosting),
+              exactHit == nil || hit === exactHit else {
+            throw WorkspaceCanvasFixtureFailure("The measured pointer target did not hit its required app-owned native view.")
+        }
+        let down = try pointer(.leftMouseDown, at: local, in: fixture.hosting)
+        let up = try pointer(.leftMouseUp, at: local, in: fixture.hosting)
+        guard down.window === fixture.window, up.window === fixture.window,
+              down.windowNumber == fixture.window.windowNumber, up.windowNumber == fixture.window.windowNumber else {
+            throw WorkspaceCanvasFixtureFailure("The independent pointer pair escaped its exact owned window.")
+        }
+        try nativeOwnedRecord(["classification": "Measured real owned-window pointer target before one queued down/up pair; subsequent assertions determine delivery and outcome",
+            "identifier": identifier, "stage": nativeDraftCurrentStage, "screen_point": NSStringFromPoint(screenPoint),
+            "window_point": NSStringFromPoint(windowPoint), "hosting_point": NSStringFromPoint(local),
+            "physical_hit_type": String(String(reflecting: type(of: hit)).prefix(256)),
+            "physical_hit_identity": String(describing: ObjectIdentifier(hit)), "exact_literal_hit_required": exactHit != nil,
+            "event_window_number": fixture.window.windowNumber, "event_windows_are_exact_owner": true,
+            "API": "NSApp.postEvent(_:atStart:false)", "prepared_pointer_event_count": 2,
+        ], name: "native-owned-target-" + identifier)
+        try nativeOwnedRequireOwner(fixture, deadline: deadline, requireKey: true)
+        NSApp.postEvent(down, atStart: false); NSApp.postEvent(up, atStart: false)
+        try nativeOwnedRecord(["classification": "One owned-window down/up pair posted; subsequent outcome assertions remain required",
+            "identifier": identifier, "actual_posted_event_count": 2, "event_windows_are_exact_owner": true,
+        ], name: "native-owned-posted-" + identifier)
+        try await Task.sleep(for: .milliseconds(40))
+        try nativeOwnedRequireOwner(fixture, deadline: deadline)
+    }
+
+    private func nativeOwnedHide(_ panel: NativeWorkspacePanelHost, fixture: NativeWorkspaceDraftFixture,
+                                 deadline: TimeInterval) async throws {
+        let identifier = "workspace-hide-" + panel.panelID
+        let buttons = try nativeOwnedViews(panel, fixture: fixture, deadline: deadline).compactMap { $0 as? NSButton }
+            .filter { $0.accessibilityIdentifier() == identifier }
+        guard buttons.count == 1, let button = buttons.first, button.isEnabled, !button.isHiddenOrHasHiddenAncestor,
+              button.bounds.width > 0, button.bounds.height > 0 else {
+            throw WorkspaceCanvasFixtureFailure("The real workspace Hide does not have one enabled literal native button.")
+        }
+        let point = button.convert(NSPoint(x: button.bounds.midX, y: button.bounds.midY), to: nil)
+        let screen = fixture.window.convertToScreen(NSRect(origin: point, size: .zero)).origin
+        try await nativeOwnedQueueClick(at: screen, fixture: fixture, deadline: deadline, identifier: identifier, exactHit: button)
+    }
+
+    private func nativeOwnedPress(_ identifier: String, in fixture: NativeWorkspaceDraftFixture,
+                                  deadline: TimeInterval) async throws {
+        let end = min(deadline, ProcessInfo.processInfo.systemUptime + 3)
+        nativeDraftStage("owned-native.action." + identifier + ".lookup")
+        let node = try await nativeOwnedNode(identifier, fixture: fixture, deadline: end)
+        guard node.role == .button, node.enabled == true else { throw WorkspaceCanvasFixtureFailure("The actual native Manager target is not an enabled identified button.") }
+        let frame = try nativeOwnedFrame(node.object, fixture: fixture, deadline: end)
+        let point = NSPoint(x: frame.midX, y: frame.midY)
+        guard let rawHit = fixture.hosting.accessibilityHitTest(point) else { throw WorkspaceCanvasFixtureFailure("The measured native frame does not have a public semantic hit.") }
+        let semanticHit: AnyObject
+        if let formal = rawHit as? any NSAccessibilityProtocol { semanticHit = formal as AnyObject }
+        else if let native = rawHit as? NSObject { semanticHit = native }
+        else { throw WorkspaceCanvasFixtureFailure("The native semantic hit is not an actual public native object.") }
+        try nativeOwnedRequireAncestor(semanticHit, fixture: fixture, deadline: end, requiredButton: identifier)
+        try nativeOwnedRecord(["classification": "Fresh identified enabled public native Manager button with owned ancestor, measured frame and semantic hit; no action invoked",
+            "identifier": identifier, "stage": nativeDraftCurrentStage, "screen_frame": NSStringFromRect(frame),
+            "target_type": String(String(reflecting: type(of: node.object)).prefix(256)),
+            "semantic_hit_type": String(String(reflecting: type(of: semanticHit)).prefix(256)),
+            "semantic_hit_reaches_identified_button_and_exact_window": true,
+        ], name: "native-owned-semantic-" + identifier)
+        try await nativeOwnedQueueClick(at: point, fixture: fixture, deadline: end, identifier: identifier)
+    }
+
+    private func nativeOwnedRequireManagerTitle(_ title: String, in fixture: NativeWorkspaceDraftFixture,
+                                               deadline: TimeInterval) async throws {
+        let end = min(deadline, ProcessInfo.processInfo.systemUptime + 3)
+        repeat {
+            nativeDraftStage("owned-native.manager-heading." + title)
+            let header = try await nativeOwnedNode("detail-manager", fixture: fixture, deadline: end)
+            _ = try nativeOwnedFrame(header.object, fixture: fixture, deadline: end)
+            let nodes = try nativeOwnedTree(header.object, fixture: fixture, deadline: end, limit: 128)
+            for node in nodes {
+                try nativeOwnedRequireOwner(fixture, deadline: end)
+                if node.value as? String == title || node.title == title {
+                    let displayed = try nativeOwnedFrame(node.object, fixture: fixture, deadline: end)
+                    try nativeOwnedRecord(["classification": "Actual displayed Manager heading observed through public ordinary native children",
+                        "expected_title": title, "identifier": "detail-manager", "subtree_node_count": nodes.count,
+                        "matched_text_screen_frame": NSStringFromRect(displayed),
+                    ], name: "native-owned-manager-heading-" + title.replacingOccurrences(of: " ", with: "-"))
+                    return
+                }
+            }
+            try await Task.sleep(for: .milliseconds(20))
+        } while ProcessInfo.processInfo.systemUptime < end
+        throw WorkspaceCanvasFixtureFailure("The actual independent Manager route did not display its selected heading: " + title)
+    }
+
+    private func nativeOwnedRequireProjectIdentity(_ fixture: NativeWorkspaceDraftFixture,
+                                                  deadline: TimeInterval) async throws {
+        let end = min(deadline, ProcessInfo.processInfo.systemUptime + 3)
+        for (identifier, expected) in [("project-canonical-root", NativeWorkspaceDraftClient.projectRoot),
+                                       ("project-generation", "Generation 4")] {
+            nativeDraftStage("owned-native.projects-identity." + identifier)
+            let node = try await nativeOwnedNode(identifier, fixture: fixture, deadline: end)
+            _ = try nativeOwnedFrame(node.object, fixture: fixture, deadline: end)
+            guard node.value as? String == expected || node.title == expected else {
+                throw WorkspaceCanvasFixtureFailure("The displayed native Projects identity/generation does not match its original expected value.")
+            }
+            try nativeOwnedRecord(["classification": "Actual displayed Projects identity observed through the public native bridge",
+                "identifier": identifier, "expected": expected,
+            ], name: "native-owned-projects-identity-" + identifier)
+        }
+    }
+
+    private func nativeOwnedRecord(_ report: [String: Any], name: String) throws {
+        let data = try JSONSerialization.data(withJSONObject: report, options: [.sortedKeys])
+        guard data.count <= 64 * 1_024, name.utf8.count <= 256 else { throw WorkspaceCanvasFixtureFailure("The independent native route evidence exceeded its finite bound.") }
+        try directEvidence.save(data, name: name, extension: "json")
+        let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+        attachment.name = name; attachment.lifetime = .keepAlways; add(attachment)
+    }
+
+    func testProductionManagerExportedIdentityOwnedEventDraftSurvivesWorkspaceAndSectionTransitions() async throws {
+        do {
+            continueAfterFailure = true
+            let flowDeadline = ProcessInfo.processInfo.systemUptime + 45
+            nativeDraftStage("manager.fixture.create")
+            defer { nativeDraftStage("manager.test.return-from-" + nativeDraftCurrentStage) }
+            let fixture = try NativeWorkspaceDraftFixture(page: .manager)
+            draftFixture = fixture
+            nativeDraftStage("bootstrap.await-success")
+            try await exposeNativeDraftFixture(fixture)
+            try nativeOwnedRequireOwner(fixture, deadline: flowDeadline)
+            nativeDraftStage("bootstrap.published-success")
+            let app = try XCTUnwrap(fixture.model.app)
+            let originalConfiguration = try Data(contentsOf: app.paths.configJSON)
+            let originalHost = fixture.model.setHost
+            let draft = "native-workspace-manager-draft.invalid"
+            nativeDraftStage("default.field.lookup")
+            let field = try await nativeExportObservedField(in: fixture.hosting, identifier: "Dashboard host",
+                                                   placeholder: "Dashboard host", fixture: fixture, deadline: flowDeadline)
+            try nativeOwnedEditField(field, value: draft, in: fixture.window, fixture: fixture, deadline: flowDeadline)
+            try await nativeOwnedWait("The real Manager field did not update its staged AppModel value.", deadline: flowDeadline) {
+                try fixture.model.setHost == draft && field.stringValue == draft
+            }
+            nativeDraftStage("edit.binding-confirmed.default-to-custom.begin")
+            let layout = nativeDraftLayout(viewID: "manager.settings")
+            try fixture.preferences.save(layout)
+            nativeDraftStage("default-to-custom.preference-saved")
+            let document = try await nativeOwnedDocument(fixture, panelID: "manager-dashboard-settings", deadline: flowDeadline)
+            let panel = try XCTUnwrap(document.panelHosts["manager-dashboard-settings"])
+            let hosting = panel.hostingView
+            nativeDraftStage("custom.field.lookup")
+            let customField = try await nativeExportObservedField(in: hosting, identifier: "Dashboard host",
+                                                         placeholder: "Dashboard host", fixture: fixture, deadline: flowDeadline)
+            XCTAssertEqual((try customField.stringValue), draft)
+            nativeDraftStage("custom.hide.begin")
+            try await nativeOwnedHide(panel, fixture: fixture, deadline: flowDeadline)
+            nativeDraftStage("custom.hide.native-action-returned")
+            try await nativeOwnedWait("The actual native Hide action did not hide Manager settings.", deadline: flowDeadline) { panel.isHidden }
+            XCTAssertFalse(try XCTUnwrap(fixture.preferences.activeLayout(for: "manager.settings")?
+                .panels.first { $0.id == "manager-dashboard-settings" }).isVisible)
+            try fixture.preferences.setShown(true, for: "manager-dashboard-settings", in: "manager.settings")
+            try await nativeOwnedWait("Manager settings did not resume from the retained native host.", deadline: flowDeadline) { !panel.isHidden }
+            XCTAssertTrue(panel.hostingView === hosting)
+            XCTAssertEqual((try customField.stringValue), draft)
+            nativeDraftStage("named-layout.save.begin")
+            let named = try fixture.preferences.saveAs(try XCTUnwrap(fixture.preferences.activeLayout(for: "manager.settings")),
+                                                       named: "Manager Native Draft")
+            try await nativeOwnedWait("The named Manager layout did not become active.", deadline: flowDeadline) {
+                fixture.preferences.activeLayout(for: "manager.settings")?.id == named
+            }
+            let namedFrame = NativeWorkspaceFrame(x: 380, y: 60, width: 860, height: 440)
+            try fixture.preferences.setFrame(namedFrame, for: "manager-dashboard-settings", in: "manager.settings")
+            try await nativeOwnedWait("The named Manager geometry did not reach the actual panel.", deadline: flowDeadline) { panel.frame == namedFrame.nativeRect }
+            try fixture.preferences.activate(layout.id, for: "manager.settings")
+            try await nativeOwnedWait("The original Manager layout did not reach the actual panel.", deadline: flowDeadline) {
+                panel.frame == layout.panels.first { $0.id == "manager-dashboard-settings" }?.frame.nativeRect
+            }
+            try fixture.preferences.activate(named, for: "manager.settings")
+            try await nativeOwnedWait("Named layout changes replaced the Manager binding.", deadline: flowDeadline) {
+                try panel.frame == namedFrame.nativeRect && panel.hostingView === hosting
+                    && customField.stringValue == draft && fixture.model.setHost == draft
+            }
+            nativeDraftStage("manager.restore-default.begin")
+            try fixture.preferences.reset("manager.settings")
+            try await nativeOwnedWait("Default restoration did not dismantle Manager's custom canvas.", deadline: flowDeadline) {
+                try self.nativeOwnedViews(fixture.hosting, fixture: fixture, deadline: flowDeadline).allSatisfy { !($0 is NativeWorkspaceDocumentView) }
+            }
+            let defaultField = try await nativeExportObservedField(in: fixture.hosting, identifier: "Dashboard host",
+                                                          placeholder: "Dashboard host", fixture: fixture, deadline: flowDeadline)
+            XCTAssertEqual((try defaultField.stringValue), draft)
+            nativeDraftStage("manager.section-transitions.begin")
+            for (section, title) in [("shell", "Project Shell"), ("folders", "Authorized Folders"),
+                                      ("workbench", "Workbench"), ("settings", "Settings")] {
+                nativeDraftStage("manager.section." + section + ".press")
+                try await nativeExportOwnedPress("manager-section-" + section, in: fixture, deadline: flowDeadline)
+                try await nativeExportRequireManagerTitle(title, in: fixture, deadline: flowDeadline)
+            }
+            let resumed = try await nativeExportObservedField(in: fixture.hosting, identifier: "Dashboard host",
+                                                     placeholder: "Dashboard host", fixture: fixture, deadline: flowDeadline)
+            XCTAssertEqual((try resumed.stringValue), draft)
+            XCTAssertEqual(fixture.model.setHost, draft)
+            XCTAssertNil(fixture.model.manager)
+            XCTAssertNil(fixture.model.remoteManager)
+            nativeDraftStage("manager.save-refusal.begin")
+            try await nativeExportOwnedPress("settings-save", in: fixture, deadline: flowDeadline)
+            try await nativeOwnedWait("The queued Save did not reach the actual unavailable-manager result.", deadline: flowDeadline) {
+                fixture.model.managerMessage == "Manager is unavailable"
+            }
+            XCTAssertEqual(fixture.model.managerMessage, "Manager is unavailable")
+            XCTAssertEqual(try Data(contentsOf: app.paths.configJSON), originalConfiguration,
+                           "The isolated native presentation must not turn a staged edit into a backend save.")
+            nativeDraftStage("manager.reload.begin")
+            try await nativeExportOwnedPress("settings-reload", in: fixture, deadline: flowDeadline)
+            try await nativeOwnedWait("Explicit native Reload did not restore the actual bootstrap configuration.", deadline: flowDeadline) {
+                try !fixture.model.isUpdatingSettings && fixture.model.setHost == originalHost
+                    && resumed.stringValue == originalHost
+            }
+            XCTAssertEqual(fixture.recorder.creations, 1)
+            XCTAssertTrue(fixture.model.app === app)
+            try nativeOwnedRequireOwner(fixture, deadline: flowDeadline)
+            try nativeOwnedRecord(["classification": "Separate exported-identity/native-event draft route completed execution; actual XCTest assertions determine its outcome; original and ordinary-native gates stay separate",
+                "test_method": "testProductionManagerExportedIdentityOwnedEventDraftSurvivesWorkspaceAndSectionTransitions", "stage": nativeDraftCurrentStage,
+                "bootstrap_creations": fixture.recorder.creations, "event_route": "Read-only exported identity/frame/hit + NSApp.postEvent owned-window pointer pair; literal AppKit editor",
+            ], name: "native-exported-identity-flow-execution")
+        } catch {
+            let actual = error as NSError
+            nativeDraftRetainMeasurement([
+                "classification": "Separate exported-identity/native-event draft failure; identical error rethrown; original and ordinary-native cases unchanged",
+                "test_method": "testProductionManagerExportedIdentityOwnedEventDraftSurvivesWorkspaceAndSectionTransitions",
+                "stage": nativeDraftCurrentStage,
+                "error_type": String(String(reflecting: type(of: error)).prefix(1_024)),
+                "error_description": String(String(describing: error).prefix(4_096)),
+                "NSError_domain": String(actual.domain.prefix(1_024)),
+                "NSError_code": actual.code,
+                "task_cancelled": Task.isCancelled,
+            ], name: "native-exported-identity-flow-boundary-error")
+            throw error
+        }
+    }
+
+    func testProductionProjectsExportedIdentityOwnedEventRepositoryDraftSurvivesWorkspaceWithSinglePageOwner() async throws {
+        do {
+            continueAfterFailure = true
+            let flowDeadline = ProcessInfo.processInfo.systemUptime + 45
+            nativeDraftStage("projects.fixture.create")
+            defer { nativeDraftStage("projects.test.return-from-" + nativeDraftCurrentStage) }
+            let fixture = try NativeWorkspaceDraftFixture(page: .projects)
+            draftFixture = fixture
+            nativeDraftStage("bootstrap.await-success")
+            try await exposeNativeDraftFixture(fixture)
+            try nativeOwnedRequireOwner(fixture, deadline: flowDeadline)
+            nativeDraftStage("bootstrap.published-success")
+            let draft = "https://github.com/fixture/native-workspace-unsaved"
+            nativeDraftStage("projects.default-viewport.capture.begin")
+            try nativeDraftRecordViewport(fixture, name: "projects-before-default-field")
+            nativeDraftStage("projects.default-viewport.capture.returned")
+            nativeDraftStage("default.field.lookup")
+            let field = try await nativeExportObservedField(in: fixture.hosting,
+                identifier: "project-github-repository-location", placeholder: "https://github.com/owner/repository",
+                expectedLabel: "GitHub repository location", fixture: fixture, deadline: flowDeadline)
+            try nativeOwnedEditField(field, value: draft, in: fixture.window, fixture: fixture, deadline: flowDeadline)
+            try await nativeOwnedWait("The real Projects repository field did not retain the native edit.", deadline: flowDeadline) { (try field.stringValue) == draft }
+            try await nativeExportRequireProjectIdentity(fixture, deadline: flowDeadline)
+            nativeDraftStage("edit.binding-confirmed.default-to-custom.begin")
+            let layout = nativeDraftLayout(viewID: "projects")
+            try fixture.preferences.save(layout)
+            nativeDraftStage("default-to-custom.preference-saved")
+            let document = try await nativeOwnedDocument(fixture, panelID: "projects-repository", deadline: flowDeadline)
+            let panel = try XCTUnwrap(document.panelHosts["projects-repository"])
+            let hosting = panel.hostingView
+            nativeDraftStage("custom.field.lookup")
+            let customField = try await nativeExportObservedField(in: hosting,
+                identifier: "project-github-repository-location", placeholder: "https://github.com/owner/repository",
+                expectedLabel: "GitHub repository location", fixture: fixture, deadline: flowDeadline)
+            XCTAssertEqual((try customField.stringValue), draft)
+            nativeDraftStage("custom.hide.begin")
+            try await nativeOwnedHide(panel, fixture: fixture, deadline: flowDeadline)
+            nativeDraftStage("custom.hide.native-action-returned")
+            try await nativeOwnedWait("The actual native Hide action did not hide the repository panel.", deadline: flowDeadline) { panel.isHidden }
+            try fixture.preferences.setShown(true, for: "projects-repository", in: "projects")
+            try await nativeOwnedWait("The retained repository host did not resume.", deadline: flowDeadline) { !panel.isHidden }
+            XCTAssertTrue(panel.hostingView === hosting)
+            XCTAssertEqual((try customField.stringValue), draft)
+            nativeDraftStage("named-layout.save.begin")
+            let named = try fixture.preferences.saveAs(try XCTUnwrap(fixture.preferences.activeLayout(for: "projects")),
+                                                       named: "Projects Native Draft")
+            let namedFrame = NativeWorkspaceFrame(x: 360, y: 260, width: 940, height: 320)
+            try fixture.preferences.setFrame(namedFrame, for: "projects-repository", in: "projects")
+            try await nativeOwnedWait("The named repository geometry did not reach the actual panel.", deadline: flowDeadline) { panel.frame == namedFrame.nativeRect }
+            try fixture.preferences.activate(layout.id, for: "projects")
+            try await nativeOwnedWait("The original repository geometry did not reach the actual panel.", deadline: flowDeadline) {
+                panel.frame == layout.panels.first { $0.id == "projects-repository" }?.frame.nativeRect
+            }
+            try fixture.preferences.activate(named, for: "projects")
+            try await nativeOwnedWait("Named layouts lost the unsaved repository binding.", deadline: flowDeadline) {
+                try panel.frame == namedFrame.nativeRect && panel.hostingView === hosting && customField.stringValue == draft
+            }
+            try fixture.preferences.reset("projects")
+            try await nativeOwnedWait("Default restoration did not dismantle Projects' custom canvas.", deadline: flowDeadline) {
+                try self.nativeOwnedViews(fixture.hosting, fixture: fixture, deadline: flowDeadline).allSatisfy { !($0 is NativeWorkspaceDocumentView) }
+            }
+            let restored = try await nativeExportObservedField(in: fixture.hosting,
+                identifier: "project-github-repository-location", placeholder: "https://github.com/owner/repository",
+                expectedLabel: "GitHub repository location", fixture: fixture, deadline: flowDeadline)
+            XCTAssertEqual((try restored.stringValue), draft)
+            try await nativeExportRequireProjectIdentity(fixture, deadline: flowDeadline)
+            try fixture.preferences.activate(named, for: "projects")
+            let reactivated = try await nativeExportObservedField(in: fixture.hosting,
+                identifier: "project-github-repository-location", placeholder: "https://github.com/owner/repository",
+                expectedLabel: "GitHub repository location", fixture: fixture, deadline: flowDeadline)
+            XCTAssertEqual((try reactivated.stringValue), draft)
+            try fixture.preferences.reset("projects")
+            let finalDefault = try await nativeExportObservedField(in: fixture.hosting,
+                identifier: "project-github-repository-location", placeholder: "https://github.com/owner/repository",
+                expectedLabel: "GitHub repository location", fixture: fixture, deadline: flowDeadline)
+            XCTAssertEqual((try finalDefault.stringValue), draft)
+            nativeDraftStage("projects.all-transitions-complete.owner-observations")
+            let observations = await fixture.client.observations()
+            XCTAssertEqual(observations.snapshots, 1,
+                           "Layout presentation changes must not recreate/reload the page StateObject.")
+            XCTAssertEqual(observations.repositoryWrites, 0)
+            XCTAssertEqual(observations.otherMutations, 0)
+            XCTAssertEqual(fixture.recorder.creations, 1)
+            try nativeOwnedRequireOwner(fixture, deadline: flowDeadline)
+            try nativeOwnedRecord(["classification": "Separate exported-identity/native-event draft route completed execution; actual XCTest assertions determine its outcome; original and ordinary-native gates stay separate",
+                "test_method": "testProductionProjectsExportedIdentityOwnedEventRepositoryDraftSurvivesWorkspaceWithSinglePageOwner", "stage": nativeDraftCurrentStage,
+                "bootstrap_creations": fixture.recorder.creations, "event_route": "Read-only exported identity/frame/hit + NSApp.postEvent owned-window pointer pair; literal AppKit editor",
+            ], name: "native-exported-identity-flow-execution")
+        } catch {
+            let actual = error as NSError
+            nativeDraftRetainMeasurement([
+                "classification": "Separate exported-identity/native-event draft failure; identical error rethrown; original and ordinary-native cases unchanged",
+                "test_method": "testProductionProjectsExportedIdentityOwnedEventRepositoryDraftSurvivesWorkspaceWithSinglePageOwner",
+                "stage": nativeDraftCurrentStage,
+                "error_type": String(String(reflecting: type(of: error)).prefix(1_024)),
+                "error_description": String(String(describing: error).prefix(4_096)),
+                "NSError_domain": String(actual.domain.prefix(1_024)),
+                "NSError_code": actual.code,
+                "task_cancelled": Task.isCancelled,
+            ], name: "native-exported-identity-flow-boundary-error")
+            throw error
+        }
+    }
+
+    private func nativeExportObservedField(in root: NSView, identifier: String, placeholder: String,
+                                           expectedLabel: String? = nil, fixture: NativeWorkspaceDraftFixture,
+                                           deadline: TimeInterval) async throws -> NativeWorkspaceDraftField {
+        try nativeOwnedRequireOwner(fixture, deadline: deadline)
+        guard deadline - ProcessInfo.processInfo.systemUptime > 3,
+              root.window === fixture.window, root === fixture.hosting || root.isDescendant(of: fixture.hosting) else {
+            throw WorkspaceCanvasFixtureFailure("The separate field observation lacks its exact root or remaining bounded phase.")
+        }
+        let observed = try await nativeDraftField(in: root, identifier: identifier,
+                                                  placeholder: placeholder, expectedLabel: expectedLabel)
+        try nativeOwnedRequireOwner(fixture, deadline: deadline)
+        guard observed.exportedOwner == nil, observed.node.exportedAX == nil,
+              let field = observed.node.object as? NSTextField, field.isEditable, field.isEnabled,
+              !field.isHiddenOrHasHiddenAncestor, field.window === fixture.window, field.isDescendant(of: root),
+              field.accessibilityIdentifier() == identifier || field.accessibilityLabel() == identifier
+                || (expectedLabel != nil && field.accessibilityLabel() == expectedLabel)
+                || field.placeholderString == placeholder else {
+            throw WorkspaceCanvasFixtureFailure("The read-only observer did not return a literal identified/labelled exact-owned AppKit field; semantic/exported edits refused.")
+        }
+        let matching = try nativeOwnedViews(root, fixture: fixture, deadline: deadline).compactMap { $0 as? NSTextField }.filter {
+            $0.isEditable && ($0.accessibilityIdentifier() == identifier || $0.accessibilityLabel() == identifier
+                || (expectedLabel != nil && $0.accessibilityLabel() == expectedLabel) || $0.placeholderString == placeholder)
+        }
+        guard matching.count == 1, matching.first === field else {
+            throw WorkspaceCanvasFixtureFailure("The literal field match is missing, duplicate or different from the read-only observation.")
+        }
+        try nativeOwnedRecord(["classification": "Separate original read-only observer returned one literal AppKit field; actual native editor remains required before input",
+            "requested_identifier": identifier, "observer_stage": nativeDraftCurrentStage,
+            "actual_identifier": String(field.accessibilityIdentifier().prefix(256)),
+            "actual_label": String((field.accessibilityLabel() ?? "").prefix(256)),
+            "actual_placeholder": String((field.placeholderString ?? "").prefix(256)),
+            "actual_field_type": String(String(reflecting: type(of: field)).prefix(256)),
+            "actual_field_identity": String(describing: ObjectIdentifier(field)), "exact_root_and_window": true,
+            "observation_bridge": "Existing nativeDraftField read-only observation; returned field must be literal native",
+        ], name: "native-exported-observation-literal-field")
+        return observed
+    }
+
+    private func nativeExportFrame(_ element: AXUIElement, context: NativeWorkspaceDraftExportedAXContext,
+                                    fixture: NativeWorkspaceDraftFixture, deadline: TimeInterval) throws
+        -> (topLeft: NSRect, screen: NSRect) {
+        try nativeOwnedRequireOwner(fixture, deadline: deadline)
+        try context.requireOwnedAncestor(element)
+        guard context.deadline == deadline,
+              let position = try NativeWorkspaceDraftAXQuery.attribute(element, kAXPositionAttribute, deadline: deadline),
+              let dimensions = try NativeWorkspaceDraftAXQuery.attribute(element, kAXSizeAttribute, deadline: deadline),
+              CFGetTypeID(position as CFTypeRef) == AXValueGetTypeID(),
+              CFGetTypeID(dimensions as CFTypeRef) == AXValueGetTypeID() else {
+            throw WorkspaceCanvasFixtureFailure("The separate exported target does not provide bounded AXValue position/size.")
+        }
+        let positionValue = position as! AXValue, sizeValue = dimensions as! AXValue
+        var point = CGPoint.zero, size = CGSize.zero
+        guard AXValueGetType(positionValue) == .cgPoint, AXValueGetType(sizeValue) == .cgSize,
+              AXValueGetValue(positionValue, .cgPoint, &point), AXValueGetValue(sizeValue, .cgSize, &size),
+              point.x.isFinite, point.y.isFinite, size.width.isFinite, size.height.isFinite,
+              size.width > 0, size.height > 0,
+              let primary = NSScreen.screens.first, primary.frame.origin == .zero else {
+            throw WorkspaceCanvasFixtureFailure("The exported geometry or existing primary-screen conversion guard failed.")
+        }
+        let topLeft = NSRect(origin: point, size: size)
+        let screen = NSRect(x: point.x, y: primary.frame.maxY - point.y - size.height,
+                            width: size.width, height: size.height)
+        let viewport = fixture.window.convertToScreen(fixture.hosting.convert(fixture.hosting.visibleRect, to: nil))
+        guard screen.minX.isFinite, screen.minY.isFinite, screen.maxX.isFinite, screen.maxY.isFinite,
+              !NSIntersectionRect(screen, viewport).isEmpty else {
+            throw WorkspaceCanvasFixtureFailure("The exact exported target is outside its displayed native host or has invalid converted geometry.")
+        }
+        try nativeOwnedRequireOwner(fixture, deadline: deadline)
+        return (topLeft, screen)
+    }
+
+    private func nativeExportRequireExactHit(_ hit: AXUIElement, target: AXUIElement,
+                                             context: NativeWorkspaceDraftExportedAXContext) throws -> Int {
+        var cursor = hit, seen: [AXUIElement] = [], foundTarget = false
+        for _ in 0..<48 {
+            try context.requireOwner()
+            try NativeWorkspaceDraftAXQuery.prepare(cursor, deadline: context.deadline)
+            guard !seen.contains(where: { CFEqual($0, cursor) }) else {
+                throw WorkspaceCanvasFixtureFailure("The exported semantic hit ancestry contains a cycle.")
+            }
+            seen.append(cursor)
+            if CFEqual(cursor, target) { foundTarget = true }
+            if CFEqual(cursor, context.windowElement) {
+                guard foundTarget else { throw WorkspaceCanvasFixtureFailure("The measured semantic hit does not reach the exact CFEqual identified target.") }
+                return seen.count
+            }
+            guard let parent = try NativeWorkspaceDraftAXQuery.attribute(cursor, kAXParentAttribute, deadline: context.deadline),
+                  CFGetTypeID(parent as CFTypeRef) == AXUIElementGetTypeID() else {
+                throw WorkspaceCanvasFixtureFailure("The exported semantic hit does not reach its exact owned window.")
+            }
+            cursor = parent as! AXUIElement
+        }
+        throw WorkspaceCanvasFixtureFailure("The exported semantic hit ancestry exceeded 48 objects.")
+    }
+
+    private func nativeExportOwnedPress(_ identifier: String, in fixture: NativeWorkspaceDraftFixture,
+                                        deadline: TimeInterval) async throws {
+        let end = min(deadline, ProcessInfo.processInfo.systemUptime + 3)
+        try nativeOwnedRequireOwner(fixture, deadline: end, requireKey: true)
+        nativeDraftStage("exported-identity.owned-action." + identifier + ".lookup")
+        let node = try await nativeDraftAXElement(identifier, in: fixture, deadline: end, scope: .applicationContent)
+        guard let element = node.exportedAX, let context = node.exportedContext else {
+            throw WorkspaceCanvasFixtureFailure("The separate route did not return a scoped exported identifier.")
+        }
+        let snapshot = try context.snapshot(element)
+        guard snapshot.identifier == identifier, snapshot.role == .button, snapshot.enabled == true else {
+            throw WorkspaceCanvasFixtureFailure("The fresh exported identity is not the exact enabled AXButton.")
+        }
+        let measured = try nativeExportFrame(element, context: context, fixture: fixture, deadline: end)
+        let topLeftPoint = NSPoint(x: measured.topLeft.midX, y: measured.topLeft.midY)
+        let screenPoint = NSPoint(x: measured.screen.midX, y: measured.screen.midY)
+        guard Float(topLeftPoint.x).isFinite, Float(topLeftPoint.y).isFinite else {
+            throw WorkspaceCanvasFixtureFailure("The exact exported hit point exceeds the public API coordinate range.")
+        }
+        let application = AXUIElementCreateApplication(ProcessInfo.processInfo.processIdentifier)
+        try NativeWorkspaceDraftAXQuery.prepare(application, deadline: end)
+        var rawHit: AXUIElement?
+        let hitStatus = AXUIElementCopyElementAtPosition(application, Float(topLeftPoint.x), Float(topLeftPoint.y), &rawHit)
+        guard hitStatus == .success, let hit = rawHit, CFGetTypeID(hit) == AXUIElementGetTypeID(),
+              ProcessInfo.processInfo.systemUptime < end else {
+            throw WorkspaceCanvasFixtureFailure("The public own-process semantic hit failed or exceeded its bound: AXError \(hitStatus.rawValue).")
+        }
+        let ancestors = try nativeExportRequireExactHit(hit, target: element, context: context)
+        let refreshed = try context.snapshot(element)
+        let currentFrame = try nativeExportFrame(element, context: context, fixture: fixture, deadline: end)
+        guard refreshed.identifier == identifier, refreshed.role == .button, refreshed.enabled == true,
+              currentFrame.topLeft == measured.topLeft, currentFrame.screen == measured.screen else {
+            throw WorkspaceCanvasFixtureFailure("The measured exported target changed before its owned native event.")
+        }
+        try nativeOwnedRecord(["classification": "Separate exported-identity/native-event route: fresh unique enabled AXButton, exact CFEqual semantic target/window hit, measured frame; no action invoked",
+            "identifier": identifier, "stage": nativeDraftCurrentStage,
+            "identity_bridge": "Scoped own-process exported AX read-only snapshot",
+            "semantic_hit_API": "AXUIElementCopyElementAtPosition own-process application",
+            "semantic_hit_status": hitStatus.rawValue, "hit_is_target_CFEqual": CFEqual(hit, element),
+            "hit_ancestor_count": ancestors, "hit_reaches_exact_target_and_window": true,
+            "frame_top_left_screen": NSStringFromRect(measured.topLeft), "frame_native_screen": NSStringFromRect(measured.screen),
+            "frame_unchanged_before_queue": true, "input_bridge": "nativeOwnedQueueClick physical own-host hit + one NSApp.postEvent down/up pair",
+        ], name: "native-exported-identity-target-" + identifier)
+        try await nativeOwnedQueueClick(at: screenPoint, fixture: fixture, deadline: end, identifier: identifier)
+    }
+
+    private func nativeExportRequireManagerTitle(_ title: String, in fixture: NativeWorkspaceDraftFixture,
+                                                 deadline: TimeInterval) async throws {
+        let end = min(deadline, ProcessInfo.processInfo.systemUptime + 3)
+        repeat {
+            nativeDraftStage("exported-identity.manager-heading." + title)
+            let header = try await nativeDraftAXElement("detail-manager", in: fixture, deadline: end, scope: .applicationContent)
+            guard let element = header.exportedAX, let context = header.exportedContext else {
+                throw WorkspaceCanvasFixtureFailure("The separate Manager heading has no scoped exported identity.")
+            }
+            _ = try nativeExportFrame(element, context: context, fixture: fixture, deadline: end)
+            let nodes = try nativeDraftExportedAXTree(header, deadline: end, limit: 128)
+            if let match = nodes.first(where: { $0.value as? String == title || $0.title == title }) {
+                guard let text = match.exportedAX else { throw WorkspaceCanvasFixtureFailure("The matching heading has no exact exported object.") }
+                let displayed = try nativeExportFrame(text, context: context, fixture: fixture, deadline: end)
+                try nativeOwnedRecord(["classification": "Separate strict displayed Manager title/value check through scoped exported read-only children",
+                    "expected_title": title, "subtree_node_count": nodes.count, "matched_text_frame": NSStringFromRect(displayed.screen),
+                    "identity_bridge": "Exported detail-manager and bounded complete child snapshots",
+                ], name: "native-exported-manager-heading-" + title.replacingOccurrences(of: " ", with: "-"))
+                return
+            }
+            try await Task.sleep(for: .milliseconds(20))
+        } while ProcessInfo.processInfo.systemUptime < end
+        throw WorkspaceCanvasFixtureFailure("The separate exported-identity route did not display its selected Manager heading.")
+    }
+
+    private func nativeExportRequireProjectIdentity(_ fixture: NativeWorkspaceDraftFixture,
+                                                    deadline: TimeInterval) async throws {
+        let end = min(deadline, ProcessInfo.processInfo.systemUptime + 3)
+        let identity = try await nativeDraftAXElement("project-canonical-root", in: fixture, deadline: end, scope: .applicationContent)
+        guard let identityElement = identity.exportedAX, let identityContext = identity.exportedContext else {
+            throw WorkspaceCanvasFixtureFailure("The displayed Projects root has no scoped exported identity.")
+        }
+        _ = try nativeExportFrame(identityElement, context: identityContext, fixture: fixture, deadline: end)
+        XCTAssertTrue(identity.value as? String == NativeWorkspaceDraftClient.projectRoot
+            || identity.title == NativeWorkspaceDraftClient.projectRoot)
+        let generation = try await nativeDraftAXElement("project-generation", in: fixture, deadline: end, scope: .applicationContent)
+        guard let generationElement = generation.exportedAX, let generationContext = generation.exportedContext else {
+            throw WorkspaceCanvasFixtureFailure("The displayed Projects generation has no scoped exported identity.")
+        }
+        _ = try nativeExportFrame(generationElement, context: generationContext, fixture: fixture, deadline: end)
+        XCTAssertTrue(generation.value as? String == "Generation 4"
+            || generation.title == "Generation 4")
+        try nativeOwnedRecord(["classification": "Separate strict displayed Projects root/generation assertions through scoped exported read-only identity",
+            "expected_root": NativeWorkspaceDraftClient.projectRoot, "expected_generation": "Generation 4",
+            "identity_bridge": "Fresh unique exported IDs, exact window ancestry and visible measured frames",
+        ], name: "native-exported-projects-displayed-identity")
+    }
+
     func testProductionManagerNativeDraftSurvivesWorkspaceAndSectionTransitions() async throws {
         do {
             continueAfterFailure = true
@@ -907,12 +1877,15 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
         try await Task.sleep(for: .milliseconds(40))
     }
 
+    private enum NativeDraftIdentifierScope: Equatable { case wholeWindow, applicationContent }
+
     private func nativeDraftAXElement(_ identifier: String, in fixture: NativeWorkspaceDraftFixture,
-                                      deadline suppliedDeadline: TimeInterval? = nil) async throws -> NativeWorkspaceDraftAccessibilityNode {
+                                      deadline suppliedDeadline: TimeInterval? = nil,
+                                      scope: NativeDraftIdentifierScope = .wholeWindow) async throws -> NativeWorkspaceDraftAccessibilityNode {
         var progress: [String: Any] = [:]
         do {
             return try await nativeDraftObserveAXElement(identifier, in: fixture, deadline: suppliedDeadline,
-                progress: &progress)
+                scope: scope, progress: &progress)
         } catch {
             await nativeDraftRetainLookupFailure(error, lookupKind: "AX-element", root: fixture.hosting,
                 identifier: identifier, placeholder: nil, expectedLabel: nil, lookupProgress: progress)
@@ -922,6 +1895,7 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
 
     private func nativeDraftObserveAXElement(_ identifier: String, in fixture: NativeWorkspaceDraftFixture,
                                              deadline suppliedDeadline: TimeInterval?,
+                                             scope: NativeDraftIdentifierScope = .wholeWindow,
                                              progress: inout [String: Any]) async throws -> NativeWorkspaceDraftAccessibilityNode {
         let deadline = suppliedDeadline ?? ProcessInfo.processInfo.systemUptime + 3
         var attempt = 0
@@ -932,6 +1906,51 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
             if let context = try NativeWorkspaceDraftExportedAXContext(fixture: fixture, deadline: deadline) {
                 progress["operation"] = "root-ancestor-validation"
                 try context.requireOwnedAncestor(context.windowElement)
+                var excludedStandardZoom: AXUIElement?, zoomIdentifier: String?, validatedZoomSubrole: String?
+                var fullScreenReferenceMatched: Bool?
+                var omittedZoomDescendants = false
+                if scope == .applicationContent {
+                    progress["operation"] = "application-content-standard-zoom-validation"
+                    guard let raw = try NativeWorkspaceDraftAXQuery.attribute(context.windowElement, kAXZoomButtonAttribute, deadline: deadline),
+                          CFGetTypeID(raw as CFTypeRef) == AXUIElementGetTypeID() else {
+                        throw WorkspaceCanvasFixtureFailure("Application-content scope requires the exact owned window's public Zoom reference.")
+                    }
+                    let zoom = raw as! AXUIElement
+                    try NativeWorkspaceDraftAXQuery.prepare(zoom, deadline: deadline)
+                    try context.requireOwnedAncestor(zoom)
+                    let zoomRole = try NativeWorkspaceDraftAXQuery.attribute(zoom, kAXRoleAttribute, deadline: deadline)
+                    progress["standard_zoom_role_string_prefix"] = (zoomRole as? String).map { String($0.prefix(256)) as Any } ?? NSNull()
+                    progress["standard_zoom_role_cf_type_id"] = zoomRole.map { CFGetTypeID($0 as CFTypeRef) as Any } ?? NSNull()
+                    let zoomSubrole = try NativeWorkspaceDraftAXQuery.attribute(zoom, kAXSubroleAttribute, deadline: deadline)
+                    progress["standard_zoom_subrole_string_prefix"] = (zoomSubrole as? String).map { String($0.prefix(256)) as Any } ?? NSNull()
+                    progress["standard_zoom_subrole_cf_type_id"] = zoomSubrole.map { CFGetTypeID($0 as CFTypeRef) as Any } ?? NSNull()
+                    guard zoomRole as? String == kAXButtonRole, let subrole = zoomSubrole as? String,
+                          subrole == kAXZoomButtonSubrole || subrole == kAXFullScreenButtonSubrole else {
+                        throw WorkspaceCanvasFixtureFailure("The exact excluded reference is not an owned AXButton with a recognized standard window-control subrole.")
+                    }
+                    if subrole == kAXFullScreenButtonSubrole {
+                        guard let rawFullScreen = try NativeWorkspaceDraftAXQuery.attribute(context.windowElement, kAXFullScreenButtonAttribute, deadline: deadline),
+                              CFGetTypeID(rawFullScreen as CFTypeRef) == AXUIElementGetTypeID() else {
+                            throw WorkspaceCanvasFixtureFailure("The Full Screen subrole requires the exact owned window's public Full Screen reference.")
+                        }
+                        let fullScreen = rawFullScreen as! AXUIElement
+                        try NativeWorkspaceDraftAXQuery.prepare(fullScreen, deadline: deadline)
+                        try context.requireOwnedAncestor(fullScreen)
+                        let matchesZoom = CFEqual(fullScreen, zoom)
+                        progress["exact_owned_window_full_screen_reference_matches_zoom"] = matchesZoom
+                        guard matchesZoom else {
+                            throw WorkspaceCanvasFixtureFailure("The owned window's Full Screen reference differs from its exact Zoom reference.")
+                        }
+                        fullScreenReferenceMatched = matchesZoom
+                    }
+                    validatedZoomSubrole = subrole
+                    let rawID = try NativeWorkspaceDraftAXQuery.attribute(zoom, kAXIdentifierAttribute, deadline: deadline)
+                    guard rawID == nil || (rawID as? String).map({ $0.utf8.count <= 16 * 1_024 }) == true,
+                          rawID as? String != identifier else {
+                        throw WorkspaceCanvasFixtureFailure("The excluded standard Zoom has invalid metadata or matches the requested Forge target.")
+                    }
+                    zoomIdentifier = rawID as? String; excludedStandardZoom = zoom
+                }
                 var pending: [(AXUIElement, Int, Int?, Int?, String?, [String], AXUIElement?)] = [
                     (context.windowElement, 0, nil, nil, nil, [], nil),
                 ]
@@ -951,6 +1970,11 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
                         "recent_successfully_read_named_ancestors": namedAncestors,
                         "named_ancestor_limit": 8, "identifier_character_limit": 256,
                     ]
+                    if scope == .applicationContent {
+                        progress["identifier_observation_scope"] = "application-content-excluding-validated-standard-zoom-descendants"
+                        progress["standard_zoom_reference_validated"] = excludedStandardZoom != nil
+                        progress["standard_zoom_descendant_expansion_omitted"] = omittedZoomDescendants
+                    }
                     try context.requireOwner()
                     guard !seen.contains(where: { CFEqual($0, element) }) else { continue }
                     guard seen.count < 2_048, depth <= 48 else {
@@ -979,6 +2003,13 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
                         match = element
                         matchedProgress = progress
                     }
+                    if let excludedStandardZoom, CFEqual(element, excludedStandardZoom) {
+                        guard rawIdentifier as? String != identifier else {
+                            throw WorkspaceCanvasFixtureFailure("Application-content scope cannot return its excluded standard Zoom as a Forge target.")
+                        }
+                        omittedZoomDescendants = true
+                        continue
+                    }
                     progress["requested_match_already_discovered"] = match != nil
                     progress["operation"] = "children-read"
                     let children = try NativeWorkspaceDraftAXQuery.children(element, kAXChildrenAttribute,
@@ -993,6 +2024,7 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
                 if let match {
                     progress = matchedProgress ?? [:]
                     progress["complete_identifier_walk_node_count"] = seen.count
+                    if scope == .applicationContent { progress["standard_zoom_descendant_expansion_omitted"] = omittedZoomDescendants }
                     progress["pending_node_count"] = 0
                     progress["requested_match_already_discovered"] = true
                     progress["operation"] = "target-ancestor-validation"
@@ -1002,6 +2034,19 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
                     progress["operation"] = "target-identifier-validation"
                     guard node.identifier == identifier else {
                         throw WorkspaceCanvasFixtureFailure("The matched exported identifier changed before its full target snapshot.")
+                    }
+                    if scope == .applicationContent {
+                        try nativeOwnedRecord(["classification": "Separate application-content identifier scope; exact validated standard Zoom ID read, only its descendant expansion excluded; remaining scoped walk completed",
+                            "requested_identifier": identifier, "scope": "application-content-excluding-validated-standard-zoom-descendants",
+                            "standard_zoom_role": kAXButtonRole,
+                            "standard_zoom_subrole": validatedZoomSubrole.map { String($0.prefix(256)) as Any } ?? NSNull(),
+                            "exact_owned_window_full_screen_reference_matches_zoom": fullScreenReferenceMatched.map { $0 as Any } ?? NSNull(),
+                            "standard_zoom_identifier": zoomIdentifier.map { String($0.prefix(256)) as Any } ?? NSNull(),
+                            "exact_owned_window_zoom_reference_validated": true,
+                            "standard_zoom_descendant_expansion_omitted": omittedZoomDescendants,
+                            "complete_scoped_identifier_walk_node_count": seen.count,
+                            "original_whole_window_and_ordinary_native_gates": "unchanged; separate outcomes required",
+                        ], name: "native-exported-application-content-scope-" + identifier)
                     }
                     return node
                 }
@@ -2670,9 +3715,85 @@ private enum NativeWorkspaceDraftAXQuery {
         report["diagnostic_deadline_independent_of_failed_lookup"] = true
         report["fresh_copy_count_limit"] = 1
         report["recorded_discovery_child_ordinal"] = childOrdinal.map { $0 as Any } ?? NSNull()
-        report["ancestor_scope"] = "Owned exported window and previously discovered AXChildren parent only; no new AXParent query or native-owner inference"
+        report["ancestor_scope"] = "Owned exported window and discovered AXChildren parent; additional read-only held-parent AXParent/window-control reference comparison, no native-owner inference"
         report["yield_request_count"] = 1; report["yield_requested_seconds"] = 0.02
+        func windowControlReferences() -> [String: Any] {
+            var measured: [String: Any] = [
+                "classification": "Read-only exact exported reference comparison; no native owner inference or recovery",
+                "shared_existing_diagnostic_deadline": true, "additional_attribute_copy_limit": 4,
+                "held_parent_AXParent_copy_limit": 1, "root_window_control_reference_copy_limit": 3,
+            ]
+            func reference(_ source: AXUIElement, attribute: String) -> (AXUIElement?, [String: Any]) {
+                var row: [String: Any] = ["attribute": attribute, "source_cf_type_id": CFGetTypeID(source)]
+                func unknown(_ reason: String) -> (AXUIElement?, [String: Any]) {
+                    row["reference_result"] = "unknown"; row["unknown_reason"] = reason; return (nil, row)
+                }
+                guard CFGetTypeID(source) == AXUIElementGetTypeID(), ProcessInfo.processInfo.systemUptime < deadline else {
+                    return unknown("invalid-source-type-or-shared-deadline")
+                }
+                var sourcePID: pid_t = 0
+                let sourceStatus = AXUIElementGetPid(source, &sourcePID)
+                row["source_pid_status"] = sourceStatus.rawValue; row["source_pid"] = sourcePID
+                guard sourceStatus == .success, sourcePID == ProcessInfo.processInfo.processIdentifier else {
+                    return unknown("source-pid-not-verified-own-process")
+                }
+                let remaining = deadline - ProcessInfo.processInfo.systemUptime
+                guard remaining > 0 else { return unknown("shared-deadline") }
+                let timeout = AXUIElementSetMessagingTimeout(source, Float(min(0.005, remaining / 2)))
+                row["timeout_status"] = timeout.rawValue
+                guard timeout == .success, ProcessInfo.processInfo.systemUptime < deadline else {
+                    return unknown("timeout-status-or-shared-deadline")
+                }
+                var value: CFTypeRef?
+                let status = AXUIElementCopyAttributeValue(source, attribute as CFString, &value)
+                row["copy_status"] = status.rawValue
+                if let value { row["value_cf_type_id"] = CFGetTypeID(value) }
+                guard status == .success, let value, CFGetTypeID(value) == AXUIElementGetTypeID(),
+                      ProcessInfo.processInfo.systemUptime < deadline else {
+                    return unknown("copy-status-absent-value-type-or-shared-deadline")
+                }
+                let element = value as! AXUIElement
+                var valuePID: pid_t = 0
+                let valueStatus = AXUIElementGetPid(element, &valuePID)
+                row["value_pid_status"] = valueStatus.rawValue; row["value_pid"] = valuePID
+                guard valueStatus == .success, valuePID == ProcessInfo.processInfo.processIdentifier,
+                      ProcessInfo.processInfo.systemUptime < deadline else {
+                    return unknown("returned-pid-or-shared-deadline-not-verified")
+                }
+                row["reference_result"] = "observed-own-process-AX-reference"
+                return (element, row)
+            }
+            let container: AXUIElement?
+            if let parent {
+                let observed = reference(parent, attribute: kAXParentAttribute)
+                container = observed.0; measured["held_parent_container"] = observed.1
+            } else {
+                container = nil
+                measured["held_parent_container"] = ["reference_result": "unknown", "unknown_reason": "missing-held-parent"]
+            }
+            var controls: [String: Any] = [:]
+            for attribute in [kAXZoomButtonAttribute, kAXCloseButtonAttribute, kAXMinimizeButtonAttribute] {
+                guard let container else {
+                    controls[attribute] = ["reference_result": "unknown", "comparison_result": "unknown",
+                        "unknown_reason": "held-parent-container-not-verified; root-reference-not-queried"]
+                    continue
+                }
+                var observed = reference(root, attribute: attribute)
+                if let control = observed.0, ProcessInfo.processInfo.systemUptime < deadline {
+                    let equal = CFEqual(container, control)
+                    observed.1["CFEqual_held_parent_container"] = equal
+                    observed.1["comparison_result"] = equal ? "observed-reference-match" : "observed-reference-no-match"
+                } else {
+                    observed.1["comparison_result"] = "unknown"
+                    observed.1["comparison_unknown_reason"] = "root-control-reference-or-shared-deadline-not-verified"
+                }
+                controls[attribute] = observed.1
+            }
+            measured["exact_lookup_root_window_control_references"] = controls
+            return measured
+        }
         func finish() -> [String: Any] {
+            report["held_parent_window_control_reference_comparison"] = windowControlReferences()
             report["elapsed_seconds"] = ProcessInfo.processInfo.systemUptime - started
             report["within_diagnostic_deadline"] = ProcessInfo.processInfo.systemUptime <= deadline
             return report
