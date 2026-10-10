@@ -29,6 +29,8 @@ Product versions do not by themselves claim shipment.
 
 - Record the separate v27 post-failure diagnostic: after one requested 20 ms wait and one fresh child copy from the held parent, both held/fresh child accessibility reads still return −25211. Both complete-draft methods remain NONPASS; original assertions and fatal errors are preserved, with no cause or production repair established.
 
+- Record the separate v28 trust-state observation: both complete-draft methods remain NONPASS, with false reported by the test client at each diagnostic start. Root/parent role reads still succeed while held/fresh child reads remain −25211. This context observation establishes no particular-child cause or production repair; all original assertions and open UI gates remain.
+
 #### Earlier UI checks before the naming repair
 
 - Verify the post-Compute ordinary Debug candidate, strict signature and CLI/app product links. Candidate Dashboard startup was observed. The later whole native Canvas selection passed 11 of 13 methods; both draft cases, Projects desktop navigation and Rune naming qualification remain open. The installed 0.18.0 (28) app was not replaced.

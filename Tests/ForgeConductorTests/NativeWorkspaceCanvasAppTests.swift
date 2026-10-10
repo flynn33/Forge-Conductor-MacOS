@@ -2493,6 +2493,7 @@ private enum NativeWorkspaceDraftAXQuery {
     static func discoveryFailureDiagnostic(root: AXUIElement, parent: AXUIElement?, child: AXUIElement,
                                            childOrdinal: Int?, deadline originalDeadline: TimeInterval) async -> [String: Any] {
         let started = ProcessInfo.processInfo.systemUptime
+        let processTrustedAtDiagnosticStart = AXIsProcessTrusted()
         let deadline = started + 0.25
         let immediateDeadline = started + 0.08
         func metadata(_ element: AXUIElement, attributes: [String], deadline stageDeadline: TimeInterval) -> [String: Any] {
@@ -2534,6 +2535,7 @@ private enum NativeWorkspaceDraftAXQuery {
         }
         let childMetadata = metadata(child, attributes: [kAXRoleAttribute, kAXIdentifierAttribute], deadline: immediateDeadline)
         var report = discoveryFailureImmediateDiagnostic(root: root, parent: parent, child: child, deadline: immediateDeadline)
+        report["process_trusted_at_diagnostic_start"] = processTrustedAtDiagnosticStart
         report["classification"] = "Bounded post-failure measurement only; one held-parent child re-enumeration after one 20ms yield; original identifier error remains fatal"
         report["immediate_discovery_elapsed_seconds"] = report["elapsed_seconds"]
         report["immediate_deadline_limit_seconds"] = 0.08
