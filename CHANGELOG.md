@@ -17,9 +17,11 @@ Product versions do not by themselves claim shipment.
 - Keep accepted Rune Forge policy commands running when all panels are hidden; pause background observation separately. The mounted regression and all 16 owning native Rune cases passed.
 - Fix Compute viewport resume after outer scrolling and moving a shown panel. Use bounded shared ancestor frame and clip bounds observations and restore their original notification flags on final detach; both focused native cases passed. All 27 Compute owning native methods also passed. Complete UI qualification remains open.
 - Fix stale naming submission: a held Rename dialog must not rename a newly selected layout. Capture its originating view/layout and request identity; dismiss changed-context submission without changing saved layouts.
-- Pass the scoped v17 23-method native selection on its recorded inputs: 18 preference cases, separate normal Rename/Save As, same-view selection/source-refresh isolation and native move/resize/Hide restoration through fresh owners. Post-naming ordinary Debug, strict signature and candidate input/artifact readback passed. Full UI/drafts/desktop, original combined naming/exported-AX/Save-button checks and exact source/wiki delivery remain open; new capabilities remain deferred.
+- Pass the scoped v17 23-method native selection on its recorded inputs: 18 preference cases, separate normal Rename/Save As, same-view selection/source-refresh isolation and native move/resize/Hide restoration through fresh owners. Post-naming ordinary Debug, strict signature and candidate input/artifact readback passed. Full UI/drafts/desktop and original combined naming/exported-AX/Save-button checks remain open; new capabilities remain deferred. Exact source/wiki delivery outcomes are retained in external receipts.
 
 - Verify a separate queued native pointer case: exact owned-window hit testing routes move/resize events through the app queue, preserves transient stored state and persists completed geometry with the same hosts. Cleanup cancels an unfinished test gesture. V18 draft/Save and v21 Save checks remain NONPASS; full UI and desktop/compositor qualification stay open.
+
+- Verify a separate v22 Rune cancellation case: actual Rename/editor input, selected-source removal and app-queued Escape dismiss the originating sheet, preserve all saved layouts and stored bytes, and retain overview panels. This adds scoped test evidence; original draft/Save and complete UI gates remain open.
 
 #### Earlier UI checks before the naming repair
 

@@ -511,6 +511,144 @@ final class RuneForgeAppTests: XCTestCase {
         await runeNamingClose(fixture, runeModel: runeModel)
     }
 
+    func testMountedRuneQueuedEscapeCancelsRenameAfterSourceRefreshWithoutSaving() async throws {
+        guard NSApp != nil, Bundle.main.bundleURL.pathExtension == "app", !NSScreen.screens.isEmpty else {
+            throw RuneWorkspaceVisibilityFailure("Run in ForgeConductorAppTests with a native display.")
+        }
+        let source = DevelopmentPolicySource(displayName: "Cancellation policy",
+            selectedPath: "/tmp/rune-cancellation-policy.md", interpretationState: .cataloging)
+        let client = RuneWorkspaceNamingClient(snapshot: policySnapshot(events: [], sources: [source]))
+        let runeModel = RuneForgeViewModel(client: client)
+        let fixture = try RuneWorkspaceVisibilityFixture(model: runeModel, urls: [])
+        let descriptors = NativeWorkspaceCatalog.runePanels(for: "source")
+        let sourceLayout = NativeWorkspaceLayout(id: UUID(), viewID: "rune-forge.source", name: "Source-" + UUID().uuidString,
+            canvas: .init(width: max(1_280, descriptors.map { $0.defaultFrame.x + $0.defaultFrame.width + 20 }.max() ?? 0),
+                          height: max(900, descriptors.map { $0.defaultFrame.y + $0.defaultFrame.height + 20 }.max() ?? 0)),
+            panels: descriptors.map { .init(id: $0.id, frame: $0.defaultFrame, isVisible: true) })
+        let observer = RuneWorkspaceNamingAX(window: fixture.window, hosting: fixture.hosting)
+        let capture = RuneWorkspaceNativeNamingMenuCapture(window: fixture.window, hosting: fixture.hosting, expectedName: sourceLayout.name)
+        var stage = "mount", witness: [String: Any] = ["event_queued": false, "postEvent_returned": false, "sheet_dismissed": false]
+        func retain(_ error: Error? = nil) throws {
+            let report: [String: Any] = [
+                "classification": "Actual native Rename and owned editor draft, controlled source refresh, and one own-sheet NSApp.postEvent Escape. No Cancel-button click, Save/Return submission or desktop-input proof.",
+                "stage": stage, "actual_queued_Escape": witness,
+                "error": error.map { String(String(describing: $0).prefix(4_096)) as Any } ?? NSNull(),
+            ]
+            let data = try JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys])
+            guard data.count <= 256 * 1_024 else { throw RuneWorkspaceVisibilityFailure("Queued cancellation witness exceeded 256 KiB.") }
+            let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+            attachment.name = "rune-queued-Escape-" + stage; attachment.lifetime = .keepAlways; add(attachment)
+            try runeNativeNamingEvidence(fixture, observer: observer, nativeMenu: capture,
+                stage: stage, savePressed: false, error: error)
+        }
+        func close() async throws {
+            capture.stop(); runeModel.stop(); fixture.model.cancelBootstrap()
+            await runeNamingClose(fixture, runeModel: runeModel)
+            try await runeWorkspaceWait("The test-owned naming models did not settle after awaited fixture cleanup.", timeout: .seconds(5)) {
+                !runeModel.isLoading && !fixture.model.isBootstrapping
+            }
+        }
+        do {
+            try fixture.preferences.save(sourceLayout)
+            NSApp.activate(ignoringOtherApps: true)
+            fixture.window.makeKeyAndOrderFront(nil); fixture.hosting.layoutSubtreeIfNeeded()
+            try await runeWorkspaceWait("The real Rune source owners did not settle for queued cancellation.") {
+                !fixture.model.isBootstrapping && !runeModel.isLoading && runeModel.sources.count == 1
+                    && fixture.document?.panelHosts.count == fixture.layout.panels.count
+            }
+            runeModel.pauseObservation()
+            let row = try await observer.required(identifier: "rune-policy-source-row-" + source.id.description)
+            try observer.pressOwned(row, role: kAXButtonRole)
+            _ = try await observer.required(identifier: "workspace-controls-" + sourceLayout.viewID)
+            try await runeWorkspaceWait("The actual source row did not mount its source workspace.") {
+                Set(fixture.document?.panelHosts.keys.map { $0 } ?? []) == Set(sourceLayout.panels.map(\.id))
+            }
+            let before = fixture.preferences.collection
+            let beforeBytes = try XCTUnwrap(fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey))
+            let encoded = try JSONEncoder().encode(before)
+            guard beforeBytes.count <= 64 * 1_024, encoded.count <= 64 * 1_024 else {
+                throw RuneWorkspaceVisibilityFailure("The cancellation baseline exceeded its 64 KiB bound.")
+            }
+            witness["expected_collection"] = try JSONSerialization.jsonObject(with: encoded)
+            witness["persisted_bytes_before_base64"] = beforeBytes.base64EncodedString()
+            stage = "actual-native-Rename"
+            let opener = try await observer.required(identifier: "workspace-layout-menu-" + sourceLayout.viewID)
+            try await observer.openOwnedMenuAndPressNativeRename(opener, capture: capture)
+            try await runeWorkspaceWait("Actual Rename did not attach its production sheet.") { fixture.window.attachedSheet != nil }
+            let sheet = try XCTUnwrap(fixture.window.attachedSheet), content = try XCTUnwrap(sheet.contentView)
+            let (originField, identity) = try await runeRequiredOwnedNamingField(fixture, sheet: sheet, content: content, expectedValue: sourceLayout.name)
+            let draft = "Cancelled-" + UUID().uuidString
+            stage = "actual-owned-editor-draft"
+            try runeReplaceOwnedNamingText(fixture, sheet: sheet, content: content, field: originField, name: draft)
+            witness["identity_source"] = identity; witness["actual_editor_draft"] = draft
+            guard fixture.preferences.collection == before,
+                  fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey) == beforeBytes else {
+                throw RuneWorkspaceVisibilityFailure("Actual editing wrote a layout before cancellation.")
+            }
+            stage = "controlled-production-refresh-removes-source"
+            client.replaceSnapshot(policySnapshot(events: [])); await runeModel.refreshNow()
+            guard runeModel.sources.isEmpty, !runeModel.isLoading else { throw RuneWorkspaceVisibilityFailure("The controlled refresh did not remove the selected source.") }
+            try await runeWorkspaceWait("The source refresh did not mount the actual overview panel set.") {
+                Set(fixture.document?.panelHosts.keys.map { $0 } ?? []) == Set(fixture.layout.panels.map(\.id))
+            }
+            runeModel.pauseObservation()
+            try runeRequireNamingSheetOwner(fixture, sheet: sheet, content: content)
+            let (field, heldIdentity) = try await runeRequiredOwnedNamingField(fixture, sheet: sheet, content: content, expectedValue: draft)
+            sheet.makeKeyAndOrderFront(nil)
+            try await runeWorkspaceWait("The exact held sheet did not become the actual key window.") { sheet.isKeyWindow && NSApp.keyWindow === sheet }
+            guard sheet.makeFirstResponder(field), let editor = field.currentEditor() as? NSTextView,
+                  sheet.firstResponder === editor, editor.window === sheet, editor.string == draft else {
+                throw RuneWorkspaceVisibilityFailure("Queued Escape did not own the actual held editor.")
+            }
+            try runeRequireNamingSheetOwner(fixture, sheet: sheet, content: content)
+            let deadline = ProcessInfo.processInfo.systemUptime + 3
+            let event = try XCTUnwrap(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [],
+                timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: sheet.windowNumber, context: nil,
+                characters: "\u{1b}", charactersIgnoringModifiers: "\u{1b}", isARepeat: false, keyCode: 53))
+            guard event.windowNumber == sheet.windowNumber, event.window === sheet,
+                  sheet.isKeyWindow, NSApp.keyWindow === sheet, field.window === sheet,
+                  field.currentEditor() === editor, sheet.firstResponder === editor,
+                  editor.window === sheet, editor.string == draft, field.stringValue == draft,
+                  fixture.preferences.collection == before,
+                  fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey) == beforeBytes,
+                  ProcessInfo.processInfo.systemUptime < deadline else {
+                throw RuneWorkspaceVisibilityFailure("Queued Escape lost its exact event/key-sheet/editor or no-write gates.")
+            }
+            stage = "held-sheet-one-queued-Escape"
+            witness["held_identity_source"] = heldIdentity
+            witness["API"] = "NSApp.postEvent(_:atStart:false)"; witness["event_keyCode"] = Int(event.keyCode)
+            witness["event_window_is_exact_sheet"] = true; witness["sheet_is_actual_key_window"] = true
+            witness["actual_editor_is_sheet_first_responder"] = true
+            NSApp.postEvent(event, atStart: false)
+            witness["event_queued"] = true; witness["postEvent_returned"] = true
+            guard ProcessInfo.processInfo.systemUptime < deadline else { throw RuneWorkspaceVisibilityFailure("Posting the owned Escape exceeded its deadline.") }
+            try await runeWorkspaceWait("The actual app-queued Escape did not dismiss its originating sheet.") {
+                fixture.window.attachedSheet == nil && sheet.sheetParent == nil
+            }
+            witness["sheet_dismissed"] = true
+            witness["originating_sheet_detached"] = sheet.sheetParent == nil
+            stage = "queued-Escape-dismissed-no-saved-changes"
+            let afterBytes = try XCTUnwrap(fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey))
+            guard afterBytes.count <= 64 * 1_024 else { throw RuneWorkspaceVisibilityFailure("Cancellation preferences exceeded their fixture bound.") }
+            witness["persisted_bytes_after_base64"] = afterBytes.base64EncodedString()
+            witness["complete_collection_unchanged"] = fixture.preferences.collection == before
+            witness["persisted_bytes_unchanged"] = afterBytes == beforeBytes
+            guard fixture.preferences.collection == before, afterBytes == beforeBytes,
+                  fixture.preferences.activeLayout(for: fixture.layout.viewID) == fixture.layout,
+                  fixture.preferences.activeLayout(for: sourceLayout.viewID) == sourceLayout,
+                  runeModel.sources.isEmpty,
+                  Set(fixture.document?.panelHosts.keys.map { $0 } ?? []) == Set(fixture.layout.panels.map(\.id)) else {
+                throw RuneWorkspaceVisibilityFailure("Queued cancellation changed saved layouts/bytes or left the actual overview.")
+            }
+            try retain()
+        } catch {
+            try? retain(error)
+            do { try await close() } catch { XCTFail("Queued cancellation fixture cleanup failed: \(error)") }
+            throw error
+        }
+        try await close()
+    }
+
     func testMountedRuneNativeReturnCannotRenameAnotherNamespaceAfterSourceRefresh() async throws {
         guard NSApp != nil, Bundle.main.bundleURL.pathExtension == "app", !NSScreen.screens.isEmpty else {
             throw RuneWorkspaceVisibilityFailure("Run in ForgeConductorAppTests with a native display.")
