@@ -1,6 +1,8 @@
 # Native custom workspaces
 
-Source target: **0.44.0 (60)**. Custom layouts belong to each existing view. They do not combine panels from different views.
+Source target: **0.44.1 (61)**. Custom layouts belong to each existing view. They do not combine panels from different views.
+
+Saved layout entries now display **Layout: …** in the layout menu, so names such as `Default` and `Delete Layout` remain selectable without duplicating built-in command labels. Stored names, UUIDs and schema are unchanged. The native collision regression passes with four menus and five stored states; the 24-method selection remains NONPASS from two fresh Rune AXIdentifier failures, also retained with the original labels. Their cause and the all-panel motion/full UI gates remain open; other new implementations stay deferred. The separate 0.44.1 (61) candidate passes CLI/app compilation, ordinary Debug compilation and strict signature/readback checks. Candidate evidence does not establish launch, installation or distribution.
 
 Customize Layout name generation now uses the same en_US_POSIX case folding as collection validation. V120’s actual Customize action returned but created no active layout with saved A/B/Cuſtom intact (one FAIL, 18.090 parent/3.245 test s, native65/unforced). After the three-line production correction, the same case passes in v121 and v122 (0.199 test s each), creating Custom 2 with the complete prior collection preserved and fresh restoration equal. Each invocation also passes all 18 preferences cases and two normal Rune Rename/Save As cases; both aggregate runs remain NONPASS because the separate wheel test aborts. The fresh v123 ordinary Debug candidate passes compilation (25.642 s) and strict signature verification (0.282 s), with Info 0.44.0 (60), unchanged graph and verified source membership. Candidate evidence adds no launch, installation or distribution claim.
 

@@ -3706,14 +3706,14 @@ private final class RuneWorkspaceNativeNamingMenuCapture: NSObject {
             }
             let titles = items.map(\.title)
             let commands = ["Default", "Save Layout As…", "Rename Layout…", "Delete Layout"]
-            guard items.filter({ $0.title == expectedName }).count == 1,
+            guard items.filter({ $0.title == "Layout: " + expectedName }).count == 1,
                   commands.allSatisfy({ title in items.filter({ $0.title == title }).count == 1 }),
                   let index = items.firstIndex(where: { $0.title == requestedCommand }),
                   items[index].isEnabled, !items[index].isHidden, !items[index].isSeparatorItem,
                   items[index].submenu == nil, items[index].action != nil else {
                 throw RuneWorkspaceVisibilityFailure("The single captured menu did not prove the exact fixture layout marker and enabled literal workspace naming command.")
             }
-            record["scope_marker_exact"] = expectedName
+            record["scope_marker_exact"] = "Layout: " + expectedName
             record["literal_commands_exact"] = commands
             if requestedCommand == "Rename Layout…" { record["actual_rename_index"] = index }
             record["actual_command_title"] = requestedCommand; record["actual_command_index"] = index

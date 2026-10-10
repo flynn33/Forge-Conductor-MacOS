@@ -1,6 +1,6 @@
 # Forge Conductor — Xcode
 
-Current source version **0.44.0**, build **60** adds the native Workspace sources and focused AppTests to the existing project. `ForgeConductor.xcworkspace` remains the canonical entry; no project regeneration, target, dependency or signing change is introduced. Keep ordinary candidate and test output directories separate. Full-view and final build/delivery checks are in progress. [Workspace contract](docs/NATIVE-WORKSPACES.md), [qualification](docs/QUALIFICATION-STATUS.md).
+Current source version **0.44.1**, build **61** corrects saved-layout menu labels in the existing native Workspace source. Existing source/test memberships remain; only product version/build settings change in the project. `ForgeConductor.xcworkspace` remains the canonical entry, with the existing targets, dependencies and signing. Keep ordinary candidate and test output directories separate. CLI/app and ordinary Debug compilation, strict signature and candidate readback passed; the native selection remains 22 PASS/two fresh Rune failures. Full-view qualification stays open. [Workspace contract](docs/NATIVE-WORKSPACES.md), [qualification](docs/QUALIFICATION-STATUS.md).
 
 ## Preceding 0.43.0 (59) qualification
 

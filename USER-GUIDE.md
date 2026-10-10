@@ -1,6 +1,6 @@
 # Forge Conductor user guide
 
-Version **0.44.0**, build **60** adds custom layouts within each existing view.
+Version **0.44.1**, build **61** retains custom layouts within each existing view and displays saved menu entries as `Layout: <name>`. Stored names and layout identities are unchanged.
 
 1. Open a view and select **Customize Layout**.
 2. Drag a panel's header to move it. Drag its lower-right grip to resize it.

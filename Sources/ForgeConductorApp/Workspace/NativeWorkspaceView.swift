@@ -139,7 +139,7 @@ private struct NativeWorkspaceScope<DefaultContent: View>: View {
             Menu {
                 Button("Default") { perform { try preferences.reset(viewID) } }
                 ForEach(preferences.layouts(for: viewID)) { layout in
-                    Button(layout.name) { perform { try preferences.activate(layout.id, for: viewID) } }
+                    Button("Layout: " + layout.name) { perform { try preferences.activate(layout.id, for: viewID) } }
                 }
                 Divider()
                 Button("Save Layout As…") { beginNaming(.saveAs) }

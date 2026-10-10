@@ -10,6 +10,10 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### `0.44.1 (61)`
+
+- Prefix saved layout menu entries with `Layout: ` to distinguish them from built-in commands while preserving names, IDs and schema. The reproduced collision regression passes; two fresh Rune failures and all-panel motion/full UI qualification remain open.
+
 ### `0.44.0 (60)` custom layouts within each view
 
 - Verify existing Tools Default menu selection and saved-layout reselection in v153/v154. Add the broader 126-placement/21-namespace queued-geometry check without changing prior tests; its pre-input presentation failures remain unresolved. V152 selected zero tests and is NONPASS. No production repair or complete UI acceptance is claimed.

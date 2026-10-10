@@ -1,6 +1,6 @@
 # Versioning policy
 
-Current target identity is **0.44.0 (60)** for custom layouts within each existing view. The current test-only workspace diagnostics and documentation correction advance no version or build; earlier receipts keep their tested identities. Complete UI and broader qualification gates remain open, and remaining new capabilities stay deferred. A source identity does not claim shipment. [Current gates](QUALIFICATION-STATUS.md).
+Current target identity is **0.44.1 (61)**. This backward-compatible layout-menu label correction advances the patch and build authorities together. Saved names and layout IDs remain unchanged. The collision regression passes; the owning native selection remains NONPASS from two fresh Rune failures; complete UI and broader gates remain open, and new capabilities stay deferred. Historical receipts retain their tested identities. [Current gates](QUALIFICATION-STATUS.md).
 
 ## Preceding 0.43.0 (59) qualification
 
@@ -373,7 +373,7 @@ focused version test, and CI reject drift between them.
 
 ## Current identity
 
-Current source target is `0.44.0`, build `60`, for custom layouts within each existing view. The current Canvas diagnostics and document correction advance no version/build and establish no production repair or complete UI qualification. Historical receipts retain their tested identities; broader gates remain open and new capabilities stay deferred. [Current gates](QUALIFICATION-STATUS.md).
+Current source target is `0.44.1`, build `61`, for a backward-compatible layout-menu label correction. The collision regression passes; the owning native selection remains NONPASS from two fresh Rune failures; historical receipts retain their tested identities. Full UI gates remain open and new capabilities stay deferred. [Current gates](QUALIFICATION-STATUS.md).
 
 ## Preceding 0.43.0 (59) identity record
 

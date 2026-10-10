@@ -1,6 +1,6 @@
 # Documentation guide
 
-Current source target **0.44.0 (60)** adds [custom layouts within each view](NATIVE-WORKSPACES.md). The owner prioritizes completing the UI changes and fixing bugs; remaining new capability implementations are deferred. [Current qualification](QUALIFICATION-STATUS.md).
+Current source target **0.44.1 (61)** corrects saved-layout menu labels within [custom layouts within each view](NATIVE-WORKSPACES.md). The owner prioritizes completing the UI changes and fixing bugs; remaining new capability implementations are deferred. [Current qualification](QUALIFICATION-STATUS.md).
 
 ## Preceding 0.43.0 (59) qualification
 
