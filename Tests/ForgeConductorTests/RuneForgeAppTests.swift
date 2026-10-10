@@ -16,6 +16,159 @@ import ApplicationServices
 final class RuneForgeAppTests: XCTestCase {
     #if !SWIFT_PACKAGE
 
+
+    func testMountedRuneActualSourceAndViolationRoutesQueuedMoveResizePersistsGeometry() async throws {
+        let deadline = ProcessInfo.processInfo.systemUptime + 90
+        for (mode, panelID) in [("source", "rune-source-identity"), ("violation", "rune-violation-identity")] {
+            guard deadline - ProcessInfo.processInfo.systemUptime > 15 else {
+                throw RuneWorkspaceVisibilityFailure("Rune route table lacks bounded preparation time.")
+            }
+            try await runeActualRouteQueuedGeometry(mode: mode, panelID: panelID, deadline: deadline)
+        }
+    }
+
+    func testMountedRuneActualFeedSelectionQueuedMoveResizePersistsGeometry() async throws {
+        try await runeActualRouteQueuedGeometry(mode: "feed", panelID: "rune-events",
+            deadline: ProcessInfo.processInfo.systemUptime + 45, selectFeed: true)
+    }
+
+    func testMountedRuneFeedPublicSelectionCapabilityProbe() async throws {
+        try await runeActualRouteQueuedGeometry(mode: "feed", panelID: nil,
+            deadline: ProcessInfo.processInfo.systemUptime + 45)
+    }
+
+    private func runeActualRouteQueuedGeometry(mode: String, panelID: String?, deadline: TimeInterval,
+                                              selectFeed: Bool = false) async throws {
+        guard ["source", "violation", "feed"].contains(mode),
+              (mode == "feed" && !selectFeed) == (panelID == nil),
+              !selectFeed || (mode == "feed" && panelID == "rune-events"), NSApp != nil,
+              Bundle.main.bundleURL.pathExtension == "app", !NSScreen.screens.isEmpty else {
+            throw RuneWorkspaceVisibilityFailure("Run the explicit Rune route/probe in the native app host.")
+        }
+        let source = DevelopmentPolicySource(displayName: "Route policy",
+            selectedPath: "/tmp/rune-route-policy.md", interpretationState: .cataloging)
+        let event = policyEvent(sequence: 1)
+        let violation = PolicyViolation(id: event.violationID, fingerprint: event.fingerprint,
+            ruleID: event.candidate.rule.id, policyRevision: event.candidate.rule.source.revision, state: .open,
+            firstObservedAt: event.occurredAt, lastObservedAt: event.occurredAt, occurrenceCount: 1,
+            latestSummary: event.candidate.summary, latestSuggestedCorrection: event.candidate.suggestedCorrection)
+        let client = RuneWorkspaceRouteClient(snapshot: policySnapshot(events: [event], sources: [source]),
+            violation: .init(violation: violation, latestEventSequence: event.sequence))
+        let runeModel = RuneForgeViewModel(client: client)
+        let fixture = try RuneWorkspaceVisibilityFixture(model: runeModel, urls: [])
+        let observer = RuneWorkspaceNamingAX(window: fixture.window, hosting: fixture.hosting)
+        var stage = "overview.mount", completed = false
+        var feedSelectionWitness: [String: Any] = [:]
+        @MainActor func retain(_ error: Error? = nil) throws {
+            let report: [String: Any] = ["classification": mode == "feed" && !selectFeed
+                ? "Public Feed selection capability observation only; no selection action or Feed geometry qualification"
+                : selectFeed ? "Actual Overview-to-Rune public Feed row selection and queued production-panel move/resize"
+                : "Actual Overview-to-Rune button route and queued production-panel move/resize",
+                "mode": mode, "panel_id": panelID.map { $0 as Any } ?? NSNull(), "stage": stage,
+                "execution_completed": completed, "snapshot_reads": client.snapshotReads,
+                "violation_page_reads": client.violationReads, "mutation_requests": client.mutationRequests,
+                "feed_selection_capability": observer.lastRouteSelectionCapability,
+                "feed_selection_action": feedSelectionWitness,
+                "last_required_AX_walk": observer.lastRequiredWalkContext,
+                "application_content_scope": observer.lastApplicationContentWindowScope,
+                "error": error.map { String(String(describing: $0).prefix(4_096)) as Any } ?? NSNull()]
+            let data = try JSONSerialization.data(withJSONObject: report, options: [.sortedKeys])
+            guard data.count <= 128 * 1_024 else { throw RuneWorkspaceVisibilityFailure("Rune route evidence exceeded its bound.") }
+            let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+            attachment.name = "rune-actual-route-" + mode + "-" + stage
+            attachment.lifetime = .keepAlways; add(attachment)
+        }
+        @MainActor func ready() -> Bool {
+            let bounds = fixture.hosting.bounds
+            return fixture.window.contentView === fixture.hosting && fixture.hosting.window === fixture.window
+                && fixture.window.isVisible && fixture.window.occlusionState.contains(.visible)
+                && !fixture.window.isMiniaturized && fixture.window.screen != nil
+                && !fixture.hosting.isHiddenOrHasHiddenAncestor && !fixture.model.isBootstrapping
+                && bounds.origin == .zero && bounds.width.isFinite && bounds.height.isFinite
+                && abs(bounds.width - 1_440) <= 0.1 && abs(bounds.height - 900) <= 0.1
+        }
+        do {
+            let descriptors = NativeWorkspaceCatalog.runePanels(for: mode)
+            let layout = NativeWorkspaceLayout(id: UUID(), viewID: "rune-forge." + mode, name: "Route-" + mode,
+                canvas: .init(width: max(1_280, descriptors.map { $0.defaultFrame.x + $0.defaultFrame.width + 20 }.max() ?? 0) + 80,
+                              height: max(900, descriptors.map { $0.defaultFrame.y + $0.defaultFrame.height + 20 }.max() ?? 0) + 80),
+                panels: descriptors.map { .init(id: $0.id, frame: $0.defaultFrame, isVisible: true) })
+            try fixture.preferences.save(layout)
+            fixture.window.setContentSize(NSSize(width: 1_440, height: 900))
+            NSApp.activate(ignoringOtherApps: true); fixture.window.makeKeyAndOrderFront(nil)
+            fixture.window.orderFrontRegardless(); fixture.hosting.layoutSubtreeIfNeeded()
+            try await runeWorkspaceWait("The actual Overview/data/window prerequisite did not settle.") {
+                ready() && NSApp.isActive && fixture.window.isKeyWindow && NSApp.keyWindow === fixture.window
+                    && !runeModel.isLoading && runeModel.errorMessage == nil && runeModel.sources.count == 1 && runeModel.violations.count == 1
+                    && runeModel.events.count == 1 && client.snapshotReads >= 1 && client.violationReads >= 1
+            }
+            runeModel.pauseObservation()
+            _ = try await observer.required(identifier: "workspace-controls-rune-forge.overview", scope: .applicationContent)
+            let before = fixture.preferences.collection
+            let beforeBytes = try XCTUnwrap(fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey))
+            guard beforeBytes.count <= NativeWorkspaceLimits.maximumStoredBytes,
+                  try JSONDecoder().decode(NativeWorkspaceCollection.self, from: beforeBytes) == before else {
+                throw RuneWorkspaceVisibilityFailure("The originating Overview collection/storage differ.")
+            }
+            stage = mode == "feed" ? (selectFeed ? "feed.row.select" : "feed.public-capability") : mode + ".row.press"
+            if mode == "feed" {
+                if selectFeed {
+                    try observer.selectOwnedFeedRow(identifier: "rune-policy-feed-route", witness: &feedSelectionWitness)
+                } else {
+                    try observer.observeOwnedFeedSelectionCapability(identifier: "rune-policy-feed-route")
+                }
+            } else {
+                let identifier = mode == "source" ? "rune-policy-source-row-" + source.id.description
+                    : "rune-violation-row-" + violation.id.description
+                let row = try await observer.required(identifier: identifier, scope: .applicationContent)
+                try observer.pressOwned(row, role: kAXButtonRole, scope: .applicationContent)
+                _ = try await observer.required(identifier: "workspace-controls-" + layout.viewID, scope: .applicationContent)
+                runeModel.pauseObservation()
+            }
+            if selectFeed {
+                _ = try await observer.required(identifier: "workspace-controls-" + layout.viewID, scope: .applicationContent)
+                runeModel.pauseObservation()
+            }
+            guard ready(), fixture.preferences.collection == before,
+                  fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey) == beforeBytes,
+                  client.mutationRequests == 0, ProcessInfo.processInfo.systemUptime < deadline else {
+                throw RuneWorkspaceVisibilityFailure("Actual route selection/probe changed saved state, backend or owner.")
+            }
+            if let panelID {
+                // Preparation hint only: the shared verifier subsequently requires its complete tree/unique document.
+                try Task.checkCancellation()
+                try await runeWorkspaceWait("The selected Rune catalog panels did not finish mounting.",
+                    timeout: .seconds(min(3, max(0, deadline - ProcessInfo.processInfo.systemUptime)))) {
+                    ready() && Set(fixture.document?.panelHosts.keys.map { $0 } ?? []) == Set(layout.panels.map(\.id))
+                }
+                stage = mode + ".queued-geometry"
+                try await NativeWorkspaceQueuedPanelGeometryVerifier.verify(layout, panelID: panelID,
+                    window: fixture.window, hosting: fixture.hosting, preferences: fixture.preferences,
+                    defaults: fixture.defaults, deadline: deadline, receiptName: "queued-rune-" + mode,
+                    presentationIsReady: { ready() }, retainReport: { data, name in
+                        let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+                        attachment.name = name; attachment.lifetime = .keepAlways; self.add(attachment)
+                    })
+            }
+            guard fixture.preferences.layouts(for: fixture.layout.viewID) == [fixture.layout],
+                  fixture.preferences.activeLayout(for: fixture.layout.viewID) == fixture.layout,
+                  client.mutationRequests == 0, !runeModel.isLoading, runeModel.errorMessage == nil,
+                  fixture.model.app == nil, fixture.model.manager == nil,
+                  fixture.model.remoteManager == nil, !fixture.model.hasLoadedInitialSettings,
+                  ProcessInfo.processInfo.systemUptime < deadline else {
+                throw RuneWorkspaceVisibilityFailure("Rune route/geometry changed Overview or the isolated backend contract.")
+            }
+            stage = "complete"; completed = true; try retain()
+        } catch {
+            try? retain(error); await runeNamingClose(fixture, runeModel: runeModel); throw error
+        }
+        await runeNamingClose(fixture, runeModel: runeModel)
+        try Task.checkCancellation()
+        guard ProcessInfo.processInfo.systemUptime < deadline else {
+            throw RuneWorkspaceVisibilityFailure("Rune route/probe exceeded its cooperative case deadline.")
+        }
+    }
+
     func testMountedRuneNamingSheetCannotRenameAnotherNamespaceAfterSourceRefresh() async throws {
         guard NSApp != nil, Bundle.main.bundleURL.pathExtension == "app", !NSScreen.screens.isEmpty else {
             throw RuneWorkspaceVisibilityFailure("Run in ForgeConductorAppTests with a native display.")
@@ -2175,6 +2328,42 @@ private final class RuneWorkspaceVisibilityFixture {
     }
 }
 
+
+@MainActor
+private final class RuneWorkspaceRouteClient: RuneForgeManagerClientProtocol {
+    private let snapshot: StjornarvaldManagerSnapshot
+    private let violation: StjornarvaldViolationPageItem
+    private(set) var snapshotReads = 0
+    private(set) var violationReads = 0
+    private(set) var mutationRequests = 0
+    init(snapshot: StjornarvaldManagerSnapshot, violation: StjornarvaldViolationPageItem) {
+        self.snapshot = snapshot; self.violation = violation
+    }
+    func runeForgeSnapshot() async throws -> StjornarvaldManagerSnapshot {
+        guard snapshotReads < 8 else { throw RuneWorkspaceVisibilityFailure("Rune route observation exceeded8 snapshot reads.") }
+        snapshotReads += 1; return snapshot
+    }
+    func runeForgeViolations(cursor: Int64, limit: Int, state: PolicyViolationProjectionState?) async throws -> StjornarvaldViolationPage {
+        guard violationReads < 8, cursor == 0, limit > 0, state == nil else {
+            throw RuneWorkspaceVisibilityFailure("Rune route observation exceeded its first-page contract.")
+        }
+        violationReads += 1
+        return .init(violations: [violation], nextCursor: nil, controlsExecution: false)
+    }
+    private func rejectMutation() throws -> Never {
+        guard mutationRequests < 8 else { throw RuneWorkspaceVisibilityFailure("Rune route mutation counter exceeded its bound.") }
+        mutationRequests += 1
+        throw RuneWorkspaceVisibilityFailure("Rune route input unexpectedly requested a backend mutation.")
+    }
+    func addRuneForgeSource(path: String, requestID: UUID) async throws -> DevelopmentPolicySource { try rejectMutation() }
+    func refreshRuneForgeSource(sourceID: PolicySourceID, requestID: UUID) async throws -> DevelopmentPolicySource { try rejectMutation() }
+    func removeRuneForgeSource(sourceID: PolicySourceID, requestID: UUID) async throws -> DevelopmentPolicySource { try rejectMutation() }
+    func reorderRuneForgeSources(sourceIDs: [PolicySourceID]) async throws -> [DevelopmentPolicySource] { try rejectMutation() }
+    func scheduleRuneForgeScan(requestID: UUID, reason: String) async throws -> StjornarvaldScanReceipt { try rejectMutation() }
+    func requestRuneForgeExport(format: StjornarvaldExportFormat, destination: String,
+                               filters: StjornarvaldExportFilters, requestID: UUID) async throws -> StjornarvaldExportReceipt { try rejectMutation() }
+}
+
 @MainActor
 private final class RuneWorkspaceNamingClient: RuneForgeManagerClientProtocol {
     private var snapshot: StjornarvaldManagerSnapshot
@@ -2236,6 +2425,7 @@ private final class RuneWorkspaceNamingAX {
     private(set) var lastNodes: [[String: Any]] = []
     private(set) var lastRead: [String: Any] = [:]
     private(set) var lastMenuTransition: [String: Any] = [:]
+    private(set) var lastRouteSelectionCapability: [String: Any] = [:]
     private var lastWalkContext: [String: Any] = [:]
     private(set) var lastRequiredWalkContext: [String: Any] = [:]
     private(set) var lastApplicationContentWindowScope: [String: Any] = [:]
@@ -2554,6 +2744,179 @@ private final class RuneWorkspaceNamingAX {
             try check(deadline); try await Task.sleep(for: .milliseconds(10))
         } while true
     }
+
+
+    func selectOwnedFeedRow(identifier: String, witness: inout [String: Any]) throws {
+        let deadline = ProcessInfo.processInfo.systemUptime + 3
+        witness = ["classification": "Actual public AXSelected setter on the exact observed Feed row; no AXPress fallback",
+            "requested_identifier": identifier, "setter_requested": false, "setter_returned": false]
+        @MainActor func requireNativeOwner() throws {
+            try check(deadline)
+            guard let window, let hosting, window.contentView === hosting, hosting.window === window,
+                  window.isVisible, window.isKeyWindow, NSApp.keyWindow === window, NSApp.isActive,
+                  window.attachedSheet == nil, !hosting.isHiddenOrHasHiddenAncestor else {
+                throw RuneWorkspaceVisibilityFailure("Feed selection lost its exact active native window/host.")
+            }
+        }
+        try requireNativeOwner()
+        let main = try ownedWindow(deadline)
+        @MainActor func exactRow(_ tree: [(AXUIElement, [AXUIElement], String?, String?, String?)]) throws
+            -> (target: AXUIElement, cell: AXUIElement, row: AXUIElement, outline: AXUIElement) {
+            let matches = tree.filter { $0.2 == identifier }
+            guard matches.count == 1, let target = matches.first, target.3 == kAXStaticTextRole,
+                  target.1.count >= 3, target.1.contains(where: { CFEqual($0, main) }),
+                  let cell = tree.first(where: { CFEqual($0.0, target.1[target.1.count - 1]) }),
+                  let row = tree.first(where: { CFEqual($0.0, target.1[target.1.count - 2]) }),
+                  let outline = tree.first(where: { CFEqual($0.0, target.1[target.1.count - 3]) }),
+                  cell.3 == kAXCellRole, row.3 == kAXRowRole, outline.3 == kAXOutlineRole,
+                  cell.1.last.map({ CFEqual($0, row.0) }) == true,
+                  row.1.last.map({ CFEqual($0, outline.0) }) == true else {
+                throw RuneWorkspaceVisibilityFailure("Feed selection requires its unique observed StaticText/Cell/Row/Outline owned ancestry.")
+            }
+            return (target.0, cell.0, row.0, outline.0)
+        }
+        let tree = try windowNodes(main, deadline, scope: .applicationContent, requestedIdentifier: identifier)
+        let (target, cell, row, outline) = try exactRow(tree)
+        witness["cached_target_identifier"] = identifier; witness["cached_target_role"] = kAXStaticTextRole
+        witness["cached_row_role"] = kAXRowRole; witness["cached_outline_role"] = kAXOutlineRole
+        for element in [target, cell, row, outline] { try prepare(element, deadline) }
+        guard try string(target, kAXIdentifierAttribute, deadline) == identifier,
+              try string(target, kAXRoleAttribute, deadline) == kAXStaticTextRole,
+              try string(cell, kAXRoleAttribute, deadline) == kAXCellRole,
+              try string(row, kAXRoleAttribute, deadline) == kAXRowRole,
+              try string(outline, kAXRoleAttribute, deadline) == kAXOutlineRole else {
+            throw RuneWorkspaceVisibilityFailure("Feed selection's observed public roles or exact identifier changed.")
+        }
+        try prepare(row, deadline)
+        var names: CFArray?
+        let advertisedStatus = AXUIElementCopyAttributeNames(row, &names)
+        witness["advertised_status"] = advertisedStatus.rawValue
+        try check(deadline)
+        guard advertisedStatus == .success, let advertised = names as? [String], advertised.count <= 256,
+              advertised.allSatisfy({ $0.utf8.count <= 512 }), advertised.contains(kAXSelectedAttribute) else {
+            throw RuneWorkspaceVisibilityFailure("The exact Feed row no longer advertises bounded AXSelected.")
+        }
+        witness["selected_advertised"] = true
+        let value = try attribute(row, kAXSelectedAttribute, deadline)
+        witness["selected_before_status"] = lastRead["actual_status"]
+        guard let value, CFGetTypeID(value) == CFBooleanGetTypeID(),
+              let selected = value as? NSNumber, !selected.boolValue else {
+            throw RuneWorkspaceVisibilityFailure("The exact Feed row must have a typed false selection before the action.")
+        }
+        witness["selected_before"] = false
+        try prepare(row, deadline)
+        var settable: DarwinBoolean = false
+        let settableStatus = AXUIElementIsAttributeSettable(row, kAXSelectedAttribute as CFString, &settable)
+        witness["settable_status"] = settableStatus.rawValue; witness["settable"] = settableStatus == .success ? settable.boolValue as Any : NSNull()
+        try check(deadline)
+        guard settableStatus == .success, settable.boolValue else {
+            throw RuneWorkspaceVisibilityFailure("The exact Feed row AXSelected is not successfully settable.")
+        }
+        try requireNativeOwner()
+        guard CFEqual(try ownedWindow(deadline), main) else {
+            throw RuneWorkspaceVisibilityFailure("Feed selection changed the exact exported window before its action.")
+        }
+        try prepare(row, deadline)
+        witness["setter_requested"] = true
+        let status = AXUIElementSetAttributeValue(row, kAXSelectedAttribute as CFString, kCFBooleanTrue)
+        witness["setter_status"] = status.rawValue
+        try check(deadline)
+        guard status == .success else { throw RuneWorkspaceVisibilityFailure("Feed AXSelected setter failed: \(status.rawValue).") }
+        witness["setter_returned"] = true
+        try requireNativeOwner()
+        guard CFEqual(try ownedWindow(deadline), main) else {
+            throw RuneWorkspaceVisibilityFailure("Feed selection changed the exact exported window after its action.")
+        }
+        let afterTree = try windowNodes(main, deadline, scope: .applicationContent, requestedIdentifier: identifier)
+        let current = try exactRow(afterTree)
+        let afterValue = try attribute(current.row, kAXSelectedAttribute, deadline)
+        witness["selected_after_status"] = lastRead["actual_status"]
+        guard let afterValue, CFGetTypeID(afterValue) == CFBooleanGetTypeID(),
+              let afterSelected = afterValue as? NSNumber, afterSelected.boolValue else {
+            throw RuneWorkspaceVisibilityFailure("The fresh exact Feed row did not expose typed true selection after its setter.")
+        }
+        witness["selected_after"] = true
+        witness["post_read_scope"] = "Fresh complete same-root graph; no old/new row reference identity assumption"
+        try requireNativeOwner()
+        guard CFEqual(try ownedWindow(deadline), main) else {
+            throw RuneWorkspaceVisibilityFailure("Feed selection changed its exported window during the fresh post-read.")
+        }
+        witness["post_window_same_reference"] = true
+        try check(deadline)
+    }
+
+    func observeOwnedFeedSelectionCapability(identifier: String) throws {
+        let deadline = ProcessInfo.processInfo.systemUptime + 3
+        lastRouteSelectionCapability = ["classification": "Own public Feed target/cached-ancestor capability probe; no selection action or geometry proof",
+            "requested_identifier": identifier, "probe_complete": false, "candidate_limit": 3]
+        let main = try ownedWindow(deadline)
+        let tree = try windowNodes(main, deadline, scope: .applicationContent, requestedIdentifier: identifier)
+        let matches = tree.filter { $0.2 == identifier }
+        guard matches.count == 1, let match = matches.first else {
+            throw RuneWorkspaceVisibilityFailure("Feed capability probe requires exactly one literal target.")
+        }
+        let lineage = [match] + match.1.reversed().compactMap { held in tree.first { CFEqual($0.0, held) } }
+        let row = lineage.first { $0.3 == kAXRowRole }
+        let container = lineage.first { $0.3 == kAXTableRole || $0.3 == kAXOutlineRole }
+        let candidates = [Optional(match), row, container].compactMap { $0 }
+        var records: [[String: Any]] = [], seen: [AXUIElement] = []
+        defer {
+            lastRouteSelectionCapability["candidates"] = records
+            lastRouteSelectionCapability["cached_ancestor_roles_nearest8"] = Array(lineage.prefix(8)).map {
+                $0.3.map { String($0.prefix(128)) as Any } ?? NSNull()
+            }
+            lastRouteSelectionCapability["last_scalar_read"] = lastRead
+        }
+        for candidate in candidates where !seen.contains(where: { CFEqual($0, candidate.0) }) {
+            seen.append(candidate.0)
+            guard seen.count <= 3, CFEqual(candidate.0, main) || candidate.1.contains(where: { CFEqual($0, main) }) else {
+                throw RuneWorkspaceVisibilityFailure("Feed capability candidate left its cached exact owned ancestry.")
+            }
+            try prepare(candidate.0, deadline)
+            var names: CFArray?
+            let copied = AXUIElementCopyAttributeNames(candidate.0, &names)
+            try check(deadline)
+            guard copied == .success, let advertised = names as? [String], advertised.count <= 256,
+                  advertised.allSatisfy({ $0.utf8.count <= 512 }) else {
+                throw RuneWorkspaceVisibilityFailure("Feed attribute advertisement failed or exceeded its bound: \(copied.rawValue).")
+            }
+            var record = diagnosticNodeMetadata(candidate.2, candidate.3, candidate.4)
+            record["advertised_selection_attributes"] = advertised.filter { $0 == kAXSelectedAttribute || $0 == kAXSelectedRowsAttribute }
+            records.append(record)
+            for attributeName in [kAXSelectedAttribute, kAXSelectedRowsAttribute] where advertised.contains(attributeName) {
+                try prepare(candidate.0, deadline)
+                var settable: DarwinBoolean = false
+                let status = AXUIElementIsAttributeSettable(candidate.0, attributeName as CFString, &settable)
+                try check(deadline)
+                records[records.count - 1][attributeName + "_settable_status"] = status.rawValue
+                records[records.count - 1][attributeName + "_settable"] = status == .success ? settable.boolValue as Any : NSNull()
+                guard status == .success || status == .attributeUnsupported || status == .noValue else {
+                    throw RuneWorkspaceVisibilityFailure("Feed selection settable query failed: \(status.rawValue).")
+                }
+                if attributeName == kAXSelectedAttribute {
+                    let selected = try attribute(candidate.0, attributeName, deadline)
+                    records[records.count - 1]["selected_raw_status"] = lastRead["actual_status"]
+                    records[records.count - 1]["selected_value"] = (selected as? NSNumber).map { $0.boolValue as Any } ?? NSNull()
+                } else {
+                    try prepare(candidate.0, deadline)
+                    var count = 0
+                    let counted = AXUIElementGetAttributeValueCount(candidate.0, attributeName as CFString, &count)
+                    try check(deadline)
+                    records[records.count - 1]["selected_rows_count_status"] = counted.rawValue
+                    records[records.count - 1]["selected_rows_count"] = counted == .success ? count as Any : NSNull()
+                    guard (counted == .success && count >= 0 && count <= 2_048)
+                        || counted == .attributeUnsupported || counted == .noValue else {
+                        throw RuneWorkspaceVisibilityFailure("Feed selected-row count failed or exceeded its bound: \(counted.rawValue).")
+                    }
+                }
+            }
+        }
+        guard CFEqual(try ownedWindow(deadline), main) else {
+            throw RuneWorkspaceVisibilityFailure("Feed probe changed its exact exported window reference.")
+        }
+        lastRouteSelectionCapability["probe_complete"] = true
+    }
+
     func requireOwnedSheetAncestor(_ element: AXUIElement) throws {
         let deadline = ProcessInfo.processInfo.systemUptime + 3
         guard window?.attachedSheet != nil else { throw RuneWorkspaceVisibilityFailure("The production naming sheet is not attached.") }
