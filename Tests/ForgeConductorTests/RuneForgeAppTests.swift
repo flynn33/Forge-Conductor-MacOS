@@ -17,6 +17,199 @@ final class RuneForgeAppTests: XCTestCase {
     #if !SWIFT_PACKAGE
 
 
+    func testAllPanelsAcrossThreeMountedRuneDetailNamespacesQueuedMoveResizePersistsGeometry() async throws {
+        let deadline = ProcessInfo.processInfo.systemUptime + 120
+        let modes = ["source", "violation", "feed"]
+        let namespaces = Set(modes.map { "rune-forge." + $0 })
+        let catalogNamespaces = Set(NativeWorkspaceCatalog.panelsByView.keys.filter {
+            $0.hasPrefix("rune-forge.") && $0 != "rune-forge.overview"
+        })
+        let expected = Set(modes.flatMap { mode in
+            NativeWorkspaceCatalog.runePanels(for: mode).map { "rune-forge." + mode + "::" + $0.id }
+        })
+        guard namespaces.count == 3, namespaces == catalogNamespaces,
+              !expected.isEmpty, expected.count <= 192 else {
+            throw RuneWorkspaceVisibilityFailure("The bounded Rune detail route table omits a namespace or placement.")
+        }
+        var completed = Set<String>()
+        for mode in modes {
+            try Task.checkCancellation()
+            guard deadline - ProcessInfo.processInfo.systemUptime > 15 else {
+                throw RuneWorkspaceVisibilityFailure("All Rune detail panels lack bounded route preparation time.")
+            }
+            let panels = try await runeAllDetailPanelsQueuedGeometry(mode: mode, deadline: deadline)
+            for panelID in panels {
+                let key = "rune-forge." + mode + "::" + panelID
+                guard expected.contains(key), completed.insert(key).inserted else {
+                    throw RuneWorkspaceVisibilityFailure("The Rune detail route duplicated or escaped a catalog placement.")
+                }
+            }
+        }
+        guard completed == expected, ProcessInfo.processInfo.systemUptime < deadline else {
+            throw RuneWorkspaceVisibilityFailure("Not every Rune detail panel completed inside its case deadline.")
+        }
+        let data = try JSONSerialization.data(withJSONObject: [
+            "classification": "Every panel in three selected isolated Rune detail namespaces; API-seeded layouts/front order and prepared scrolling, actual public route selection and six-event move/resize. Desktop input, naming menus and installed operation remain separate.",
+            "namespace_count": namespaces.count, "placement_count": expected.count,
+            "completed_placements": completed.sorted(), "total_posted_events": completed.count * 6,
+            "case_deadline_seconds": 120, "placement_limit": 192,
+        ], options: [.sortedKeys])
+        guard data.count <= 64 * 1_024 else {
+            throw RuneWorkspaceVisibilityFailure("The complete Rune detail panel receipt exceeded its byte bound.")
+        }
+        let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+        attachment.name = "all-rune-detail-panels-complete"; attachment.lifetime = .keepAlways; add(attachment)
+        try Task.checkCancellation()
+        guard ProcessInfo.processInfo.systemUptime < deadline else {
+            throw RuneWorkspaceVisibilityFailure("The Rune detail panel case exceeded its deadline during receipt creation.")
+        }
+    }
+
+    private func runeAllDetailPanelsQueuedGeometry(mode: String, deadline: TimeInterval) async throws -> Set<String> {
+        guard ["source", "violation", "feed"].contains(mode), NSApp != nil,
+              Bundle.main.bundleURL.pathExtension == "app", !NSScreen.screens.isEmpty else {
+            throw RuneWorkspaceVisibilityFailure("Run all Rune detail panels in the native app host.")
+        }
+        let descriptors = NativeWorkspaceCatalog.runePanels(for: mode)
+        let panelIDs = descriptors.map(\.id)
+        guard !panelIDs.isEmpty, panelIDs.count <= 64, Set(panelIDs).count == panelIDs.count else {
+            throw RuneWorkspaceVisibilityFailure("The Rune detail catalog is empty, duplicated or oversized.")
+        }
+        let source = DevelopmentPolicySource(displayName: "Route policy",
+            selectedPath: "/tmp/rune-route-policy.md", interpretationState: .cataloging)
+        let event = policyEvent(sequence: 1)
+        let violation = PolicyViolation(id: event.violationID, fingerprint: event.fingerprint,
+            ruleID: event.candidate.rule.id, policyRevision: event.candidate.rule.source.revision, state: .open,
+            firstObservedAt: event.occurredAt, lastObservedAt: event.occurredAt, occurrenceCount: 1,
+            latestSummary: event.candidate.summary, latestSuggestedCorrection: event.candidate.suggestedCorrection)
+        let client = RuneWorkspaceRouteClient(snapshot: policySnapshot(events: [event], sources: [source]),
+            violation: .init(violation: violation, latestEventSequence: event.sequence))
+        let runeModel = RuneForgeViewModel(client: client)
+        let fixture = try RuneWorkspaceVisibilityFixture(model: runeModel, urls: [])
+        let observer = RuneWorkspaceNamingAX(window: fixture.window, hosting: fixture.hosting)
+        var stage = "overview.mount", completed = false
+        var completedPanels = Set<String>()
+        var feedSelectionWitness: [String: Any] = [:]
+        @MainActor func retain(_ error: Error? = nil) throws {
+            let report: [String: Any] = ["classification": "Actual public Overview-to-Rune selection and every catalog panel's queued move/resize; XCTest outcome determines qualification",
+                "mode": mode, "panel_ids": panelIDs, "completed_panels": completedPanels.sorted(), "stage": stage,
+                "execution_completed": completed, "snapshot_reads": client.snapshotReads,
+                "violation_page_reads": client.violationReads, "mutation_requests": client.mutationRequests,
+                "feed_selection_capability": observer.lastRouteSelectionCapability,
+                "feed_selection_action": feedSelectionWitness,
+                "last_required_AX_walk": observer.lastRequiredWalkContext,
+                "application_content_scope": observer.lastApplicationContentWindowScope,
+                "error": error.map { String(String(describing: $0).prefix(4_096)) as Any } ?? NSNull()]
+            let data = try JSONSerialization.data(withJSONObject: report, options: [.sortedKeys])
+            guard data.count <= 128 * 1_024 else { throw RuneWorkspaceVisibilityFailure("Rune route evidence exceeded its bound.") }
+            let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+            attachment.name = "rune-all-detail-route-" + mode + "-" + stage
+            attachment.lifetime = .keepAlways; add(attachment)
+        }
+        @MainActor func ready() -> Bool {
+            let bounds = fixture.hosting.bounds
+            return fixture.window.contentView === fixture.hosting && fixture.hosting.window === fixture.window
+                && fixture.window.isVisible && fixture.window.occlusionState.contains(.visible)
+                && !fixture.window.isMiniaturized && fixture.window.screen != nil
+                && !fixture.hosting.isHiddenOrHasHiddenAncestor && !fixture.model.isBootstrapping
+                && bounds.origin == .zero && bounds.width.isFinite && bounds.height.isFinite
+                && abs(bounds.width - 1_440) <= 0.1 && abs(bounds.height - 900) <= 0.1
+        }
+        do {
+            let layout = NativeWorkspaceLayout(id: UUID(), viewID: "rune-forge." + mode, name: "Route-" + mode,
+                canvas: .init(width: max(1_280, descriptors.map { $0.defaultFrame.x + $0.defaultFrame.width + 20 }.max() ?? 0) + 80,
+                              height: max(900, descriptors.map { $0.defaultFrame.y + $0.defaultFrame.height + 20 }.max() ?? 0) + 80),
+                panels: descriptors.map { .init(id: $0.id, frame: $0.defaultFrame, isVisible: true) })
+            try fixture.preferences.save(layout)
+            fixture.window.setContentSize(NSSize(width: 1_440, height: 900))
+            NSApp.activate(ignoringOtherApps: true); fixture.window.makeKeyAndOrderFront(nil)
+            fixture.window.orderFrontRegardless(); fixture.hosting.layoutSubtreeIfNeeded()
+            try await runeWorkspaceWait("The actual Overview/data/window prerequisite did not settle.") {
+                ready() && NSApp.isActive && fixture.window.isKeyWindow && NSApp.keyWindow === fixture.window
+                    && !runeModel.isLoading && runeModel.errorMessage == nil && runeModel.sources.count == 1 && runeModel.violations.count == 1
+                    && runeModel.events.count == 1 && client.snapshotReads >= 1 && client.violationReads >= 1
+            }
+            runeModel.pauseObservation()
+            _ = try await observer.required(identifier: "workspace-controls-rune-forge.overview", scope: .applicationContent)
+            let before = fixture.preferences.collection
+            let beforeBytes = try XCTUnwrap(fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey))
+            guard beforeBytes.count <= NativeWorkspaceLimits.maximumStoredBytes,
+                  try JSONDecoder().decode(NativeWorkspaceCollection.self, from: beforeBytes) == before else {
+                throw RuneWorkspaceVisibilityFailure("The originating Overview collection/storage differ.")
+            }
+            stage = mode == "feed" ? "feed.row.select" : mode + ".row.press"
+            if mode == "feed" {
+                try observer.selectOwnedFeedRow(identifier: "rune-policy-feed-route", witness: &feedSelectionWitness)
+            } else {
+                let identifier = mode == "source" ? "rune-policy-source-row-" + source.id.description
+                    : "rune-violation-row-" + violation.id.description
+                let row = try await observer.required(identifier: identifier, scope: .applicationContent)
+                try observer.pressOwned(row, role: kAXButtonRole, scope: .applicationContent)
+                _ = try await observer.required(identifier: "workspace-controls-" + layout.viewID, scope: .applicationContent)
+                runeModel.pauseObservation()
+            }
+            if mode == "feed" {
+                _ = try await observer.required(identifier: "workspace-controls-" + layout.viewID, scope: .applicationContent)
+                runeModel.pauseObservation()
+            }
+            guard ready(), fixture.preferences.collection == before,
+                  fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey) == beforeBytes,
+                  client.mutationRequests == 0, ProcessInfo.processInfo.systemUptime < deadline else {
+                throw RuneWorkspaceVisibilityFailure("Actual route selection/probe changed saved state, backend or owner.")
+            }
+            // Preparation hint only: the unchanged verifier still requires its complete tree/unique document.
+            do {
+                try Task.checkCancellation()
+                try await runeWorkspaceWait("The selected Rune catalog panels did not finish mounting.",
+                    timeout: .seconds(min(3, max(0, deadline - ProcessInfo.processInfo.systemUptime)))) {
+                    ready() && Set(fixture.document?.panelHosts.keys.map { $0 } ?? []) == Set(layout.panels.map(\.id))
+                }
+                for panelID in panelIDs {
+                    try Task.checkCancellation()
+                    guard ready(), ProcessInfo.processInfo.systemUptime < deadline,
+                          !completedPanels.contains(panelID) else {
+                        throw RuneWorkspaceVisibilityFailure("The all-panel Rune route lost its owner or exact placement/deadline.")
+                    }
+                    try fixture.preferences.bringToFront(panelID, in: layout.viewID)
+                    let current = try XCTUnwrap(fixture.preferences.activeLayout(for: layout.viewID))
+                    guard current.id == layout.id, current.viewID == layout.viewID else {
+                        throw RuneWorkspaceVisibilityFailure("The Rune panel lost its originating custom layout.")
+                    }
+                    stage = mode + ".queued-geometry." + panelID
+                    try await NativeWorkspaceQueuedPanelGeometryVerifier.verify(current, panelID: panelID,
+                        window: fixture.window, hosting: fixture.hosting, preferences: fixture.preferences,
+                        defaults: fixture.defaults, deadline: deadline,
+                        receiptName: "queued-rune-all-panels-" + mode + "-" + panelID,
+                        presentationIsReady: { ready() }, retainReport: { data, name in
+                            let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+                            attachment.name = name; attachment.lifetime = .keepAlways; self.add(attachment)
+                        })
+                    completedPanels.insert(panelID)
+                }
+                guard completedPanels == Set(panelIDs) else {
+                    throw RuneWorkspaceVisibilityFailure("The Rune route omitted a catalog panel.")
+                }
+            }
+            guard fixture.preferences.layouts(for: fixture.layout.viewID) == [fixture.layout],
+                  fixture.preferences.activeLayout(for: fixture.layout.viewID) == fixture.layout,
+                  client.mutationRequests == 0, !runeModel.isLoading, runeModel.errorMessage == nil,
+                  fixture.model.app == nil, fixture.model.manager == nil,
+                  fixture.model.remoteManager == nil, !fixture.model.hasLoadedInitialSettings,
+                  ProcessInfo.processInfo.systemUptime < deadline else {
+                throw RuneWorkspaceVisibilityFailure("Rune route/geometry changed Overview or the isolated backend contract.")
+            }
+            stage = "complete"; completed = true; try retain()
+        } catch {
+            try? retain(error); await runeNamingClose(fixture, runeModel: runeModel); throw error
+        }
+        await runeNamingClose(fixture, runeModel: runeModel)
+        try Task.checkCancellation()
+        guard ProcessInfo.processInfo.systemUptime < deadline else {
+            throw RuneWorkspaceVisibilityFailure("All Rune detail panels exceeded their cooperative case deadline.")
+        }
+        return completedPanels
+    }
+
     func testMountedRuneActualSourceAndViolationRoutesQueuedMoveResizePersistsGeometry() async throws {
         let deadline = ProcessInfo.processInfo.systemUptime + 90
         for (mode, panelID) in [("source", "rune-source-identity"), ("violation", "rune-violation-identity")] {
