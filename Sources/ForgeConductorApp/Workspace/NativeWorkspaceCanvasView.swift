@@ -40,7 +40,10 @@ struct NativeWorkspaceCanvasView: NSViewRepresentable {
     }
 
     static func dismantleNSView(_ view: NSScrollView, coordinator: ()) {
-        (view.documentView as? NativeWorkspaceDocumentView)?.removePanels()
+        if let document = view.documentView as? NativeWorkspaceDocumentView {
+            document.stopHorizontalWheelMonitoring()
+            document.removePanels()
+        }
         view.documentView = nil
     }
 }
@@ -50,6 +53,80 @@ final class NativeWorkspaceDocumentView: NSView {
     override var isFlipped: Bool { true }
     private(set) var panelHosts: [String: NativeWorkspacePanelHost] = [:]
     private var activeLayoutIdentity: String?
+    private var horizontalWheelMonitor: Any?
+    var hasHorizontalWheelMonitor: Bool { horizontalWheelMonitor != nil }
+
+    override func viewWillMove(toWindow newWindow: NSWindow?) {
+        stopHorizontalWheelMonitoring()
+        super.viewWillMove(toWindow: newWindow)
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard window != nil, horizontalWheelMonitor == nil else { return }
+        horizontalWheelMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+            guard Thread.isMainThread else { return event }
+            let forwarded = MainActor.assumeIsolated {
+                guard let self else { return false }
+                return self.routeHorizontalWheel(event) == nil
+            }
+            return forwarded ? nil : event
+        }
+    }
+
+    isolated deinit { stopHorizontalWheelMonitoring() }
+
+    func stopHorizontalWheelMonitoring() {
+        guard let monitor = horizontalWheelMonitor else { return }
+        horizontalWheelMonitor = nil
+        NSEvent.removeMonitor(monitor)
+    }
+
+    private func routeHorizontalWheel(_ event: NSEvent) -> NSEvent? {
+        guard event.type == .scrollWheel, event.phase.isEmpty, event.momentumPhase.isEmpty,
+              event.scrollingDeltaX.isFinite, event.scrollingDeltaX != 0,
+              event.scrollingDeltaY.isFinite, event.scrollingDeltaY == 0,
+              let window, event.window === window, !isHiddenOrHasHiddenAncestor,
+              let outer = enclosingScrollView, outer.documentView === self,
+              superview === outer.contentView,
+              outer.contentView.convert(bounds, from: self).width > outer.contentView.bounds.width,
+              let contentView = window.contentView, contentView.window === window else {
+            return event
+        }
+        let location = contentView.convert(event.locationInWindow, from: nil)
+        guard contentView.bounds.contains(location),
+              let hit = contentView.hitTest(contentView.convert(location, to: contentView.superview)) else {
+            return event
+        }
+        var current: NSView? = hit
+        var inner: NSScrollView?
+        var owner: NativeWorkspacePanelHost?
+        for _ in 0..<64 {
+            guard let view = current, view !== self else { break }
+            if view is NSControl || view is NSTextView { return event }
+            if let scroll = view as? NSScrollView {
+                guard inner == nil else { return event }
+                inner = scroll
+            }
+            if let panel = view as? NativeWorkspacePanelHost {
+                owner = panel
+                break
+            }
+            current = view.superview
+        }
+        guard let owner, panelHosts[owner.panelID] === owner, owner.superview === self,
+              owner.descriptor.scrollsContent, !owner.isHiddenOrHasHiddenAncestor, !owner.isManipulating,
+              hit === owner.hostingView || hit.isDescendant(of: owner.hostingView),
+              let inner, inner.window === window, !inner.hasHorizontalScroller,
+              let innerDocument = inner.documentView, innerDocument.superview === inner.contentView,
+              hit === innerDocument || hit.isDescendant(of: innerDocument),
+              inner.contentView.convert(innerDocument.bounds, from: innerDocument).width
+                <= inner.contentView.bounds.width + 0.5 else {
+            return event
+        }
+        outer.scrollWheel(with: event)
+        return nil
+    }
 
     func apply(layout: NativeWorkspaceLayout, descriptors: [NativeWorkspacePanelDescriptor],
                content: (String, Bool) -> AnyView,

@@ -1,5 +1,11 @@
 # Forge Conductor — Xcode
 
+Current source version **0.44.2**, build **62** adds discrete horizontal wheel routing in the existing native Workspace canvas. Source/test memberships, workspace, dependencies and signing remain; the project changes only twelve marketing and sixteen build settings. Keep ordinary candidate and test output directories separate. Current build and qualification results are recorded in [qualification status](docs/QUALIFICATION-STATUS.md).
+
+Final-source app compilation, ordinary Debug compilation and strict signature verification pass; the final four-case native selection passes with no failures/skips/runtime warnings. The ordinary build retains the destination-selection warning, while the newly observed Canvas concurrency warning is corrected. The ordinary candidate is separate from test products and the working installation. [Exact scope/results](docs/NATIVE-WORKSPACES.md).
+
+## Preceding 0.44.1 (61) qualification
+
 Current source version **0.44.1**, build **61** corrects saved-layout menu labels in the existing native Workspace source. Existing source/test memberships remain; only product version/build settings change in the project. `ForgeConductor.xcworkspace` remains the canonical entry, with the existing targets, dependencies and signing. Keep ordinary candidate and test output directories separate. CLI/app and ordinary Debug compilation, strict signature and candidate readback passed; the native selection remains 22 PASS/two fresh Rune failures. Full-view qualification stays open. [Workspace contract](docs/NATIVE-WORKSPACES.md), [qualification](docs/QUALIFICATION-STATUS.md).
 
 ## Preceding 0.43.0 (59) qualification

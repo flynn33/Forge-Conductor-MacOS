@@ -1,5 +1,9 @@
 # Versioning policy
 
+Current target identity is **0.44.2 (62)**. The backward-compatible discrete horizontal wheel routing correction advances patch/build authorities together. Layout schema, names and UUIDs remain. Current qualification is recorded separately from shipment. [Current gates](QUALIFICATION-STATUS.md).
+
+## Preceding 0.44.1 (61) qualification
+
 Current target identity is **0.44.1 (61)**. This backward-compatible layout-menu label correction advances the patch and build authorities together. Saved names and layout IDs remain unchanged. The collision regression passes; the owning native selection remains NONPASS from two fresh Rune failures; complete UI and broader gates remain open, and new capabilities stay deferred. Historical receipts retain their tested identities. [Current gates](QUALIFICATION-STATUS.md).
 
 ## Preceding 0.43.0 (59) qualification
@@ -373,7 +377,7 @@ focused version test, and CI reject drift between them.
 
 ## Current identity
 
-Current source target is `0.44.1`, build `61`, for a backward-compatible layout-menu label correction. The collision regression passes; the owning native selection remains NONPASS from two fresh Rune failures; historical receipts retain their tested identities. Full UI gates remain open and new capabilities stay deferred. [Current gates](QUALIFICATION-STATUS.md).
+Current source target is `0.44.2`, build `62`, for backward-compatible discrete horizontal wheel routing. The preceding 0.44.1 layout-menu label correction remains available. The final focused wheel selection passes four native cases. The preceding collision regression and historical owning selection retain their original pass/NONPASS results and tested identities. Full UI gates remain open and new capabilities stay deferred. [Current gates](QUALIFICATION-STATUS.md).
 
 ## Preceding 0.43.0 (59) identity record
 

@@ -1,6 +1,6 @@
 # Forge Conductor user guide
 
-Version **0.44.1**, build **61** retains custom layouts within each existing view and displays saved menu entries as `Layout: <name>`. Stored names and layout identities are unchanged.
+Version **0.44.2**, build **62** retains custom layouts within each existing view and displays saved menu entries as `Layout: <name>`. Stored names and layout identities are unchanged.
 
 1. Open a view and select **Customize Layout**.
 2. Drag a panel's header to move it. Drag its lower-right grip to resize it.
@@ -8,6 +8,8 @@ Version **0.44.1**, build **61** retains custom layouts within each existing vie
 4. Open the layout menu and choose **Save Layout As…** to create a named arrangement. Completed moves, sizes and visibility changes are saved automatically to the active layout.
 5. Switch between saved layouts in that view. **Rename Layout…** and **Delete Layout** manage the selected layout.
 6. Select **Restore Default** to return to the original view arrangement. Saved layouts remain available.
+
+A discrete horizontal wheel over a vertical panel body pans the custom canvas. Vertical wheels scroll the panel content; nested horizontal content retains its own scrolling. Gesture and momentum routing retain the existing AppKit behavior.
 
 Focus a panel's header and use arrow keys to move it by 10 points; Option-arrow resizes it. Arrow keys on the resize grip resize directly. Escape cancels a drag. Layouts stay within the current view; Manager sections and Rune Forge detail modes have their own arrangements. [Workspace details](docs/NATIVE-WORKSPACES.md).
 

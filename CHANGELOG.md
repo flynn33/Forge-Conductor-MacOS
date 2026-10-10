@@ -10,6 +10,10 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### `0.44.2 (62)`
+
+- Route discrete horizontal wheels over vertical custom-panel bodies to their canvas. Preserve vertical wheels, nested horizontal content, saved layouts and window ownership; remove the local monitor on detach/dismantle/deinit. Gesture and momentum events retain AppKit dispatch. The final 0.44.2 native selection passes four scrolling/lifecycle cases; CLI/app, ordinary Debug and strict signature checks pass. Broader UI and gesture gates remain open. [Qualification](docs/QUALIFICATION-STATUS.md).
+
 ### `0.44.1 (61)`
 
 - Prefix saved layout menu entries with `Layout: ` to distinguish them from built-in commands while preserving names, IDs and schema. The reproduced collision regression passes; two fresh Rune failures and full UI qualification remain open.

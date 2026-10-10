@@ -1,6 +1,8 @@
 # Forge Conductor for macOS
 
-Current source target **0.44.1 (61)** distinguishes saved layout entries with **Layout: …**, preserving stored names and UUIDs. Movable, resizable, show/hide panels and named layouts remain within each existing view. Use **Customize Layout**, drag a panel header or resize grip, and select visible panels in **Panels**. **Restore Default** returns to the original composition while retaining saved layouts. [Workspace guide](docs/NATIVE-WORKSPACES.md).
+Current source target **0.44.2 (62)** corrects discrete horizontal wheel routing over vertical custom-panel bodies. Saved menu entries retain **Layout: …**, stored names and UUIDs. Movable, resizable, show/hide panels and named layouts remain within each existing view. Use **Customize Layout**, drag a panel header or resize grip, and select visible panels in **Panels**. **Restore Default** returns to the original composition while retaining saved layouts. [Workspace guide](docs/NATIVE-WORKSPACES.md).
+
+Four focused native scrolling/lifecycle cases pass on the final 0.44.2 source; CLI/app and ordinary Debug compilation and strict signature checks pass. The Projects body-wheel regression now pans the canvas while inner scrolling and saved layouts are preserved. Broader desktop/full UI and gesture qualification remain open. [Current evidence](docs/QUALIFICATION-STATUS.md).
 
 Saved layout entries now display **Layout: …** in the layout menu, so names such as `Default` and `Delete Layout` remain selectable without duplicating built-in command labels. Stored names, UUIDs and schema are unchanged. The native collision regression passes with four menus and five stored states; the 24-method selection remains NONPASS from two fresh Rune AXIdentifier failures, also retained with the original labels. Their cause and broader full UI gates remain open; other new implementations stay deferred. The separate 0.44.1 (61) candidate passes CLI/app compilation, ordinary Debug compilation and strict signature/readback checks. The V160 compilation/signature/readback results did not establish launch, installation or distribution. V171’s later initial Dashboard launch observation is recorded below.
 
@@ -1057,8 +1059,8 @@ continuity. The user does not start project work through a Forge Managed Run.
 
 | | |
 |---|---|
-| **Version** | **0.44.1** |
-| **Build** | **61** |
+| **Version** | **0.44.2** |
+| **Build** | **62** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |

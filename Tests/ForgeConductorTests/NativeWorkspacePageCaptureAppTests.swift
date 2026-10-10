@@ -802,6 +802,917 @@ final class NativeWorkspacePageCaptureAppTests: XCTestCase, @unchecked Sendable 
         }
     }
 
+    func testNativeProjectsCustomCanvasQueuedHorizontalWheelOverNestedPanelBodyExposesResizeCenterAtMinimumSize() async throws {
+        let deadline = ProcessInfo.processInfo.systemUptime + 30
+        let viewport = NSSize(width: 1_100, height: 720)
+        var stage = "presentation", events: [[String: Any]] = [], posted = 0
+        var report: [String: Any] = ["classification": "Owned-window horizontal queued wheel over exact nested Projects panel body; no direct scroll, semantic action or desktop input",
+            "execution_completed": false, "maximum_events": 1, "maximum_case_seconds": 30,
+            "maximum_phase_seconds": 3, "case_deadline_uptime": deadline]
+        func retainReport(_ suffix: String) throws {
+            report["last_stage"] = stage; report["events"] = events; report["posted_events"] = posted
+            let data = try JSONSerialization.data(withJSONObject: report, options: [.sortedKeys])
+            guard events.count <= 1, data.count <= 512 * 1_024 else {
+                throw NativeWorkspacePageCaptureFailure("Projects wheel receipt exceeded its event/JSON bound")
+            }
+            let receiptName = "projects-nested-panel-wheel-" + suffix
+            try directEvidence.save(data, name: receiptName, extension: "json")
+            let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+            attachment.name = receiptName; attachment.lifetime = .keepAlways; add(attachment)
+        }
+        do {
+            try directEvidence.configure(testName: name + "-nested-panel-wheel")
+            try await prepareHost()
+            guard deadline - ProcessInfo.processInfo.systemUptime > 10 else {
+                throw NativeWorkspacePageCaptureFailure("Projects wheel case lacks bounded presentation time")
+            }
+            let owned = try NativeWorkspacePageCaptureFixture(contentSize: viewport)
+            fixture = owned; owned.route.page = .projects
+            try await presentPhysicalCache(owned, expectedContentSize: viewport)
+            let layout = try owned.customize("projects")
+            guard deadline - ProcessInfo.processInfo.systemUptime > 5 else {
+                throw NativeWorkspacePageCaptureFailure("Projects wheel case lacks bounded canvas time")
+            }
+            try await requireCanvas(layout, in: owned)
+            let documents = nativeViews(owned.hosting).compactMap { $0 as? NativeWorkspaceDocumentView }
+            guard documents.count == 1, let document = documents.first,
+                  let scroll = document.enclosingScrollView, scroll.documentView === document,
+                  document.superview === scroll.contentView, document.isFlipped,
+                  scroll.hasHorizontalScroller, scroll.hasVerticalScroller,
+                  let horizontal = scroll.horizontalScroller, let vertical = scroll.verticalScroller,
+                  horizontal !== vertical, let panel = document.panelHosts["projects-status"],
+                  layout.panels.count > 0, layout.panels.count <= 64, layout.panels.allSatisfy(\.isVisible) else {
+                throw NativeWorkspacePageCaptureFailure("Projects wheel exact document/panel/scrollers are absent")
+            }
+            let frame = document.frame, bounds = document.bounds
+            let canvasSize = NSSize(width: layout.canvas.width, height: layout.canvas.height)
+            let identities = document.panelHosts.mapValues { ObjectIdentifier($0) }
+            let panelFrames = document.panelHosts.mapValues(\.frame)
+            let hostingIdentities = document.panelHosts.mapValues { ObjectIdentifier($0.hostingView) }
+            guard Set(identities.keys) == Set(layout.panels.map(\.id)), frame.size == canvasSize,
+                  bounds.origin == .zero, bounds.size == canvasSize,
+                  layout.panels.allSatisfy({ document.panelHosts[$0.id]?.frame == NSRect(x: $0.frame.x,
+                    y: $0.frame.y, width: $0.frame.width, height: $0.frame.height) }) else {
+                throw NativeWorkspacePageCaptureFailure("Projects wheel catalog frames/canvas differ from its layout")
+            }
+            let controls = nativeViews(panel).filter { $0.accessibilityIdentifier() == "workspace-resize-projects-status" }
+            guard controls.count == 1, let control = controls.first, control.superview === panel,
+                  !control.isHiddenOrHasHiddenAncestor, control.bounds.width >= 8, control.bounds.height >= 8 else {
+                throw NativeWorkspacePageCaptureFailure("Projects wheel exact resize control is absent")
+            }
+            let innerScrolls = nativeViews(panel.hostingView).compactMap { $0 as? NSScrollView }
+            guard innerScrolls.count == 1, let inner = innerScrolls.first, inner !== scroll,
+                  let innerDocument = inner.documentView, innerDocument.superview === inner.contentView,
+                  inner.window === owned.window, innerDocument.window === owned.window else {
+                throw NativeWorkspacePageCaptureFailure("Nested Projects body lacks its exact sole inner scroll/document owner")
+            }
+            let innerClip = inner.contentView, innerBefore = innerClip.bounds
+            let innerFrame = inner.frame, innerBounds = inner.bounds
+            guard [innerBefore.minX, innerBefore.minY, innerBefore.width, innerBefore.height].allSatisfy(\.isFinite),
+                  innerBefore.width > 0, innerBefore.height > 0 else {
+                throw NativeWorkspacePageCaptureFailure("Nested Projects inner clip geometry is invalid")
+            }
+            func exactBodyHit(_ hit: NSView) throws -> Bool {
+                guard hit.window === owned.window, !hit.isHiddenOrHasHiddenAncestor,
+                      hit.enclosingScrollView === inner else { return false }
+                var ancestor: NSView? = hit, seen = Set<ObjectIdentifier>()
+                var foundInnerDocument = false, foundPanelHost = false, foundOuterDocument = false
+                while let view = ancestor {
+                    try Task.checkCancellation()
+                    guard seen.count < 64, seen.insert(ObjectIdentifier(view)).inserted,
+                          view.window === owned.window, ProcessInfo.processInfo.systemUptime < deadline else {
+                        throw NativeWorkspacePageCaptureFailure("Nested Projects input ancestry exceeded its owner/depth/deadline bound")
+                    }
+                    if view === innerDocument { foundInnerDocument = true }
+                    if view === panel.hostingView { foundPanelHost = true }
+                    if view === document { foundOuterDocument = true }
+                    if view === owned.hosting { return foundInnerDocument && foundPanelHost && foundOuterDocument }
+                    ancestor = view.superview
+                }
+                return false
+            }
+            let controlFrame = control.frame, controlBounds = control.bounds
+            let targetBounds = document.convert(control.bounds, from: control)
+            let target = NSRect(x: targetBounds.midX - 4, y: targetBounds.midY - 4, width: 8, height: 8)
+            let baseline = owned.preferences.collection
+            let beforeBytes = try XCTUnwrap(owned.defaults.data(forKey: NativeWorkspacePreferences.storageKey))
+            let initialKey = owned.window.isKeyWindow, initialActive = NSApp.isActive
+            guard beforeBytes.count <= NativeWorkspaceLimits.maximumStoredBytes,
+                  try JSONDecoder().decode(NativeWorkspaceCollection.self, from: beforeBytes) == baseline,
+                  owned.preferences.activeLayout(for: "projects") == layout, document.bounds.contains(target),
+                  target.minX > document.visibleRect.maxX,
+                  target.minY >= document.visibleRect.minY, target.maxY <= document.visibleRect.maxY else {
+                throw NativeWorkspacePageCaptureFailure("Projects wheel storage or initially offscreen resize center is invalid")
+            }
+            func requireOwner() throws {
+                try Task.checkCancellation()
+                guard ProcessInfo.processInfo.systemUptime < deadline,
+                      self.physicalCachePresentationIsReady(owned, expectedContentSize: viewport),
+                      owned.route.page == .projects, owned.window.isKeyWindow == initialKey, NSApp.isActive == initialActive,
+                      document.window === owned.window, scroll.window === owned.window,
+                      document.enclosingScrollView === scroll, scroll.documentView === document,
+                      document.superview === scroll.contentView, document.frame == frame, document.bounds == bounds,
+                      scroll.horizontalScroller === horizontal, scroll.verticalScroller === vertical,
+                      inner.window === owned.window, inner.frame == innerFrame, inner.bounds == innerBounds,
+                      inner.contentView === innerClip, inner.documentView === innerDocument,
+                      innerDocument.superview === innerClip, innerDocument.window === owned.window,
+                      innerClip.bounds == innerBefore,
+                      horizontal.superview === scroll, vertical.superview === scroll,
+                      document.panelHosts.mapValues({ ObjectIdentifier($0) }) == identities,
+                      document.panelHosts.mapValues(\.frame) == panelFrames,
+                      document.panelHosts.mapValues({ ObjectIdentifier($0.hostingView) }) == hostingIdentities,
+                      panel.superview === document, !panel.isHiddenOrHasHiddenAncestor,
+                      control.superview === panel, control.window === owned.window,
+                      !control.isHiddenOrHasHiddenAncestor, control.frame == controlFrame, control.bounds == controlBounds,
+                      document.convert(control.bounds, from: control) == targetBounds,
+                      owned.preferences.collection == baseline,
+                      owned.defaults.data(forKey: NativeWorkspacePreferences.storageKey) == beforeBytes,
+                      owned.model.app == nil, owned.model.manager == nil, owned.model.remoteManager == nil,
+                      !owned.model.hasLoadedInitialSettings else {
+                    throw NativeWorkspacePageCaptureFailure("Projects wheel owner/geometry/storage/model changed or deadline elapsed")
+                }
+                var ancestor: NSView? = document, seen = Set<ObjectIdentifier>()
+                while let view = ancestor {
+                    guard seen.count < 64, seen.insert(ObjectIdentifier(view)).inserted,
+                          view.window === owned.window, ProcessInfo.processInfo.systemUptime < deadline else {
+                        throw NativeWorkspacePageCaptureFailure("Projects wheel native ancestry exceeded its owner/depth/deadline bound")
+                    }
+                    if view === owned.hosting { return }
+                    ancestor = view.superview
+                }
+                throw NativeWorkspacePageCaptureFailure("Projects wheel document ancestry did not reach its exact hosting owner")
+            }
+            try requireOwner()
+            report["initial_document_visible"] = NSStringFromRect(document.visibleRect)
+            report["target_center_rect"] = NSStringFromRect(target)
+            report["window_key"] = initialKey; report["application_active"] = initialActive
+            report["stored_bytes"] = beforeBytes.count
+            report["input_panel_id"] = panel.panelID
+            report["inner_clip_before"] = NSStringFromRect(innerBefore)
+            report["inner_scroll_count"] = innerScrolls.count
+            try retainReport("before")
+            try capturePhysicalCache(owned, expectedContentSize: viewport, name: "projects-nested-panel-wheel-before")
+            for (axis, wheel1, wheel2) in [("horizontal", Int32(0), Int32(-480))] {
+                stage = axis + ".nested-body-hit"
+                try requireOwner()
+                let before = scroll.contentView.bounds, visible = document.visibleRect
+                let bodyVisible = document.convert(innerDocument.visibleRect, from: innerDocument).intersection(visible)
+                guard [bodyVisible.minX, bodyVisible.minY, bodyVisible.width, bodyVisible.height].allSatisfy(\.isFinite),
+                      bodyVisible.width > 8, bodyVisible.height > 8 else {
+                    throw NativeWorkspacePageCaptureFailure("Nested Projects body has no finite visible input region")
+                }
+                var admittedInput: (point: NSPoint, hit: NSView)?
+                for x in [0.25, 0.5, 0.75] {
+                    for y in [0.25, 0.5, 0.75] {
+                        guard ProcessInfo.processInfo.systemUptime < deadline else {
+                            throw NativeWorkspacePageCaptureFailure("Nested Projects input search exceeded its deadline")
+                        }
+                        let candidate = NSPoint(x: bodyVisible.minX + bodyVisible.width * x,
+                                                y: bodyVisible.minY + bodyVisible.height * y)
+                        if let hit = owned.hosting.hitTest(document.convert(candidate, to: owned.hosting.superview)),
+                           try exactBodyHit(hit) { admittedInput = (candidate, hit); break }
+                    }
+                    if admittedInput != nil { break }
+                }
+                let input = try XCTUnwrap(admittedInput), point = input.point
+                guard [before.minX, before.minY, before.width, before.height, point.x, point.y].allSatisfy(\.isFinite),
+                      before.width > 0, before.height > 20, visible.contains(point),
+                      owned.hosting.hitTest(document.convert(point, to: owned.hosting.superview)) === input.hit,
+                      try exactBodyHit(input.hit) else {
+                    throw NativeWorkspacePageCaptureFailure("Nested Projects wheel point lost its exact inner body hit")
+                }
+                report["input_hit_type"] = String(String(describing: type(of: input.hit)).prefix(128))
+                report["input_exact_inner_body_ancestry"] = true
+                report["input_body_visible_in_document"] = NSStringFromRect(bodyVisible)
+                let slot = events.count
+                events.append(["axis": axis, "requested_wheel1": wheel1, "requested_wheel2": wheel2,
+                    "posted": false, "before_clip_bounds": NSStringFromRect(before)])
+                defer {
+                    events[slot]["after_clip_bounds"] = NSStringFromRect(scroll.contentView.bounds)
+                    events[slot]["after_document_visible"] = NSStringFromRect(document.visibleRect)
+                    events[slot]["inner_clip_after"] = NSStringFromRect(innerClip.bounds)
+                    events[slot]["finished_uptime"] = ProcessInfo.processInfo.systemUptime
+                }
+                stage = axis + ".conversion"
+                let local = document.convert(point, to: nil), windowNumber = owned.window.windowNumber
+                let seed = try XCTUnwrap(NSEvent.mouseEvent(with: .mouseMoved, location: local,
+                    modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: windowNumber,
+                    context: nil, eventNumber: 1, clickCount: 0, pressure: 0))
+                events[slot]["seed_exact_window"] = seed.window === owned.window
+                events[slot]["seed_window_number"] = seed.windowNumber
+                guard windowNumber > 0, seed.window === owned.window, seed.windowNumber == windowNumber,
+                      abs(seed.locationInWindow.x - local.x) <= 0.5, abs(seed.locationInWindow.y - local.y) <= 0.5 else {
+                    throw NativeWorkspacePageCaptureFailure("Projects wheel seed lacks exact window/point association")
+                }
+                let seedCG = try XCTUnwrap(seed.cgEvent)
+                let seedRoundTrip = NSEvent(cgEvent: seedCG)
+                events[slot]["seed_cg_roundtrip_exact_window"] = seedRoundTrip?.window === owned.window
+                events[slot]["seed_cg_roundtrip_window_number"] = seedRoundTrip.map { $0.windowNumber as Any } ?? NSNull()
+                events[slot]["seed_cg_roundtrip_point"] = seedRoundTrip.map { NSStringFromPoint($0.locationInWindow) as Any } ?? NSNull()
+                let template = try XCTUnwrap(CGEvent(scrollWheelEvent2Source: nil, units: .pixel,
+                    wheelCount: 2, wheel1: wheel1, wheel2: wheel2, wheel3: 0))
+                let wheel = try XCTUnwrap(seedCG.copy())
+                wheel.type = .scrollWheel
+                for field in [CGEventField.scrollWheelEventDeltaAxis1, .scrollWheelEventDeltaAxis2, .scrollWheelEventDeltaAxis3,
+                    .scrollWheelEventPointDeltaAxis1, .scrollWheelEventPointDeltaAxis2, .scrollWheelEventPointDeltaAxis3,
+                    .scrollWheelEventIsContinuous] {
+                    wheel.setIntegerValueField(field, value: template.getIntegerValueField(field))
+                }
+                for field in [CGEventField.scrollWheelEventFixedPtDeltaAxis1, .scrollWheelEventFixedPtDeltaAxis2,
+                    .scrollWheelEventFixedPtDeltaAxis3] {
+                    wheel.setDoubleValueField(field, value: template.getDoubleValueField(field))
+                }
+                guard seedCG.location.x.isFinite, seedCG.location.y.isFinite else {
+                    throw NativeWorkspacePageCaptureFailure("Projects wheel seed global point is nonfinite")
+                }
+                let field91 = wheel.getIntegerValueField(.mouseEventWindowUnderMousePointer)
+                let field92 = wheel.getIntegerValueField(.mouseEventWindowUnderMousePointerThatCanHandleThisEvent)
+                events[slot]["field91"] = field91; events[slot]["field92"] = field92
+                let event = try XCTUnwrap(NSEvent(cgEvent: wheel))
+                events[slot]["converted_exact_window"] = event.window === owned.window
+                events[slot]["converted_window_number"] = event.windowNumber
+                events[slot]["converted_type"] = event.type.rawValue
+                events[slot]["local_point"] = NSStringFromPoint(local)
+                events[slot]["converted_point"] = NSStringFromPoint(event.locationInWindow)
+                guard event.type == .scrollWheel else {
+                    throw NativeWorkspacePageCaptureFailure("Projects wheel conversion did not return a scroll-wheel event")
+                }
+                let dx = event.scrollingDeltaX, dy = event.scrollingDeltaY
+                events[slot]["delta_x"] = dx.isFinite ? dx as Any : String(describing: dx)
+                events[slot]["delta_y"] = dy.isFinite ? dy as Any : String(describing: dy)
+                events[slot]["precise_deltas"] = event.hasPreciseScrollingDeltas
+                events[slot]["direction_inverted"] = event.isDirectionInvertedFromDevice
+                guard event.window === owned.window, event.windowNumber == windowNumber,
+                      [local.x, local.y, event.locationInWindow.x, event.locationInWindow.y, dx, dy].allSatisfy({ $0.isFinite }),
+                      abs(event.locationInWindow.x - local.x) <= 0.5, abs(event.locationInWindow.y - local.y) <= 0.5,
+                      axis == "horizontal" ? (dx < 0 && abs(dy) <= 0.1) : (dy < 0 && abs(dx) <= 0.1) else {
+                    throw NativeWorkspacePageCaptureFailure("Projects wheel conversion lacks exact window/point/single-axis association")
+                }
+                try requireOwner()
+                guard posted < 1, owned.hosting.hitTest(document.convert(point, to: owned.hosting.superview)) === input.hit,
+                      try exactBodyHit(input.hit) else {
+                    throw NativeWorkspacePageCaptureFailure("Projects wheel dispatch lost its exact document/one-event bound")
+                }
+                stage = axis + ".movement"
+                events[slot]["post_uptime"] = ProcessInfo.processInfo.systemUptime
+                NSApp.postEvent(event, atStart: false); posted += 1; events[slot]["posted"] = true
+                let settleDeadline = min(deadline, ProcessInfo.processInfo.systemUptime + 3)
+                var progressed = false
+                while ProcessInfo.processInfo.systemUptime < settleDeadline {
+                    try requireOwner(); owned.hosting.layoutSubtreeIfNeeded(); try requireOwner()
+                    let after = scroll.contentView.bounds, currentVisible = document.visibleRect
+                    let delta = axis == "horizontal" ? after.minX - before.minX : after.minY - before.minY
+                    let other = axis == "horizontal" ? after.minY - before.minY : after.minX - before.minX
+                    events[slot]["axis_delta"] = delta.isFinite ? delta as Any : String(describing: delta)
+                    events[slot]["other_axis_delta"] = other.isFinite ? other as Any : String(describing: other)
+                    guard [after.minX, after.minY, after.width, after.height, delta, other].allSatisfy({ $0.isFinite }),
+                          abs(after.width - before.width) <= 0.1, abs(after.height - before.height) <= 0.1,
+                          delta >= -0.1, abs(other) <= 0.1 else {
+                        throw NativeWorkspacePageCaptureFailure("Projects wheel moved in an unexpected axis/direction or resized its clip")
+                    }
+                    let contains = axis == "horizontal" ? currentVisible.minX <= target.minX && currentVisible.maxX >= target.maxX
+                        : currentVisible.minY <= target.minY && currentVisible.maxY >= target.maxY
+                    if delta > 0.1 && contains {
+                        guard ProcessInfo.processInfo.systemUptime < settleDeadline else {
+                            throw NativeWorkspacePageCaptureFailure("Projects wheel progress sample crossed its phase deadline")
+                        }
+                        progressed = true; break
+                    }
+                    try await Task.sleep(for: .milliseconds(20))
+                }
+                guard progressed else {
+                    throw NativeWorkspacePageCaptureFailure("Projects wheel did not expose its target axis within three seconds")
+                }
+                try requireOwner(); events[slot]["target_axis_visible"] = true
+            }
+            stage = "final-storage-and-hit-test"
+            let fresh = NativeWorkspacePreferences(knownPanelIDsByView: NativeWorkspaceCatalog.knownPanelIDsByView,
+                panelSizeBoundsByView: NativeWorkspaceCatalog.sizeBoundsByView, defaults: owned.defaults)
+            let mutations = await owned.client.mutationNames()
+            try requireOwner()
+            guard posted == 1, document.visibleRect.contains(target),
+                  owned.hosting.hitTest(document.convert(NSPoint(x: target.midX, y: target.midY), to: owned.hosting.superview)) === control,
+                  fresh.restorationError == nil, fresh.collection == baseline, mutations.isEmpty else {
+                throw NativeWorkspacePageCaptureFailure("Projects wheel final control hit/storage/isolation proof failed")
+            }
+            report["target_center_visible"] = true; report["exact_control_hit_test"] = true
+            report["complete_preferences_and_bytes_unchanged"] = true; report["fresh_restoration_unchanged"] = true
+            report["fixture_mutations"] = mutations.sorted()
+            report["inner_clip_after"] = NSStringFromRect(innerClip.bounds)
+            report["inner_clip_unchanged"] = innerClip.bounds == innerBefore
+            try capturePhysicalCache(owned, expectedContentSize: viewport, name: "projects-nested-panel-wheel-after")
+            try requireOwner()
+            guard deadline - ProcessInfo.processInfo.systemUptime > 5 else {
+                throw NativeWorkspacePageCaptureFailure("Projects wheel case lacks bounded reset time")
+            }
+            try owned.preferences.reset("projects")
+            try await waitUntil("Projects wheel canvas did not dismantle after reset",
+                timeout: min(5, deadline - ProcessInfo.processInfo.systemUptime)) {
+                owned.hosting.layoutSubtreeIfNeeded()
+                return !self.nativeViews(owned.hosting).contains { $0 is NativeWorkspaceDocumentView }
+            }
+            guard owned.preferences.activeLayout(for: "projects") == nil,
+                  physicalCachePresentationIsReady(owned, expectedContentSize: viewport) else {
+                throw NativeWorkspacePageCaptureFailure("Projects wheel reset changed its exact presentation owner")
+            }
+            await owned.close(); fixture = nil; await restoreHost()
+            try Task.checkCancellation()
+            stage = "complete"; report["execution_completed"] = true
+            try retainReport("after")
+            guard ProcessInfo.processInfo.systemUptime < deadline else {
+                throw NativeWorkspacePageCaptureFailure("Projects wheel case exceeded its cleanup/receipt deadline")
+            }
+        } catch let failure {
+            report["execution_completed"] = false
+            report["original_error"] = scrollerActionBoundedString(String(reflecting: failure), bytes: 512)
+            if let owned = fixture, physicalCachePresentationIsReady(owned, expectedContentSize: viewport) {
+                do { try capturePhysicalCache(owned, expectedContentSize: viewport, name: "projects-nested-panel-wheel-failed") }
+                catch { report["failure_cache_error"] = scrollerActionBoundedString(String(reflecting: error), bytes: 512) }
+            }
+            do { try retainReport("failed"); try retainFailure(failure) }
+            catch { XCTFail("Could not retain Projects wheel failure: \(scrollerActionBoundedString(String(reflecting: error), bytes: 512))") }
+            await restoreHost(); throw failure
+        }
+    }
+
+    func testPlainAppKitNestedVerticalScrollViewQueuedHorizontalWheelMeasurementAtMinimumSize() async throws {
+        let deadline = ProcessInfo.processInfo.systemUptime + 30
+        let viewport = NSSize(width: 1_100, height: 720)
+        var stage = "presentation", events: [[String: Any]] = [], posted = 0
+        var receiverForFailure: PlainAppKitNestedWheelReceiver?
+        var report: [String: Any] = ["classification": "Plain AppKit nested vertical scroll comparison; observed propagation only, no Forge or SwiftUI equivalence claim",
+            "execution_completed": false, "maximum_events": 1, "maximum_case_seconds": 30,
+            "maximum_phase_seconds": 3, "maximum_samples": 160]
+        func retainReport(_ suffix: String) throws {
+            report["last_stage"] = stage; report["events"] = events; report["posted_events"] = posted
+            report["native_child_receipt"] = receiverForFailure?.receipt ?? [:]
+            report["native_child_delivery_count_capped_at_two"] = receiverForFailure?.deliveryCount ?? 0
+            let data = try JSONSerialization.data(withJSONObject: report, options: [.sortedKeys])
+            guard events.count <= 1, data.count <= 64 * 1_024 else {
+                throw NativeWorkspacePageCaptureFailure("Plain AppKit wheel receipt exceeded its event/JSON bound")
+            }
+            let receiptName = "plain-appkit-nested-wheel-" + suffix
+            try directEvidence.save(data, name: receiptName, extension: "json")
+            let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+            attachment.name = receiptName; attachment.lifetime = .keepAlways; add(attachment)
+        }
+        do {
+            try directEvidence.configure(testName: name + "-plain-appkit-nested-wheel")
+            try await prepareHost()
+            let root = NSView(frame: NSRect(origin: .zero, size: viewport))
+            let outer = NSScrollView(frame: NSRect(x: 0, y: 0, width: 1_100, height: 672))
+            outer.hasHorizontalScroller = true; outer.hasVerticalScroller = true; outer.autohidesScrollers = true
+            let document = PlainAppKitNestedWheelDocument(frame: NSRect(x: 0, y: 0, width: 1_460, height: 3_380))
+            outer.documentView = document; root.addSubview(outer)
+            let inner = NSScrollView(frame: NSRect(x: 341, y: 53, width: 1_098, height: 111))
+            inner.hasVerticalScroller = true; inner.hasHorizontalScroller = false; inner.autohidesScrollers = true
+            let receiver = PlainAppKitNestedWheelReceiver(frame: NSRect(x: 0, y: 0, width: 1_098, height: 111))
+            receiverForFailure = receiver; inner.documentView = receiver; document.addSubview(inner)
+            let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: viewport.width, height: viewport.height),
+                styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false; window.title = "Plain AppKit nested wheel " + UUID().uuidString
+            window.contentView = root
+            let owned = (window: window, root: root)
+            defer {
+                receiver.expectedWindow = nil; receiver.expectedEvent = nil
+                window.orderOut(nil); window.contentView = nil; window.close()
+            }
+            window.setContentSize(viewport); window.orderFrontRegardless()
+            let presentationEnd = min(deadline, ProcessInfo.processInfo.systemUptime + 3)
+            while !(window.isVisible && window.occlusionState.contains(.visible) && window.contentView === root
+                    && root.window === window && root.bounds.origin == .zero && root.bounds.size == viewport) {
+                guard ProcessInfo.processInfo.systemUptime < presentationEnd else {
+                    throw NativeWorkspacePageCaptureFailure("Plain AppKit nested wheel presentation exceeded three seconds")
+                }
+                root.layoutSubtreeIfNeeded(); try await Task.sleep(for: .milliseconds(20))
+            }
+            root.layoutSubtreeIfNeeded()
+            let initialKey = window.isKeyWindow, initialActive = NSApp.isActive
+            let outerClip = outer.contentView, innerClip = inner.contentView
+            let outerBefore = outerClip.bounds, innerBefore = innerClip.bounds
+            let outerFrame = outer.frame, outerBounds = outer.bounds, documentFrame = document.frame, documentBounds = document.bounds
+            let innerFrame = inner.frame, innerBounds = inner.bounds, receiverFrame = receiver.frame, receiverBounds = receiver.bounds
+            let horizontal = try XCTUnwrap(outer.horizontalScroller), vertical = try XCTUnwrap(outer.verticalScroller)
+            func geometry() -> [String: Any] {
+                ["root_frame": NSStringFromRect(root.frame), "root_bounds": NSStringFromRect(root.bounds),
+                 "outer_frame": NSStringFromRect(outer.frame), "outer_bounds": NSStringFromRect(outer.bounds),
+                 "outer_clip_bounds": NSStringFromRect(outerClip.bounds), "document_frame": NSStringFromRect(document.frame),
+                 "document_bounds": NSStringFromRect(document.bounds), "inner_frame": NSStringFromRect(inner.frame),
+                 "inner_bounds": NSStringFromRect(inner.bounds), "inner_clip_bounds": NSStringFromRect(innerClip.bounds),
+                 "receiver_frame": NSStringFromRect(receiver.frame), "receiver_bounds": NSStringFromRect(receiver.bounds)]
+            }
+            func requireOwner() throws {
+                try Task.checkCancellation()
+                guard ProcessInfo.processInfo.systemUptime < deadline,
+                      window.contentView === root, root.window === window, root.bounds.origin == .zero, root.bounds.size == viewport,
+                      window.isVisible, window.occlusionState.contains(.visible), !window.isMiniaturized,
+                      window.styleMask == [.titled, .closable, .resizable], window.isKeyWindow == initialKey, NSApp.isActive == initialActive,
+                      NSApp.windows.filter({ $0.title == window.title }).count == 1,
+                      outer.superview === root, outer.window === window, outer.frame == outerFrame, outer.bounds == outerBounds,
+                      outer.documentView === document, outer.contentView === outerClip, document.superview === outerClip,
+                      document.enclosingScrollView === outer, document.window === window,
+                      document.frame == documentFrame, document.bounds == documentBounds, document.isFlipped,
+                      outer.horizontalScroller === horizontal, outer.verticalScroller === vertical,
+                      inner.superview === document, inner.window === window, inner.frame == innerFrame, inner.bounds == innerBounds,
+                      inner.documentView === receiver, inner.contentView === innerClip, receiver.superview === innerClip,
+                      receiver.enclosingScrollView === inner, receiver.window === window, receiver.frame == receiverFrame,
+                      receiver.bounds == receiverBounds, receiver.isFlipped,
+                      outerClip.bounds.size == outerBefore.size, innerClip.bounds.size == innerBefore.size,
+                      ObjectIdentifier(type(of: outer)) == ObjectIdentifier(NSScrollView.self),
+                      ObjectIdentifier(type(of: inner)) == ObjectIdentifier(NSScrollView.self) else {
+                    throw NativeWorkspacePageCaptureFailure("Plain AppKit nested wheel owner/geometry/state or deadline changed")
+                }
+                var ancestor: NSView? = receiver, seen = Set<ObjectIdentifier>()
+                var foundInner = false, foundDocument = false, foundOuter = false
+                while let view = ancestor {
+                    guard seen.count < 64, seen.insert(ObjectIdentifier(view)).inserted,
+                          view.window === window, !view.isHiddenOrHasHiddenAncestor,
+                          ProcessInfo.processInfo.systemUptime < deadline else {
+                        throw NativeWorkspacePageCaptureFailure("Plain AppKit receiver ancestry exceeded its owner/depth/deadline bound")
+                    }
+                    if view === inner { foundInner = true }; if view === document { foundDocument = true }
+                    if view === outer { foundOuter = true }
+                    if view === root {
+                        guard foundInner && foundDocument && foundOuter else {
+                            throw NativeWorkspacePageCaptureFailure("Plain AppKit receiver missed its exact nested owners")
+                        }
+                        return
+                    }
+                    ancestor = view.superview
+                }
+                throw NativeWorkspacePageCaptureFailure("Plain AppKit receiver ancestry did not reach its exact content owner")
+            }
+            try requireOwner()
+            report["window_key"] = initialKey; report["application_active"] = initialActive
+            report["same_key_active_as_V176"] = !initialKey && initialActive
+            report["geometry_before"] = geometry()
+            report["native_classes"] = ["outer": NSStringFromClass(type(of: outer)), "inner": NSStringFromClass(type(of: inner)),
+                "outer_clip": NSStringFromClass(type(of: outerClip)), "inner_clip": NSStringFromClass(type(of: innerClip)),
+                "document": NSStringFromClass(type(of: document)), "receiver": NSStringFromClass(type(of: receiver))]
+            try retainReport("before")
+            for (axis, wheel1, wheel2) in [("horizontal", Int32(0), Int32(-480))] {
+                stage = "nested-body-hit"; try requireOwner()
+                let bodyVisible = document.convert(receiver.visibleRect, from: receiver).intersection(document.visibleRect)
+                let point = NSPoint(x: bodyVisible.minX + bodyVisible.width * 0.25, y: bodyVisible.minY + bodyVisible.height * 0.25)
+                guard [bodyVisible.minX, bodyVisible.minY, bodyVisible.width, bodyVisible.height, point.x, point.y].allSatisfy(\.isFinite),
+                      bodyVisible.width > 8, bodyVisible.height > 8, receiver.deliveryCount == 0,
+                      root.hitTest(document.convert(point, to: root.superview)) === receiver else {
+                    throw NativeWorkspacePageCaptureFailure("Plain AppKit input did not hit its exact visible inner receiver")
+                }
+                let slot = events.count
+                events.append(["axis": axis, "requested_wheel1": wheel1, "requested_wheel2": wheel2,
+                    "posted": false, "before_clip_bounds": NSStringFromRect(outerClip.bounds)])
+                stage = "conversion"
+                let local = document.convert(point, to: nil), windowNumber = owned.window.windowNumber
+                let seed = try XCTUnwrap(NSEvent.mouseEvent(with: .mouseMoved, location: local,
+                    modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: windowNumber,
+                    context: nil, eventNumber: 1, clickCount: 0, pressure: 0))
+                events[slot]["seed_exact_window"] = seed.window === owned.window
+                events[slot]["seed_window_number"] = seed.windowNumber
+                guard windowNumber > 0, seed.window === owned.window, seed.windowNumber == windowNumber,
+                      abs(seed.locationInWindow.x - local.x) <= 0.5, abs(seed.locationInWindow.y - local.y) <= 0.5 else {
+                    throw NativeWorkspacePageCaptureFailure("Projects wheel seed lacks exact window/point association")
+                }
+                let seedCG = try XCTUnwrap(seed.cgEvent)
+                let seedRoundTrip = NSEvent(cgEvent: seedCG)
+                events[slot]["seed_cg_roundtrip_exact_window"] = seedRoundTrip?.window === owned.window
+                events[slot]["seed_cg_roundtrip_window_number"] = seedRoundTrip.map { $0.windowNumber as Any } ?? NSNull()
+                events[slot]["seed_cg_roundtrip_point"] = seedRoundTrip.map { NSStringFromPoint($0.locationInWindow) as Any } ?? NSNull()
+                let template = try XCTUnwrap(CGEvent(scrollWheelEvent2Source: nil, units: .pixel,
+                    wheelCount: 2, wheel1: wheel1, wheel2: wheel2, wheel3: 0))
+                let wheel = try XCTUnwrap(seedCG.copy())
+                wheel.type = .scrollWheel
+                for field in [CGEventField.scrollWheelEventDeltaAxis1, .scrollWheelEventDeltaAxis2, .scrollWheelEventDeltaAxis3,
+                    .scrollWheelEventPointDeltaAxis1, .scrollWheelEventPointDeltaAxis2, .scrollWheelEventPointDeltaAxis3,
+                    .scrollWheelEventIsContinuous] {
+                    wheel.setIntegerValueField(field, value: template.getIntegerValueField(field))
+                }
+                for field in [CGEventField.scrollWheelEventFixedPtDeltaAxis1, .scrollWheelEventFixedPtDeltaAxis2,
+                    .scrollWheelEventFixedPtDeltaAxis3] {
+                    wheel.setDoubleValueField(field, value: template.getDoubleValueField(field))
+                }
+                guard seedCG.location.x.isFinite, seedCG.location.y.isFinite else {
+                    throw NativeWorkspacePageCaptureFailure("Projects wheel seed global point is nonfinite")
+                }
+                let field91 = wheel.getIntegerValueField(.mouseEventWindowUnderMousePointer)
+                let field92 = wheel.getIntegerValueField(.mouseEventWindowUnderMousePointerThatCanHandleThisEvent)
+                events[slot]["field91"] = field91; events[slot]["field92"] = field92
+                let event = try XCTUnwrap(NSEvent(cgEvent: wheel))
+                events[slot]["converted_exact_window"] = event.window === owned.window
+                events[slot]["converted_window_number"] = event.windowNumber
+                events[slot]["converted_type"] = event.type.rawValue
+                events[slot]["local_point"] = NSStringFromPoint(local)
+                events[slot]["converted_point"] = NSStringFromPoint(event.locationInWindow)
+                guard event.type == .scrollWheel else {
+                    throw NativeWorkspacePageCaptureFailure("Projects wheel conversion did not return a scroll-wheel event")
+                }
+                let dx = event.scrollingDeltaX, dy = event.scrollingDeltaY
+                events[slot]["delta_x"] = dx.isFinite ? dx as Any : String(describing: dx)
+                events[slot]["delta_y"] = dy.isFinite ? dy as Any : String(describing: dy)
+                events[slot]["precise_deltas"] = event.hasPreciseScrollingDeltas
+                events[slot]["direction_inverted"] = event.isDirectionInvertedFromDevice
+                guard event.window === owned.window, event.windowNumber == windowNumber,
+                      [local.x, local.y, event.locationInWindow.x, event.locationInWindow.y, dx, dy].allSatisfy({ $0.isFinite }),
+                      abs(event.locationInWindow.x - local.x) <= 0.5, abs(event.locationInWindow.y - local.y) <= 0.5,
+                      axis == "horizontal" ? (dx < 0 && abs(dy) <= 0.1) : (dy < 0 && abs(dx) <= 0.1) else {
+                    throw NativeWorkspacePageCaptureFailure("Projects wheel conversion lacks exact window/point/single-axis association")
+                }
+                try requireOwner()
+                guard posted < 1, root.hitTest(document.convert(point, to: root.superview)) === receiver else {
+                    throw NativeWorkspacePageCaptureFailure("Plain AppKit dispatch lost its exact receiver/one-event bound")
+                }
+                receiver.expectedWindow = window; receiver.expectedEvent = event
+                receiver.expectedPoint = event.locationInWindow
+                stage = "native-child-observation"
+                events[slot]["post_uptime"] = ProcessInfo.processInfo.systemUptime
+                NSApp.postEvent(event, atStart: false); posted += 1; events[slot]["posted"] = true
+                let settleDeadline = min(deadline, ProcessInfo.processInfo.systemUptime + 3)
+                var samples = 0
+                while ProcessInfo.processInfo.systemUptime < settleDeadline {
+                    try requireOwner()
+                    let outerNow = outerClip.bounds, innerNow = innerClip.bounds
+                    guard [outerNow.minX, outerNow.minY, innerNow.minX, innerNow.minY].allSatisfy(\.isFinite), samples < 160 else {
+                        throw NativeWorkspacePageCaptureFailure("Plain AppKit observation exceeded finite geometry/sample bounds")
+                    }
+                    let sampled = ProcessInfo.processInfo.systemUptime
+                    guard sampled < settleDeadline else { break }
+                    samples += 1
+                    events[slot]["after_clip_bounds"] = NSStringFromRect(outerNow)
+                    events[slot]["inner_clip_after"] = NSStringFromRect(innerNow)
+                    events[slot]["last_sample_uptime"] = sampled
+                    let remaining = settleDeadline - sampled
+                    try await Task.sleep(for: .seconds(min(0.02, remaining)))
+                }
+                try requireOwner()
+                let child = receiver.receipt
+                guard posted == 1, samples > 0, receiver.deliveryCount == 1,
+                      child["super_scrollWheel_returned"] as? Bool == true,
+                      child["exact_window"] as? Bool == true, child["exact_window_number"] as? Bool == true,
+                      child["exact_expected_local_point"] as? Bool == true,
+                      child["scroll_wheel_type"] as? Bool == true, child["single_horizontal_negative_delta"] as? Bool == true,
+                      (child["received_uptime"] as? TimeInterval).map({ $0 < settleDeadline }) == true else {
+                    throw NativeWorkspacePageCaptureFailure("Plain AppKit did not observe exactly one owned matching child wheel and returned superclass call")
+                }
+                events[slot]["samples"] = samples; events[slot]["settle_deadline_uptime"] = settleDeadline
+                events[slot]["outer_delta_x"] = outerClip.bounds.minX - outerBefore.minX
+                events[slot]["outer_delta_y"] = outerClip.bounds.minY - outerBefore.minY
+                events[slot]["inner_delta_x"] = innerClip.bounds.minX - innerBefore.minX
+                events[slot]["inner_delta_y"] = innerClip.bounds.minY - innerBefore.minY
+                events[slot]["finished_uptime"] = ProcessInfo.processInfo.systemUptime
+            }
+            stage = "complete"; report["geometry_after"] = geometry()
+            report["execution_completed"] = true; report["exact_native_owners_and_view_geometry_preserved"] = true
+            report["propagation_acceptance"] = "Observed inner/outer clip deltas; no expected movement imposed"
+            try requireOwner(); try retainReport("after"); try requireOwner()
+        } catch {
+            let original = error
+            report["execution_completed"] = false
+            report["original_error"] = String(String(describing: original).prefix(2_048))
+            do { try retainReport("failed") }
+            catch { XCTFail("Could not retain plain AppKit wheel diagnostic: \(String(String(describing: error).prefix(2_048)))") }
+            await restoreHost(); throw original
+        }
+        await restoreHost()
+        guard ProcessInfo.processInfo.systemUptime < deadline else {
+            throw NativeWorkspacePageCaptureFailure("Plain AppKit measurement cleanup exceeded its case deadline")
+        }
+    }
+
+    func testNativeCustomCanvasNestedBodyWheelPreservesInnerVerticalAndHorizontalScrolling() async throws {
+        let deadline = ProcessInfo.processInfo.systemUptime + 30
+        let viewport = NSSize(width: 1_100, height: 720)
+        var stage = "presentation", rows: [[String: Any]] = [], posted = 0
+        var report: [String: Any] = ["classification": "Queued native inner-axis preservation in two production wrapped custom panels; no direct scroll or live backend",
+            "execution_completed": false, "maximum_events": 2, "maximum_case_seconds": 30, "maximum_phase_seconds": 3]
+        func retain(_ suffix: String) throws {
+            report["last_stage"] = stage; report["events"] = rows; report["posted_events"] = posted
+            let data = try JSONSerialization.data(withJSONObject: report, options: [.sortedKeys])
+            guard rows.count <= 2, data.count <= 128 * 1_024 else {
+                throw NativeWorkspacePageCaptureFailure("Nested preservation receipt exceeded its event/byte bound")
+            }
+            let receiptName = "nested-body-wheel-preservation-" + suffix
+            try directEvidence.save(data, name: receiptName, extension: "json")
+            let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+            attachment.name = receiptName; attachment.lifetime = .keepAlways; add(attachment)
+        }
+        do {
+            try directEvidence.configure(testName: name + "-nested-body-wheel-preservation")
+            try await prepareHost()
+            let owned = try NativeWorkspacePageCaptureFixture(contentSize: viewport)
+            fixture = owned; owned.route.page = .projects
+            let descriptors = NativeWorkspaceCatalog.projects
+            var layout = try owned.customize("projects")
+            let shown: Set<String> = ["projects-status", "projects-registration-reconciliation"]
+            for index in layout.panels.indices {
+                layout.panels[index].isVisible = shown.contains(layout.panels[index].id)
+                if layout.panels[index].id == "projects-status" {
+                    layout.panels[index].frame = .init(x: 20, y: 20, width: 500, height: 320)
+                } else if layout.panels[index].id == "projects-registration-reconciliation" {
+                    layout.panels[index].frame = .init(x: 560, y: 20, width: 500, height: 320)
+                }
+            }
+            try owned.preferences.save(layout)
+            owned.hosting.rootView = AnyView(NativeWorkspaceView(viewID: "projects", descriptors: descriptors,
+                defaultContent: { Text("Isolated nested-scroll default") }, panelContent: { id, _ in
+                    if id == "projects-status" {
+                        return AnyView(VStack(alignment: .leading, spacing: 8) {
+                            ForEach(0..<60, id: \.self) { Text("Vertical row \($0)") }
+                        }.frame(maxWidth: .infinity, minHeight: 1_800, alignment: .topLeading))
+                    }
+                    return AnyView(ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(0..<30, id: \.self) { Text("Horizontal \($0)").frame(width: 90, height: 150) }
+                        }
+                    }.frame(height: 150))
+                }).environmentObject(owned.model).environmentObject(owned.workbench).environmentObject(owned.guided)
+                .environment(\.nativeWorkspacePreferences, owned.preferences).graphiteWorkbench())
+            try await presentPhysicalCache(owned, expectedContentSize: viewport)
+            let mountEnd = min(deadline, ProcessInfo.processInfo.systemUptime + 3)
+            while nativeViews(owned.hosting).compactMap({ $0 as? NativeWorkspaceDocumentView }).first?.panelHosts.count != 2 {
+                guard ProcessInfo.processInfo.systemUptime < mountEnd else {
+                    throw NativeWorkspacePageCaptureFailure("Two production wrapped panels did not mount within three seconds")
+                }
+                owned.hosting.layoutSubtreeIfNeeded(); try await Task.sleep(for: .milliseconds(20))
+            }
+            owned.hosting.layoutSubtreeIfNeeded()
+            let documents = nativeViews(owned.hosting).compactMap { $0 as? NativeWorkspaceDocumentView }
+            guard documents.count == 1, let document = documents.first,
+                  let outer = document.enclosingScrollView, outer.documentView === document,
+                  Set(document.panelHosts.keys) == shown,
+                  let verticalPanel = document.panelHosts["projects-status"],
+                  let horizontalPanel = document.panelHosts["projects-registration-reconciliation"] else {
+                throw NativeWorkspacePageCaptureFailure("Nested preservation lacks its exact production document/two panels")
+            }
+            let verticalScrolls = nativeViews(verticalPanel.hostingView).compactMap { $0 as? NSScrollView }
+            let horizontalScrolls = nativeViews(horizontalPanel.hostingView).compactMap { $0 as? NSScrollView }
+            let overflowingHorizontal = horizontalScrolls.filter {
+                ($0.documentView?.bounds.width ?? 0) > $0.contentView.bounds.width + 1
+            }
+            guard verticalScrolls.count == 1, let innerV = verticalScrolls.first,
+                  horizontalScrolls.count == 2, overflowingHorizontal.count == 1, let innerH = overflowingHorizontal.first,
+                  innerV !== outer, innerH !== outer,
+                  (innerV.documentView?.bounds.height ?? 0) > innerV.contentView.bounds.height + 1 else {
+                throw NativeWorkspacePageCaptureFailure("Fixture did not expose one overflowing vertical and one indicator-hidden horizontal inner route")
+            }
+            let innerScrolls = verticalScrolls + horizontalScrolls
+            let innerDocuments = try innerScrolls.map { try XCTUnwrap($0.documentView) }
+            let innerFrames = innerScrolls.map(\.frame), innerBounds = innerScrolls.map(\.bounds)
+            let innerClipSizes = innerScrolls.map { $0.contentView.bounds.size }
+            let documentFrame = document.frame, documentBounds = document.bounds
+            let panelIDs = document.panelHosts.mapValues { ObjectIdentifier($0) }
+            let panelFrames = document.panelHosts.mapValues(\.frame)
+            let hostIDs = document.panelHosts.mapValues { ObjectIdentifier($0.hostingView) }
+            let baseline = owned.preferences.collection
+            let bytes = try XCTUnwrap(owned.defaults.data(forKey: NativeWorkspacePreferences.storageKey))
+            let initialKey = owned.window.isKeyWindow, initialActive = NSApp.isActive
+            guard bytes.count <= NativeWorkspaceLimits.maximumStoredBytes,
+                  try JSONDecoder().decode(NativeWorkspaceCollection.self, from: bytes) == baseline,
+                  documentFrame.size == NSSize(width: layout.canvas.width, height: layout.canvas.height),
+                  documentBounds.origin == .zero, documentBounds.size == documentFrame.size else {
+                throw NativeWorkspacePageCaptureFailure("Nested preservation baseline storage/canvas is invalid")
+            }
+            func requireOwner() throws {
+                try Task.checkCancellation()
+                guard ProcessInfo.processInfo.systemUptime < deadline,
+                      physicalCachePresentationIsReady(owned, expectedContentSize: viewport),
+                      owned.window.isKeyWindow == initialKey, NSApp.isActive == initialActive,
+                      document.window === owned.window, document.hasHorizontalWheelMonitor, document.enclosingScrollView === outer,
+                      outer.documentView === document, document.superview === outer.contentView,
+                      document.frame == documentFrame, document.bounds == documentBounds,
+                      document.panelHosts.mapValues({ ObjectIdentifier($0) }) == panelIDs,
+                      document.panelHosts.mapValues(\.frame) == panelFrames,
+                      document.panelHosts.mapValues({ ObjectIdentifier($0.hostingView) }) == hostIDs,
+                      owned.preferences.collection == baseline,
+                      owned.defaults.data(forKey: NativeWorkspacePreferences.storageKey) == bytes,
+                      owned.model.app == nil, owned.model.manager == nil, owned.model.remoteManager == nil,
+                      !owned.model.hasLoadedInitialSettings else {
+                    throw NativeWorkspacePageCaptureFailure("Nested preservation owner/hosts/geometry/storage/model changed or deadline elapsed")
+                }
+                for index in innerScrolls.indices {
+                    let scroll = innerScrolls[index], body = innerDocuments[index]
+                    guard scroll.window === owned.window, scroll.frame == innerFrames[index], scroll.bounds == innerBounds[index],
+                          scroll.documentView === body, body.superview === scroll.contentView,
+                          scroll.contentView.bounds.size == innerClipSizes[index], body.window === owned.window else {
+                        throw NativeWorkspacePageCaptureFailure("Nested preservation changed an exact inner owner/clip size")
+                    }
+                }
+            }
+            func exactBodyHit(_ inner: NSScrollView, panel: NativeWorkspacePanelHost) throws -> (NSView, NSPoint) {
+                let body = try XCTUnwrap(inner.documentView)
+                let visible = document.convert(body.visibleRect, from: body).intersection(document.visibleRect)
+                let point = NSPoint(x: visible.minX + visible.width * 0.25, y: visible.minY + visible.height * 0.25)
+                guard visible.width > 8, visible.height > 8,
+                      [point.x, point.y].allSatisfy(\.isFinite),
+                      let hit = owned.hosting.hitTest(document.convert(point, to: owned.hosting.superview)),
+                      hit.enclosingScrollView === inner else {
+                    throw NativeWorkspacePageCaptureFailure("Nested preservation point missed its exact visible innermost route")
+                }
+                var ancestor: NSView? = hit, seen = Set<ObjectIdentifier>()
+                var foundBody = false, foundPanel = false, foundDocument = false
+                while let view = ancestor {
+                    guard seen.count < 64, seen.insert(ObjectIdentifier(view)).inserted,
+                          view.window === owned.window, !view.isHiddenOrHasHiddenAncestor,
+                          ProcessInfo.processInfo.systemUptime < deadline else {
+                        throw NativeWorkspacePageCaptureFailure("Nested preservation hit ancestry exceeded its owner/depth/deadline bound")
+                    }
+                    if view === body { foundBody = true }; if view === panel.hostingView { foundPanel = true }
+                    if view === document { foundDocument = true }
+                    if view === owned.hosting {
+                        guard foundBody && foundPanel && foundDocument else {
+                            throw NativeWorkspacePageCaptureFailure("Nested preservation hit missed its exact body/panel/document")
+                        }
+                        return (hit, point)
+                    }
+                    ancestor = view.superview
+                }
+                throw NativeWorkspacePageCaptureFailure("Nested preservation hit did not reach the exact hosting owner")
+            }
+            try requireOwner(); report["stored_bytes"] = bytes.count
+            report["nested_horizontal_has_native_scroller"] = innerH.hasHorizontalScroller
+            report["nested_horizontal_indicators_requested_hidden"] = true
+            report["window_key"] = initialKey; report["application_active"] = initialActive
+            try retain("before")
+            for (axis, inner, panel, wheel1, wheel2) in [
+                ("vertical", innerV, verticalPanel, Int32(-120), Int32(0)),
+                ("horizontal", innerH, horizontalPanel, Int32(0), Int32(-120))] {
+                stage = axis + ".dispatch"; try requireOwner()
+                let (hit, point) = try exactBodyHit(inner, panel: panel)
+                let before = inner.contentView.bounds, outerBefore = outer.contentView.bounds
+                let allBefore = innerScrolls.map { $0.contentView.bounds }
+                let slot = rows.count
+                rows.append(["axis": axis, "posted": false, "before_inner": NSStringFromRect(before),
+                    "before_outer": NSStringFromRect(outerBefore), "input_type": NSStringFromClass(type(of: hit))])
+                let event = try nestedPreservationWheel(window: owned.window, document: document, point: point,
+                    axis: axis, wheel1: wheel1, wheel2: wheel2, deadline: deadline, row: &rows[slot])
+                rows[slot]["phase_raw"] = event.phase.rawValue; rows[slot]["momentum_phase_raw"] = event.momentumPhase.rawValue
+                try requireOwner()
+                guard event.phase.isEmpty, event.momentumPhase.isEmpty, posted < 2, owned.hosting.hitTest(document.convert(point, to: owned.hosting.superview)) === hit else {
+                    throw NativeWorkspacePageCaptureFailure("Nested preservation lost its exact hit/two-event bound before posting")
+                }
+                rows[slot]["post_uptime"] = ProcessInfo.processInfo.systemUptime
+                NSApp.postEvent(event, atStart: false); posted += 1; rows[slot]["posted"] = true
+                stage = axis + ".inner-movement"
+                let phaseEnd = min(deadline, ProcessInfo.processInfo.systemUptime + 3)
+                var progressed = false
+                while ProcessInfo.processInfo.systemUptime < phaseEnd {
+                    try requireOwner()
+                    let after = inner.contentView.bounds
+                    rows[slot]["after_inner"] = NSStringFromRect(after)
+                    rows[slot]["after_outer"] = NSStringFromRect(outer.contentView.bounds)
+                    rows[slot]["sample_uptime"] = ProcessInfo.processInfo.systemUptime
+                    let delta = axis == "horizontal" ? after.minX - before.minX : after.minY - before.minY
+                    let other = axis == "horizontal" ? after.minY - before.minY : after.minX - before.minX
+                    guard [delta, other].allSatisfy(\.isFinite), outer.contentView.bounds == outerBefore,
+                          abs(other) <= 0.1, delta >= -0.1,
+                          innerScrolls.indices.allSatisfy({ innerScrolls[$0] === inner || innerScrolls[$0].contentView.bounds == allBefore[$0] }) else {
+                        throw NativeWorkspacePageCaptureFailure("Nested preservation moved the outer/wrong inner axis or changed direction")
+                    }
+                    if delta > 0.1 {
+                        guard ProcessInfo.processInfo.systemUptime < phaseEnd else {
+                            throw NativeWorkspacePageCaptureFailure("Nested preservation progress crossed its three-second deadline")
+                        }
+                        rows[slot]["inner_axis_delta"] = delta; progressed = true; break
+                    }
+                    try await Task.sleep(for: .milliseconds(20))
+                }
+                guard progressed else { throw NativeWorkspacePageCaptureFailure("Queued nested wheel did not move its intended inner axis within three seconds") }
+            }
+            try requireOwner()
+            let fresh = NativeWorkspacePreferences(knownPanelIDsByView: NativeWorkspaceCatalog.knownPanelIDsByView,
+                panelSizeBoundsByView: NativeWorkspaceCatalog.sizeBoundsByView, defaults: owned.defaults)
+            let mutations = await owned.client.mutationNames()
+            try requireOwner()
+            guard posted == 2, fresh.restorationError == nil, fresh.collection == baseline, mutations.isEmpty else {
+                throw NativeWorkspacePageCaptureFailure("Nested preservation failed full fresh restoration/backend isolation")
+            }
+            report["full_collection_and_bytes_unchanged"] = true; report["fresh_restoration_unchanged"] = true
+            report["fixture_mutations"] = mutations.sorted()
+            stage = "reset"
+            try owned.preferences.reset("projects")
+            let resetEnd = min(deadline, ProcessInfo.processInfo.systemUptime + 3)
+            while nativeViews(owned.hosting).contains(where: { $0 is NativeWorkspaceDocumentView }) {
+                guard ProcessInfo.processInfo.systemUptime < resetEnd else {
+                    throw NativeWorkspacePageCaptureFailure("Nested preservation document did not dismantle within three seconds")
+                }
+                try await Task.sleep(for: .milliseconds(20))
+            }
+            guard document.panelHosts.isEmpty, !document.hasHorizontalWheelMonitor,
+                  owned.preferences.activeLayout(for: "projects") == nil else {
+                throw NativeWorkspacePageCaptureFailure("Nested preservation dismantle retained panels/monitor or active layout")
+            }
+            await restoreHost(); try Task.checkCancellation()
+            guard ProcessInfo.processInfo.systemUptime < deadline else {
+                throw NativeWorkspacePageCaptureFailure("Nested preservation cleanup exceeded thirty seconds")
+            }
+            stage = "complete"; report["execution_completed"] = true; try retain("after")
+            guard ProcessInfo.processInfo.systemUptime < deadline else {
+                throw NativeWorkspacePageCaptureFailure("Nested preservation final receipt crossed its case deadline")
+            }
+        } catch {
+            let original = error
+            report["execution_completed"] = false; report["original_error"] = scrollerActionBoundedString(String(reflecting: original), bytes: 512)
+            do { try retain("failed") } catch { XCTFail("Could not retain nested preservation failure: \(error)") }
+            await restoreHost(); throw original
+        }
+    }
+
+    func testNativeCustomCanvasHorizontalWheelMonitorDetachesReattachesAndDismantles() throws {
+        let deadline = ProcessInfo.processInfo.systemUptime + 3
+        let document = NativeWorkspaceDocumentView(), scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: 400, height: 240))
+        let root = NSView(frame: scroll.frame)
+        let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 400, height: 240),
+            styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        defer { window.contentView = nil; scroll.documentView = nil; window.close() }
+        guard !document.hasHorizontalWheelMonitor else { throw NativeWorkspacePageCaptureFailure("Detached new document already owns a monitor") }
+        scroll.documentView = document; root.addSubview(scroll); window.contentView = root
+        guard document.window === window, document.hasHorizontalWheelMonitor else {
+            throw NativeWorkspacePageCaptureFailure("Attaching the exact document did not install its monitor")
+        }
+        window.contentView = nil
+        guard document.window == nil, !document.hasHorizontalWheelMonitor else {
+            throw NativeWorkspacePageCaptureFailure("Detaching the exact document retained its monitor")
+        }
+        window.contentView = root
+        guard document.window === window, document.hasHorizontalWheelMonitor else {
+            throw NativeWorkspacePageCaptureFailure("Reattaching the exact document did not install a monitor")
+        }
+        NativeWorkspaceCanvasView.dismantleNSView(scroll, coordinator: ())
+        guard scroll.documentView == nil, document.panelHosts.isEmpty, !document.hasHorizontalWheelMonitor,
+              ProcessInfo.processInfo.systemUptime < deadline else {
+            throw NativeWorkspacePageCaptureFailure("Explicit canvas dismantle retained its document/panels/monitor or exceeded three seconds")
+        }
+    }
+
+    private func nestedPreservationWheel(window: NSWindow, document: NSView, point: NSPoint,
+        axis: String, wheel1: Int32, wheel2: Int32, deadline: TimeInterval, row: inout [String: Any]) throws -> NSEvent {
+        try Task.checkCancellation()
+        guard (axis == "horizontal" || axis == "vertical"), ProcessInfo.processInfo.systemUptime < deadline else {
+            throw NativeWorkspacePageCaptureFailure("Nested preservation wheel axis/deadline is invalid")
+        }
+        let owned = (window: window, document: document), slot = 0
+        var events = [row]
+        defer { row = events[slot] }
+        let local = document.convert(point, to: nil), windowNumber = owned.window.windowNumber
+        let seed = try XCTUnwrap(NSEvent.mouseEvent(with: .mouseMoved, location: local,
+            modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: windowNumber,
+            context: nil, eventNumber: 1, clickCount: 0, pressure: 0))
+        events[slot]["seed_exact_window"] = seed.window === owned.window
+        events[slot]["seed_window_number"] = seed.windowNumber
+        guard windowNumber > 0, seed.window === owned.window, seed.windowNumber == windowNumber,
+              abs(seed.locationInWindow.x - local.x) <= 0.5, abs(seed.locationInWindow.y - local.y) <= 0.5 else {
+            throw NativeWorkspacePageCaptureFailure("Projects wheel seed lacks exact window/point association")
+        }
+        let seedCG = try XCTUnwrap(seed.cgEvent)
+        let seedRoundTrip = NSEvent(cgEvent: seedCG)
+        events[slot]["seed_cg_roundtrip_exact_window"] = seedRoundTrip?.window === owned.window
+        events[slot]["seed_cg_roundtrip_window_number"] = seedRoundTrip.map { $0.windowNumber as Any } ?? NSNull()
+        events[slot]["seed_cg_roundtrip_point"] = seedRoundTrip.map { NSStringFromPoint($0.locationInWindow) as Any } ?? NSNull()
+        let template = try XCTUnwrap(CGEvent(scrollWheelEvent2Source: nil, units: .pixel,
+            wheelCount: 2, wheel1: wheel1, wheel2: wheel2, wheel3: 0))
+        let wheel = try XCTUnwrap(seedCG.copy())
+        wheel.type = .scrollWheel
+        for field in [CGEventField.scrollWheelEventDeltaAxis1, .scrollWheelEventDeltaAxis2, .scrollWheelEventDeltaAxis3,
+            .scrollWheelEventPointDeltaAxis1, .scrollWheelEventPointDeltaAxis2, .scrollWheelEventPointDeltaAxis3,
+            .scrollWheelEventIsContinuous] {
+            wheel.setIntegerValueField(field, value: template.getIntegerValueField(field))
+        }
+        for field in [CGEventField.scrollWheelEventFixedPtDeltaAxis1, .scrollWheelEventFixedPtDeltaAxis2,
+            .scrollWheelEventFixedPtDeltaAxis3] {
+            wheel.setDoubleValueField(field, value: template.getDoubleValueField(field))
+        }
+        guard seedCG.location.x.isFinite, seedCG.location.y.isFinite else {
+            throw NativeWorkspacePageCaptureFailure("Projects wheel seed global point is nonfinite")
+        }
+        let field91 = wheel.getIntegerValueField(.mouseEventWindowUnderMousePointer)
+        let field92 = wheel.getIntegerValueField(.mouseEventWindowUnderMousePointerThatCanHandleThisEvent)
+        events[slot]["field91"] = field91; events[slot]["field92"] = field92
+        let event = try XCTUnwrap(NSEvent(cgEvent: wheel))
+        events[slot]["converted_exact_window"] = event.window === owned.window
+        events[slot]["converted_window_number"] = event.windowNumber
+        events[slot]["converted_type"] = event.type.rawValue
+        events[slot]["local_point"] = NSStringFromPoint(local)
+        events[slot]["converted_point"] = NSStringFromPoint(event.locationInWindow)
+        guard event.type == .scrollWheel else {
+            throw NativeWorkspacePageCaptureFailure("Projects wheel conversion did not return a scroll-wheel event")
+        }
+        let dx = event.scrollingDeltaX, dy = event.scrollingDeltaY
+        events[slot]["delta_x"] = dx.isFinite ? dx as Any : String(describing: dx)
+        events[slot]["delta_y"] = dy.isFinite ? dy as Any : String(describing: dy)
+        events[slot]["precise_deltas"] = event.hasPreciseScrollingDeltas
+        events[slot]["direction_inverted"] = event.isDirectionInvertedFromDevice
+        guard event.window === owned.window, event.windowNumber == windowNumber,
+              [local.x, local.y, event.locationInWindow.x, event.locationInWindow.y, dx, dy].allSatisfy({ $0.isFinite }),
+              abs(event.locationInWindow.x - local.x) <= 0.5, abs(event.locationInWindow.y - local.y) <= 0.5,
+              axis == "horizontal" ? (dx < 0 && abs(dy) <= 0.1) : (dy < 0 && abs(dx) <= 0.1) else {
+            throw NativeWorkspacePageCaptureFailure("Projects wheel conversion lacks exact window/point/single-axis association")
+        }
+        guard ProcessInfo.processInfo.systemUptime < deadline else {
+            throw NativeWorkspacePageCaptureFailure("Nested preservation conversion crossed its case deadline")
+        }
+        return event
+    }
+
     func testRealCatalogViewsQueuedMoveResizePersistsGeometry() async throws {
         let deadline = ProcessInfo.processInfo.systemUptime + 120
         try await prepareHost()
@@ -4522,6 +5433,47 @@ private actor NativeWorkspacePageCaptureClient: OperatorManagerClientProtocol {
     }
     private static func decode<T: Decodable>(_ type: T.Type, _ object: [String: Any]) throws -> T {
         try JSONDecoder().decode(type, from: JSONSerialization.data(withJSONObject: object))
+    }
+}
+#endif
+
+#if !SWIFT_PACKAGE
+@MainActor
+private class PlainAppKitNestedWheelDocument: NSView {
+    override var isFlipped: Bool { true }
+}
+
+@MainActor
+private final class PlainAppKitNestedWheelReceiver: PlainAppKitNestedWheelDocument {
+    weak var expectedWindow: NSWindow?
+    weak var expectedEvent: NSEvent?
+    var expectedPoint = NSPoint.zero
+    private(set) var deliveryCount = 0
+    private(set) var receipt: [String: Any] = [:]
+    override func scrollWheel(with event: NSEvent) {
+        deliveryCount = min(2, deliveryCount + 1)
+        if deliveryCount == 1 {
+            let dx = event.scrollingDeltaX, dy = event.scrollingDeltaY
+            receipt = ["received_uptime": ProcessInfo.processInfo.systemUptime,
+                "exact_window": expectedWindow.map { event.window === $0 } ?? false,
+                "exact_window_number": expectedWindow.map { event.windowNumber == $0.windowNumber } ?? false,
+                "same_queued_NSEvent_identity": expectedEvent.map { event === $0 } ?? false,
+                "scroll_wheel_type": event.type == .scrollWheel, "actual_type": event.type.rawValue,
+                "actual_window_number": event.windowNumber, "actual_point": NSStringFromPoint(event.locationInWindow),
+                "expected_point": NSStringFromPoint(expectedPoint),
+                "exact_expected_local_point": event.locationInWindow.x.isFinite && event.locationInWindow.y.isFinite
+                    && abs(event.locationInWindow.x - expectedPoint.x) <= 0.5 && abs(event.locationInWindow.y - expectedPoint.y) <= 0.5,
+                "delta_x": dx.isFinite ? dx as Any : String(describing: dx),
+                "delta_y": dy.isFinite ? dy as Any : String(describing: dy),
+                "single_horizontal_negative_delta": dx.isFinite && dy.isFinite && dx < 0 && abs(dy) <= 0.1,
+                "precise_deltas": event.hasPreciseScrollingDeltas,
+                "super_scrollWheel_returned": false]
+        }
+        super.scrollWheel(with: event)
+        if deliveryCount == 1 {
+            receipt["super_scrollWheel_returned"] = true
+            receipt["super_return_uptime"] = ProcessInfo.processInfo.systemUptime
+        }
     }
 }
 #endif
