@@ -20,6 +20,8 @@ Product versions do not by themselves claim shipment.
 
 - Correct three test receipt fields to serialize mutation sets as sorted JSON arrays, preserving field names and all input/assertion guards. Standalone v135 and the original native wheel/reset case v136 pass; formal-scroller/advertisement siblings remain NONPASS in v137. No production repair or full UI claim.
 
+- Add separate owned Projects AXValue verification and correct advertisement receipt accounting to avoid repeated full JSON serialization without changing byte/time limits. V143 passes value input, read-only advertisements and unchanged queued wheel together; storage, Reset and cleanup are retained. Original parent-increment failure and full UI/desktop/installed gates remain; production is unchanged.
+
 - Add native movable/resizable panel frames, show/hide controls, saved named layouts, rename/delete and Restore Default to all 13 main views. Manager sections and Rune Forge detail modes retain independent layouts within their existing views. [Workspace guide](docs/NATIVE-WORKSPACES.md).
 - Keep page-owned settings and project drafts outside rearranged panels. Cancel a drag with Escape. Pause Provider setup observation when all its panels are hidden and resume the durable operation without reloading unsaved LM Studio settings.
 - Keep accepted Rune Forge policy commands running when all panels are hidden; pause background observation separately. The mounted regression and all 16 owning native Rune cases passed.

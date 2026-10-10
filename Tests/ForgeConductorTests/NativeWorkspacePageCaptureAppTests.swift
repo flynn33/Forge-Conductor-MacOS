@@ -353,6 +353,186 @@ final class NativeWorkspacePageCaptureAppTests: XCTestCase, @unchecked Sendable 
         }
     }
 
+    func testNativeProjectsCustomCanvasAXValuesExposeResizeCenterAtMinimumSize() async throws {
+        let deadline = ProcessInfo.processInfo.systemUptime + 30, viewport = NSSize(width: 1_100, height: 720)
+        var report: [String: Any] = ["execution_completed": false, "maximum_case_seconds": 30, "maximum_phase_seconds": 3,
+            "maximum_setters": 2, "maximum_settle_seconds": 0.5, "case_deadline_uptime": deadline]
+        func retain(_ suffix: String) throws {
+            let data = try JSONSerialization.data(withJSONObject: report, options: [.sortedKeys])
+            guard data.count <= 64 * 1_024 else { throw NativeWorkspacePageCaptureFailure("Projects AX value final receipt exceeded 64 KiB") }
+            try directEvidence.save(data, name: "projects-ax-values-" + suffix, extension: "json")
+            let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+            attachment.name = "projects-ax-values-" + suffix; attachment.lifetime = .keepAlways; add(attachment)
+        }
+        do {
+            try directEvidence.configure(testName: name + "-ax-values"); try await prepareHost()
+            guard deadline - ProcessInfo.processInfo.systemUptime > 10 else { throw NativeWorkspacePageCaptureFailure("Projects AX values lacks presentation time") }
+            let owned = try NativeWorkspacePageCaptureFixture(contentSize: viewport); fixture = owned; owned.route.page = .projects
+            try await presentPhysicalCache(owned, expectedContentSize: viewport)
+            let layout = try owned.customize("projects")
+            guard deadline - ProcessInfo.processInfo.systemUptime > 5 else { throw NativeWorkspacePageCaptureFailure("Projects AX values lacks canvas time") }
+            try await requireCanvas(layout, in: owned)
+            report["input_proof"] = try await nativeProjectsAXValues(layout, in: owned, viewport: viewport, deadline: deadline)
+            guard deadline - ProcessInfo.processInfo.systemUptime > 5 else { throw NativeWorkspacePageCaptureFailure("Projects AX values lacks reset time") }
+            try owned.preferences.reset("projects")
+            try await waitUntil("Projects AX value canvas did not dismantle after reset", timeout: min(5, deadline - ProcessInfo.processInfo.systemUptime)) {
+                owned.hosting.layoutSubtreeIfNeeded(); return !self.nativeViews(owned.hosting).contains { $0 is NativeWorkspaceDocumentView }
+            }
+            guard owned.preferences.activeLayout(for: "projects") == nil, physicalCachePresentationIsReady(owned, expectedContentSize: viewport) else {
+                throw NativeWorkspacePageCaptureFailure("Projects AX value reset lost its exact presentation owner")
+            }
+            report["reset_and_document_dismantle_completed"] = true
+            await owned.close(); fixture = nil; await restoreHost(); try Task.checkCancellation()
+            guard owned.window.contentView == nil, owned.hosting.window == nil, !owned.window.isVisible,
+                  owned.defaults.persistentDomain(forName: owned.suite)?.isEmpty != false,
+                  !FileManager.default.fileExists(atPath: owned.home.path), ProcessInfo.processInfo.systemUptime < deadline else {
+                throw NativeWorkspacePageCaptureFailure("Projects AX value cleanup or case deadline failed")
+            }
+            report["isolated_close_defaults_home_cleanup_completed"] = true; report["execution_completed"] = true; try retain("complete")
+            guard ProcessInfo.processInfo.systemUptime < deadline else { throw NativeWorkspacePageCaptureFailure("Projects AX value final receipt crossed deadline") }
+        } catch let failure {
+            report["execution_completed"] = false; report["original_error"] = scrollerActionBoundedString(String(reflecting: failure), bytes: 512)
+            do { try retain("failed"); try retainFailure(failure) } catch { XCTFail("Could not retain Projects AX value failure: \(scrollerActionBoundedString(String(reflecting: error), bytes: 512))") }
+            await restoreHost(); throw failure
+        }
+    }
+
+    private func nativeProjectsAXValues(_ layout: NativeWorkspaceLayout, in owned: NativeWorkspacePageCaptureFixture,
+                                       viewport: NSSize, deadline: TimeInterval) async throws -> [String: Any] {
+        var stage = "owner", rows: [[String: Any]] = [], setters = 0, phaseDeadline: TimeInterval?
+        var report: [String: Any] = ["classification": "Exact owned Projects NSScroller formal AXValue route; actual geometry determines result",
+            "input_completed": false, "direct_scroll_fallback": false, "pointer_input": false]
+        func retain(_ suffix: String) throws {
+            report["stage"] = stage; report["setters"] = setters; report["actions"] = rows
+            let data = try JSONSerialization.data(withJSONObject: report, options: [.sortedKeys])
+            guard rows.count <= 2, data.count <= 64 * 1_024 else { throw NativeWorkspacePageCaptureFailure("Projects AX value action receipt exceeds bounds") }
+            let receipt = "projects-ax-values-input-" + suffix
+            try directEvidence.save(data, name: receipt, extension: "json")
+            let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json"); attachment.name = receipt; attachment.lifetime = .keepAlways; add(attachment)
+        }
+        func numericJSON(_ value: Double) -> Any {
+            value.isFinite ? value as Any : scrollerActionBoundedString(String(describing: value), bytes: 32)
+        }
+        do {
+            let docs = nativeViews(owned.hosting).compactMap { $0 as? NativeWorkspaceDocumentView }
+            guard docs.count == 1, let document = docs.first, let scroll = document.enclosingScrollView,
+                let horizontal = scroll.horizontalScroller, let vertical = scroll.verticalScroller, horizontal !== vertical,
+                let panel = document.panelHosts["projects-summary"], layout.viewID == "projects", !layout.panels.isEmpty,
+                layout.panels.count <= 64, layout.panels.allSatisfy(\.isVisible) else { throw NativeWorkspacePageCaptureFailure("Projects AX value native catalog is absent") }
+            let clip = scroll.contentView, frame = document.frame, bounds = document.bounds
+            let canvas = NSSize(width: layout.canvas.width, height: layout.canvas.height)
+            let identities = document.panelHosts.mapValues { ObjectIdentifier($0) }, frames = document.panelHosts.mapValues(\.frame)
+            let hosts = document.panelHosts.mapValues { ObjectIdentifier($0.hostingView) }
+            let controls = nativeViews(panel).filter { $0.accessibilityIdentifier() == "workspace-resize-projects-summary" }
+            guard controls.count == 1, let control = controls.first, control.bounds.width >= 8, control.bounds.height >= 8,
+                Set(identities.keys) == Set(layout.panels.map(\.id)), frame.size == canvas, bounds.origin == .zero, bounds.size == canvas,
+                layout.panels.allSatisfy({ document.panelHosts[$0.id]?.frame == NSRect(x: $0.frame.x,y: $0.frame.y,width: $0.frame.width,height: $0.frame.height) }) else { throw NativeWorkspacePageCaptureFailure("Projects AX value exact frames/control invalid") }
+            let controlFrame = control.frame, controlBounds = control.bounds, targetBounds = document.convert(control.bounds, from: control)
+            let target = NSRect(x: targetBounds.midX - 4, y: targetBounds.midY - 4, width: 8, height: 8)
+            let baseline = owned.preferences.collection, stored = try XCTUnwrap(owned.defaults.data(forKey: NativeWorkspacePreferences.storageKey))
+            let key = owned.window.isKeyWindow, active = NSApp.isActive
+            guard stored.count <= NativeWorkspaceLimits.maximumStoredBytes, try JSONDecoder().decode(NativeWorkspaceCollection.self, from: stored) == baseline,
+                owned.preferences.activeLayout(for: "projects") == layout, document.bounds.contains(target),
+                target.minX > document.visibleRect.maxX, target.minY > document.visibleRect.maxY else { throw NativeWorkspacePageCaptureFailure("Projects AX value baseline/initial offscreen target invalid") }
+            func owner() throws {
+                try Task.checkCancellation(); let now = ProcessInfo.processInfo.systemUptime
+                guard now < deadline, phaseDeadline.map({ now < $0 }) != false, physicalCachePresentationIsReady(owned, expectedContentSize: viewport),
+                    owned.route.page == .projects, owned.window.isKeyWindow == key, NSApp.isActive == active,
+                    document.window === owned.window, scroll.window === owned.window, document.enclosingScrollView === scroll,
+                    scroll.contentView === clip, scroll.documentView === document, document.superview === clip, document.isFlipped,
+                    document.frame == frame, document.bounds == bounds, frame.size == canvas, bounds.origin == .zero, bounds.size == canvas,
+                    scroll.hasHorizontalScroller, scroll.hasVerticalScroller, scroll.horizontalScroller === horizontal, scroll.verticalScroller === vertical,
+                    horizontal.superview === scroll, vertical.superview === scroll, horizontal.window === owned.window, vertical.window === owned.window,
+                    document.panelHosts.mapValues({ ObjectIdentifier($0) }) == identities, document.panelHosts.mapValues(\.frame) == frames,
+                    document.panelHosts.mapValues({ ObjectIdentifier($0.hostingView) }) == hosts, panel.superview === document, !panel.isHiddenOrHasHiddenAncestor,
+                    control.superview === panel, control.window === owned.window, !control.isHiddenOrHasHiddenAncestor,
+                    control.frame == controlFrame, control.bounds == controlBounds, document.convert(control.bounds, from: control) == targetBounds,
+                    owned.preferences.collection == baseline, owned.defaults.data(forKey: NativeWorkspacePreferences.storageKey) == stored,
+                    owned.model.app == nil, owned.model.manager == nil, owned.model.remoteManager == nil, !owned.model.hasLoadedInitialSettings,
+                    rows.count <= 2, setters <= 2 else { throw NativeWorkspacePageCaptureFailure("Projects AX value owner/storage/model/deadline changed") }
+                var ancestor: NSView? = scroll, seen = Set<ObjectIdentifier>()
+                while let view = ancestor { guard seen.count < 64, seen.insert(ObjectIdentifier(view)).inserted, view.window === owned.window,
+                    ProcessInfo.processInfo.systemUptime < deadline else { throw NativeWorkspacePageCaptureFailure("Projects AX value native ancestry bound failed") }
+                    if view === owned.hosting { break }; ancestor = view.superview }
+                guard ancestor === owned.hosting else { throw NativeWorkspacePageCaptureFailure("Projects AX value ancestry lost hosting owner") }
+                let b = clip.bounds
+                guard [b.minX,b.minY,b.width,b.height,target.minX,target.minY,target.width,target.height].allSatisfy({ $0.isFinite }), b.width > 0, b.height > 0,
+                    b.minX >= bounds.minX - 0.1, b.minY >= bounds.minY - 0.1, b.maxX <= bounds.maxX + 0.1, b.maxY <= bounds.maxY + 0.1 else { throw NativeWorkspacePageCaptureFailure("Projects AX value finite geometry/limits invalid") }
+                let finished = ProcessInfo.processInfo.systemUptime
+                guard finished < deadline, phaseDeadline.map({ finished < $0 }) != false else {
+                    throw NativeWorkspacePageCaptureFailure("Projects AX value ownership validation exceeded its phase deadline")
+                }
+            }
+            func read<T>(_ getter: () -> T) throws -> T { try owner(); let value = getter(); try owner(); return value }
+            try owner(); report["target_center_rect"] = NSStringFromRect(target); report["stored_bytes"] = stored.count
+            report["window_key"] = key; report["application_active"] = active
+            try capturePhysicalCache(owned, expectedContentSize: viewport, name: "projects-ax-values-before"); try retain("before")
+            for (axis, scroller) in [("horizontal", horizontal), ("vertical", vertical)] {
+                stage = axis; phaseDeadline = min(deadline, ProcessInfo.processInfo.systemUptime + 3); try owner()
+                let before = clip.bounds, length = axis == "horizontal" ? before.width : before.height
+                let extent = (axis == "horizontal" ? bounds.width : bounds.height) - length
+                let far = axis == "horizontal" ? target.maxX : target.maxY
+                guard extent.isFinite, extent > 0 else { throw NativeWorkspacePageCaptureFailure("Projects AX value scrollable extent invalid") }
+                let requested = Double(max(0, min(1, (far - length + 8) / extent))), slot = rows.count
+                rows.append(["axis":axis, "requested":requested, "scrollable_extent":extent, "before_clip":NSStringFromRect(before), "invoked":false])
+                let attrs = try read { scroller.accessibilityAttributeNames() }
+                guard attrs.count <= 256, attrs.allSatisfy({ $0.rawValue.utf8.count <= 128 }), attrs.contains(.value) else { throw NativeWorkspacePageCaptureFailure("Projects AXValue is not freshly advertised within bounds") }
+                let settable = try read { scroller.accessibilityIsAttributeSettable(.value) }
+                let allowed = try read { scroller.isAccessibilitySelectorAllowed(#selector(NSAccessibilityProtocol.setAccessibilityValue(_:))) }
+                let axBefore = try XCTUnwrap(try read { scroller.accessibilityValue() as? NSNumber }), nativeBefore = try read { scroller.doubleValue }
+                let role = try read { scroller.accessibilityRole() }, orientation = try read { scroller.accessibilityOrientation() }
+                let enabled = try read { scroller.isEnabled && scroller.isAccessibilityEnabled() }
+                rows[slot]["advertised_value"] = true; rows[slot]["settable"] = settable; rows[slot]["selector_allowed"] = allowed
+                rows[slot]["ax_before"] = numericJSON(axBefore.doubleValue); rows[slot]["native_before"] = numericJSON(nativeBefore)
+                guard settable, allowed, enabled, role == .scrollBar, orientation == (axis == "horizontal" ? .horizontal : .vertical),
+                    [requested,axBefore.doubleValue,nativeBefore].allSatisfy({ $0.isFinite && $0 >= 0 && $0 <= 1 }),
+                    abs(axBefore.doubleValue - nativeBefore) <= 0.000_001 else { throw NativeWorkspacePageCaptureFailure("Projects AX value fresh setter/numeric admission failed") }
+                try owner(); try retain(axis + "-before"); try owner()
+                let dispatchAttributes = try read { scroller.accessibilityAttributeNames() }
+                let dispatchSettable = try read { scroller.accessibilityIsAttributeSettable(.value) }
+                let dispatchAllowed = try read { scroller.isAccessibilitySelectorAllowed(#selector(NSAccessibilityProtocol.setAccessibilityValue(_:))) }
+                let dispatchNumeric = try XCTUnwrap(try read { scroller.accessibilityValue() as? NSNumber })
+                guard dispatchAttributes.count <= 256, dispatchAttributes.contains(.value), dispatchSettable, dispatchAllowed,
+                    dispatchNumeric.doubleValue.isFinite, abs(dispatchNumeric.doubleValue - axBefore.doubleValue) <= 0.000_001,
+                    scroller.accessibilityRole() == .scrollBar,
+                    scroller.accessibilityOrientation() == (axis == "horizontal" ? .horizontal : .vertical),
+                    scroller.isEnabled, scroller.isAccessibilityEnabled() else {
+                    throw NativeWorkspacePageCaptureFailure("Projects AX value dispatch admission changed after evidence retention")
+                }
+                try owner(); rows[slot]["dispatch_admission_rechecked"] = true
+                rows[slot]["invoked"] = true; setters += 1; rows[slot]["dispatch_uptime"] = ProcessInfo.processInfo.systemUptime
+                scroller.setAccessibilityValue(NSNumber(value: requested)); rows[slot]["setter_returned"] = true; try owner()
+                let settle = min(deadline, phaseDeadline ?? deadline, ProcessInfo.processInfo.systemUptime + 0.5); var progressed = false
+                repeat {
+                    try owner(); owned.hosting.layoutSubtreeIfNeeded(); try owner()
+                    let after = clip.bounds, ax = try XCTUnwrap(try read { scroller.accessibilityValue() as? NSNumber }), native = try read { scroller.doubleValue }
+                    let delta = axis == "horizontal" ? after.minX - before.minX : after.minY - before.minY
+                    let other = axis == "horizontal" ? after.minY - before.minY : after.minX - before.minX
+                    rows[slot]["got"] = numericJSON(ax.doubleValue); rows[slot]["native_got"] = numericJSON(native); rows[slot]["after_clip"] = NSStringFromRect(after)
+                    rows[slot]["delta"] = delta; rows[slot]["other_delta"] = other; rows[slot]["sample_uptime"] = ProcessInfo.processInfo.systemUptime
+                    guard [delta,other,ax.doubleValue,native].allSatisfy({ $0.isFinite }), delta >= -0.1, abs(other) <= 0.1,
+                        abs(after.width-before.width) <= 0.1, abs(after.height-before.height) <= 0.1, ProcessInfo.processInfo.systemUptime < settle else { throw NativeWorkspacePageCaptureFailure("Projects AX value geometry or settle sample bound failed") }
+                    let visible = document.visibleRect, contains = axis == "horizontal" ? visible.minX <= target.minX && visible.maxX >= target.maxX : visible.minY <= target.minY && visible.maxY >= target.maxY
+                    if delta > 0.1 && contains && abs(ax.doubleValue-requested) <= 0.001 && abs(native-requested) <= 0.001 { progressed = true; break }
+                    try await Task.sleep(for: .milliseconds(20))
+                } while ProcessInfo.processInfo.systemUptime < settle
+                guard progressed else { throw NativeWorkspacePageCaptureFailure("Projects AX value did not expose its target axis within 0.5 seconds") }
+                try owner(); rows[slot]["target_axis_visible"] = true; try retain(axis + "-after")
+            }
+            phaseDeadline = nil; stage = "final"
+            let fresh = NativeWorkspacePreferences(knownPanelIDsByView: NativeWorkspaceCatalog.knownPanelIDsByView, panelSizeBoundsByView: NativeWorkspaceCatalog.sizeBoundsByView, defaults: owned.defaults)
+            let mutations = await owned.client.mutationNames(); try owner()
+            guard setters == 2, document.visibleRect.contains(target), fresh.restorationError == nil, fresh.collection == baseline, mutations.isEmpty,
+                owned.hosting.hitTest(document.convert(NSPoint(x:target.midX,y:target.midY),to:owned.hosting.superview)) === control else { throw NativeWorkspacePageCaptureFailure("Projects AX value final exact hit/storage/isolation proof failed") }
+            report["input_completed"] = true; report["exact_control_hit_test"] = true; report["fresh_restoration_unchanged"] = true
+            report["complete_preferences_and_bytes_unchanged"] = true; report["fixture_mutations"] = mutations.sorted()
+            try capturePhysicalCache(owned, expectedContentSize: viewport, name: "projects-ax-values-after"); try owner(); try retain("complete"); return report
+        } catch {
+            report["input_completed"] = false; report["original_error"] = scrollerActionBoundedString(String(reflecting:error),bytes:512)
+            do { try retain("failed") } catch { XCTFail("Could not retain Projects AX value action failure: \(scrollerActionBoundedString(String(reflecting:error),bytes:512))") }; throw error
+        }
+    }
+
     /// Two owned-window wheel events; conversion and measured movement must both qualify.
     func testNativeProjectsCustomCanvasQueuedScrollWheelExposesResizeCenterAtMinimumSize() async throws {
         let deadline = ProcessInfo.processInfo.systemUptime + 30
@@ -2160,6 +2340,7 @@ final class NativeWorkspacePageCaptureAppTests: XCTestCase, @unchecked Sendable 
                                                       deadline: TimeInterval) async throws {
         var stage = "owner", rows: [[String: Any]] = []
         var observationDeadline: TimeInterval?
+        var rowJSONByteCounts: [Int] = []
         var report: [String: Any] = [
             "classification": "Read-only public advertisements on exact isolated Projects outer scrollers; no scroll action or input qualification",
             "view_id": "projects", "target_identifier": "workspace-resize-projects-summary",
@@ -2184,16 +2365,21 @@ final class NativeWorkspacePageCaptureAppTests: XCTestCase, @unchecked Sendable 
             var candidate = rows
             if slot == candidate.count { candidate.append(fields) }
             else { candidate[slot].merge(fields) { _, value in value } }
-            let data = try JSONSerialization.data(withJSONObject: candidate, options: [.sortedKeys])
-            var candidateReport = report; candidateReport["objects"] = candidate
-            let completeData = try JSONSerialization.data(withJSONObject: candidateReport, options: [.sortedKeys])
-            guard candidate.count <= 64, data.count <= 48 * 1_024, completeData.count <= 56 * 1_024 else {
+            let rowBytes = try JSONSerialization.data(withJSONObject: candidate[slot], options: [.sortedKeys]).count
+            var candidateByteCounts = rowJSONByteCounts
+            if slot == candidateByteCounts.count { candidateByteCounts.append(rowBytes) }
+            else { candidateByteCounts[slot] = rowBytes }
+            // Compact JSON uses one comma between rows and two array brackets.
+            let rowsBytes = 2 + candidateByteCounts.reduce(0, +) + max(0, candidate.count - 1)
+            var candidateReport = report; candidateReport["objects"] = [Any]()
+            let completeBytes = try JSONSerialization.data(withJSONObject: candidateReport, options: [.sortedKeys]).count - 2 + rowsBytes
+            guard candidate.count <= 64, rowsBytes <= 48 * 1_024, completeBytes <= 56 * 1_024 else {
                 report["row_budget_rejected_slot"] = slot
-                report["row_budget_rejected_bytes"] = data.count
-                report["receipt_budget_rejected_bytes"] = completeData.count
+                report["row_budget_rejected_bytes"] = rowsBytes
+                report["receipt_budget_rejected_bytes"] = completeBytes
                 throw NativeWorkspacePageCaptureFailure("Projects advertisement rows exceeded their reserved JSON byte bound")
             }
-            rows = candidate
+            rows = candidate; rowJSONByteCounts = candidateByteCounts
             try checkObservation()
         }
         func textFields(_ value: String?, key: String, bytes: Int) -> [String: Any] {
