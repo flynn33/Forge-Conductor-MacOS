@@ -2125,6 +2125,27 @@ private final class RuneWorkspaceNamingAX {
         record["all_three_copies_attempted"] = count == 3
         return finishedRecord()
     }
+    private func failureOnlyHeldChildRole(_ element: AXUIElement) -> [String: Any] {
+        let started = ProcessInfo.processInfo.systemUptime, diagnosticDeadline = started + 0.1
+        var record: [String: Any] = ["classification": "Post-failure Role on the same held child; not original query state, retry, native-class proof or cause",
+            "post_failure_budget_seconds": 0.1, "original_query_timeout_seconds": 0.1,
+            "attribute": kAXRoleAttribute, "query_limit": 1, "query_count": 0,
+            "raw_status": NSNull(), "returned_type_id": NSNull(), "role_utf8_prefix": NSNull(),
+            "role_utf8_input_prefix_limit": 128, "snapshot_uptime": started]
+        if ProcessInfo.processInfo.systemUptime < diagnosticDeadline {
+            var raw: CFTypeRef?
+            let status = AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &raw)
+            record["query_count"] = 1; record["raw_status"] = status.rawValue
+            record["returned_type_id"] = raw.map { Int(CFGetTypeID($0)) as Any } ?? NSNull()
+            if let value = raw as? String {
+                record["role_utf8_prefix"] = String(decoding: value.utf8.prefix(128), as: UTF8.self)
+            }
+        }
+        let finished = ProcessInfo.processInfo.systemUptime
+        record["elapsed_seconds"] = finished - started
+        record["budget_expired"] = finished >= diagnosticDeadline
+        return record
+    }
     private func nodes(_ root: AXUIElement, _ deadline: TimeInterval,
                        queryContext: [String: Any] = [:]) throws -> [(AXUIElement, [AXUIElement], String?, String?, String?)] {
         var pending: [(AXUIElement, [AXUIElement], [Int], [[String: Any]], Int)] = [(root, [], [], [], 0)]
@@ -2153,6 +2174,7 @@ private final class RuneWorkspaceNamingAX {
                 defer { lastRead = originalScalarRead }
                 lastWalkContext["failure_only_standard_window_references"] = failureOnlyRootStandardReferences(
                     root: root, ancestors: ancestors, path: path, originalScalarRead: originalScalarRead)
+                lastWalkContext["failure_only_held_child_role"] = failureOnlyHeldChildRole(element)
                 throw error
             }
             result.append((element, ancestors, identifier, role, title))
@@ -2175,12 +2197,34 @@ private final class RuneWorkspaceNamingAX {
         lastWalkContext["completed_nodes"] = result.count
         return result
     }
+    private func requiredNativeBoundarySnapshot(_ queryDeadline: TimeInterval) -> [String: Any] {
+        let observed = ProcessInfo.processInfo.systemUptime, readDeadline = observed + 0.02
+        var state: [String: Any] = ["classification": "Current-process scalars at required method boundary only; not evaluated AX failure values, query result or cause",
+            "snapshot_uptime": observed, "query_deadline": queryDeadline, "cached_query_owner_pid": pid,
+            "read_budget_seconds": 0.02, "process_trusted": NSNull(), "trust_read_attempted": false,
+            "run_loop_mode_prefix": NSNull(), "mode_read_attempted": false]
+        if ProcessInfo.processInfo.systemUptime < readDeadline {
+            state["trust_read_attempted"] = true
+            state["process_trusted"] = AXIsProcessTrusted()
+        }
+        if ProcessInfo.processInfo.systemUptime < readDeadline {
+            state["mode_read_attempted"] = true
+            state["run_loop_mode_prefix"] = RunLoop.current.currentMode.map { String($0.rawValue.prefix(128)) as Any } ?? NSNull()
+        }
+        let finished = ProcessInfo.processInfo.systemUptime
+        state["snapshot_elapsed_seconds"] = finished - observed
+        state["read_budget_expired"] = finished >= readDeadline
+        return state
+    }
     func required(identifier: String, inSheet: Bool = false) async throws -> AXUIElement {
         let deadline = ProcessInfo.processInfo.systemUptime + 3
         var attempt = 0
+        let nativeBeforeQuery = requiredNativeBoundarySnapshot(deadline)
         defer {
             lastRequiredWalkContext = lastWalkContext
             lastRequiredWalkContext["last_scalar_read"] = lastRead
+            lastRequiredWalkContext["native_before_first_query"] = nativeBeforeQuery
+            lastRequiredWalkContext["native_after_required_return_or_throw"] = requiredNativeBoundarySnapshot(deadline)
         }
         repeat {
             attempt += 1
