@@ -4687,3 +4687,287 @@ private func runeNativeTrackingMeasurement(menu: NSMenu, notification: Notificat
 
 
 #endif
+#if !SWIFT_PACKAGE
+@MainActor
+func nativeWorkspaceVerifyNaming(window: NSWindow, hosting: NSView,
+    preferences: NativeWorkspacePreferences, defaults: UserDefaults,
+    viewID: String, deadline: TimeInterval, retain: ([String: Any]) -> Void) async throws {
+    let started = ProcessInfo.processInfo.systemUptime
+    guard NSApp != nil, Bundle.main.bundleURL.pathExtension == "app", !NSScreen.screens.isEmpty,
+          deadline.isFinite, deadline > started, deadline - started <= 120,
+          NativeWorkspaceCatalog.panelsByView[viewID] != nil else {
+        throw RuneWorkspaceVisibilityFailure("Shared naming requires a catalog view, native host and finite deadline of at most 120 seconds.")
+    }
+    let commands = ["Rename Layout…", "Save Layout As…"]
+    let observer = RuneWorkspaceNamingAX(window: window, hosting: hosting)
+    let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
+    let initial = preferences.collection
+    let original = try XCTUnwrap(preferences.activeLayout(for: viewID))
+    let independentLayouts = initial.layouts.filter { $0.viewID != viewID }
+    let independentSelections = initial.activeLayoutIDs.filter { $0.key != viewID }
+    guard original.viewID == viewID, !independentLayouts.isEmpty, preferences.restorationError == nil else {
+        throw RuneWorkspaceVisibilityFailure("Shared naming requires an active same-view layout and an independent saved namespace.")
+    }
+    var stage = "baseline", menus: [[String: Any]] = [], witnesses: [[String: Any]] = []
+    var states: [[String: Any]] = [], activeMenu: RuneWorkspaceNativeNamingMenuCapture?
+
+    func requireOwner() throws {
+        try Task.checkCancellation()
+        guard ProcessInfo.processInfo.systemUptime < deadline,
+              window.contentView === hosting, hosting.window === window,
+              window.isVisible, !hosting.isHiddenOrHasHiddenAncestor else {
+            throw RuneWorkspaceVisibilityFailure("Shared naming lost its exact window/hosting owner or deadline.")
+        }
+    }
+    func admitThreeSecondCall() throws {
+        try requireOwner()
+        guard deadline - ProcessInfo.processInfo.systemUptime > 3 else {
+            throw RuneWorkspaceVisibilityFailure("Shared naming lacks three seconds for its existing bounded native operation.")
+        }
+    }
+    func wait(_ message: String, _ condition: () throws -> Bool) async throws {
+        let end = min(deadline, ProcessInfo.processInfo.systemUptime + 3)
+        while ProcessInfo.processInfo.systemUptime < end {
+            try requireOwner()
+            if try condition() {
+                try requireOwner()
+                guard ProcessInfo.processInfo.systemUptime < end else {
+                    throw RuneWorkspaceVisibilityFailure("Shared naming condition returned after its bounded wait.")
+                }
+                return
+            }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        throw RuneWorkspaceVisibilityFailure(message)
+    }
+    func requireSheetOwner(_ sheet: NSWindow, _ content: NSView) throws {
+        try requireOwner()
+        guard window.attachedSheet === sheet, sheet.sheetParent === window,
+              window.sheets.count == 1, window.sheets.first === sheet, sheet.sheets.isEmpty,
+              sheet.contentView === content, content.window === sheet, sheet.isVisible,
+              !content.isHiddenOrHasHiddenAncestor else {
+            throw RuneWorkspaceVisibilityFailure("Shared naming lost its exact sole attached sheet/content/parent.")
+        }
+    }
+    func checkStored(_ expected: NativeWorkspaceCollection, label: String) throws {
+        try requireOwner()
+        let bytes = try encoder.encode(expected)
+        let restored = NativeWorkspacePreferences(knownPanelIDsByView: NativeWorkspaceCatalog.knownPanelIDsByView,
+            panelSizeBoundsByView: NativeWorkspaceCatalog.sizeBoundsByView, defaults: defaults)
+        guard bytes.count <= NativeWorkspaceLimits.maximumStoredBytes,
+              preferences.collection == expected, defaults.data(forKey: NativeWorkspacePreferences.storageKey) == bytes,
+              restored.restorationError == nil, restored.collection == expected,
+              preferences.collection.layouts.filter({ $0.viewID != viewID }) == independentLayouts,
+              preferences.collection.activeLayoutIDs.filter({ $0.key != viewID }) == independentSelections,
+              states.count < 3 else {
+            throw RuneWorkspaceVisibilityFailure("Shared naming changed unexpected collection bytes, identity or another namespace.")
+        }
+        try requireOwner()
+        states.append(["stage": label, "complete_collection_and_sorted_bytes_exact": true,
+            "fresh_preferences_restoration_exact": true, "independent_namespaces_unchanged": true,
+            "stored_bytes": bytes.count, "saved_layout_count": expected.layouts.count])
+    }
+    func expectedUnusedName() -> String {
+        let locale = Locale(identifier: "en_US_POSIX")
+        let names = Set(preferences.layouts(for: viewID).map { $0.name.folding(options: .caseInsensitive, locale: locale) })
+        for index in 1...NativeWorkspaceLimits.maximumSavedLayouts + 1 {
+            let name = index == 1 ? "Custom" : "Custom \(index)"
+            if !names.contains(name.folding(options: .caseInsensitive, locale: locale)) { return name }
+        }
+        return "Custom"
+    }
+    func requiredField(sheet: NSWindow, content: NSView, expectedValue: String) async throws -> (NSTextField, String) {
+        try requireSheetOwner(sheet, content)
+        let semantic = RuneWorkspaceNativeNamingSheet(window: window, hosting: hosting, sheet: sheet)
+        try admitThreeSecondCall()
+        _ = try await semantic.requiredName()
+        try requireSheetOwner(sheet, content)
+        let end = min(deadline, ProcessInfo.processInfo.systemUptime + 3)
+        var pending: [(NSView, Int)] = [(content, 0)], seen = Set<ObjectIdentifier>(), matches: [(NSTextField, String)] = []
+        while let (view, depth) = pending.popLast() {
+            try requireSheetOwner(sheet, content)
+            guard ProcessInfo.processInfo.systemUptime < end, depth <= 48 else {
+                throw RuneWorkspaceVisibilityFailure("Shared name-field discovery exceeded its deadline/depth bound.")
+            }
+            guard seen.insert(ObjectIdentifier(view)).inserted else { continue }
+            guard seen.count <= 2_048, view.window === sheet else {
+                throw RuneWorkspaceVisibilityFailure("Shared name-field discovery exceeded its node/owner bound.")
+            }
+            if let field = view as? NSTextField {
+                let direct = field.accessibilityIdentifier(), cell = field.cell
+                let ownedID = cell?.controlView === field ? cell?.accessibilityIdentifier() : nil
+                guard [direct, ownedID].allSatisfy({ $0.map { $0.utf8.count <= 4_096 } ?? true }) else {
+                    throw RuneWorkspaceVisibilityFailure("Shared name-field identifier exceeded its scalar bound.")
+                }
+                if direct == "workspace-layout-name" || ownedID == "workspace-layout-name" {
+                    matches.append((field, direct == "workspace-layout-name" ? "NSTextField.accessibilityIdentifier" : "actual owned field.cell.accessibilityIdentifier"))
+                }
+            }
+            let children = view.subviews
+            guard pending.count + children.count + seen.count <= 2_048 else {
+                throw RuneWorkspaceVisibilityFailure("Shared name-field pending walk exceeded its bound.")
+            }
+            pending.append(contentsOf: children.reversed().map { ($0, depth + 1) })
+        }
+        try requireSheetOwner(sheet, content)
+        guard ProcessInfo.processInfo.systemUptime < end, matches.count == 1 else {
+            throw RuneWorkspaceVisibilityFailure("Shared naming did not expose exactly one actual owned name field.")
+        }
+        let (field, identity) = matches[0], rect = field.convert(field.bounds, to: nil)
+        guard field.isEnabled, field.isEditable, !field.isHiddenOrHasHiddenAncestor,
+              [rect.origin.x, rect.origin.y, rect.width, rect.height].allSatisfy(\.isFinite),
+              rect.width > 0, rect.height > 0, rect.width <= 2_400, rect.height <= 2_400,
+              expectedValue.utf8.count <= NativeWorkspaceLimits.maximumNameBytes, field.stringValue == expectedValue,
+              ProcessInfo.processInfo.systemUptime < end else {
+            throw RuneWorkspaceVisibilityFailure("Shared name field lost its finite owner/value/deadline gates.")
+        }
+        try requireSheetOwner(sheet, content)
+        guard ProcessInfo.processInfo.systemUptime < end else {
+            throw RuneWorkspaceVisibilityFailure("Shared name-field getters returned after their deadline.")
+        }
+        return (field, identity)
+    }
+    func replaceText(sheet: NSWindow, content: NSView, field: NSTextField, name: String) throws {
+        let end = min(deadline, ProcessInfo.processInfo.systemUptime + 3)
+        try requireSheetOwner(sheet, content)
+        guard name.utf8.count <= NativeWorkspaceLimits.maximumNameBytes, field.window === sheet,
+              sheet.makeFirstResponder(field), let editor = field.currentEditor() as? NSTextView,
+              sheet.firstResponder === editor, editor.window === sheet, editor.string == field.stringValue else {
+            throw RuneWorkspaceVisibilityFailure("Shared naming did not establish its exact actual editor.")
+        }
+        editor.selectAll(nil)
+        guard editor.selectedRange() == NSRange(location: 0, length: editor.string.utf16.count) else {
+            throw RuneWorkspaceVisibilityFailure("Shared editor did not select its complete original name.")
+        }
+        editor.insertText(name, replacementRange: editor.selectedRange())
+        guard editor.string == name else { throw RuneWorkspaceVisibilityFailure("Shared editor did not receive the new name.") }
+        sheet.endEditing(for: field)
+        try requireSheetOwner(sheet, content)
+        guard field.window === sheet, field.stringValue == name, ProcessInfo.processInfo.systemUptime < end else {
+            throw RuneWorkspaceVisibilityFailure("Shared editor did not commit its name within the owned deadline.")
+        }
+    }
+    func retainReport(_ error: Error? = nil) throws {
+        let bytes = try encoder.encode(preferences.collection)
+        guard bytes.count <= NativeWorkspaceLimits.maximumStoredBytes,
+              witnesses.count <= 2, menus.count + (activeMenu == nil ? 0 : 1) <= 2, states.count <= 3 else {
+            throw RuneWorkspaceVisibilityFailure("Shared naming evidence exceeded its collection/witness/menu/state bound.")
+        }
+        let report: [String: Any] = [
+            "classification": "Actual native naming on one isolated production root; validated application-content opener and sole first-order exact attached-sheet Save. Native/exported sheet correspondence is inferred from sole sheets under the same exact parent, not direct conversion. Original whole-window gates remain separate; no Return fallback, sidebar, desktop or live-backend proof.",
+            "view_id": viewID, "stage": stage, "requested_commands": commands,
+            "execution_completed": stage == "completed" && error == nil, "within_shared_deadline": ProcessInfo.processInfo.systemUptime < deadline,
+            "shared_deadline_maximum_seconds": 120, "local_wait_maximum_seconds": 3,
+            "original_layout_id": original.id.uuidString, "menu_reports": menus,
+            "incomplete_menu_attempt": activeMenu.map { $0.evidence as Any } ?? NSNull(),
+            "normal_naming_witnesses": witnesses, "stored_state_checks": states,
+            "last_required_AX_walk_context": observer.lastRequiredWalkContext,
+            "last_application_content_window_scope": observer.lastApplicationContentWindowScope,
+            "last_AX_scalar_read": observer.lastRead,
+            "collection": try JSONSerialization.jsonObject(with: bytes),
+            "error": error.map { String(String(describing: $0).prefix(4_096)) as Any } ?? NSNull(),
+        ]
+        let data = try JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys])
+        guard data.count <= 256 * 1_024 else {
+            throw RuneWorkspaceVisibilityFailure("Shared naming JSON exceeded the caller's existing 256 KiB payload bound.")
+        }
+        if error == nil { try requireOwner() }
+        retain(report)
+    }
+    do {
+        try requireOwner()
+        guard window.attachedSheet == nil, window.sheets.isEmpty else {
+            throw RuneWorkspaceVisibilityFailure("Shared naming fixture already has an attached sheet.")
+        }
+        try checkStored(initial, label: "baseline")
+        for command in commands {
+            try requireOwner()
+            let before = preferences.collection, beforeBytes = try encoder.encode(preferences.collection)
+            let active = try XCTUnwrap(preferences.activeLayout(for: viewID))
+            let newName = (command == "Rename Layout…" ? "Renamed-" : "Saved-") + UUID().uuidString
+            let fieldValue = command == "Rename Layout…" ? active.name : expectedUnusedName()
+            guard active.viewID == viewID, !preferences.layouts(for: viewID).contains(where: { $0.name == newName }),
+                  window.attachedSheet == nil, window.sheets.isEmpty, witnesses.count < 2, menus.count < 2 else {
+                throw RuneWorkspaceVisibilityFailure("Shared naming lost its originating layout, unused name or sheet/menu bound.")
+            }
+            stage = command == "Rename Layout…" ? "rename" : "save-as"
+            let index = witnesses.count
+            witnesses.append(["command": command, "new_name": newName, "actual_editor_changed": false,
+                "actual_Save_action_requested": false, "actual_Save_action_returned": false, "actual_sheet_dismissed": false])
+            let capture = RuneWorkspaceNativeNamingMenuCapture(window: window, hosting: hosting,
+                expectedName: active.name, requestedCommand: command)
+            activeMenu = capture
+            try admitThreeSecondCall()
+            let opener = try await observer.required(identifier: "workspace-layout-menu-" + viewID, scope: .applicationContent)
+            try admitThreeSecondCall()
+            try await observer.openOwnedMenuAndPressNativeNamingCommand(opener, capture: capture, scope: .applicationContent)
+            menus.append(capture.evidence); activeMenu = nil
+            try requireOwner()
+            try await wait("Shared native command did not present its production naming sheet.") { window.attachedSheet != nil }
+            let sheet = try XCTUnwrap(window.attachedSheet), content = try XCTUnwrap(sheet.contentView)
+            let (field, identity) = try await requiredField(sheet: sheet, content: content, expectedValue: fieldValue)
+            witnesses[index]["identity_source"] = identity
+            try replaceText(sheet: sheet, content: content, field: field, name: newName)
+            witnesses[index]["actual_editor_changed"] = true
+            try requireSheetOwner(sheet, content)
+            guard preferences.collection == before,
+                  defaults.data(forKey: NativeWorkspacePreferences.storageKey) == beforeBytes else {
+                throw RuneWorkspaceVisibilityFailure("Shared editor changed saved layouts or stored bytes before Save.")
+            }
+            witnesses[index]["collection_and_bytes_unchanged_before_Save"] = true
+            try admitThreeSecondCall()
+            let save = try observer.requiredExactAttachedSheetSave(sheet: sheet, content: content, field: field, expectedName: newName)
+            try requireSheetOwner(sheet, content)
+            guard field.window === sheet, field.stringValue == newName, preferences.collection == before,
+                  defaults.data(forKey: NativeWorkspacePreferences.storageKey) == beforeBytes else {
+                throw RuneWorkspaceVisibilityFailure("Shared exported Save lost its retained name field or unchanged stored collection.")
+            }
+            try admitThreeSecondCall()
+            try observer.pressRetainedExactAttachedSheetSave(save, sheet: sheet, content: content, field: field,
+                expectedName: newName, witness: &witnesses[index])
+            try requireOwner()
+            try await wait("Shared exact exported Save did not dismiss its naming sheet.") { window.attachedSheet == nil }
+            witnesses[index]["actual_sheet_dismissed"] = true
+            let after = preferences.collection, result = try XCTUnwrap(preferences.activeLayout(for: viewID))
+            if command == "Rename Layout…" {
+                var expected = before
+                let layoutIndex = try XCTUnwrap(expected.layouts.firstIndex { $0.id == active.id && $0.viewID == viewID })
+                expected.layouts[layoutIndex].name = newName
+                guard result.id == original.id, result.name == newName, after == expected else {
+                    throw RuneWorkspaceVisibilityFailure("Shared Rename did not preserve exact identity, geometry, panels and other namespaces.")
+                }
+            } else {
+                guard result.id != active.id, result.name == newName, result.viewID == active.viewID,
+                      result.canvas == active.canvas, result.panels == active.panels else {
+                    throw RuneWorkspaceVisibilityFailure("Shared Save As did not create one named copy with a new identity and unchanged geometry/panels.")
+                }
+                var expected = before; expected.layouts.append(result); expected.activeLayoutIDs[viewID] = result.id
+                guard after == expected else { throw RuneWorkspaceVisibilityFailure("Shared Save As changed more than its new layout and selection.") }
+            }
+            try checkStored(after, label: stage)
+        }
+        guard menus.count == 2, witnesses.count == 2, states.count == 3,
+              witnesses.allSatisfy({ $0["actual_editor_changed"] as? Bool == true
+                && $0["actual_Save_action_requested"] as? Bool == true
+                && $0["actual_Save_action_returned"] as? Bool == true
+                && $0["actual_Save_action_status"] as? Int32 == 0
+                && $0["actual_sheet_dismissed"] as? Bool == true }),
+              window.attachedSheet == nil, window.sheets.isEmpty else {
+            throw RuneWorkspaceVisibilityFailure("Shared naming omitted one actual menu/editor/Save/dismissal/state witness.")
+        }
+        try requireOwner(); stage = "completed"
+        try retainReport()
+        try requireOwner()
+    } catch {
+        let originalError = error
+        do { try retainReport(originalError) }
+        catch {
+            retain(["classification": "Shared naming evidence retention failure; original operation error preserved",
+                "view_id": viewID, "stage": stage,
+                "original_error": String(String(describing: originalError).prefix(4_096)),
+                "retention_error": String(String(describing: error).prefix(4_096))])
+        }
+        throw originalError
+    }
+}
+#endif

@@ -2932,6 +2932,104 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
         }
     }
 
+    func testProductionThirteenViewsNativeRenameAndSaveAsPersistNamesAndLayoutIdentity() async throws {
+        let deadline = ProcessInfo.processInfo.systemUptime + 120
+        let routes: [(viewID: String, root: @MainActor (AppModel) -> AnyView)] = [
+            ("rig", { _ in AnyView(RigDashboardView()) }),
+            ("mcp", { _ in AnyView(MCPServersView()) }),
+            ("agents", { _ in AnyView(AgentsView()) }),
+            ("tools", { _ in AnyView(ToolsView()) }),
+            ("feed", { _ in AnyView(LiveFeedView()) }),
+            ("projects", { AnyView(ProjectsOperatorView(client: $0.operatorManagerClient)) }),
+            ("rune-forge.overview", { AnyView(RuneForgeOperatorView(client: $0.operatorManagerClient)) }),
+            ("continuity", { AnyView(ContinuityOperatorView(client: $0.operatorManagerClient)) }),
+            ("runtimes", { AnyView(RuntimesOperatorView(client: $0.operatorManagerClient)) }),
+            ("provider", { AnyView(ProviderOperatorView(client: $0.operatorManagerClient)) }),
+            ("evidence", { AnyView(EvidenceOperatorView(client: $0.operatorManagerClient)) }),
+            ("diagnostics", { _ in AnyView(DiagnosticsView()) }),
+            ("manager.folders", { _ in AnyView(ManagerSettingsView(initialSection: .folders)) }),
+        ]
+        let admitted = Set(NativeWorkspaceCatalog.panelsByView.keys.filter {
+            !$0.hasPrefix("manager.") && !$0.hasPrefix("rune-forge.")
+        } + ["manager.folders", "rune-forge.overview"])
+        guard routes.count == 13, Set(routes.map(\.viewID)) == admitted else {
+            throw WorkspaceCanvasFixtureFailure("The native naming table omitted or duplicated an existing main view.")
+        }
+        var completed: [String] = []
+        defer {
+            nativeDraftRetainMeasurement([
+                "classification": "Actual Rename and Save As on 13 isolated production roots; application-content opener and exact attached-sheet Save, no sidebar/desktop/live-backend qualification",
+                "completed_view_ids": completed, "expected_view_ids": admitted.sorted(),
+                "native_naming_commands": completed.count * 2,
+                "aggregate_deadline_seconds": 120,
+                "within_deadline": ProcessInfo.processInfo.systemUptime < deadline,
+                "execution_completed": completed.count == 13,
+            ], name: "workspace-thirteen-view-native-naming-union")
+        }
+        for route in routes {
+            try Task.checkCancellation()
+            guard ProcessInfo.processInfo.systemUptime < deadline else {
+                throw WorkspaceCanvasFixtureFailure("The main-view naming flow exceeded its aggregate deadline.")
+            }
+            let suite = "forge.workspace.naming.tests.\(UUID().uuidString)"
+            let home = FileManager.default.temporaryDirectory.appendingPathComponent("forge-workspace-naming-\(UUID().uuidString)")
+            let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+            defer { defaults.removePersistentDomain(forName: suite); try? FileManager.default.removeItem(at: home) }
+            let preferences = NativeWorkspacePreferences(knownPanelIDsByView: NativeWorkspaceCatalog.knownPanelIDsByView,
+                panelSizeBoundsByView: NativeWorkspaceCatalog.sizeBoundsByView, defaults: defaults)
+            func seed(_ viewID: String) throws -> NativeWorkspaceLayout {
+                let panels = try XCTUnwrap(NativeWorkspaceCatalog.panelsByView[viewID])
+                guard !panels.isEmpty, panels.count <= 16, Set(panels.map(\.id)).count == panels.count else {
+                    throw WorkspaceCanvasFixtureFailure("Native naming received an empty, duplicated or oversized catalog.")
+                }
+                return .init(id: UUID(), viewID: viewID, name: "Original-" + viewID + "-" + UUID().uuidString,
+                    canvas: .init(width: max(1_280, panels.map { $0.defaultFrame.x + $0.defaultFrame.width + 20 }.max() ?? 0),
+                                  height: max(900, panels.map { $0.defaultFrame.y + $0.defaultFrame.height + 20 }.max() ?? 0)),
+                    panels: panels.map { .init(id: $0.id, frame: $0.defaultFrame, isVisible: true) })
+            }
+            // Isolated initial layout setup only; both naming changes use the actual menus/editor/Save button.
+            try preferences.save(seed(route.viewID))
+            try preferences.save(seed(route.viewID == "diagnostics" ? "tools" : "diagnostics"))
+            let workbench = WorkbenchPreferences(defaults: defaults)
+            let guidedMode = GuidedModeCoordinator(defaults: defaults)
+            let bootstrap = AppBootstrapOperation(factory: { throw CancellationError() }, pluginStatus: { _ in nil })
+            let model = AppModel(bootstrapOperation: bootstrap, diagnosticPaths: AppPaths(home: home))
+            model.autoRefresh = false
+            let hosting = NSHostingView(rootView: AnyView(route.root(model)
+                .environment(\.nativeWorkspacePreferences, preferences)
+                .environmentObject(model).environmentObject(workbench).environmentObject(guidedMode).graphiteWorkbench()))
+            hosting.sizingOptions = []
+            let owned = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 1_240, height: 900),
+                styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+            owned.isReleasedWhenClosed = false
+            owned.title = "Forge workspace naming test " + UUID().uuidString
+            owned.contentView = hosting; window = owned
+            func close() async {
+                if let sheet = owned.attachedSheet { owned.endSheet(sheet) }
+                owned.endEditing(for: nil); _ = owned.makeFirstResponder(nil)
+                hosting.rootView = AnyView(EmptyView()); hosting.layoutSubtreeIfNeeded()
+                owned.orderOut(nil); owned.contentView = nil; owned.close(); window = nil
+                model.stopRigOperationalMonitoring()
+                await model.stopBootstrap(); model.telemetryBinding.detach()
+            }
+            do {
+                NSApp.activate(ignoringOtherApps: true); owned.makeKeyAndOrderFront(nil); owned.orderFrontRegardless()
+                try await nativeWorkspaceVerifyNaming(window: owned, hosting: hosting, preferences: preferences,
+                    defaults: defaults, viewID: route.viewID, deadline: deadline) { report in
+                    self.nativeDraftRetainMeasurement(report, name: "workspace-" + route.viewID + "-native-naming")
+                }
+                await close()
+                completed.append(route.viewID)
+            } catch {
+                await close(); throw error
+            }
+        }
+        guard completed.count == 13, Set(completed) == admitted,
+              ProcessInfo.processInfo.systemUptime < deadline else {
+            throw WorkspaceCanvasFixtureFailure("The native naming union is incomplete or exceeded its deadline.")
+        }
+    }
+
     private func nativeToolsSharedControls(_ identifierRoute: ToolsSharedControlIdentifierRoute,
         viewID: String = "tools", flowDeadline: TimeInterval? = nil,
         makeRoot: (@MainActor (AppModel) -> AnyView)? = nil) async throws {
