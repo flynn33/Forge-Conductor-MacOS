@@ -132,6 +132,179 @@ final class RuneForgeAppTests: XCTestCase {
         }
     }
 
+    func testMountedRuneZoomSubtreeBeforeDuringAfterProductionRenameCancellation() async throws {
+        guard NSApp != nil, Bundle.main.bundleURL.pathExtension == "app", !NSScreen.screens.isEmpty else {
+            throw RuneWorkspaceVisibilityFailure("Run the Rune Zoom lifecycle measurement in ForgeConductorAppTests with a native display.")
+        }
+        let deadline = ProcessInfo.processInfo.systemUptime + 45
+        let source = DevelopmentPolicySource(displayName: "Zoom lifecycle policy",
+            selectedPath: "/tmp/rune-zoom-lifecycle-policy.md", interpretationState: .cataloging)
+        let runeModel = RuneForgeViewModel(client: RuneWorkspaceNamingClient(snapshot: policySnapshot(events: [], sources: [source])))
+        let fixture = try RuneWorkspaceVisibilityFixture(model: runeModel, urls: [])
+        let descriptors = NativeWorkspaceCatalog.runePanels(for: "source")
+        let original = NativeWorkspaceLayout(id: UUID(), viewID: "rune-forge.source", name: "Source-" + UUID().uuidString,
+            canvas: .init(width: max(1_280, descriptors.map { $0.defaultFrame.x + $0.defaultFrame.width + 20 }.max() ?? 0),
+                          height: max(900, descriptors.map { $0.defaultFrame.y + $0.defaultFrame.height + 20 }.max() ?? 0)),
+            panels: descriptors.map { .init(id: $0.id, frame: $0.defaultFrame, isVisible: true) })
+        let observer = RuneWorkspaceNamingAX(window: fixture.window, hosting: fixture.hosting)
+        let capture = RuneWorkspaceNativeNamingMenuCapture(window: fixture.window, hosting: fixture.hosting, expectedName: original.name)
+        let style = fixture.window.styleMask
+        var rows: [[String: Any]] = [], firstScalarError: Error?, stage = "mount"
+        var before: NativeWorkspaceCollection?, beforeBytes: Data?, heldSheet: NSWindow?, heldContent: NSView?
+        var cancellation: [String: Any] = ["actual_Save_request_count": 0, "Escape_posted": false]
+        func check(reservingPhase: Bool = false) throws {
+            try Task.checkCancellation()
+            guard ProcessInfo.processInfo.systemUptime < deadline,
+                  !reservingPhase || deadline - ProcessInfo.processInfo.systemUptime > 3 else {
+                throw RuneWorkspaceVisibilityFailure("The Rune Zoom lifecycle measurement exceeded its shared 45-second deadline or lacks phase time.")
+            }
+        }
+        func wait(_ message: String, _ predicate: () -> Bool) async throws {
+            let end = min(deadline, ProcessInfo.processInfo.systemUptime + 3)
+            while !predicate() {
+                try check()
+                guard ProcessInfo.processInfo.systemUptime < end else { throw RuneWorkspaceVisibilityFailure(message) }
+                try await Task.sleep(for: .milliseconds(10))
+            }
+            try check()
+            guard ProcessInfo.processInfo.systemUptime < end else { throw RuneWorkspaceVisibilityFailure(message) }
+        }
+        func requireOwner(during: Bool) throws {
+            try check()
+            guard let before, let beforeBytes, NSApp.isActive, fixture.window.isVisible,
+                  fixture.window.contentView === fixture.hosting, fixture.hosting.window === fixture.window,
+                  !fixture.hosting.isHiddenOrHasHiddenAncestor, fixture.window.styleMask == style,
+                  fixture.hosting.frame.size == NSSize(width: 1_280, height: 900),
+                  fixture.preferences.collection == before,
+                  fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey) == beforeBytes,
+                  Set(fixture.document?.panelHosts.keys.map { $0 } ?? []) == Set(original.panels.map(\.id)),
+                  let zoom = fixture.window.standardWindowButton(.zoomButton), zoom.window === fixture.window else {
+                throw RuneWorkspaceVisibilityFailure("The Rune Zoom phase lost exact native owners, source panels or unchanged stored layout.")
+            }
+            if during {
+                guard let heldSheet, let heldContent, heldSheet.isKeyWindow, NSApp.keyWindow === heldSheet,
+                      fixture.window.sheets.count == 1, fixture.window.sheets.first === heldSheet else {
+                    throw RuneWorkspaceVisibilityFailure("The Rune Zoom phase lost its sole exact key production sheet.")
+                }
+                try runeRequireNamingSheetOwner(fixture, sheet: heldSheet, content: heldContent)
+            } else {
+                guard fixture.window.isKeyWindow, NSApp.keyWindow === fixture.window,
+                      fixture.window.attachedSheet == nil, fixture.window.sheets.isEmpty, heldSheet?.sheetParent == nil else {
+                    throw RuneWorkspaceVisibilityFailure("The Rune Zoom phase lacks its exact key parent with no attached sheet.")
+                }
+            }
+        }
+        func record(_ phase: String, during: Bool) throws {
+            try requireOwner(during: during)
+            guard rows.count < 3 else { throw RuneWorkspaceVisibilityFailure("The Rune Zoom lifecycle exceeded three phase rows.") }
+            let zoom = try XCTUnwrap(fixture.window.standardWindowButton(.zoomButton))
+            var row: [String: Any] = ["phase": phase, "process_pid": ProcessInfo.processInfo.processIdentifier,
+                "AXIsProcessTrusted_before_query": AXIsProcessTrusted(), "native_application_active": NSApp.isActive,
+                "native_exact_phase_key_owner": during ? NSApp.keyWindow === heldSheet : NSApp.keyWindow === fixture.window,
+                "native_exact_host": fixture.window.contentView === fixture.hosting && fixture.hosting.window === fixture.window,
+                "native_style_mask": Int(style.rawValue), "native_content_frame": NSStringFromRect(fixture.hosting.frame),
+                "native_standard_zoom_owned": zoom.window === fixture.window, "native_standard_zoom_enabled": zoom.isEnabled,
+                "native_standard_zoom_hidden": zoom.isHiddenOrHasHiddenAncestor, "native_sheet_count": fixture.window.sheets.count,
+                "native_exact_sheet_attached": heldSheet.map { fixture.window.attachedSheet === $0 } ?? false,
+                "stored_collection_unchanged": true, "stored_bytes_unchanged": true]
+            do {
+                if let error = try observer.observePlainAppKitStandardZoom(
+                    deadline: min(deadline, ProcessInfo.processInfo.systemUptime + 3), report: &row), firstScalarError == nil {
+                    firstScalarError = error
+                }
+                try requireOwner(during: during)
+                row["AXIsProcessTrusted_after_query"] = AXIsProcessTrusted()
+                try requireOwner(during: during)
+                row["native_phase_owner_after_query"] = true; rows.append(row)
+            } catch {
+                row["strict_phase_error"] = String(String(describing: error).prefix(512)); rows.append(row); throw error
+            }
+        }
+        func retain(_ error: Error? = nil) throws {
+            let bytes = fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey)
+            guard rows.count <= 3, beforeBytes.map({ $0.count <= 64 * 1_024 }) ?? true,
+                  bytes.map({ $0.count <= 64 * 1_024 }) ?? true else {
+                throw RuneWorkspaceVisibilityFailure("The Rune Zoom stored-layout/phase evidence exceeded its bound.")
+            }
+            let payload: [String: Any] = ["classification": "Actual isolated Rune source-window exact Zoom subtree before/during/after production Rename cancellation; no Save dispatch, full naming pass, desktop or permission-cause claim",
+                "stage": stage, "shared_budget_seconds": 45, "per_phase_query_budget_seconds": 3,
+                "expected_phase_rows": 3, "rows": rows, "all_three_phases_recorded": rows.count == 3,
+                "actual_menu_transition": capture.evidence, "cancellation": cancellation,
+                "persisted_bytes_before_base64": beforeBytes.map { $0.base64EncodedString() as Any } ?? NSNull(),
+                "persisted_bytes_after_base64": bytes.map { $0.base64EncodedString() as Any } ?? NSNull(),
+                "stored_collection_unchanged": before.map { fixture.preferences.collection == $0 } ?? false,
+                "stored_bytes_unchanged": beforeBytes.map { bytes == $0 } ?? false,
+                "first_scalar_error": firstScalarError.map { String(String(describing: $0).prefix(512)) as Any } ?? NSNull(),
+                "error_description": error.map { String(String(describing: $0).prefix(512)) as Any } ?? NSNull()]
+            let data = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys])
+            guard data.count <= 512 * 1_024 else { throw RuneWorkspaceVisibilityFailure("The Rune Zoom lifecycle report exceeded 512 KiB.") }
+            let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+            attachment.name = "rune-production-zoom-sheet-lifecycle"; attachment.lifetime = .keepAlways; add(attachment)
+        }
+        do {
+            try check(); try fixture.preferences.save(original)
+            before = fixture.preferences.collection
+            beforeBytes = try XCTUnwrap(fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey))
+            NSApp.activate(ignoringOtherApps: true); fixture.window.makeKeyAndOrderFront(nil)
+            fixture.hosting.layoutSubtreeIfNeeded()
+            try await wait("The real Rune source owners did not settle for Zoom measurement.") {
+                !fixture.model.isBootstrapping && !runeModel.isLoading && runeModel.sources.count == 1
+                    && fixture.document?.panelHosts.count == fixture.layout.panels.count
+            }
+            runeModel.pauseObservation(); try check(reservingPhase: true)
+            let sourceRow = try await observer.required(identifier: "rune-policy-source-row-" + source.id.description, scope: .applicationContent)
+            try check(reservingPhase: true); try observer.pressOwned(sourceRow, role: kAXButtonRole, scope: .applicationContent)
+            try await wait("The actual source row did not mount its source workspace.") {
+                Set(fixture.document?.panelHosts.keys.map { $0 } ?? []) == Set(original.panels.map(\.id))
+            }
+            stage = "before-sheet"; try record(stage, during: false)
+            stage = "production-Rename-menu"
+            try check(reservingPhase: true)
+            let opener = try await observer.required(identifier: "workspace-layout-menu-" + original.viewID, scope: .applicationContent)
+            try check(reservingPhase: true); try await observer.openOwnedMenuAndPressNativeNamingCommand(opener, capture: capture, scope: .applicationContent)
+            try await wait("Production Rename did not attach its actual naming sheet.") { fixture.window.attachedSheet != nil }
+            heldSheet = try XCTUnwrap(fixture.window.attachedSheet); heldContent = try XCTUnwrap(heldSheet?.contentView)
+            let sheet = try XCTUnwrap(heldSheet), content = try XCTUnwrap(heldContent)
+            sheet.makeKeyAndOrderFront(nil)
+            try await wait("The production naming sheet did not become the exact key owner.") { sheet.isKeyWindow && NSApp.keyWindow === sheet }
+            stage = "during-sheet"; try record(stage, during: true)
+            try check(reservingPhase: true)
+            let (field, identity) = try await runeRequiredOwnedNamingField(fixture, sheet: sheet, content: content, expectedValue: original.name)
+            try requireOwner(during: true)
+            guard sheet.makeFirstResponder(field), let editor = field.currentEditor() as? NSTextView,
+                  sheet.firstResponder === editor, editor.window === sheet, editor.string == original.name else {
+                throw RuneWorkspaceVisibilityFailure("Rename cancellation did not own the actual production sheet editor.")
+            }
+            let event = try XCTUnwrap(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [],
+                timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: sheet.windowNumber, context: nil,
+                characters: "\u{1b}", charactersIgnoringModifiers: "\u{1b}", isARepeat: false, keyCode: 53))
+            try requireOwner(during: true)
+            guard event.window === sheet, event.windowNumber == sheet.windowNumber, field.currentEditor() === editor,
+                  sheet.firstResponder === editor, editor.window === sheet, field.stringValue == original.name else {
+                throw RuneWorkspaceVisibilityFailure("Rename cancellation lost its exact event/sheet/editor before posting.")
+            }
+            cancellation["API"] = "NSApp.postEvent(_:atStart:false) Escape / production cancelAction shortcut"
+            cancellation["identity_source"] = identity; cancellation["event_window_number"] = event.windowNumber
+            cancellation["event_window_is_exact_sheet"] = true
+            NSApp.postEvent(event, atStart: false); cancellation["Escape_posted"] = true; try check()
+            try await wait("The owned Escape did not cancel the production Rename sheet.") {
+                fixture.window.attachedSheet == nil && sheet.sheetParent == nil
+            }
+            cancellation["production_sheet_dismissed"] = true
+            fixture.window.makeKeyAndOrderFront(nil)
+            try await wait("The parent did not resume exact key ownership after cancellation.") { fixture.window.isKeyWindow && NSApp.keyWindow === fixture.window }
+            stage = "after-sheet"; try record(stage, during: false)
+            guard rows.count == 3 else { throw RuneWorkspaceVisibilityFailure("The Rune Zoom lifecycle did not retain all three bounded phase rows.") }
+            try requireOwner(during: false)
+            if let firstScalarError { throw firstScalarError }
+            stage = "complete"; try retain(); try check()
+        } catch {
+            let finalError = firstScalarError ?? error
+            try? retain(finalError); await runeNamingClose(fixture, runeModel: runeModel); throw finalError
+        }
+        await runeNamingClose(fixture, runeModel: runeModel)
+    }
+
     func testAllPanelsAcrossThreeMountedRuneDetailNamespacesQueuedMoveResizePersistsGeometry() async throws {
         let deadline = ProcessInfo.processInfo.systemUptime + 120
         let modes = ["source", "violation", "feed"]

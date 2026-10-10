@@ -14,6 +14,10 @@ Product versions do not by themselves claim shipment.
 
 - Clear previous repository success feedback before validating a new Save or Clear. Invalid input or a changed project now shows only the current error, preserving the saved link and refusing an extra write. The same failing unit/native regression now passes; all 22 Projects view-model tests and the existing native draft case pass. Other implementations remain deferred. [Qualification](docs/QUALIFICATION-STATUS.md).
 
+- Record V199’s failed Rune Zoom diagnostic before/during/after production Rename cancellation. The pre-sheet two-node traversal succeeds; third-node AXIdentifier/fresh Role −25211 persists during and after owned Escape with trust=false throughout. Saved layouts and bytes are unchanged, Save is not requested, and the different terminal error plus one QoS warning establish no cause or repair. Naming and desktop/full UI gates remain open. [Qualification](docs/QUALIFICATION-STATUS.md).
+
+- Verify real isolated Projects repository Save/rejection/reopen/Clear through two app/backend epochs and a fresh custom view (V200), preserving identity and layout and leaving rejected durable files unchanged. The real-backend method and unchanged default-fixture queued move/resize method (V201) each pass with no failures/skips/runtime warnings. Resize is API-prepared; ordinary process/desktop/installed gates remain open. No production or version change follows. [Qualification](docs/QUALIFICATION-STATUS.md).
+
 ### `0.44.2 (62)`
 
 - Route discrete horizontal wheels over vertical custom-panel bodies to their canvas. Preserve vertical wheels, nested horizontal content, saved layouts and window ownership; remove the local monitor on detach/dismantle/deinit. Gesture and momentum events retain AppKit dispatch. The final 0.44.2 native selection passes four scrolling/lifecycle cases; CLI/app, ordinary Debug and strict signature checks pass. Broader UI and gesture gates remain open. [Qualification](docs/QUALIFICATION-STATUS.md).

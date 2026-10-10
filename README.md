@@ -4,6 +4,10 @@ Current source target **0.44.3 (63)** clears stale repository success feedback w
 
 V198 reproduces and corrects the feedback bug in unit and native resized-panel tests. All 22 Projects view-model tests and the existing native Projects draft check pass. CLI/app compilation, ordinary Debug build and strict signature checks pass; desktop/full UI and gesture qualification remain open, and other implementations remain deferred. [Current evidence](docs/QUALIFICATION-STATUS.md).
 
+V199’s separate Rune Zoom diagnostic remains NONPASS: one native method fails; Zoom queries fail during and after Rename-sheet cancellation at AXIdentifier/fresh Role −25211. The pre-sheet two-node traversal completes, and trust=false throughout all three phases. The saved collection is unchanged and no Save is requested; the different terminal error and one QoS warning establish no cause, permission diagnosis or production repair. Naming, desktop/full UI gates remain open. [Diagnostic evidence](docs/QUALIFICATION-STATUS.md).
+
+V200 now qualifies isolated real Manager/backend Save, invalid-input refusal, backend/view reopen and Clear, preserving project identity and the custom layout. V201 separately passes the unchanged default-fixture queued move/resize case. This closes the scoped durable-reopen gap left by V198; API-prepared resize and app-hosted testing add no ordinary process quit/relaunch, desktop, gesture or installed proof. Other implementations remain deferred. [Evidence](docs/QUALIFICATION-STATUS.md).
+
 ## Preceding UI evidence
 
 Current source target **0.44.2 (62)** corrects discrete horizontal wheel routing over vertical custom-panel bodies. Saved menu entries retain **Layout: …**, stored names and UUIDs. Movable, resizable, show/hide panels and named layouts remain within each existing view. Use **Customize Layout**, drag a panel header or resize grip, and select visible panels in **Panels**. **Restore Default** returns to the original composition while retaining saved layouts. [Workspace guide](docs/NATIVE-WORKSPACES.md).

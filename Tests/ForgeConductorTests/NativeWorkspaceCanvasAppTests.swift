@@ -1,6 +1,7 @@
 #if !SWIFT_PACKAGE
 import AppKit
 import ApplicationServices
+import Darwin
 import SwiftUI
 import XCTest
 @testable import Forge_Conductor
@@ -11,6 +12,7 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
     private var window: NSWindow?
     private var scopeFixture: WorkspaceScopeFixture?
     private var draftFixture: NativeWorkspaceDraftFixture?
+    private var repositoryBackend: NativeWorkspaceProjectRepositoryBackend?
     private let directEvidence = DirectNativeFixtureEvidenceWriter()
     private var nativeDraftCurrentStage = "not-started"
 
@@ -32,6 +34,12 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
             nativeDraftStage("teardown.positive-fixture.returned")
         }
         draftFixture = nil
+        if let repositoryBackend {
+            let cleanup = await repositoryBackend.cleanup()
+            XCTAssertTrue(cleanup.completed, "The owned repository backend must shut down before cleanup.")
+            XCTAssertTrue(cleanup.homeRemoved, "Only the completed backend's exact owned temporary home is removed.")
+        }
+        repositoryBackend = nil
         if let scopeFixture { await scopeFixture.close() }
         scopeFixture = nil
         if let window { window.orderOut(nil); window.contentView = nil; window.close() }
@@ -1369,6 +1377,163 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(observations.otherMutations, 0)
         XCTAssertEqual(fixture.recorder.creations, 1)
         try nativeOwnedRequireOwner(fixture, deadline: deadline, requireKey: true)
+    }
+
+    func testProductionCustomProjectsRepositoryPersistsAcrossRealBackendReopen() async throws {
+        let deadline = ProcessInfo.processInfo.systemUptime + 75
+        let backend = NativeWorkspaceProjectRepositoryBackend(deadline: deadline)
+        repositoryBackend = backend
+        let first = try await backend.start()
+        let registered = try await backend.checkpoint()
+        XCTAssertNotNil(UUID(uuidString: registered.project.projectID))
+        XCTAssertEqual(registered.project.projectGeneration, 1)
+        XCTAssertNil(registered.project.githubRepositoryURL)
+        let fixture = try NativeWorkspaceDraftFixture(page: .projects, backend: first)
+        draftFixture = fixture
+        try await nativeOwnedWait("The prepared real backend bootstrap did not publish.", deadline: deadline) {
+            !fixture.model.isBootstrapping
+        }
+        try await exposeNativeDraftFixture(fixture)
+        XCTAssertTrue(fixture.model.app === first.app)
+        let layout = NativeWorkspaceLayout(id: UUID(), viewID: "projects", name: "Real repository reopen",
+            canvas: .init(width: 1_460, height: 3_600), panels: NativeWorkspaceCatalog.projects.map {
+                let frame: NativeWorkspaceFrame
+                switch $0.id {
+                case "projects-status": frame = .init(x: 40, y: 20, width: 640, height: 300)
+                case "projects-repository": frame = .init(x: 40, y: 340, width: 980, height: 300)
+                case "projects-summary": frame = .init(x: 740, y: 20, width: 600, height: 200)
+                case "projects-identity": frame = .init(x: 740, y: 240, width: 600, height: 180)
+                default: frame = $0.defaultFrame
+                }
+                return NativeWorkspacePanelPlacement(id: $0.id, frame: frame,
+                    isVisible: ["projects-status", "projects-repository", "projects-summary", "projects-identity"].contains($0.id))
+            })
+        try fixture.preferences.save(layout)
+        let document = try await nativeOwnedDocument(fixture, panelID: "projects-repository", deadline: deadline)
+        let panel = try XCTUnwrap(document.panelHosts["projects-repository"])
+        let resized = NativeWorkspaceFrame(x: 40, y: 340, width: 640, height: 260)
+        try fixture.preferences.setFrame(resized, for: "projects-repository", in: "projects")
+        try await nativeOwnedWait("The real repository panel did not resize.", deadline: deadline) {
+            panel.frame == resized.nativeRect
+        }
+        let collection = fixture.preferences.collection
+        let field = try await nativeExportObservedField(in: panel.hostingView,
+            identifier: "project-github-repository-location", placeholder: "https://github.com/owner/repository",
+            expectedLabel: "GitHub repository location", fixture: fixture, deadline: deadline)
+        let canonical = "https://github.com/fixture/native-panel"
+        try nativeOwnedEditField(field, value: "git@github.com:fixture/native-panel.git", in: fixture.window,
+                                fixture: fixture, deadline: deadline)
+        try await nativeExportOwnedPress("project-github-repository-save", in: fixture, deadline: deadline)
+        try await nativeOwnedWait("The real Save did not publish its canonical URL.", deadline: deadline) {
+            try field.stringValue == canonical
+        }
+        _ = try await nativeDraftAXElement("operator-notice", in: fixture, deadline: deadline, scope: .applicationContent)
+        let saved = try await backend.checkpoint()
+        XCTAssertEqual(saved.project.projectID, registered.project.projectID)
+        XCTAssertEqual(saved.project.projectGeneration, registered.project.projectGeneration)
+        XCTAssertEqual(saved.project.githubRepositoryURL, canonical)
+        XCTAssertEqual(saved.durable.metadata.githubRepositoryURL, canonical)
+        XCTAssertEqual(saved.durable.metadata.aliases, registered.durable.metadata.aliases)
+        XCTAssertEqual(saved.durable.metadata.repositoryIdentity, registered.durable.metadata.repositoryIdentity)
+        try await nativeRepositoryBackendRecord(saved, phase: "saved", backend: backend)
+
+        try nativeOwnedEditField(field, value: "https://example.invalid/fixture/native-panel", in: fixture.window,
+                                fixture: fixture, deadline: deadline)
+        try await nativeExportOwnedPress("project-github-repository-save", in: fixture, deadline: deadline)
+        _ = try await nativeDraftAXElement("operator-unavailable", in: fixture, deadline: deadline, scope: .applicationContent)
+        let statusRoot = try await nativeDraftAXElement("workspace-panel-projects-status", in: fixture,
+                                                      deadline: deadline, scope: .applicationContent)
+        let rejectedStatus = try nativeDraftExportedAXTree(statusRoot, deadline: deadline, limit: 64)
+        XCTAssertEqual(rejectedStatus.filter { $0.identifier == "operator-unavailable" }.count, 1)
+        XCTAssertFalse(rejectedStatus.contains { $0.identifier == "operator-notice" },
+                       "A rejected Save must remove the prior Saved notice in the actual custom panel.")
+        let rejected = try await backend.checkpoint()
+        XCTAssertEqual(rejected.project.githubRepositoryURL, canonical)
+        XCTAssertEqual(rejected.project.projectID, saved.project.projectID)
+        XCTAssertEqual(rejected.project.projectGeneration, saved.project.projectGeneration)
+        XCTAssertEqual(rejected.durable, saved.durable, "Invalid input must not rewrite either durable identity file.")
+        try await nativeRepositoryBackendRecord(rejected, phase: "rejected", backend: backend)
+
+        await fixture.close()
+        draftFixture = nil
+        let firstStop = try XCTUnwrap(fixture.backendStop)
+        XCTAssertTrue(firstStop.completed)
+        XCTAssertTrue(firstStop.serviceStopped)
+        XCTAssertEqual(firstStop.completedShutdowns, 1)
+        let stoppedSaved = try await backend.durableCheckpoint()
+        XCTAssertEqual(stoppedSaved, saved.durable)
+        let reopened = try await backend.start()
+        XCTAssertFalse(reopened.app === first.app, "Reopen must construct another real ForgeApp graph.")
+        XCTAssertEqual(reopened.home, first.home)
+        let reopenedCheckpoint = try await backend.checkpoint()
+        XCTAssertEqual(reopenedCheckpoint.project.projectID, saved.project.projectID)
+        XCTAssertEqual(reopenedCheckpoint.project.projectGeneration, saved.project.projectGeneration)
+        XCTAssertEqual(reopenedCheckpoint.project.githubRepositoryURL, canonical)
+        XCTAssertEqual(reopenedCheckpoint.durable, saved.durable)
+        let fresh = try NativeWorkspaceDraftFixture(page: .projects, backend: reopened)
+        draftFixture = fresh
+        XCTAssertFalse(fresh.hosting === fixture.hosting)
+        try await nativeOwnedWait("The fresh real backend bootstrap did not publish.", deadline: deadline) {
+            !fresh.model.isBootstrapping
+        }
+        try await exposeNativeDraftFixture(fresh)
+        XCTAssertTrue(fresh.model.app === reopened.app)
+        XCTAssertEqual(fresh.preferences.collection, collection)
+        let freshDocument = try await nativeOwnedDocument(fresh, panelID: "projects-repository", deadline: deadline)
+        let freshPanel = try XCTUnwrap(freshDocument.panelHosts["projects-repository"])
+        XCTAssertEqual(freshPanel.frame, resized.nativeRect)
+        let restored = try await nativeExportObservedField(in: freshPanel.hostingView,
+            identifier: "project-github-repository-location", placeholder: "https://github.com/owner/repository",
+            expectedLabel: "GitHub repository location", fixture: fresh, deadline: deadline)
+        XCTAssertEqual(try restored.stringValue, canonical)
+        let generation = try await nativeDraftAXElement("project-generation", in: fresh,
+                                                       deadline: deadline, scope: .applicationContent)
+        XCTAssertTrue([generation.title, generation.value as? String].contains("Generation \(saved.project.projectGeneration)"))
+        let identity = try await nativeDraftAXElement("workspace-panel-projects-identity", in: fresh,
+                                                     deadline: deadline, scope: .applicationContent)
+        let identityNodes = try nativeDraftExportedAXTree(identity, deadline: deadline, limit: 64)
+        XCTAssertTrue(identityNodes.contains {
+            [$0.title, $0.value as? String].compactMap { $0 }.contains {
+                $0.caseInsensitiveCompare(saved.project.projectID) == .orderedSame
+            }
+        }, "The fresh custom Projects view must expose the same project UUID.")
+        try await nativeRepositoryBackendRecord(reopenedCheckpoint, phase: "reopened", backend: backend)
+
+        try await nativeExportOwnedPress("project-github-repository-clear", in: fresh, deadline: deadline)
+        try await nativeOwnedWait("The real Clear did not publish an empty field.", deadline: deadline) {
+            try restored.stringValue.isEmpty
+        }
+        _ = try await nativeDraftAXElement("operator-notice", in: fresh, deadline: deadline, scope: .applicationContent)
+        let cleared = try await backend.checkpoint()
+        XCTAssertNil(cleared.project.githubRepositoryURL)
+        XCTAssertNil(cleared.durable.metadata.githubRepositoryURL)
+        XCTAssertEqual(cleared.project.projectID, saved.project.projectID)
+        XCTAssertEqual(cleared.project.projectGeneration, saved.project.projectGeneration)
+        XCTAssertEqual(cleared.durable.metadata.aliases, saved.durable.metadata.aliases)
+        XCTAssertEqual(cleared.durable.metadata.repositoryIdentity, saved.durable.metadata.repositoryIdentity)
+        XCTAssertNotEqual(cleared.durable.metadataBytes, saved.durable.metadataBytes)
+        XCTAssertNotEqual(cleared.durable.registryBytes, saved.durable.registryBytes)
+        try await nativeRepositoryBackendRecord(cleared, phase: "cleared", backend: backend)
+        await fresh.close()
+        draftFixture = nil
+        let secondStop = try XCTUnwrap(fresh.backendStop)
+        XCTAssertTrue(secondStop.completed)
+        XCTAssertTrue(secondStop.serviceStopped)
+        XCTAssertEqual(secondStop.completedShutdowns, 2)
+        let stoppedCleared = try await backend.durableCheckpoint()
+        XCTAssertEqual(stoppedCleared, cleared.durable,
+                       "Clear must remain on disk after the second completed shutdown.")
+        try await nativeRepositoryBackendRecord(cleared, phase: "closed", backend: backend)
+        XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, deadline)
+    }
+
+    private func nativeRepositoryBackendRecord(_ checkpoint: NativeWorkspaceProjectRepositoryBackend.Checkpoint,
+                                              phase: String, backend: NativeWorkspaceProjectRepositoryBackend) async throws {
+        let payload = try await backend.evidence(checkpoint, phase: phase)
+        let attachment = XCTAttachment(data: payload, uniformTypeIdentifier: "public.json")
+        attachment.name = "projects-real-backend-" + phase
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 
     private func nativeExportObservedField(in root: NSView, identifier: String, placeholder: String,
@@ -6523,10 +6688,16 @@ private final class NativeWorkspaceDraftFixture {
     let recorder: NativeWorkspaceDraftBootstrapRecorder
     let hosting: NSHostingView<AnyView>
     let window: NSWindow
+    private let backendOwner: NativeWorkspaceProjectRepositoryBackend?
+    private(set) var backendStop: NativeWorkspaceProjectRepositoryBackend.StopReceipt?
 
-    init(page: Page, repositoryUpdatesEnabled: Bool = false) throws {
-        let suiteName = "forge.workspace.positive-draft.tests.\(UUID().uuidString)"
-        let homeURL = FileManager.default.temporaryDirectory.appendingPathComponent("forge-native-workspace-positive-\(UUID().uuidString)")
+    init(page: Page, repositoryUpdatesEnabled: Bool = false,
+         backend: NativeWorkspaceProjectRepositoryBackend.Presentation? = nil) throws {
+        guard backend == nil || page == .projects else {
+            throw WorkspaceCanvasFixtureFailure("The real repository backend is only for the Projects fixture.")
+        }
+        let suiteName = backend?.suite ?? "forge.workspace.positive-draft.tests.\(UUID().uuidString)"
+        let homeURL = backend?.home ?? FileManager.default.temporaryDirectory.appendingPathComponent("forge-native-workspace-positive-\(UUID().uuidString)")
         let localDefaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
         let clientOwner = try NativeWorkspaceDraftClient(repositoryUpdatesEnabled: repositoryUpdatesEnabled)
         let preferencesOwner = NativeWorkspacePreferences(knownPanelIDsByView: NativeWorkspaceCatalog.knownPanelIDsByView,
@@ -6535,16 +6706,21 @@ private final class NativeWorkspaceDraftFixture {
         let guidedOwner = GuidedModeCoordinator(defaults: localDefaults)
         let recorderOwner = NativeWorkspaceDraftBootstrapRecorder()
         let bootstrap = AppBootstrapOperation(factory: {
-            let app = try ForgeApp.bootstrap(home: homeURL, startTelemetry: false)
+            let app: ForgeApp
+            if let backend { app = backend.app }
+            else { app = try ForgeApp.bootstrap(home: homeURL, startTelemetry: false) }
             recorderOwner.recordCreation()
             return app
         }, pluginStatus: { _ in nil })
         let modelOwner = AppModel(bootstrapOperation: bootstrap, bootstrapIntegration: .isolatedPresentation,
                                   diagnosticPaths: AppPaths(home: homeURL))
         modelOwner.autoRefresh = false
+        let projectsClient: any OperatorManagerClientProtocol
+        if let backend { projectsClient = backend.client }
+        else { projectsClient = clientOwner }
         let content: AnyView = page == .manager
             ? AnyView(ManagerSettingsView(initialSection: .settings))
-            : AnyView(ProjectsOperatorView(client: clientOwner))
+            : AnyView(ProjectsOperatorView(client: projectsClient))
         let host = NSHostingView(rootView: AnyView(content.environmentObject(modelOwner)
             .environmentObject(workbenchOwner).environmentObject(guidedOwner)
             .environment(\.nativeWorkspacePreferences, preferencesOwner).graphiteWorkbench()))
@@ -6556,6 +6732,7 @@ private final class NativeWorkspaceDraftFixture {
         home = homeURL; suite = suiteName; defaults = localDefaults; recorder = recorderOwner
         preferences = preferencesOwner; model = modelOwner; client = clientOwner
         workbench = workbenchOwner; guidedMode = guidedOwner; hosting = host; window = ownedWindow
+        backendOwner = backend?.owner
     }
 
     func close() async {
@@ -6565,12 +6742,263 @@ private final class NativeWorkspaceDraftFixture {
         model.cancelBackgroundOperations()
         await model.stopBootstrap()
         model.telemetryBinding.detach()
+        if let backendOwner {
+            await Task.yield()
+            let stopped = await backendOwner.stop()
+            backendStop = stopped
+            XCTAssertTrue(stopped.serviceStopped, "The owned Manager service must stop before its application graph.")
+            XCTAssertTrue(stopped.completed, "The real backend must complete shutdown before reopen or cleanup.")
+            return
+        }
         if let app = model.app {
             let report = await Task.detached { app.shutdown() }.value
             XCTAssertTrue(report.completed, "The isolated real application graph must shut down before its home is removed.")
             if report.completed { try? FileManager.default.removeItem(at: home) }
         } else { try? FileManager.default.removeItem(at: home) }
         defaults.removePersistentDomain(forName: suite)
+    }
+}
+
+private actor NativeWorkspaceProjectRepositoryBackend {
+    struct Presentation: Sendable {
+        let owner: NativeWorkspaceProjectRepositoryBackend
+        let home: URL
+        let suite: String
+        let app: ForgeApp
+        let client: OperatorManagerHTTPClient
+    }
+    struct Metadata: Decodable, Sendable, Equatable {
+        let id: String
+        let aliases: [String]
+        let repositoryIdentity: String?
+        let githubRepositoryURL: String?
+    }
+    private struct Registry: Decodable { let projects: [Metadata] }
+    struct FileVersion: Sendable, Equatable { let inode: UInt64; let modified: Date }
+    struct Durable: Sendable, Equatable {
+        let metadata: Metadata
+        let metadataBytes: Data
+        let registryBytes: Data
+        let metadataVersion: FileVersion
+        let registryVersion: FileVersion
+    }
+    struct Checkpoint: Sendable { let project: OperatorProject; let durable: Durable }
+    struct StopReceipt: Sendable {
+        let completed: Bool
+        let serviceStopped: Bool
+        let completedShutdowns: Int
+    }
+    struct CleanupReceipt: Sendable { let completed: Bool; let homeRemoved: Bool }
+
+    private let deadline: TimeInterval
+    private let suite = "forge.workspace.repository-backend.tests.\(UUID().uuidString)"
+    private var home: URL?
+    private var projectID: String?
+    private var app: ForgeApp?
+    private var node: ManagerNode?
+    private var client: OperatorManagerHTTPClient?
+    private var session: URLSession?
+    private var starts = 0
+    private var completedShutdowns = 0
+    private var lastStop = StopReceipt(completed: true, serviceStopped: true, completedShutdowns: 0)
+
+    init(deadline: TimeInterval) { self.deadline = deadline }
+
+    private func requireDeadline() throws {
+        try Task.checkCancellation()
+        guard ProcessInfo.processInfo.systemUptime < deadline else {
+            throw WorkspaceCanvasFixtureFailure("The real repository flow exceeded its shared 75-second deadline.")
+        }
+    }
+
+    func start() async throws -> Presentation {
+        try requireDeadline()
+        guard app == nil, starts < 2, lastStop.completed else {
+            throw WorkspaceCanvasFixtureFailure("Reopen requires the previous owned backend's completed shutdown.")
+        }
+        let ownedHome: URL
+        if let home { ownedHome = home }
+        else {
+            let temporary = FileManager.default.temporaryDirectory.resolvingSymlinksInPath()
+            ownedHome = temporary.appendingPathComponent("forge-native-repository-reopen-\(UUID().uuidString)", isDirectory: true)
+            guard !FileManager.default.fileExists(atPath: ownedHome.path) else {
+                throw WorkspaceCanvasFixtureFailure("The unique repository test home already exists.")
+            }
+            try FileManager.default.createDirectory(at: ownedHome, withIntermediateDirectories: false,
+                                                   attributes: [.posixPermissions: 0o700])
+            home = ownedHome
+            try FileManager.default.createDirectory(at: ownedHome.appendingPathComponent("project", isDirectory: true),
+                                                   withIntermediateDirectories: false)
+        }
+        let application = try ForgeApp.bootstrap(home: ownedHome, startTelemetry: false)
+        app = application
+        starts += 1
+        let port = try Self.reserveLoopbackPort()
+        try application.config.update([
+            "dashboard": ["host": "127.0.0.1", "port": port] as [String: Any],
+            "allowed_roots": [ownedHome.path],
+        ], save: true)
+        let manager = ManagerNode(app: application)
+        node = manager
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = 3
+        configuration.timeoutIntervalForResource = 5
+        configuration.waitsForConnectivity = false
+        configuration.connectionProxyDictionary = [:]
+        let transport = URLSession(configuration: configuration)
+        session = transport
+        let http = OperatorManagerHTTPClient(host: "127.0.0.1", port: port, session: transport,
+                                            credentials: ManagerControlCredentialStore(paths: application.paths))
+        client = http
+        let started = try manager.startService()
+        guard started.serviceActive, started.dashboardHost == "127.0.0.1", started.dashboardPort == port else {
+            throw WorkspaceCanvasFixtureFailure("The owned loopback Manager did not start at its reserved endpoint.")
+        }
+        if projectID == nil {
+            let outcome = try await http.registerProject(.init(path: ownedHome.appendingPathComponent("project").path,
+                displayName: "Native repository reopen", repositoryIdentity: nil))
+            guard case .committed(let project, _) = outcome else {
+                throw WorkspaceCanvasFixtureFailure("The actual owned Manager did not commit project registration.")
+            }
+            projectID = project.projectID
+        }
+        try requireDeadline()
+        return Presentation(owner: self, home: ownedHome, suite: suite, app: application, client: http)
+    }
+
+    func checkpoint() async throws -> Checkpoint {
+        try requireDeadline()
+        guard let client, let projectID else { throw WorkspaceCanvasFixtureFailure("No active owned project backend.") }
+        let project = try await client.projectStatus(projectID: projectID)
+        let durable = try durableCheckpoint()
+        guard project.projectID == durable.metadata.id, project.githubRepositoryURL == durable.metadata.githubRepositoryURL,
+              durable.metadata.aliases.contains(project.canonicalRoot) else {
+            throw WorkspaceCanvasFixtureFailure("Manager status and the owned durable project descriptor disagree.")
+        }
+        try requireDeadline()
+        return Checkpoint(project: project, durable: durable)
+    }
+
+    func durableCheckpoint() throws -> Durable {
+        try requireDeadline()
+        guard let home, let projectID, UUID(uuidString: projectID) != nil else {
+            throw WorkspaceCanvasFixtureFailure("No validated owned project metadata path.")
+        }
+        let paths = AppPaths(home: home)
+        let metadataFile = paths.projectsDir.appendingPathComponent(projectID).appendingPathComponent("project.json")
+        let metadata = try Self.read(metadataFile)
+        let registry = try Self.read(paths.projectRegistry)
+        let decoded = try JSONDecoder().decode(Metadata.self, from: metadata.bytes)
+        let entries = try JSONDecoder().decode(Registry.self, from: registry.bytes).projects
+        guard entries.count == 1, entries.first == decoded, decoded.id == projectID else {
+            throw WorkspaceCanvasFixtureFailure("The two real durable identity files do not describe exactly the owned project.")
+        }
+        try requireDeadline()
+        return Durable(metadata: decoded, metadataBytes: metadata.bytes, registryBytes: registry.bytes,
+                       metadataVersion: metadata.version, registryVersion: registry.version)
+    }
+
+    private static func read(_ file: URL) throws -> (bytes: Data, version: FileVersion) {
+        let attributes = try FileManager.default.attributesOfItem(atPath: file.path)
+        guard attributes[.type] as? FileAttributeType == .typeRegular,
+              let inode = attributes[.systemFileNumber] as? NSNumber,
+              let size = attributes[.size] as? NSNumber, size.intValue > 0, size.intValue <= 16 * 1_024,
+              let modified = attributes[.modificationDate] as? Date else {
+            throw WorkspaceCanvasFixtureFailure("The owned durable identity input is not a regular file.")
+        }
+        let handle = try FileHandle(forReadingFrom: file)
+        defer { try? handle.close() }
+        let bytes = try handle.read(upToCount: 16 * 1_024 + 1) ?? Data()
+        guard bytes.count == size.intValue, bytes.count <= 16 * 1_024 else {
+            throw WorkspaceCanvasFixtureFailure("The single-project identity input exceeded its 16-KiB bound.")
+        }
+        return (bytes, FileVersion(inode: inode.uint64Value, modified: modified))
+    }
+
+    func stop() -> StopReceipt {
+        guard let app else { return lastStop }
+        var serviceStopped = node == nil
+        if let node {
+            guard let status = try? node.stopService(), !status.serviceActive, !status.desiredRunning else {
+                session?.invalidateAndCancel()
+                session = nil; client = nil
+                lastStop = StopReceipt(completed: false, serviceStopped: false,
+                                       completedShutdowns: completedShutdowns)
+                return lastStop
+            }
+            serviceStopped = true
+        }
+        node = nil
+        session?.invalidateAndCancel()
+        session = nil; client = nil
+        let report = app.shutdown()
+        let completed = serviceStopped && report.completed
+        if completed { self.app = nil; completedShutdowns += 1 }
+        lastStop = StopReceipt(completed: completed, serviceStopped: serviceStopped,
+                               completedShutdowns: completedShutdowns)
+        return lastStop
+    }
+
+    func cleanup() -> CleanupReceipt {
+        let stopped = stop()
+        guard stopped.completed else { return CleanupReceipt(completed: false, homeRemoved: false) }
+        guard let home else { return CleanupReceipt(completed: true, homeRemoved: true) }
+        let temporary = FileManager.default.temporaryDirectory.resolvingSymlinksInPath()
+        guard home.deletingLastPathComponent() == temporary,
+              home.lastPathComponent.hasPrefix("forge-native-repository-reopen-"),
+              home.resolvingSymlinksInPath() == home else {
+            return CleanupReceipt(completed: true, homeRemoved: false)
+        }
+        do {
+            try FileManager.default.removeItem(at: home)
+            UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite)
+            self.home = nil
+            return CleanupReceipt(completed: true, homeRemoved: true)
+        } catch { return CleanupReceipt(completed: true, homeRemoved: false) }
+    }
+
+    func evidence(_ checkpoint: Checkpoint, phase: String) throws -> Data {
+        try requireDeadline()
+        let bytes = try JSONSerialization.data(withJSONObject: [
+            "classification": "App-hosted real isolated Manager/backend and fresh custom Projects view reopen; no ordinary candidate process quit or installed acceptance",
+            "phase": phase, "project_id": checkpoint.project.projectID,
+            "project_generation": checkpoint.project.projectGeneration,
+            "github_repository_url": checkpoint.project.githubRepositoryURL as Any? ?? NSNull(),
+            "metadata_sha256": JSONSupport.sha256Hex(checkpoint.durable.metadataBytes),
+            "registry_sha256": JSONSupport.sha256Hex(checkpoint.durable.registryBytes),
+            "metadata_bytes": checkpoint.durable.metadataBytes.count,
+            "registry_bytes": checkpoint.durable.registryBytes.count,
+            "backend_starts": starts, "completed_shutdowns": completedShutdowns,
+            "last_shutdown_completed": completedShutdowns > 0 ? lastStop.completed as Any : NSNull(),
+            "last_service_stop_succeeded": completedShutdowns > 0 ? lastStop.serviceStopped as Any : NSNull(),
+            "backend_running": app != nil,
+            "deadline_seconds": 75,
+        ], options: [.sortedKeys])
+        guard bytes.count <= 4 * 1_024 else { throw WorkspaceCanvasFixtureFailure("The owned backend receipt exceeded 4 KiB.") }
+        return bytes
+    }
+
+    private static func reserveLoopbackPort() throws -> Int {
+        let descriptor = Darwin.socket(AF_INET, SOCK_STREAM, 0)
+        guard descriptor >= 0 else { throw WorkspaceCanvasFixtureFailure("Owned loopback socket creation failed.") }
+        defer { Darwin.close(descriptor) }
+        var address = sockaddr_in()
+        address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+        address.sin_family = sa_family_t(AF_INET)
+        address.sin_addr.s_addr = inet_addr("127.0.0.1")
+        let bound = withUnsafePointer(to: &address) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                Darwin.bind(descriptor, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+            }
+        }
+        var length = socklen_t(MemoryLayout<sockaddr_in>.size)
+        let inspected = withUnsafeMutablePointer(to: &address) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { getsockname(descriptor, $0, &length) }
+        }
+        guard bound == 0, inspected == 0, address.sin_port != 0 else {
+            throw WorkspaceCanvasFixtureFailure("Owned loopback ephemeral-port reservation failed.")
+        }
+        return Int(UInt16(bigEndian: address.sin_port))
     }
 }
 
