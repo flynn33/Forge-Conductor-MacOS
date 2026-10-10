@@ -2680,6 +2680,17 @@ private final class RuneWorkspaceNativeNamingMenuCapture: NSObject {
     private var capturedRoots = 0
     private var ticks = 0
     private var querying = false
+    private enum TrackingEndStage: String {
+        case observerRegistered = "observer_registered_return"
+        case nativeActionReturned = "native_action_return"
+        case cancelReturned = "cancel_tracking_return"
+        case resultAssigned = "result_assignment_return"
+        case firstExactEnd = "first_exact_end_notification_receipt"
+        case stopEntry = "stop_entry"
+        case stopAfterClear = "stop_after_reference_clear"
+    }
+    private var exactEndMatchesFirstTwo = 0
+    private var trackingEndOrder: [String: [String: Any]] = [:]
     private(set) var result: Result<Void, Error>?
     private(set) var record: [String: Any] = [:]
     var sheetNodes: [[String: Any]] = []
@@ -2708,6 +2719,11 @@ private final class RuneWorkspaceNativeNamingMenuCapture: NSObject {
         value["sheet_nodes_first64"] = sheetNodes; value["actual_native_sheet_press"] = sheetPress
         value["failure_only_physical_buttons"] = sheetPhysicalButtons
         value["failure_only_default_button_relationship"] = sheetDefaultButton
+        value["first_captured_menu_tracking_end_order"] = [
+            "classification": "Exact first captured menu notification and cached scalar order only; not enclosing run-loop unwind, menu release, or original failure cause",
+            "first_write_stage_limit": 7, "exact_end_match_counter_limit": 2,
+            "exact_end_matches_first_two": exactEndMatchesFirstTwo,
+            "stages": trackingEndOrder] as [String: Any]
         return value
     }
     func noteOpener(action: String, status: Int32) {
@@ -2776,6 +2792,42 @@ private final class RuneWorkspaceNativeNamingMenuCapture: NSObject {
         state["read_budget_expired"] = state["read_budget_expired"] as? Bool == true || ProcessInfo.processInfo.systemUptime >= readDeadline
         record["native_state_" + stage] = state
     }
+    private func recordTrackingEndStage(_ stage: TrackingEndStage) {
+        guard trackingEndOrder[stage.rawValue] == nil else { return }
+        let observed = ProcessInfo.processInfo.systemUptime
+        let outcome: String
+        switch result {
+        case .some(.success(_)): outcome = "success"
+        case .some(.failure(_)): outcome = "failure"
+        case .none: outcome = "none"
+        }
+        var state: [String: Any] = ["snapshot_uptime": observed, "attempt_deadline": deadline,
+            "armed": armed, "held_first_menu_present": actualMenu != nil,
+            "result_outcome": outcome, "exact_end_matches_first_two": exactEndMatchesFirstTwo,
+            "cached_fixture_marker_proven": record["scope_marker_exact"] != nil,
+            "cached_native_dispatch_returned": record["native_command_dispatch_returned"] as? Bool == true,
+            "cached_cancel_tracking_returned": record["qualified_native_menu_cancel_tracking_returned"] as? Bool == true]
+        if stage == .firstExactEnd {
+            let readDeadline = observed + 0.02
+            state["notification_object_is_exact_held_first_menu"] = true
+            state["mode_read_budget_seconds"] = 0.02
+            state["run_loop_mode_prefix"] = NSNull()
+            if ProcessInfo.processInfo.systemUptime < readDeadline {
+                state["run_loop_mode_prefix"] = RunLoop.current.currentMode.map { String($0.rawValue.prefix(128)) as Any } ?? NSNull()
+            }
+            let finished = ProcessInfo.processInfo.systemUptime
+            state["mode_snapshot_elapsed_seconds"] = finished - observed
+            state["mode_read_budget_expired"] = finished >= readDeadline
+        }
+        trackingEndOrder[stage.rawValue] = state
+    }
+    @objc func didEndTracking(_ value: Notification) {
+        guard armed, let heldMenu = actualMenu, let menu = value.object as? NSMenu,
+              menu === heldMenu, exactEndMatchesFirstTwo < 2 else { return }
+        exactEndMatchesFirstTwo += 1
+        guard exactEndMatchesFirstTwo == 1 else { return }
+        recordTrackingEndStage(.firstExactEnd)
+    }
     private func requireOwner() throws -> (NSWindow, NSView) {
         guard ProcessInfo.processInfo.systemUptime < deadline,
               let window, let hosting, window.contentView === hosting, hosting.window === window,
@@ -2792,6 +2844,9 @@ private final class RuneWorkspaceNativeNamingMenuCapture: NSObject {
             result = .failure(RuneWorkspaceVisibilityFailure("The armed native opener did not produce exactly one actual NSMenu tracking root.")); return
         }
         actualMenu = menu; notification = value
+        NotificationCenter.default.addObserver(self, selector: #selector(didEndTracking(_:)),
+            name: NSMenu.didEndTrackingNotification, object: menu)
+        recordTrackingEndStage(.observerRegistered)
     }
     @objc func fire(_ timer: Timer) {
         guard !isFinished else { timer.invalidate(); return }
@@ -2844,18 +2899,25 @@ private final class RuneWorkspaceNativeNamingMenuCapture: NSObject {
             menu.performActionForItem(at: index)
             if requestedCommand == "Rename Layout…" { record["native_rename_dispatch_returned"] = true }
             record["native_command_dispatch_returned"] = true
+            recordTrackingEndStage(.nativeActionReturned)
             menu.cancelTracking()
             record["qualified_native_menu_cancel_tracking_returned"] = true
+            recordTrackingEndStage(.cancelReturned)
             result = .success(()); timer.invalidate()
+            recordTrackingEndStage(.resultAssigned)
         } catch {
             record["callback_error"] = String(String(describing: error).prefix(4_096))
             result = .failure(error); timer.invalidate()
+            recordTrackingEndStage(.resultAssigned)
         }
     }
     func stop() {
+        recordTrackingEndStage(.stopEntry)
         armed = false
         NotificationCenter.default.removeObserver(self, name: NSMenu.didBeginTrackingNotification, object: nil)
+        NotificationCenter.default.removeObserver(self, name: NSMenu.didEndTrackingNotification, object: nil)
         actualMenu = nil; notification = nil
+        recordTrackingEndStage(.stopAfterClear)
     }
 }
 

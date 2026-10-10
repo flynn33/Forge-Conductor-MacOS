@@ -24,6 +24,8 @@ Hide during an unfinished move or resize now cancels the hidden host’s gesture
 
 Mixed pointer/keyboard editing now keeps arrows transient, retains their displacement through later pointer input and restores the original frame on Escape. A separate rollback frame and keyboard-rebased pointer anchor repair the reproduced early-save/discarded-displacement defects. All seven unchanged mixed cases pass in v61; v62 passes 22 related methods including those seven. App compilation, ordinary Debug, strict signature and v8 candidate readback pass. Qwen’s separate review is advisory. Final source/document checks follow admission; exact delivery stays in external receipts. Original UI/desktop/installed gates remain open and new implementations stay deferred. [Exact outcomes](docs/QUALIFICATION-STATUS.md).
 
+The test-only Rune tracking diagnostic leaves naming open: v67 failed; v68 passed Fresh Rename but failed Fresh Save As and the combined case. All four captured menus lack an exact didEnd receipt before capture stop, including the pass, so this observation does not distinguish failure. Fatal AXIdentifier reads still stop Save discovery; no naming repair or broader UI qualification follows. [Exact outcomes](docs/QUALIFICATION-STATUS.md).
+
 The post-naming v6 ordinary Debug build, strict signature and seven-artifact/Info 0.44.0 (60) readback passed against 320 product/build inputs. This qualifies candidate compilation and file identities; candidate launch, installed operation and full UI remain unverified. Remaining new capability implementations stay deferred. [Current gates](docs/QUALIFICATION-STATUS.md).
 
 ## Earlier UI checks before the naming repair

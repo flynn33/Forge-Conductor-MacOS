@@ -43,6 +43,8 @@ Product versions do not by themselves claim shipment.
 
 - Add bounded Rune cached-path, native menu-state and failure-only standard-control reference diagnostics without relaxing original errors. V44–v46 remain mixed/combined NONPASS; v46 maps the held first-edge ancestor to the exact window Zoom reference. V47 again captures no second menu root. Unreadable-child and menu-failure causes remain unknown. [Qualification](docs/QUALIFICATION-STATUS.md).
 
+- Record the bounded test-only Rune tracking diagnostic: v67 fails and v68 passes Fresh Rename while Fresh Save As and combined naming fail before Save activation. All four menus lack an exact didEnd receipt before capture stop, including the pass; this is no failure discriminator, unwind/release proof or cause. Original gates remain open. [Qualification](docs/QUALIFICATION-STATUS.md).
+
 #### Earlier UI checks before the naming repair
 
 - Verify the post-Compute ordinary Debug candidate, strict signature and CLI/app product links. Candidate Dashboard startup was observed. The later whole native Canvas selection passed 11 of 13 methods; both draft cases, Projects desktop navigation and Rune naming qualification remain open. The installed 0.18.0 (28) app was not replaced.
