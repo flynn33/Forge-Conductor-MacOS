@@ -31,6 +31,8 @@ Product versions do not by themselves claim shipment.
 
 - Record the separate v28 trust-state observation: both complete-draft methods remain NONPASS, with false reported by the test client at each diagnostic start. Root/parent role reads still succeed while held/fresh child reads remain −25211. This context observation establishes no particular-child cause or production repair; all original assertions and open UI gates remain.
 
+- Record the separate synthetic export comparison: v29 failed compilation with no method executed, v30 failed its added direct NSButton-role assumption, and v31 passed one actual bounded AppKit/SwiftUI comparison after fixture-only corrections. Both fixtures exported one exact identified AXButton with client trust false. Original Manager/Projects actions and all 23 assertions remain unchanged/NONPASS on v28; no permission cause, product repair, control action or full UI qualification follows.
+
 #### Earlier UI checks before the naming repair
 
 - Verify the post-Compute ordinary Debug candidate, strict signature and CLI/app product links. Candidate Dashboard startup was observed. The later whole native Canvas selection passed 11 of 13 methods; both draft cases, Projects desktop navigation and Rune naming qualification remain open. The installed 0.18.0 (28) app was not replaced.

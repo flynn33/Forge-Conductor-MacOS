@@ -38,6 +38,129 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
         window = nil
     }
 
+    func testOwnedAppKitAndSwiftUIExportComparisonDiagnostic() async throws {
+        continueAfterFailure = true
+        for technology in ["AppKit", "SwiftUI"] {
+            let measured = try await nativeDraftExportComparison(technology: technology)
+            nativeDraftRetainMeasurement(measured.report, name: "native-export-comparison-" + technology)
+            XCTAssertTrue(measured.complete, "The separate synthetic export comparison did not complete its bounded snapshot.")
+            XCTAssertEqual(measured.matchingButtons, 1,
+                           "The separate owned window did not export exactly one identified button.")
+        }
+    }
+
+    private func nativeDraftExportComparison(technology: String) async throws
+        -> (report: [String: Any], complete: Bool, matchingButtons: Int) {
+        let identifier = "native-export-comparison-control"
+        let title = "Export comparison control"
+        let root: NSView
+        if technology == "AppKit" {
+            let button = NSButton(title: title, target: nil, action: nil)
+            button.setAccessibilityIdentifier(identifier)
+            root = button
+            XCTAssertEqual(button.accessibilityIdentifier(), identifier)
+            XCTAssertEqual(button.title, title)
+        } else {
+            root = NSHostingView(rootView: Button(title) {}.accessibilityIdentifier(identifier))
+        }
+        let owned = NSWindow(contentRect: NSRect(x: 120, y: 120, width: 320, height: 120),
+                             styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        owned.isReleasedWhenClosed = false
+        owned.title = "Synthetic export comparison \(technology) \(UUID().uuidString)"
+        owned.contentView = root
+        window = owned
+        defer {
+            owned.orderOut(nil); owned.contentView = nil; owned.close()
+            if window === owned { window = nil }
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        owned.makeKeyAndOrderFront(nil); owned.orderFrontRegardless()
+        root.layoutSubtreeIfNeeded()
+        try await Task.sleep(for: .milliseconds(40))
+        root.layoutSubtreeIfNeeded()
+        XCTAssertTrue(owned.isKeyWindow && owned.isVisible)
+        XCTAssertTrue(owned.contentView === root && root.window === owned)
+        let started = ProcessInfo.processInfo.systemUptime
+        let deadline = started + 2
+        let ownPID = ProcessInfo.processInfo.processIdentifier
+        var report: [String: Any] = [
+            "classification": "Separate synthetic own-window export diagnostic only; no production workflow qualification",
+            "technology": technology, "process_pid": ownPID, "AXIsProcessTrusted": AXIsProcessTrusted(),
+            "expected_identifier": identifier, "expected_title": title,
+            "owned_window_title": owned.title, "window_visible": owned.isVisible, "window_key": owned.isKeyWindow,
+            "exact_owned_root": owned.contentView === root && root.window === owned,
+            "root_type": String(String(reflecting: type(of: root)).prefix(256)),
+            "native_root_identifier": String(root.accessibilityIdentifier().prefix(256)),
+            "native_root_role": root.accessibilityRole()?.rawValue as Any? ?? NSNull(),
+            "shared_deadline_seconds": 2, "single_exported_message_timeout_seconds": 0.1,
+            "node_limit": 64, "depth_limit": 16, "window_limit": 32,
+            "one_initial_settle_milliseconds": 40, "retry_count": 0,
+        ]
+        var rows: [[String: Any]] = [], matchingButtons = 0, complete = false
+        func requireOwner() throws {
+            guard ProcessInfo.processInfo.systemUptime < deadline,
+                  owned.contentView === root, root.window === owned,
+                  NSApp.windows.filter({ $0.title == owned.title }).count == 1 else {
+                throw WorkspaceCanvasFixtureFailure("The synthetic comparison lost its owned window/root or finite deadline.")
+            }
+        }
+        do {
+            try requireOwner()
+            let application = AXUIElementCreateApplication(ownPID)
+            let windows = try NativeWorkspaceDraftAXQuery.children(application, kAXWindowsAttribute,
+                                                                   limit: 32, deadline: deadline)
+            let matches = try windows.filter {
+                try NativeWorkspaceDraftAXQuery.attribute($0, kAXTitleAttribute, deadline: deadline) as? String == owned.title
+            }
+            guard matches.count == 1 else {
+                throw WorkspaceCanvasFixtureFailure("The synthetic comparison did not find one exact uniquely titled own-process AX window.")
+            }
+            var pending: [(AXUIElement, [Int])] = [(matches[0], [])]
+            var seen: [AXUIElement] = []
+            while let (element, path) = pending.popLast() {
+                try requireOwner()
+                guard !seen.contains(where: { CFEqual($0, element) }) else { continue }
+                guard seen.count < 64, path.count <= 16 else {
+                    throw WorkspaceCanvasFixtureFailure("The synthetic comparison exceeded its 64-node/16-level bound.")
+                }
+                seen.append(element)
+                var row: [String: Any] = ["visit_index": seen.count - 1, "discovery_path": path]
+                var rawIdentifier: String?, rawRole: String?
+                for attribute in [kAXIdentifierAttribute, kAXRoleAttribute, kAXTitleAttribute] {
+                    try requireOwner()
+                    try NativeWorkspaceDraftAXQuery.prepare(element, deadline: deadline)
+                    var value: CFTypeRef?
+                    let status = AXUIElementCopyAttributeValue(element, attribute as CFString, &value)
+                    let text = value as? String
+                    row[attribute] = [
+                        "status": status.rawValue,
+                        "cf_type_id": value.map { CFGetTypeID($0) as Any } ?? NSNull(),
+                        "string_sample": text.map { String($0.prefix(256)) as Any } ?? NSNull(),
+                    ] as [String: Any]
+                    if attribute == kAXIdentifierAttribute, status == .success { rawIdentifier = text }
+                    if attribute == kAXRoleAttribute, status == .success { rawRole = text }
+                    try requireOwner()
+                }
+                rows.append(row)
+                if rawIdentifier == identifier && rawRole == NSAccessibility.Role.button.rawValue { matchingButtons += 1 }
+                let children = try NativeWorkspaceDraftAXQuery.children(element, kAXChildrenAttribute,
+                    limit: 64 - seen.count - pending.count, deadline: deadline)
+                pending.append(contentsOf: children.enumerated().map { ($0.element, path + [$0.offset]) })
+            }
+            try requireOwner()
+            complete = true
+        } catch {
+            report["snapshot_error_type"] = String(String(reflecting: type(of: error)).prefix(1_024))
+            report["snapshot_error_description"] = String(String(describing: error).prefix(4_096))
+        }
+        report["snapshot_complete"] = complete
+        report["matching_button_count"] = matchingButtons
+        report["visited_nodes"] = rows
+        report["elapsed_seconds"] = ProcessInfo.processInfo.systemUptime - started
+        report["within_shared_deadline"] = ProcessInfo.processInfo.systemUptime < deadline
+        return (report, complete, matchingButtons)
+    }
+
     func testProductionManagerNativeDraftSurvivesWorkspaceAndSectionTransitions() async throws {
         do {
             continueAfterFailure = true

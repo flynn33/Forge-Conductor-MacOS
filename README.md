@@ -14,6 +14,8 @@ Two later diagnostic selections, v25/v26, still failed both complete draft metho
 
 A separate v28 trust-state observation still failed both complete-draft methods. The test client reported `AXIsProcessTrusted() == false` when each failure diagnostic began; this records client context, without proving the particular child’s failure cause. Original errors remain fatal and all original actions/assertions remain; complete drafts/UI stay open.
 
+A separate synthetic AppKit/SwiftUI export comparison v31 passed one actual method: both owned fixtures exported exactly one identified AXButton while the test client reported false for accessibility trust. The earlier v29 compile failure executed no method; v30 failed a new direct-role assumption, preserved as NONPASS. Only the added fixture/report checks were corrected. No button action or original Manager/Projects flow was exercised; their v28 two-method failure and complete UI gates remain open.
+
 The post-naming v6 ordinary Debug build, strict signature and seven-artifact/Info 0.44.0 (60) readback passed against 320 product/build inputs. This qualifies candidate compilation and file identities; candidate launch, installed operation and full UI remain unverified. Remaining new capability implementations stay deferred. [Current gates](docs/QUALIFICATION-STATUS.md).
 
 ## Earlier UI checks before the naming repair
