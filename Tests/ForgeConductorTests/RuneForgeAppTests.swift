@@ -535,6 +535,117 @@ final class RuneForgeAppTests: XCTestCase {
         await runeNamingClose(fixture, runeModel: runeModel)
     }
 
+    func testMountedRuneApplicationContentExactAttachedSheetNativeMenuSavePersistsNamesAndLayoutIdentity() async throws {
+        let commands = ["Rename Layout…", "Save Layout As…"]
+        guard !commands.isEmpty, commands.count <= 2, Set(commands).count == commands.count,
+              commands.allSatisfy({ $0 == "Rename Layout…" || $0 == "Save Layout As…" }) else {
+            throw RuneWorkspaceVisibilityFailure("Fresh exported Save requires one or two distinct literal naming commands.")
+        }
+        guard NSApp != nil, Bundle.main.bundleURL.pathExtension == "app", !NSScreen.screens.isEmpty else {
+            throw RuneWorkspaceVisibilityFailure("Run in ForgeConductorAppTests with a native display.")
+        }
+        let source = DevelopmentPolicySource(displayName: "Naming policy",
+            selectedPath: "/tmp/rune-naming-policy.md", interpretationState: .cataloging)
+        let client = RuneWorkspaceNamingClient(snapshot: policySnapshot(events: [], sources: [source]))
+        let runeModel = RuneForgeViewModel(client: client)
+        let fixture = try RuneWorkspaceVisibilityFixture(model: runeModel, urls: [])
+        let descriptors = NativeWorkspaceCatalog.runePanels(for: "source")
+        let original = NativeWorkspaceLayout(id: UUID(), viewID: "rune-forge.source", name: "Source-" + UUID().uuidString,
+            canvas: .init(width: max(1_280, descriptors.map { $0.defaultFrame.x + $0.defaultFrame.width + 20 }.max() ?? 0),
+                          height: max(900, descriptors.map { $0.defaultFrame.y + $0.defaultFrame.height + 20 }.max() ?? 0)),
+            panels: descriptors.map { .init(id: $0.id, frame: $0.defaultFrame, isVisible: true) })
+        let observer = RuneWorkspaceNamingAX(window: fixture.window, hosting: fixture.hosting)
+        var stage = "mount", witnesses: [[String: Any]] = []
+        var menu: RuneWorkspaceNativeNamingMenuCapture?
+        func retain(_ error: Error? = nil) throws {
+            let bytes = try JSONEncoder().encode(fixture.preferences.collection)
+            guard bytes.count <= NativeWorkspaceLimits.maximumStoredBytes, witnesses.count <= 2 else {
+                throw RuneWorkspaceVisibilityFailure("Positive naming evidence exceeded its collection/witness bound.")
+            }
+            let report: [String: Any] = ["classification": "Separate application-content window membership plus sole first-order attached-sheet Save scope; native menus/editor, unchanged complete sheet graph/actions. Only freshly validated standard Zoom/FullScreen descendants are excluded from window walks. Native/exported sheet correspondence is inferred from repeated sole-sheet observations under the exact parent, not a direct conversion or atomic identity guarantee. Original whole-window tests/gates remain unchanged; no end-wait experiment, Return fallback, product repair or desktop-input proof.",
+                "stage": stage, "requested_commands": commands, "fresh_fixture_command_count": commands.count,
+                "normal_naming_witnesses": witnesses,
+                "actual_menu_transition": menu?.evidence ?? [:],
+                "last_required_AX_walk_context": observer.lastRequiredWalkContext,
+                "last_application_content_window_scope": observer.lastApplicationContentWindowScope,
+                "last_AX_scalar_read": observer.lastRead,
+                "collection": try JSONSerialization.jsonObject(with: bytes),
+                "error": error.map { String(String(describing: $0).prefix(4_096)) as Any } ?? NSNull()]
+            let data = try JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys])
+            guard data.count <= 1_152 * 1_024 else { throw RuneWorkspaceVisibilityFailure("Positive naming JSON exceeded its payload bound.") }
+            let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+            attachment.name = "rune-application-content-attached-sheet-save-" + stage; attachment.lifetime = .keepAlways; add(attachment)
+        }
+        do {
+            try fixture.preferences.save(original)
+            fixture.window.orderFront(nil); fixture.hosting.layoutSubtreeIfNeeded()
+            try await runeWorkspaceWait("The real Rune source owners did not settle for positive naming.") {
+                !fixture.model.isBootstrapping && !runeModel.isLoading && runeModel.sources.count == 1
+                    && fixture.document?.panelHosts.count == fixture.layout.panels.count
+            }
+            runeModel.pauseObservation()
+            let row = try await observer.required(identifier: "rune-policy-source-row-" + source.id.description, scope: .applicationContent)
+            try observer.pressOwned(row, role: kAXButtonRole, scope: .applicationContent)
+            _ = try await observer.required(identifier: "workspace-controls-rune-forge.source", scope: .applicationContent)
+            try await runeWorkspaceWait("The actual source row did not mount its source workspace.") {
+                Set(fixture.document?.panelHosts.keys.map { $0 } ?? []) == Set(original.panels.map(\.id))
+            }
+            for command in commands {
+                let before = fixture.preferences.collection
+                let active = try XCTUnwrap(fixture.preferences.activeLayout(for: original.viewID))
+                let newName = (command == "Rename Layout…" ? "Renamed-" : "Saved-") + UUID().uuidString
+                stage = command == "Rename Layout…" ? "attached-sheet-save-rename" : "attached-sheet-save-as"
+                let capture = RuneWorkspaceNativeNamingMenuCapture(window: fixture.window, hosting: fixture.hosting,
+                    expectedName: active.name, requestedCommand: command)
+                menu = capture
+                let opener = try await observer.required(identifier: "workspace-layout-menu-" + original.viewID, scope: .applicationContent)
+                try await observer.openOwnedMenuAndPressNativeNamingCommand(opener, capture: capture, scope: .applicationContent)
+                try await runeWorkspaceWait("The actual naming command did not present its production sheet.") { fixture.window.attachedSheet != nil }
+                let sheet = try XCTUnwrap(fixture.window.attachedSheet), content = try XCTUnwrap(sheet.contentView)
+                let (field, identity) = try await runeRequiredOwnedNamingField(fixture, sheet: sheet, content: content,
+                    expectedValue: command == "Rename Layout…" ? active.name : "Custom")
+                try runeReplaceOwnedNamingText(fixture, sheet: sheet, content: content, field: field, name: newName)
+                guard fixture.preferences.collection == before else { throw RuneWorkspaceVisibilityFailure("Actual editing/endEditing changed saved layouts before the exported Save action.") }
+                witnesses.append(["command": command, "new_name": newName, "identity_source": identity,
+                    "actual_editor_changed": true, "actual_Save_action_requested": false,
+                    "actual_Save_action_returned": false, "actual_sheet_dismissed": false])
+                let save = try observer.requiredExactAttachedSheetSave(sheet: sheet, content: content, field: field, expectedName: newName)
+                try runeRequireNamingSheetOwner(fixture, sheet: sheet, content: content)
+                guard field.window === sheet, field.stringValue == newName, fixture.preferences.collection == before else {
+                    throw RuneWorkspaceVisibilityFailure("Exported Save lost its retained actual name field or unchanged collection.")
+                }
+                try observer.pressRetainedExactAttachedSheetSave(save, sheet: sheet, content: content, field: field, expectedName: newName,
+                    witness: &witnesses[witnesses.count - 1])
+                try await runeWorkspaceWait("The exact exported Save action did not dismiss the naming sheet.") {
+                    fixture.window.attachedSheet == nil
+                }
+                witnesses[witnesses.count - 1]["actual_sheet_dismissed"] = true
+                let after = fixture.preferences.collection
+                let result = try XCTUnwrap(fixture.preferences.activeLayout(for: original.viewID))
+                if command == "Rename Layout…" {
+                    var expected = before
+                    let index = try XCTUnwrap(expected.layouts.firstIndex(where: { $0.id == active.id }))
+                    expected.layouts[index].name = newName
+                    guard result.id == original.id, after == expected else { throw RuneWorkspaceVisibilityFailure("Actual Rename did not preserve exact layout identity, geometry, panels and other namespaces.") }
+                } else {
+                    guard result.id != active.id, result.name == newName, result.viewID == active.viewID,
+                          result.canvas == active.canvas, result.panels == active.panels else { throw RuneWorkspaceVisibilityFailure("Actual Save As did not create a new named identity with copied geometry/panels.") }
+                    var expected = before; expected.layouts.append(result); expected.activeLayoutIDs[original.viewID] = result.id
+                    guard after == expected else { throw RuneWorkspaceVisibilityFailure("Actual Save As changed more than its new layout and source selection.") }
+                }
+                let restored = NativeWorkspacePreferences(knownPanelIDsByView: NativeWorkspaceCatalog.knownPanelIDsByView,
+                    panelSizeBoundsByView: NativeWorkspaceCatalog.sizeBoundsByView, defaults: fixture.defaults)
+                guard restored.restorationError == nil, restored.collection == after else {
+                    throw RuneWorkspaceVisibilityFailure("The actual naming result did not restore exactly from isolated preferences.")
+                }
+                try retain()
+            }
+        } catch {
+            try? retain(error); await runeNamingClose(fixture, runeModel: runeModel); throw error
+        }
+        await runeNamingClose(fixture, runeModel: runeModel)
+    }
+
     private func runeExerciseFreshNativeMenuExportedSave(commands: [String]) async throws {
         guard !commands.isEmpty, commands.count <= 2, Set(commands).count == commands.count,
               commands.allSatisfy({ $0 == "Rename Layout…" || $0 == "Save Layout As…" }) else {
@@ -2115,6 +2226,8 @@ private final class RuneWorkspaceNamingMenuSelection: NSObject {
     }
 }
 
+private enum RuneWorkspaceWindowIdentifierScope: Equatable { case wholeWindow, applicationContent }
+
 @MainActor
 private final class RuneWorkspaceNamingAX {
     private weak var window: NSWindow?
@@ -2125,6 +2238,7 @@ private final class RuneWorkspaceNamingAX {
     private(set) var lastMenuTransition: [String: Any] = [:]
     private var lastWalkContext: [String: Any] = [:]
     private(set) var lastRequiredWalkContext: [String: Any] = [:]
+    private(set) var lastApplicationContentWindowScope: [String: Any] = [:]
     init(window: NSWindow, hosting: NSView) { self.window = window; self.hosting = hosting }
 
     private func check(_ deadline: TimeInterval) throws {
@@ -2257,7 +2371,8 @@ private final class RuneWorkspaceNamingAX {
         return record
     }
     private func nodes(_ root: AXUIElement, _ deadline: TimeInterval,
-                       queryContext: [String: Any] = [:]) throws -> [(AXUIElement, [AXUIElement], String?, String?, String?)] {
+                       queryContext: [String: Any] = [:], excludingDescendantsOf standardZoom: AXUIElement? = nil,
+                       requestedIdentifier: String? = nil) throws -> [(AXUIElement, [AXUIElement], String?, String?, String?)] {
         var pending: [(AXUIElement, [AXUIElement], [Int], [[String: Any]], Int)] = [(root, [], [], [], 0)]
         var result: [(AXUIElement, [AXUIElement], String?, String?, String?)] = []
         lastNodes = []
@@ -2296,6 +2411,13 @@ private final class RuneWorkspaceNamingAX {
             var currentMetadata = diagnosticNodeMetadata(identifier, role, title)
             currentMetadata["cached"] = true
             lastWalkContext["current_node"] = currentMetadata
+            if let standardZoom, CFEqual(element, standardZoom) {
+                guard role == kAXButtonRole, requestedIdentifier == nil || identifier != requestedIdentifier else {
+                    throw RuneWorkspaceVisibilityFailure("Application-content scope cannot exclude a changed-role standard control or the requested Forge identifier.")
+                }
+                lastWalkContext["validated_standard_zoom_descendant_expansion_omitted"] = true
+                continue
+            }
             let nextCachedAncestors = Array((cachedAncestors + [currentMetadata]).suffix(4))
             let nextSheetAncestorCount = sheetAncestorCount + (role == kAXSheetRole ? 1 : 0)
             let next = try children(element, kAXChildrenAttribute, limit: 2_048 - result.count - pending.count, deadline)
@@ -2307,6 +2429,83 @@ private final class RuneWorkspaceNamingAX {
         lastWalkContext["completed_nodes"] = result.count
         return result
     }
+    private func requireOwnedWindowAncestor(_ element: AXUIElement, root: AXUIElement,
+                                           deadline: TimeInterval) throws {
+        var cursor = element, seen: [AXUIElement] = []
+        for _ in 0...48 {
+            try prepare(cursor, deadline)
+            guard !seen.contains(where: { CFEqual($0, cursor) }) else {
+                throw RuneWorkspaceVisibilityFailure("Application-content standard-control ancestry repeated an AX reference.")
+            }
+            seen.append(cursor)
+            if CFEqual(cursor, root) { return }
+            guard let raw = try attribute(cursor, kAXParentAttribute, deadline),
+                  CFGetTypeID(raw) == AXUIElementGetTypeID() else {
+                throw RuneWorkspaceVisibilityFailure("Application-content standard control lacks a typed parent reaching its exact owned window.")
+            }
+            cursor = raw as! AXUIElement
+        }
+        throw RuneWorkspaceVisibilityFailure("Application-content standard-control ancestry exceeded 48 levels.")
+    }
+
+    private func windowNodes(_ root: AXUIElement, _ deadline: TimeInterval,
+                             scope: RuneWorkspaceWindowIdentifierScope = .wholeWindow,
+                             requestedIdentifier: String? = nil, requestedTarget: AXUIElement? = nil,
+                             queryContext: [String: Any] = [:]) throws -> [(AXUIElement, [AXUIElement], String?, String?, String?)] {
+        guard scope == .applicationContent else { return try nodes(root, deadline, queryContext: queryContext) }
+        var query = queryContext
+        query["window_membership_scope"] = "application-content-excluding-validated-standard-zoom-descendants"
+        lastApplicationContentWindowScope = ["classification": "Fresh public owned-window standard reference validation; only its descendant expansion may be excluded",
+            "scope": "application-content-excluding-validated-standard-zoom-descendants", "complete_scoped_walk": false,
+            "requested_identifier_prefix": requestedIdentifier.map { String(decoding: $0.utf8.prefix(512), as: UTF8.self) as Any } ?? NSNull(),
+            "target_reference_supplied": requestedTarget != nil, "standard_zoom_reference_validated": false,
+            "standard_zoom_descendant_expansion_omitted": false, "full_screen_reference_matches_zoom": NSNull()]
+        lastWalkContext = ["query": query, "phase": "application-content-standard-zoom-validation"]
+        try prepare(root, deadline)
+        guard let rawZoom = try attribute(root, kAXZoomButtonAttribute, deadline),
+              CFGetTypeID(rawZoom) == AXUIElementGetTypeID() else {
+            throw RuneWorkspaceVisibilityFailure("Application-content scope requires the exact owned window's public Zoom reference.")
+        }
+        let zoom = rawZoom as! AXUIElement
+        try prepare(zoom, deadline)
+        try requireOwnedWindowAncestor(zoom, root: root, deadline: deadline)
+        let role = try string(zoom, kAXRoleAttribute, deadline)
+        let subrole = try string(zoom, kAXSubroleAttribute, deadline)
+        lastApplicationContentWindowScope["standard_zoom_role"] = role.map { String($0.prefix(256)) as Any } ?? NSNull()
+        lastApplicationContentWindowScope["standard_zoom_subrole"] = subrole.map { String($0.prefix(256)) as Any } ?? NSNull()
+        guard role == kAXButtonRole, let subrole,
+              subrole == kAXZoomButtonSubrole || subrole == kAXFullScreenButtonSubrole else {
+            throw RuneWorkspaceVisibilityFailure("Application-content scope requires an owned AXButton with a recognized standard Zoom/Full Screen subrole.")
+        }
+        if subrole == kAXFullScreenButtonSubrole {
+            guard let rawFullScreen = try attribute(root, kAXFullScreenButtonAttribute, deadline),
+                  CFGetTypeID(rawFullScreen) == AXUIElementGetTypeID() else {
+                throw RuneWorkspaceVisibilityFailure("The standard Full Screen subrole lacks its exact owned window public reference.")
+            }
+            let fullScreen = rawFullScreen as! AXUIElement
+            try prepare(fullScreen, deadline)
+            try requireOwnedWindowAncestor(fullScreen, root: root, deadline: deadline)
+            let sameReference = CFEqual(fullScreen, zoom)
+            lastApplicationContentWindowScope["full_screen_reference_matches_zoom"] = sameReference
+            guard sameReference else {
+                throw RuneWorkspaceVisibilityFailure("The owned window Full Screen reference differs from its exact Zoom reference.")
+            }
+        }
+        let identifier = try string(zoom, kAXIdentifierAttribute, deadline)
+        lastApplicationContentWindowScope["standard_zoom_identifier_prefix"] = identifier.map { String(decoding: $0.utf8.prefix(256), as: UTF8.self) as Any } ?? NSNull()
+        guard (requestedIdentifier == nil || identifier != requestedIdentifier),
+              requestedTarget.map({ !CFEqual($0, zoom) }) ?? true else {
+            throw RuneWorkspaceVisibilityFailure("Application-content scope cannot exclude the requested Forge identifier or exact target.")
+        }
+        lastApplicationContentWindowScope["standard_zoom_reference_validated"] = true
+        let tree = try nodes(root, deadline, queryContext: query, excludingDescendantsOf: zoom,
+                             requestedIdentifier: requestedIdentifier)
+        lastApplicationContentWindowScope["complete_scoped_walk"] = true
+        lastApplicationContentWindowScope["complete_scoped_walk_nodes"] = tree.count
+        lastApplicationContentWindowScope["standard_zoom_descendant_expansion_omitted"] = tree.contains { CFEqual($0.0, zoom) }
+        return tree
+    }
+
     private func requiredNativeBoundarySnapshot(_ queryDeadline: TimeInterval) -> [String: Any] {
         let observed = ProcessInfo.processInfo.systemUptime, readDeadline = observed + 0.02
         var state: [String: Any] = ["classification": "Current-process scalars at required method boundary only; not evaluated AX failure values, query result or cause",
@@ -2326,7 +2525,8 @@ private final class RuneWorkspaceNamingAX {
         state["read_budget_expired"] = finished >= readDeadline
         return state
     }
-    func required(identifier: String, inSheet: Bool = false) async throws -> AXUIElement {
+    func required(identifier: String, inSheet: Bool = false,
+                  scope: RuneWorkspaceWindowIdentifierScope = .wholeWindow) async throws -> AXUIElement {
         let deadline = ProcessInfo.processInfo.systemUptime + 3
         var attempt = 0
         let nativeBeforeQuery = requiredNativeBoundarySnapshot(deadline)
@@ -2342,7 +2542,7 @@ private final class RuneWorkspaceNamingAX {
                 "requested_identifier_prefix_capped": identifier.utf8.count > 512, "in_sheet": inSheet, "attempt": attempt]
             lastWalkContext = ["query": query, "phase": "owned-window"]
             let main = try ownedWindow(deadline)
-            let tree = try nodes(main, deadline, queryContext: query)
+            let tree = try windowNodes(main, deadline, scope: scope, requestedIdentifier: identifier, queryContext: query)
             let sheets = tree.filter { $0.3 == kAXSheetRole }.map { $0.0 }
             let matches = tree.filter { node in
                 node.2 == identifier && (!inSheet || node.1.contains(where: { ancestor in
@@ -2379,10 +2579,10 @@ private final class RuneWorkspaceNamingAX {
         try check(deadline)
         guard pressed == .success else { throw RuneWorkspaceVisibilityFailure("The actual naming action failed: \(pressed.rawValue), \(action).") }
     }
-    func pressOwned(_ element: AXUIElement, role: String) throws {
+    func pressOwned(_ element: AXUIElement, role: String, scope: RuneWorkspaceWindowIdentifierScope = .wholeWindow) throws {
         let deadline = ProcessInfo.processInfo.systemUptime + 3
         let main = try ownedWindow(deadline)
-        guard try nodes(main, deadline).contains(where: { CFEqual($0.0, element) }) else { throw RuneWorkspaceVisibilityFailure("The exact naming control left the owned window graph.") }
+        guard try windowNodes(main, deadline, scope: scope, requestedTarget: element).contains(where: { CFEqual($0.0, element) }) else { throw RuneWorkspaceVisibilityFailure("The exact naming control left the owned window graph.") }
         try perform(element, action: kAXPressAction, roles: [role], deadline)
     }
 
@@ -2562,11 +2762,12 @@ private final class RuneWorkspaceNamingAX {
         try await openOwnedMenuAndPressNativeNamingCommand(opener, capture: capture)
     }
 
-    func openOwnedMenuAndPressNativeNamingCommand(_ opener: AXUIElement, capture: RuneWorkspaceNativeNamingMenuCapture) async throws {
+    func openOwnedMenuAndPressNativeNamingCommand(_ opener: AXUIElement, capture: RuneWorkspaceNativeNamingMenuCapture,
+                                                 scope: RuneWorkspaceWindowIdentifierScope = .wholeWindow) async throws {
         try capture.startAttempt()
         let deadline = capture.deadline
         let expectedWindow = try ownedWindow(deadline)
-        guard try nodes(expectedWindow, deadline).contains(where: { CFEqual($0.0, opener) }) else {
+        guard try windowNodes(expectedWindow, deadline, scope: scope, requestedTarget: opener).contains(where: { CFEqual($0.0, opener) }) else {
             throw RuneWorkspaceVisibilityFailure("The independent native menu route lost its exact owned opener before arming.")
         }
         NotificationCenter.default.addObserver(capture, selector: #selector(RuneWorkspaceNativeNamingMenuCapture.didBeginTracking(_:)),
@@ -2575,7 +2776,7 @@ private final class RuneWorkspaceNamingAX {
         RunLoop.main.add(timer, forMode: .eventTracking); RunLoop.main.add(timer, forMode: .default)
         defer { timer.invalidate(); capture.stop() }
         capture.armed = true
-        try openOwnedMenu(opener, deadline: deadline) { action, status in capture.noteOpener(action: action, status: status) }
+        try openOwnedMenu(opener, deadline: deadline, scope: scope) { action, status in capture.noteOpener(action: action, status: status) }
         while !capture.isFinished {
             try check(deadline); try await Task.sleep(for: .milliseconds(10))
         }
@@ -2910,9 +3111,10 @@ private final class RuneWorkspaceNamingAX {
     }
 
     private func openOwnedMenu(_ opener: AXUIElement, deadline: TimeInterval,
+                               scope: RuneWorkspaceWindowIdentifierScope = .wholeWindow,
                                recordStatus: @escaping (String, Int32) -> Void) throws {
         let main = try ownedWindow(deadline)
-        guard try nodes(main, deadline).contains(where: { CFEqual($0.0, opener) }) else { throw RuneWorkspaceVisibilityFailure("The actual layout menu left the owned window graph.") }
+        guard try windowNodes(main, deadline, scope: scope, requestedTarget: opener).contains(where: { CFEqual($0.0, opener) }) else { throw RuneWorkspaceVisibilityFailure("The actual layout menu left the owned window graph.") }
         try prepare(opener, deadline)
         var names: CFArray?
         let status = AXUIElementCopyActionNames(opener, &names)

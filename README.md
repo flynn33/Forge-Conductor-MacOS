@@ -40,6 +40,8 @@ Synthetic v94 passes one comparison method: AppKit matches ordinary and strict e
 
 Native v101 passes queued move/resize on 21 representative real namespaces in one method, verifying saved state, fresh preferences and live hosts. V100’s compile failure remains recorded; only the new test’s conversion changes. API-seeded layouts and prepared scrolling do not qualify menu actions or every panel. Original naming/ordinary/full UI gates remain open; new implementations stay deferred.
 
+Scoped Rune v103 passes combined Rename and Save As through actual native menus/editor and exact attached-sheet Save AXPress, retaining layout identity, copied geometry and fresh preferences. V104 passes both unchanged normal naming regressions through owned-editor Return submission. Original whole-window/ordinary combined failures and full UI gates remain open; new implementations stay deferred.
+
 The post-naming v6 ordinary Debug build, strict signature and seven-artifact/Info 0.44.0 (60) readback passed against 320 product/build inputs. This qualifies candidate compilation and file identities; candidate launch, installed operation and full UI remain unverified. Remaining new capability implementations stay deferred. [Current gates](docs/QUALIFICATION-STATUS.md).
 
 ## Earlier UI checks before the naming repair

@@ -58,6 +58,8 @@ Product versions do not by themselves claim shipment.
 
 - Verify queued move/resize across 21 representative real namespaces in v101, one method/126 events with saved-state and host guards. Retain v100’s compile failure and local test-only correction; menu, original naming/ordinary and broader UI gates stay open.
 
+- Verify scoped combined Rune Rename/Save As in v103 through exact attached-sheet Save AXPress and fresh saved-state restoration. V104 retains both unchanged owned-editor/Return regressions. Original whole-window/ordinary combined and broader UI gates remain open; no production repair.
+
 #### Earlier UI checks before the naming repair
 
 - Verify the post-Compute ordinary Debug candidate, strict signature and CLI/app product links. Candidate Dashboard startup was observed. The later whole native Canvas selection passed 11 of 13 methods; both draft cases, Projects desktop navigation and Rune naming qualification remain open. The installed 0.18.0 (28) app was not replaced.
