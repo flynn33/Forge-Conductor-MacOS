@@ -16,6 +16,10 @@ Product versions do not by themselves claim shipment.
 
 - Add native Hide/focus verification: the real close button releases the focused move handle, and API re-show restores the same handle for persistent arrow movement. V125/v128 isolated checks and V129's 11 selected layout methods pass with storage/owners/local state preserved. V127's four pre-input window/owner failures remain unexplained; the added observations change no guards or waits and establish no repeatability repair. No production focus repair was needed; scrolling reset and full UI qualification remain open.
 
+- Record v130/v131 wheel diagnostics as NONPASS: reset-wait/layout/dismantle observations establish no allocator-abort cause, and removing the test-forced layout call still aborts. Original test source is restored; scrolling and full UI remain open.
+
+- Correct three test receipt fields to serialize mutation sets as sorted JSON arrays, preserving field names and all input/assertion guards. Standalone v135 and the original native wheel/reset case v136 pass; formal-scroller/advertisement siblings remain NONPASS in v137. No production repair or full UI claim.
+
 - Add native movable/resizable panel frames, show/hide controls, saved named layouts, rename/delete and Restore Default to all 13 main views. Manager sections and Rune Forge detail modes retain independent layouts within their existing views. [Workspace guide](docs/NATIVE-WORKSPACES.md).
 - Keep page-owned settings and project drafts outside rearranged panels. Cancel a drag with Escape. Pause Provider setup observation when all its panels are hidden and resume the durable operation without reloading unsaved LM Studio settings.
 - Keep accepted Rune Forge policy commands running when all panels are hidden; pause background observation separately. The mounted regression and all 16 owning native Rune cases passed.

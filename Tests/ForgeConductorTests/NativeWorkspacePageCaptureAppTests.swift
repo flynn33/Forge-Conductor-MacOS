@@ -586,7 +586,7 @@ final class NativeWorkspacePageCaptureAppTests: XCTestCase, @unchecked Sendable 
             }
             report["target_center_visible"] = true; report["exact_control_hit_test"] = true
             report["complete_preferences_and_bytes_unchanged"] = true; report["fresh_restoration_unchanged"] = true
-            report["fixture_mutations"] = mutations
+            report["fixture_mutations"] = mutations.sorted()
             try capturePhysicalCache(owned, expectedContentSize: viewport, name: "projects-queued-wheel-after")
             try requireOwner()
             guard deadline - ProcessInfo.processInfo.systemUptime > 5 else {
@@ -2549,7 +2549,7 @@ final class NativeWorkspacePageCaptureAppTests: XCTestCase, @unchecked Sendable 
             report["same_inner_hosting_view_identities"] = true
             report["same_clip_and_document_visible_rect"] = true
             report["complete_preferences_and_bytes_unchanged"] = true
-            report["fresh_preferences_restoration_unchanged"] = true; report["fixture_mutations"] = mutations
+            report["fresh_preferences_restoration_unchanged"] = true; report["fixture_mutations"] = mutations.sorted()
             report["target_center_visible_after"] = document.visibleRect.contains(target)
             stage = "complete"; report["execution_completed"] = true
             try capturePhysicalCache(owned, expectedContentSize: expectedContentSize, name: "projects-native-scroller-advertisements-after")
@@ -2838,7 +2838,7 @@ final class NativeWorkspacePageCaptureAppTests: XCTestCase, @unchecked Sendable 
             report["same_target_control_frame_and_bounds"] = true
             report["same_inner_hosting_view_identities"] = true
             report["complete_preferences_and_bytes_unchanged"] = true
-            report["fresh_preferences_restoration_unchanged"] = true; report["fixture_mutations"] = mutations
+            report["fresh_preferences_restoration_unchanged"] = true; report["fixture_mutations"] = mutations.sorted()
             stage = "complete"; report["execution_completed"] = true
             try capturePhysicalCache(owned, expectedContentSize: expectedContentSize, name: "projects-native-scroller-actions-after")
             try requireOwner(); try retainReport("after")
