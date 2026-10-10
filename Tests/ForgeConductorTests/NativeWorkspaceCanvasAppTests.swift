@@ -1527,6 +1527,206 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
         XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, deadline)
     }
 
+    func testInitializedContentViewOwnedSidebarNavigatesRealProjectsDiagnosticsAndBack() async throws {
+        let priorContinuation = continueAfterFailure
+        continueAfterFailure = true
+        defer { continueAfterFailure = priorContinuation }
+        let deadline = ProcessInfo.processInfo.systemUptime + 75
+        let priorSuite = getenv("FORGE_GUIDED_SETUP_DEFAULTS_SUITE").map { String(cString: $0) }
+        let backend = NativeWorkspaceProjectRepositoryBackend(deadline: deadline)
+        repositoryBackend = backend
+        do {
+            let presentation = try await backend.start()
+            let canonical = "https://github.com/fixture/native-shell"
+            let prepared = try await backend.prepareRepository(canonical)
+            XCTAssertEqual(prepared.project.githubRepositoryURL, canonical)
+            XCTAssertEqual(prepared.durable.metadata.githubRepositoryURL, canonical)
+            let fixture = try NativeWorkspaceDraftFixture(page: .shell, backend: presentation)
+            draftFixture = fixture
+            try await nativeOwnedWait("The initialized shell did not publish its actual application/settings.", deadline: deadline) {
+                !fixture.model.isBootstrapping && fixture.model.hasLoadedInitialSettings
+            }
+            try await exposeNativeDraftFixture(fixture)
+            XCTAssertTrue(fixture.model.app === presentation.app)
+            XCTAssertEqual(ProcessInfo.processInfo.environment["FORGE_GUIDED_SETUP_DEFAULTS_SUITE"], fixture.suite)
+            let layout = NativeWorkspaceLayout(id: UUID(), viewID: "projects", name: "Initialized shell Projects",
+                canvas: .init(width: 1_460, height: 3_600), panels: NativeWorkspaceCatalog.projects.map {
+                    let frame: NativeWorkspaceFrame
+                    switch $0.id {
+                    case "projects-status": frame = .init(x: 40, y: 20, width: 640, height: 300)
+                    case "projects-repository": frame = .init(x: 40, y: 340, width: 980, height: 300)
+                    case "projects-summary": frame = .init(x: 740, y: 20, width: 600, height: 200)
+                    case "projects-identity": frame = .init(x: 740, y: 240, width: 600, height: 180)
+                    default: frame = $0.defaultFrame
+                    }
+                    return NativeWorkspacePanelPlacement(id: $0.id, frame: frame,
+                        isVisible: ["projects-status", "projects-repository", "projects-summary", "projects-identity"].contains($0.id))
+                })
+            try fixture.preferences.save(layout)
+            let resized = NativeWorkspaceFrame(x: 40, y: 340, width: 640, height: 260)
+            try fixture.preferences.setFrame(resized, for: "projects-repository", in: "projects")
+            let collection = fixture.preferences.collection
+            let layoutBytes = try XCTUnwrap(fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey))
+
+            func observe(_ tab: AppModel.AppTab, phase: String) async throws {
+                try nativeOwnedRequireOwner(fixture, deadline: deadline, requireKey: true)
+                guard fixture.model.selectedTab == tab, fixture.model.hasLoadedInitialSettings,
+                      fixture.model.app === presentation.app else {
+                    throw WorkspaceCanvasFixtureFailure("Sidebar navigation lost its initialized application or selected route.")
+                }
+                let split = try await nativeDraftAXElement("root-split", in: fixture,
+                    deadline: deadline, scope: .applicationContent)
+                let nodes = try nativeDraftExportedAXTree(split, deadline: deadline, limit: 2_048)
+                let beforeValues = nodes.flatMap { [$0.title, $0.value as? String].compactMap { $0 } }
+                let marker = "detail-" + tab.accessibilityID
+                guard let detail = nodes.first(where: {
+                    $0.identifier == marker && ($0.role == .group || $0.role == .staticText || $0.role == .scrollArea)
+                }), let detailElement = detail.exportedAX, let detailContext = detail.exportedContext else {
+                    throw WorkspaceCanvasFixtureFailure("The actual production shell did not expose its selected detail identifier with a content role.")
+                }
+                let detailFrame = try nativeExportFrame(detailElement, context: detailContext,
+                    fixture: fixture, deadline: deadline)
+                let application = AXUIElementCreateApplication(ProcessInfo.processInfo.processIdentifier)
+                try NativeWorkspaceDraftAXQuery.prepare(application, deadline: deadline)
+                var rawHit: AXUIElement?
+                let hitStatus = AXUIElementCopyElementAtPosition(application,
+                    Float(detailFrame.topLeft.midX), Float(detailFrame.topLeft.midY), &rawHit)
+                guard hitStatus == .success, let hit = rawHit, CFGetTypeID(hit) == AXUIElementGetTypeID() else {
+                    throw WorkspaceCanvasFixtureFailure("The selected detail did not receive an actual own-process visible semantic hit.")
+                }
+                let detailHitAncestors = try nativeExportRequireExactHit(hit, target: detailElement, context: detailContext)
+                let checkpoint = try await backend.checkpoint()
+                XCTAssertEqual(checkpoint.project.projectID, prepared.project.projectID)
+                XCTAssertEqual(checkpoint.project.projectGeneration, prepared.project.projectGeneration)
+                XCTAssertEqual(checkpoint.project.canonicalRoot, prepared.project.canonicalRoot)
+                XCTAssertEqual(checkpoint.project.githubRepositoryURL, canonical)
+                XCTAssertEqual(checkpoint.durable, prepared.durable,
+                               "Read-only sidebar navigation must preserve both exact durable project identity files.")
+                XCTAssertEqual(fixture.preferences.collection, collection)
+                XCTAssertEqual(fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey), layoutBytes)
+                var fieldValue: String?
+                var freshNodes = nodes
+                if tab == .projects {
+                    let document = try await nativeOwnedDocument(fixture, panelID: "projects-repository", deadline: deadline)
+                    let panel = try XCTUnwrap(document.panelHosts["projects-repository"])
+                    XCTAssertEqual(panel.frame, resized.nativeRect)
+                    let field = try await nativeExportObservedField(in: panel.hostingView,
+                        identifier: "project-github-repository-location", placeholder: "https://github.com/owner/repository",
+                        expectedLabel: "GitHub repository location", fixture: fixture, deadline: deadline)
+                    fieldValue = try field.stringValue
+                    XCTAssertEqual(fieldValue, canonical)
+                    let freshSplit = try await nativeDraftAXElement("root-split", in: fixture,
+                        deadline: deadline, scope: .applicationContent)
+                    freshNodes = try nativeDraftExportedAXTree(freshSplit, deadline: deadline, limit: 2_048)
+                    guard fixture.model.selectedTab == tab, fixture.model.hasLoadedInitialSettings,
+                          fixture.model.app === presentation.app else {
+                        throw WorkspaceCanvasFixtureFailure("The refreshed Projects observation lost its selected route or initialized application.")
+                    }
+                }
+                let values = freshNodes.flatMap { [$0.title, $0.value as? String].compactMap { $0 } }
+                let identifiers: Set<String> = ["root-split", marker, "tab-" + tab.accessibilityID,
+                    "project-generation", "project-canonical-root", "project-github-repository-location"]
+                let selected = freshNodes.filter { identifiers.contains($0.identifier ?? "") }
+                guard selected.count <= 32 else { throw WorkspaceCanvasFixtureFailure("Shell semantic receipt exceeded 32 selected nodes.") }
+                var candidates: [[String: String]] = []
+                for (snapshot, snapshotNodes) in [("before-field", nodes), ("fresh", freshNodes)] {
+                    var snapshotCount = 0
+                    for node in snapshotNodes {
+                        for (attribute, value) in [("title", node.title), ("label", node.label), ("value", node.value as? String)] {
+                            guard let value, value.localizedCaseInsensitiveContains(prepared.project.projectID)
+                                || value.contains(prepared.project.canonicalRoot) || value.contains("Generation")
+                                || value.contains("Project UUID") else { continue }
+                            guard snapshotCount < 8 else { continue }
+                            candidates.append(["snapshot": snapshot, "attribute": attribute, "text": String(value.prefix(512))])
+                            snapshotCount += 1
+                        }
+                    }
+                }
+                let record: [String: Any] = [
+                    "classification": "Initialized ContentView in an owned NSHostingView; actual owned sidebar events and isolated Manager. Repository was API-prepared; no UI Save, ForgeMainWindowController, candidate-process, desktop-compositor or Metal proof",
+                    "phase": phase, "selected_tab": tab.accessibilityID, "detail_identifier": marker,
+                    "detail_role": detail.role?.rawValue ?? "", "detail_visible_frame": NSStringFromRect(detailFrame.screen),
+                    "detail_hit_status": hitStatus.rawValue, "detail_hit_reaches_exact_target_and_window": true,
+                    "detail_hit_ancestor_count": detailHitAncestors,
+                    "settings_ready": fixture.model.hasLoadedInitialSettings, "backend_epochs": 1,
+                    "project_id": checkpoint.project.projectID, "project_generation": checkpoint.project.projectGeneration,
+                    "canonical_root": checkpoint.project.canonicalRoot, "github_repository_url": canonical,
+                    "repository_field_value": fieldValue as Any? ?? NSNull(),
+                    "metadata_sha256": JSONSupport.sha256Hex(checkpoint.durable.metadataBytes),
+                    "registry_sha256": JSONSupport.sha256Hex(checkpoint.durable.registryBytes),
+                    "prepared_custom_layout_id": layout.id.uuidString, "repository_frame": NSStringFromRect(resized.nativeRect),
+                    "before_field_subtree_nodes": nodes.count, "fresh_subtree_nodes": freshNodes.count,
+                    "before_field_exact_uuid_title_value": beforeValues.contains { $0.caseInsensitiveCompare(prepared.project.projectID) == .orderedSame },
+                    "before_field_exact_generation_title_value": beforeValues.contains("Generation \(prepared.project.projectGeneration)"),
+                    "before_field_exact_root_title_value": beforeValues.contains(prepared.project.canonicalRoot),
+                    "fresh_exact_uuid_title_value": values.contains { $0.caseInsensitiveCompare(prepared.project.projectID) == .orderedSame },
+                    "fresh_exact_generation_title_value": values.contains("Generation \(prepared.project.projectGeneration)"),
+                    "fresh_exact_root_title_value": values.contains(prepared.project.canonicalRoot),
+                    "identity_candidates": candidates, "selected_nodes": selected.map {
+                        ["identifier": String(($0.identifier ?? "").prefix(256)),
+                         "role": $0.role?.rawValue ?? "", "title": String(($0.title ?? "").prefix(512)),
+                         "value": ($0.value as? String).map { String($0.prefix(512)) as Any } ?? NSNull()]
+                    },
+                ]
+                guard try JSONSerialization.data(withJSONObject: record, options: [.sortedKeys]).count <= 8 * 1_024 else {
+                    throw WorkspaceCanvasFixtureFailure("The shell identity receipt exceeded its eight-KiB bound.")
+                }
+                try nativeOwnedRecord(record, name: "initialized-shell-" + phase)
+                if tab == .projects {
+                    XCTAssertTrue(values.contains { $0.caseInsensitiveCompare(prepared.project.projectID) == .orderedSame })
+                    XCTAssertTrue(values.contains("Generation \(prepared.project.projectGeneration)"))
+                    XCTAssertTrue(values.contains(prepared.project.canonicalRoot))
+                }
+                try nativeOwnedRequireOwner(fixture, deadline: deadline, requireKey: true)
+            }
+
+            try await nativeExportOwnedPress("tab-projects", in: fixture, deadline: deadline)
+            try await nativeOwnedWait("The actual sidebar did not select Projects.", deadline: deadline) {
+                fixture.model.selectedTab == .projects
+            }
+            try await observe(.projects, phase: "projects-first")
+            try await nativeExportOwnedPress("tab-diagnostics", in: fixture, deadline: deadline)
+            try await nativeOwnedWait("The actual sidebar did not select Diagnostics.", deadline: deadline) {
+                fixture.model.selectedTab == .diagnostics
+            }
+            try await observe(.diagnostics, phase: "diagnostics")
+            try await nativeExportOwnedPress("tab-projects", in: fixture, deadline: deadline)
+            try await nativeOwnedWait("The actual sidebar did not return to Projects.", deadline: deadline) {
+                fixture.model.selectedTab == .projects
+            }
+            try await observe(.projects, phase: "projects-returned")
+            await fixture.close()
+            draftFixture = nil
+            let stopped = try XCTUnwrap(fixture.backendStop)
+            XCTAssertTrue(stopped.completed)
+            XCTAssertTrue(stopped.serviceStopped)
+            XCTAssertEqual(stopped.completedShutdowns, 1)
+            let retained = try await backend.durableCheckpoint()
+            XCTAssertEqual(retained, prepared.durable)
+            let cleanup = await backend.cleanup()
+            XCTAssertTrue(cleanup.completed)
+            XCTAssertTrue(cleanup.homeRemoved)
+            repositoryBackend = nil
+            XCTAssertEqual(getenv("FORGE_GUIDED_SETUP_DEFAULTS_SUITE").map { String(cString: $0) }, priorSuite)
+            XCTAssertEqual(ProcessInfo.processInfo.environment["FORGE_GUIDED_SETUP_DEFAULTS_SUITE"], priorSuite)
+            try nativeOwnedRecord(["classification": "One owned initialized shell backend completed shutdown and owned-home cleanup",
+                "project_id": prepared.project.projectID, "project_generation": prepared.project.projectGeneration,
+                "completed_shutdowns": stopped.completedShutdowns, "shutdown_completed": stopped.completed,
+                "service_stopped": stopped.serviceStopped, "owned_home_removed": cleanup.homeRemoved,
+                "guided_setup_environment_restored": true], name: "initialized-shell-closed")
+            XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, deadline)
+        } catch {
+            if let draftFixture { await draftFixture.close() }
+            draftFixture = nil
+            let cleanup = await backend.cleanup()
+            XCTAssertTrue(cleanup.completed)
+            XCTAssertTrue(cleanup.homeRemoved)
+            repositoryBackend = nil
+            XCTAssertEqual(getenv("FORGE_GUIDED_SETUP_DEFAULTS_SUITE").map { String(cString: $0) }, priorSuite)
+            throw error
+        }
+    }
+
     private func nativeRepositoryBackendRecord(_ checkpoint: NativeWorkspaceProjectRepositoryBackend.Checkpoint,
                                               phase: String, backend: NativeWorkspaceProjectRepositoryBackend) async throws {
         let payload = try await backend.evidence(checkpoint, phase: phase)
@@ -6676,7 +6876,7 @@ private final class NativeWorkspaceDraftExportedAXContext {
 
 @MainActor
 private final class NativeWorkspaceDraftFixture {
-    enum Page: Equatable { case manager, projects }
+    enum Page: Equatable { case manager, projects, shell }
     let home: URL
     let suite: String
     let defaults: UserDefaults
@@ -6690,11 +6890,13 @@ private final class NativeWorkspaceDraftFixture {
     let window: NSWindow
     private let backendOwner: NativeWorkspaceProjectRepositoryBackend?
     private(set) var backendStop: NativeWorkspaceProjectRepositoryBackend.StopReceipt?
+    private let guidedSetupPriorEnvironment: String?
+    private var ownsGuidedSetupEnvironment = false
 
     init(page: Page, repositoryUpdatesEnabled: Bool = false,
          backend: NativeWorkspaceProjectRepositoryBackend.Presentation? = nil) throws {
-        guard backend == nil || page == .projects else {
-            throw WorkspaceCanvasFixtureFailure("The real repository backend is only for the Projects fixture.")
+        guard (backend == nil && page != .shell) || (backend != nil && page != .manager) else {
+            throw WorkspaceCanvasFixtureFailure("The real backend is required for Shell and supported for Projects only.")
         }
         let suiteName = backend?.suite ?? "forge.workspace.positive-draft.tests.\(UUID().uuidString)"
         let homeURL = backend?.home ?? FileManager.default.temporaryDirectory.appendingPathComponent("forge-native-workspace-positive-\(UUID().uuidString)")
@@ -6705,6 +6907,20 @@ private final class NativeWorkspaceDraftFixture {
         let workbenchOwner = WorkbenchPreferences(defaults: localDefaults)
         let guidedOwner = GuidedModeCoordinator(defaults: localDefaults)
         let recorderOwner = NativeWorkspaceDraftBootstrapRecorder()
+        let priorSuite = page == .shell ? getenv("FORGE_GUIDED_SETUP_DEFAULTS_SUITE").map { String(cString: $0) } : nil
+        var environmentCommitted = false
+        defer {
+            if page == .shell, !environmentCommitted {
+                if let priorSuite { setenv("FORGE_GUIDED_SETUP_DEFAULTS_SUITE", priorSuite, 1) }
+                else { unsetenv("FORGE_GUIDED_SETUP_DEFAULTS_SUITE") }
+            }
+        }
+        if page == .shell {
+            guard setenv("FORGE_GUIDED_SETUP_DEFAULTS_SUITE", suiteName, 1) == 0,
+                  ProcessInfo.processInfo.environment["FORGE_GUIDED_SETUP_DEFAULTS_SUITE"] == suiteName else {
+                throw WorkspaceCanvasFixtureFailure("The initialized shell could not isolate its guided-setup defaults.")
+            }
+        }
         let bootstrap = AppBootstrapOperation(factory: {
             let app: ForgeApp
             if let backend { app = backend.app }
@@ -6718,9 +6934,14 @@ private final class NativeWorkspaceDraftFixture {
         let projectsClient: any OperatorManagerClientProtocol
         if let backend { projectsClient = backend.client }
         else { projectsClient = clientOwner }
-        let content: AnyView = page == .manager
-            ? AnyView(ManagerSettingsView(initialSection: .settings))
-            : AnyView(ProjectsOperatorView(client: projectsClient))
+        let content: AnyView
+        switch page {
+        case .manager: content = AnyView(ManagerSettingsView(initialSection: .settings))
+        case .projects: content = AnyView(ProjectsOperatorView(client: projectsClient))
+        case .shell:
+            modelOwner.operatorManagerClient.replace(with: projectsClient)
+            content = AnyView(ContentView())
+        }
         let host = NSHostingView(rootView: AnyView(content.environmentObject(modelOwner)
             .environmentObject(workbenchOwner).environmentObject(guidedOwner)
             .environment(\.nativeWorkspacePreferences, preferencesOwner).graphiteWorkbench()))
@@ -6733,9 +6954,23 @@ private final class NativeWorkspaceDraftFixture {
         preferences = preferencesOwner; model = modelOwner; client = clientOwner
         workbench = workbenchOwner; guidedMode = guidedOwner; hosting = host; window = ownedWindow
         backendOwner = backend?.owner
+        guidedSetupPriorEnvironment = priorSuite
+        ownsGuidedSetupEnvironment = page == .shell
+        environmentCommitted = true
     }
 
     func close() async {
+        defer {
+            if ownsGuidedSetupEnvironment {
+                let restored: Int32
+                if let guidedSetupPriorEnvironment {
+                    restored = setenv("FORGE_GUIDED_SETUP_DEFAULTS_SUITE", guidedSetupPriorEnvironment, 1)
+                } else { restored = unsetenv("FORGE_GUIDED_SETUP_DEFAULTS_SUITE") }
+                XCTAssertEqual(restored, 0, "The initialized shell must restore its exact prior guided-setup environment.")
+                XCTAssertEqual(getenv("FORGE_GUIDED_SETUP_DEFAULTS_SUITE").map { String(cString: $0) }, guidedSetupPriorEnvironment)
+                ownsGuidedSetupEnvironment = false
+            }
+        }
         window.endEditing(for: nil); _ = window.makeFirstResponder(nil)
         hosting.rootView = AnyView(EmptyView())
         window.orderOut(nil); window.contentView = nil; window.close()
@@ -6864,6 +7099,14 @@ private actor NativeWorkspaceProjectRepositoryBackend {
         }
         try requireDeadline()
         return Presentation(owner: self, home: ownedHome, suite: suite, app: application, client: http)
+    }
+
+    func prepareRepository(_ location: String) async throws -> Checkpoint {
+        let before = try await checkpoint()
+        guard let client else { throw WorkspaceCanvasFixtureFailure("No actual backend for API repository preparation.") }
+        _ = try await client.updateProjectRepository(projectID: before.project.projectID,
+                                                     generation: before.project.projectGeneration, location: location)
+        return try await checkpoint()
     }
 
     func checkpoint() async throws -> Checkpoint {

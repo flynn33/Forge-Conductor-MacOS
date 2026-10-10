@@ -18,6 +18,8 @@ Product versions do not by themselves claim shipment.
 
 - Verify real isolated Projects repository Save/rejection/reopen/Clear through two app/backend epochs and a fresh custom view (V200), preserving identity and layout and leaving rejected durable files unchanged. The real-backend method and unchanged default-fixture queued move/resize method (V201) each pass with no failures/skips/runtime warnings. Resize is API-prepared; ordinary process/desktop/installed gates remain open. No production or version change follows. [Qualification](docs/QUALIFICATION-STATUS.md).
 
+- Verify initialized ContentView Projects→Diagnostics→Projects navigation with real isolated Manager state and the prepared custom layout (V203), plus the unchanged move/resize case (V204), each PASS without failures/skips/runtime warnings. Preserve V202 as a failed/stopped UUID-snapshot attempt; fresh observations establish test snapshot timing, without a product repair. Production/version/graph are unchanged; ordinary window-controller/desktop/full13/gesture/installed gates remain open and other implementations remain deferred. [Qualification](docs/QUALIFICATION-STATUS.md).
+
 ### `0.44.2 (62)`
 
 - Route discrete horizontal wheels over vertical custom-panel bodies to their canvas. Preserve vertical wheels, nested horizontal content, saved layouts and window ownership; remove the local monitor on detach/dismantle/deinit. Gesture and momentum events retain AppKit dispatch. The final 0.44.2 native selection passes four scrolling/lifecycle cases; CLI/app, ordinary Debug and strict signature checks pass. Broader UI and gesture gates remain open. [Qualification](docs/QUALIFICATION-STATUS.md).

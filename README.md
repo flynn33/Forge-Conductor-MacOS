@@ -8,6 +8,8 @@ V199’s separate Rune Zoom diagnostic remains NONPASS: one native method fails;
 
 V200 now qualifies isolated real Manager/backend Save, invalid-input refusal, backend/view reopen and Clear, preserving project identity and the custom layout. V201 separately passes the unchanged default-fixture queued move/resize case. This closes the scoped durable-reopen gap left by V198; API-prepared resize and app-hosted testing add no ordinary process quit/relaunch, desktop, gesture or installed proof. Other implementations remain deferred. [Evidence](docs/QUALIFICATION-STATUS.md).
 
+V203 passes initialized-shell Projects→Diagnostics→Projects navigation with six owned queued events, retaining real isolated project state and the API-prepared custom layout; V204 passes the unchanged move/resize case. The earlier V202 UUID-snapshot failure/stopped run remains NONPASS; fresh V203 observations establish test snapshot timing, without a product absence or repair claim. Ordinary window-controller, desktop/full-view, gesture and installed/shipment gates stay open; production/version are unchanged and other implementations remain deferred. [Evidence](docs/QUALIFICATION-STATUS.md).
+
 ## Preceding UI evidence
 
 Current source target **0.44.2 (62)** corrects discrete horizontal wheel routing over vertical custom-panel bodies. Saved menu entries retain **Layout: …**, stored names and UUIDs. Movable, resizable, show/hide panels and named layouts remain within each existing view. Use **Customize Layout**, drag a panel header or resize grip, and select visible panels in **Panels**. **Restore Default** returns to the original composition while retaining saved layouts. [Workspace guide](docs/NATIVE-WORKSPACES.md).
