@@ -17,6 +17,121 @@ final class RuneForgeAppTests: XCTestCase {
     #if !SWIFT_PACKAGE
 
 
+    func testPlainAppKitZoomSubtreeBeforeDuringAfterSheetAcrossRuneWindowStyles() async throws {
+        guard NSApp != nil, Bundle.main.bundleURL.pathExtension == "app", !NSScreen.screens.isEmpty else {
+            throw RuneWorkspaceVisibilityFailure("Run the plain AppKit control in ForgeConductorAppTests with a native display.")
+        }
+        let deadline = ProcessInfo.processInfo.systemUptime + 35
+        var rows: [[String: Any]] = [], firstScalarError: Error?
+        func retain(_ error: Error? = nil) throws {
+            let payload: [String: Any] = ["classification": "Synthetic plain AppKit standard-control/sheet lifecycle comparison; not product naming or full-UI proof",
+                "shared_budget_seconds": 35, "per_phase_query_budget_seconds": 3, "expected_phase_rows": 6,
+                "rows": rows, "all_six_phases_recorded": rows.count == 6,
+                "error_description": error.map { String(String(describing: $0).prefix(512)) as Any } ?? NSNull()]
+            let data = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys])
+            guard data.count <= 512 * 1_024 else { throw RuneWorkspaceVisibilityFailure("Plain AppKit control report exceeded its payload bound.") }
+            let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+            attachment.name = "plain-appkit-zoom-sheet-control"; attachment.lifetime = .keepAlways
+            add(attachment)
+        }
+        do {
+            for miniaturizable in [false, true] {
+                try Task.checkCancellation()
+                guard ProcessInfo.processInfo.systemUptime < deadline else {
+                    throw RuneWorkspaceVisibilityFailure("Plain AppKit control exceeded its shared deadline.")
+                }
+                var style: NSWindow.StyleMask = [.titled, .closable, .resizable]
+                if miniaturizable { style.insert(.miniaturizable) }
+                let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 1_280, height: 900),
+                    styleMask: style, backing: .buffered, defer: false)
+                window.isReleasedWhenClosed = false
+                window.title = "Plain Rune window control \(UUID().uuidString)"
+                let host = NSView(frame: NSRect(x: 0, y: 0, width: 1_280, height: 900))
+                window.contentView = host
+                let sheet = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 420, height: 150),
+                    styleMask: [.titled], backing: .buffered, defer: false)
+                sheet.isReleasedWhenClosed = false; sheet.title = "Plain attached sheet \(UUID().uuidString)"
+                let sheetHost = NSView(frame: NSRect(x: 0, y: 0, width: 420, height: 150))
+                sheet.contentView = sheetHost
+                defer {
+                    if window.attachedSheet === sheet { window.endSheet(sheet) }
+                    sheet.orderOut(nil); sheet.contentView = nil; sheet.close()
+                    window.orderOut(nil); window.contentView = nil; window.close()
+                }
+                let observer = RuneWorkspaceNamingAX(window: window, hosting: host)
+                func ready(_ during: Bool) -> Bool {
+                    guard NSApp.isActive, window.isVisible, window.styleMask == style,
+                          host.frame.size == NSSize(width: 1_280, height: 900),
+                          window.contentView === host, host.window === window,
+                          !host.isHiddenOrHasHiddenAncestor,
+                          let nativeZoom = window.standardWindowButton(.zoomButton), nativeZoom.window === window else { return false }
+                    if during {
+                        return sheet.isKeyWindow && NSApp.keyWindow === sheet
+                            && window.attachedSheet === sheet && window.sheets.count == 1 && window.sheets.first === sheet
+                            && sheet.sheetParent === window && sheet.isVisible && sheet.contentView === sheetHost
+                            && sheetHost.window === sheet && !sheetHost.isHiddenOrHasHiddenAncestor
+                    }
+                    return window.isKeyWindow && NSApp.keyWindow === window
+                        && window.attachedSheet == nil && window.sheets.isEmpty && sheet.sheetParent == nil && !sheet.isVisible
+                }
+                func awaitReady(_ during: Bool) async throws {
+                    let readyDeadline = min(deadline, ProcessInfo.processInfo.systemUptime + 3)
+                    while !ready(during) {
+                        try Task.checkCancellation()
+                        guard ProcessInfo.processInfo.systemUptime < readyDeadline else {
+                            throw RuneWorkspaceVisibilityFailure("Plain AppKit control lost exact window/sheet readiness.")
+                        }
+                        try await Task.sleep(for: .milliseconds(10))
+                    }
+                    try Task.checkCancellation()
+                    guard ProcessInfo.processInfo.systemUptime < readyDeadline else {
+                        throw RuneWorkspaceVisibilityFailure("Plain AppKit readiness completed after its deadline.")
+                    }
+                }
+                func record(_ phase: String, during: Bool) throws {
+                    guard ready(during), rows.count < 6 else {
+                        throw RuneWorkspaceVisibilityFailure("Plain AppKit phase lacks exact native ownership or row capacity.")
+                    }
+                    let nativeZoom = try XCTUnwrap(window.standardWindowButton(.zoomButton))
+                    var row: [String: Any] = ["phase": phase, "miniaturizable": miniaturizable,
+                        "style_mask": Int(window.styleMask.rawValue), "native_window_visible": window.isVisible, "native_application_active": NSApp.isActive,
+                        "native_exact_phase_key_owner": during ? NSApp.keyWindow === sheet : NSApp.keyWindow === window,
+                        "native_exact_style": window.styleMask == style, "native_content_width": host.frame.width, "native_content_height": host.frame.height,
+                        "native_window_key": window.isKeyWindow, "native_window_main": window.isMainWindow,
+                        "native_content_exact": window.contentView === host && host.window === window,
+                        "native_standard_zoom_owned": nativeZoom.window === window,
+                        "native_standard_zoom_enabled": nativeZoom.isEnabled, "native_standard_zoom_hidden": nativeZoom.isHiddenOrHasHiddenAncestor,
+                        "native_sheet_count": window.sheets.count, "native_exact_sheet_attached": window.attachedSheet === sheet,
+                        "native_exact_sheet_parent": sheet.sheetParent === window, "native_sheet_visible": sheet.isVisible]
+                    do {
+                        if let error = try observer.observePlainAppKitStandardZoom(
+                            deadline: min(deadline, ProcessInfo.processInfo.systemUptime + 3), report: &row), firstScalarError == nil {
+                            firstScalarError = error
+                        }
+                        guard ready(during) else { throw RuneWorkspaceVisibilityFailure("Plain AppKit ownership changed during the query.") }
+                        row["native_phase_owner_after_query"] = true; rows.append(row)
+                    } catch {
+                        row["strict_phase_error"] = String(String(describing: error).prefix(512)); rows.append(row); throw error
+                    }
+                }
+                NSApp.activate(ignoringOtherApps: true); window.makeKeyAndOrderFront(nil)
+                try await awaitReady(false); try record("before-sheet", during: false)
+                window.beginSheet(sheet, completionHandler: nil); sheet.makeKeyAndOrderFront(nil)
+                try await awaitReady(true); try record("during-sheet", during: true)
+                window.endSheet(sheet); sheet.orderOut(nil); window.makeKeyAndOrderFront(nil)
+                try await awaitReady(false); try record("after-sheet", during: false)
+            }
+            guard rows.count == 6, ProcessInfo.processInfo.systemUptime < deadline else {
+                throw RuneWorkspaceVisibilityFailure("Plain AppKit comparison did not complete its six bounded lifecycle rows.")
+            }
+            if let firstScalarError { throw firstScalarError }
+            try retain()
+        } catch {
+            let finalError = firstScalarError ?? error
+            try? retain(finalError); throw finalError
+        }
+    }
+
     func testAllPanelsAcrossThreeMountedRuneDetailNamespacesQueuedMoveResizePersistsGeometry() async throws {
         let deadline = ProcessInfo.processInfo.systemUptime + 120
         let modes = ["source", "violation", "feed"]
@@ -763,6 +878,10 @@ final class RuneForgeAppTests: XCTestCase {
         await runeNamingClose(fixture, runeModel: runeModel)
     }
 
+    func testMountedRuneFreshActiveKeyNativeRenameExportedSavePersistsIdentity() async throws {
+        try await runeExerciseFreshNativeMenuExportedSave(commands: ["Rename Layout…"], requireActiveKey: true)
+    }
+
     func testMountedRuneFreshNativeRenameExportedSavePersistsIdentity() async throws {
         try await runeExerciseFreshNativeMenuExportedSave(commands: ["Rename Layout…"])
     }
@@ -992,7 +1111,7 @@ final class RuneForgeAppTests: XCTestCase {
         await runeNamingClose(fixture, runeModel: runeModel)
     }
 
-    private func runeExerciseFreshNativeMenuExportedSave(commands: [String]) async throws {
+    private func runeExerciseFreshNativeMenuExportedSave(commands: [String], requireActiveKey: Bool = false) async throws {
         guard !commands.isEmpty, commands.count <= 2, Set(commands).count == commands.count,
               commands.allSatisfy({ $0 == "Rename Layout…" || $0 == "Save Layout As…" }) else {
             throw RuneWorkspaceVisibilityFailure("Fresh exported Save requires one or two distinct literal naming commands.")
@@ -1013,6 +1132,7 @@ final class RuneForgeAppTests: XCTestCase {
         let observer = RuneWorkspaceNamingAX(window: fixture.window, hosting: fixture.hosting)
         var stage = "mount", witnesses: [[String: Any]] = []
         var menu: RuneWorkspaceNativeNamingMenuCapture?
+        var activeKeyWitnesses: [[String: Any]] = []
         func retain(_ error: Error? = nil) throws {
             let bytes = try JSONEncoder().encode(fixture.preferences.collection)
             guard bytes.count <= NativeWorkspaceLimits.maximumStoredBytes, witnesses.count <= 2 else {
@@ -1020,6 +1140,7 @@ final class RuneForgeAppTests: XCTestCase {
             }
             let report: [String: Any] = ["classification": "Separate fresh-fixture naming reachability: native menu, actual NSTextView editor and exported exact-sheet Save activation; distinct from combined sequential Rename/Save As qualification, no Return fallback or desktop/pointer-input proof.",
                 "stage": stage, "requested_commands": commands, "fresh_fixture_command_count": commands.count,
+                "active_key_readiness_opt_in": requireActiveKey, "active_key_readiness_witnesses": activeKeyWitnesses,
                 "normal_naming_witnesses": witnesses,
                 "actual_menu_transition": menu?.evidence ?? [:],
                 "last_required_AX_walk_context": observer.lastRequiredWalkContext,
@@ -1033,6 +1154,20 @@ final class RuneForgeAppTests: XCTestCase {
         }
         do {
             try fixture.preferences.save(original)
+            if requireActiveKey {
+                try Task.checkCancellation()
+                NSApp.activate(ignoringOtherApps: true); fixture.window.makeKeyAndOrderFront(nil)
+                try await runeWorkspaceWait("The active/key experiment did not establish the exact foreground parent.") {
+                    NSApp.isActive && fixture.window.isKeyWindow && NSApp.keyWindow === fixture.window
+                        && fixture.window.isVisible && fixture.window.contentView === fixture.hosting
+                        && fixture.hosting.window === fixture.window && !fixture.hosting.isHiddenOrHasHiddenAncestor
+                        && fixture.window.attachedSheet == nil
+                }
+                try Task.checkCancellation()
+                activeKeyWitnesses.append(["phase": "foreground-parent-before-mount",
+                    "snapshot_uptime": ProcessInfo.processInfo.systemUptime, "application_active": NSApp.isActive,
+                    "exact_parent_key": fixture.window.isKeyWindow && NSApp.keyWindow === fixture.window])
+            }
             fixture.window.orderFront(nil); fixture.hosting.layoutSubtreeIfNeeded()
             try await runeWorkspaceWait("The real Rune source owners did not settle for positive naming.") {
                 !fixture.model.isBootstrapping && !runeModel.isLoading && runeModel.sources.count == 1
@@ -1057,6 +1192,16 @@ final class RuneForgeAppTests: XCTestCase {
                 try await observer.openOwnedMenuAndPressNativeNamingCommand(opener, capture: capture)
                 try await runeWorkspaceWait("The actual naming command did not present its production sheet.") { fixture.window.attachedSheet != nil }
                 let sheet = try XCTUnwrap(fixture.window.attachedSheet), content = try XCTUnwrap(sheet.contentView)
+                if requireActiveKey {
+                    try Task.checkCancellation(); try runeRequireNamingSheetOwner(fixture, sheet: sheet, content: content)
+                    sheet.makeKeyAndOrderFront(nil)
+                    try await runeWorkspaceWait("The active/key experiment did not establish the exact foreground sheet.") {
+                        NSApp.isActive && sheet.isKeyWindow && NSApp.keyWindow === sheet
+                            && fixture.window.attachedSheet === sheet && sheet.sheetParent === fixture.window
+                            && sheet.contentView === content && content.window === sheet && sheet.isVisible
+                    }
+                    try Task.checkCancellation(); try runeRequireNamingSheetOwner(fixture, sheet: sheet, content: content)
+                }
                 let (field, identity) = try await runeRequiredOwnedNamingField(fixture, sheet: sheet, content: content,
                     expectedValue: command == "Rename Layout…" ? active.name : "Custom")
                 try runeReplaceOwnedNamingText(fixture, sheet: sheet, content: content, field: field, name: newName)
@@ -1064,6 +1209,15 @@ final class RuneForgeAppTests: XCTestCase {
                 witnesses.append(["command": command, "new_name": newName, "identity_source": identity,
                     "actual_editor_changed": true, "actual_Save_action_requested": false,
                     "actual_Save_action_returned": false, "actual_sheet_dismissed": false])
+                if requireActiveKey {
+                    try Task.checkCancellation(); try runeRequireNamingSheetOwner(fixture, sheet: sheet, content: content)
+                    let active = NSApp.isActive, exactKey = sheet.isKeyWindow && NSApp.keyWindow === sheet
+                    activeKeyWitnesses.append(["phase": "foreground-sheet-before-whole-window-Save-query",
+                        "snapshot_uptime": ProcessInfo.processInfo.systemUptime, "application_active": active,
+                        "exact_sheet_key": exactKey, "exact_attached_sheet": fixture.window.attachedSheet === sheet,
+                        "exact_sheet_parent": sheet.sheetParent === fixture.window])
+                    guard active, exactKey else { throw RuneWorkspaceVisibilityFailure("The active/key experiment lost the exact foreground sheet before Save discovery.") }
+                }
                 let save = try await observer.required(identifier: "workspace-save-layout", inSheet: true)
                 try runeRequireNamingSheetOwner(fixture, sheet: sheet, content: content)
                 guard field.window === sheet, field.stringValue == newName, fixture.preferences.collection == before else {
@@ -2667,6 +2821,70 @@ private final class RuneWorkspaceNamingAX {
         guard copied == .success, let values = array as? [AXUIElement], values.count == count else { throw RuneWorkspaceVisibilityFailure("Naming AX \(key) child copy failed: \(copied.rawValue).") }
         return values
     }
+    func observePlainAppKitStandardZoom(deadline: TimeInterval, report: inout [String: Any]) throws -> Error? {
+        let root = try ownedWindow(deadline)
+        guard let rawZoom = try attribute(root, kAXZoomButtonAttribute, deadline),
+              CFGetTypeID(rawZoom) == AXUIElementGetTypeID() else {
+            throw RuneWorkspaceVisibilityFailure("Plain AppKit comparison requires a typed exact owned-window Zoom reference.")
+        }
+        let zoom = rawZoom as! AXUIElement
+        try prepare(zoom, deadline)
+        try requireOwnedWindowAncestor(zoom, root: root, deadline: deadline)
+        let role = try string(zoom, kAXRoleAttribute, deadline)
+        let subrole = try string(zoom, kAXSubroleAttribute, deadline)
+        guard role == kAXButtonRole, let subrole,
+              subrole == kAXZoomButtonSubrole || subrole == kAXFullScreenButtonSubrole else {
+            throw RuneWorkspaceVisibilityFailure("Plain AppKit comparison requires an owned standard Zoom/Full Screen AXButton.")
+        }
+        report["standard_subrole"] = subrole
+        report["full_screen_reference_matches_zoom"] = NSNull()
+        if subrole == kAXFullScreenButtonSubrole {
+            guard let raw = try attribute(root, kAXFullScreenButtonAttribute, deadline),
+                  CFGetTypeID(raw) == AXUIElementGetTypeID() else {
+                throw RuneWorkspaceVisibilityFailure("Plain AppKit Full Screen subrole lacks a typed owned-window reference.")
+            }
+            let fullScreen = raw as! AXUIElement
+            try prepare(fullScreen, deadline)
+            try requireOwnedWindowAncestor(fullScreen, root: root, deadline: deadline)
+            let same = CFEqual(fullScreen, zoom)
+            report["full_screen_reference_matches_zoom"] = same
+            guard same else { throw RuneWorkspaceVisibilityFailure("Plain AppKit Full Screen and Zoom references differ.") }
+        }
+        let identifier = try string(zoom, kAXIdentifierAttribute, deadline)
+        report["standard_control_metadata"] = diagnosticNodeMetadata(identifier, role, nil)
+        report["subtree_root_is_exact_zoom_not_window"] = true
+        report["subtree_node_limit"] = 2_048; report["subtree_depth_limit"] = 48
+        var scalarError: Error?
+        do {
+            let tree = try nodes(zoom, deadline, queryContext: ["operation": "plain-AppKit-exact-Zoom-subtree"])
+            report["subtree_complete"] = true; report["subtree_completed_nodes"] = tree.count
+        } catch {
+            let key = lastRead["attribute"] as? String, status = lastRead["actual_status"] as? Int32
+            guard lastWalkContext["phase"] as? String == "query-scalars",
+                  let key, [kAXIdentifierAttribute, kAXRoleAttribute, kAXTitleAttribute].contains(key),
+                  let status, status != AXError.success.rawValue, status != AXError.noValue.rawValue,
+                  status != AXError.attributeUnsupported.rawValue,
+                  ProcessInfo.processInfo.systemUptime < deadline else { throw error }
+            report["subtree_complete"] = false; report["original_scalar_read"] = lastRead
+            var context = lastWalkContext
+            // The generic walker queried these references on the Zoom root, not on an AXWindow.
+            context.removeValue(forKey: "failure_only_standard_window_references")
+            report["original_scalar_failure_context"] = context
+            report["original_scalar_error"] = String(String(describing: error).prefix(512))
+            scalarError = error
+        }
+        report["cached_nodes_first64"] = lastNodes.map { row in
+            var bounded = diagnosticNodeMetadata(row["identifier"] as? String, row["role"] as? String, row["title"] as? String)
+            bounded["depth"] = row["depth"]; return bounded
+        }
+        let freshRoot = try ownedWindow(deadline)
+        guard CFEqual(root, freshRoot) else { throw RuneWorkspaceVisibilityFailure("Plain AppKit comparison changed its exact owned exported window.") }
+        try check(deadline)
+        report["fresh_owned_window_reference_equal"] = true
+        // Retain an observed scalar error only to sample later lifecycle phases; the test rethrows the first one.
+        return scalarError
+    }
+
     private func ownedWindow(_ deadline: TimeInterval) throws -> AXUIElement {
         guard let window, let hosting, window.contentView === hosting, hosting.window === window,
               window.isVisible, !hosting.isHiddenOrHasHiddenAncestor else { throw RuneWorkspaceVisibilityFailure("Naming fixture lost its exact visible native window/host.") }
@@ -2753,6 +2971,87 @@ private final class RuneWorkspaceNamingAX {
         record["budget_expired"] = finished >= diagnosticDeadline
         return record
     }
+    private func failureOnlyFreshParentMembership(_ element: AXUIElement, ancestors: [AXUIElement],
+                                                   originalDeadline: TimeInterval) -> [String: Any] {
+        let started = ProcessInfo.processInfo.systemUptime
+        let deadline = min(originalDeadline, started + 0.1)
+        var record: [String: Any] = ["classification": "Failure-only exact held-parent child recopy and CFEqual membership; no fallback, original-error replacement or cause claim",
+            "post_failure_budget_seconds": 0.1, "original_query_deadline": originalDeadline,
+            "diagnostic_deadline": deadline, "child_limit": 16, "membership_copy_complete": false,
+            "parent_pid_queries": 0, "count_queries": 0, "copy_queries": 0,
+            "child_pid_queries": 0, "role_queries": 0, "matching_child_count": NSNull()]
+        func finish() -> [String: Any] {
+            let ended = ProcessInfo.processInfo.systemUptime
+            record["elapsed_seconds"] = ended - started; record["budget_expired"] = ended >= deadline
+            return record
+        }
+        guard let parent = ancestors.last, ProcessInfo.processInfo.systemUptime < deadline else {
+            record["unavailable"] = "No held parent or remaining original query budget"; return finish()
+        }
+        var parentPID: pid_t = 0
+        let parentStatus = AXUIElementGetPid(parent, &parentPID)
+        record["parent_pid_queries"] = 1; record["parent_pid_status"] = parentStatus.rawValue
+        record["parent_pid"] = parentPID
+        guard parentStatus == .success, parentPID == pid, ProcessInfo.processInfo.systemUptime < deadline else {
+            record["unavailable"] = "Held parent own-PID validation failed or budget expired"; return finish()
+        }
+        var count = 0
+        let countStatus = AXUIElementGetAttributeValueCount(parent, kAXChildrenAttribute as CFString, &count)
+        record["count_queries"] = 1; record["count_status"] = countStatus.rawValue
+        record["returned_count"] = countStatus == .success ? count as Any : NSNull()
+        guard countStatus == .success, count >= 0, count <= 16,
+              ProcessInfo.processInfo.systemUptime < deadline else {
+            record["unavailable"] = "Parent child count failed, exceeded16 or budget expired"; return finish()
+        }
+        if count == 0 {
+            record["membership_copy_complete"] = true; record["matching_child_count"] = 0
+            record["empty_children_without_indexed_copy"] = true; return finish()
+        }
+        var array: CFArray?
+        let copyStatus = AXUIElementCopyAttributeValues(parent, kAXChildrenAttribute as CFString, 0, count, &array)
+        record["copy_queries"] = 1; record["copy_status"] = copyStatus.rawValue
+        record["copy_type_id"] = array.map { Int(CFGetTypeID($0)) as Any } ?? NSNull()
+        guard copyStatus == .success, let array, CFGetTypeID(array) == CFArrayGetTypeID(),
+              let values = array as? [AXUIElement], values.count == count,
+              ProcessInfo.processInfo.systemUptime < deadline else {
+            record["unavailable"] = "Parent child copy failed, changed type/count or budget expired"; return finish()
+        }
+        var rows: [[String: Any]] = [], matches: [AXUIElement] = []
+        for child in values {
+            guard ProcessInfo.processInfo.systemUptime < deadline,
+                  CFGetTypeID(child) == AXUIElementGetTypeID() else {
+                record["child_rows"] = rows; record["unavailable"] = "Child type invalid or budget expired"; return finish()
+            }
+            var childPID: pid_t = 0
+            let status = AXUIElementGetPid(child, &childPID)
+            record["child_pid_queries"] = rows.count + 1
+            let same = CFEqual(child, element)
+            rows.append(["pid_status": status.rawValue, "pid": childPID, "CFEqual_to_held_failed_child": same])
+            guard status == .success, childPID == pid, ProcessInfo.processInfo.systemUptime < deadline else {
+                record["child_rows"] = rows; record["unavailable"] = "Copied child own-PID validation failed or budget expired"; return finish()
+            }
+            if same { matches.append(child) }
+        }
+        record["child_rows"] = rows; record["membership_copy_complete"] = true
+        record["matching_child_count"] = matches.count
+        guard matches.count == 1, let fresh = matches.first, ProcessInfo.processInfo.systemUptime < deadline else {
+            record["fresh_role_unavailable"] = "No unique exact copied match or remaining budget"; return finish()
+        }
+        let timeoutStatus = AXUIElementSetMessagingTimeout(fresh, 0.1)
+        record["fresh_timeout_status"] = timeoutStatus.rawValue
+        guard timeoutStatus == .success, ProcessInfo.processInfo.systemUptime < deadline else {
+            record["fresh_role_unavailable"] = "Fresh match messaging timeout failed or budget expired"; return finish()
+        }
+        var raw: CFTypeRef?
+        let roleStatus = AXUIElementCopyAttributeValue(fresh, kAXRoleAttribute as CFString, &raw)
+        record["role_queries"] = 1; record["fresh_role_raw_status"] = roleStatus.rawValue
+        record["fresh_role_type_id"] = raw.map { Int(CFGetTypeID($0)) as Any } ?? NSNull()
+        record["fresh_role_utf8_prefix"] = NSNull()
+        if roleStatus == .success, let raw, CFGetTypeID(raw) == CFStringGetTypeID(), let role = raw as? String {
+            record["fresh_role_utf8_prefix"] = String(decoding: role.utf8.prefix(128), as: UTF8.self)
+        }
+        return finish()
+    }
     private func nodes(_ root: AXUIElement, _ deadline: TimeInterval,
                        queryContext: [String: Any] = [:], excludingDescendantsOf standardZoom: AXUIElement? = nil,
                        requestedIdentifier: String? = nil) throws -> [(AXUIElement, [AXUIElement], String?, String?, String?)] {
@@ -2783,6 +3082,8 @@ private final class RuneWorkspaceNamingAX {
                 lastWalkContext["failure_only_standard_window_references"] = failureOnlyRootStandardReferences(
                     root: root, ancestors: ancestors, path: path, originalScalarRead: originalScalarRead)
                 lastWalkContext["failure_only_held_child_role"] = failureOnlyHeldChildRole(element)
+                lastWalkContext["failure_only_fresh_parent_membership"] = failureOnlyFreshParentMembership(
+                    element, ancestors: ancestors, originalDeadline: deadline)
                 throw error
             }
             result.append((element, ancestors, identifier, role, title))
