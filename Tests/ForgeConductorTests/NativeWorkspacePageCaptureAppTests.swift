@@ -256,6 +256,228 @@ final class NativeWorkspacePageCaptureAppTests: XCTestCase, @unchecked Sendable 
     }
 
 
+    func testRealCatalogViewsQueuedMoveResizePersistsGeometry() async throws {
+        let deadline = ProcessInfo.processInfo.systemUptime + 120
+        try await prepareHost()
+        do {
+            try directEvidence.configure(testName: name + "-queued-real-views")
+            let routes: [(NativeWorkspaceCapturePage, ManagerSettingsView.ManagementSection?, String)] = [
+                (.rig, nil, "rig-header"), (.mcp, nil, "mcp-controls"), (.agents, nil, "agents-controls"),
+                (.tools, nil, "tools-controls"), (.feed, nil, "feed-summary"),
+                (.projects, nil, "projects-repository"), (.runeForge, nil, "rune-controls"),
+                (.continuity, nil, "continuity-controls"), (.runtimes, nil, "runtimes-controls"),
+                (.provider, nil, "provider-controls"), (.evidence, nil, "evidence-controls"),
+                (.diagnostics, nil, "diagnostics-controls"),
+            ] + ManagerSettingsView.ManagementSection.allCases.map { (.manager, Optional($0), "manager-header") }
+            let namespaces = routes.map { page, section, _ in section.map { "manager." + $0.rawValue } ?? page.viewID }
+            guard routes.count == 21, Set(namespaces).count == 21 else {
+                throw NativeWorkspacePageCaptureFailure("The real queued-input route table must contain21 distinct namespaces.")
+            }
+            for (index, route) in routes.enumerated() {
+                try Task.checkCancellation()
+                // The unchanged presentation/canvas helpers can each use their existing five-second waits.
+                guard deadline - ProcessInfo.processInfo.systemUptime > 15 else {
+                    throw NativeWorkspacePageCaptureFailure("The real queued-input case lacks bounded presentation time.")
+                }
+                let (page, section, panelID) = route
+                let viewID = namespaces[index]
+                let owned = try NativeWorkspacePageCaptureFixture(contentSize: NSSize(width: 1_440, height: 900),
+                    initialManagerSection: section ?? .folders)
+                fixture = owned; owned.route.page = page
+                try await present(owned)
+                let otherID = viewID == "feed" ? "tools" : "feed"
+                let independent = try owned.customize(otherID)
+                var layout = try owned.customize(viewID)
+                layout.canvas.width += 80; layout.canvas.height += 80
+                try owned.preferences.save(layout)
+                try await requireCanvas(layout, in: owned)
+                try owned.preferences.bringToFront(panelID, in: viewID)
+                try await queuedRealPanelGeometry(layout, panelID: panelID, in: owned, deadline: deadline,
+                    receiptName: "queued-real-\(index)-\(viewID)")
+                let mutations = await owned.client.mutationNames()
+                guard owned.preferences.layouts(for: otherID) == [independent],
+                      owned.preferences.activeLayout(for: otherID) == independent,
+                      mutations.isEmpty, owned.model.app == nil,
+                      owned.model.manager == nil, owned.model.remoteManager == nil,
+                      !owned.model.hasLoadedInitialSettings else {
+                    throw NativeWorkspacePageCaptureFailure("The isolated real-view gesture changed another workspace/backend or fixture bootstrap contract.")
+                }
+                await owned.close(); fixture = nil
+                guard ProcessInfo.processInfo.systemUptime < deadline else {
+                    throw NativeWorkspacePageCaptureFailure("The real queued-input case exceeded its shared deadline during cleanup.")
+                }
+            }
+        } catch { try? retainFailure(error); await restoreHost(); throw error }
+        await restoreHost()
+        try Task.checkCancellation()
+        guard ProcessInfo.processInfo.systemUptime < deadline else {
+            throw NativeWorkspacePageCaptureFailure("The real queued-input case exceeded its shared deadline.")
+        }
+    }
+
+    private func queuedRealPanelGeometry(_ layout: NativeWorkspaceLayout, panelID: String,
+                                         in owned: NativeWorkspacePageCaptureFixture, deadline: TimeInterval,
+                                         receiptName: String) async throws {
+        let documents = nativeViews(owned.hosting).compactMap { $0 as? NativeWorkspaceDocumentView }
+        let descriptors = try XCTUnwrap(NativeWorkspaceCatalog.panelsByView[layout.viewID])
+        guard documents.count == 1, let document = documents.first,
+              let panel = document.panelHosts[panelID], let scroll = document.enclosingScrollView,
+              scroll.documentView === document, document.isFlipped,
+              let descriptor = descriptors.first(where: { $0.id == panelID }),
+              let placement = layout.panels.first(where: { $0.id == panelID }), placement.isVisible else {
+            throw NativeWorkspacePageCaptureFailure("The exact real catalog document/panel/descriptor is absent.")
+        }
+        defer { panel.cancelGesture() }
+        let hosting = panel.hostingView, identities = document.panelHosts.mapValues { ObjectIdentifier($0) }
+        var stage = "owner", posted = 0
+        var report: [String: Any] = [
+            "classification": "Actual isolated production-page queued panel gestures; XCTest outcome determines qualification",
+            "view_id": layout.viewID, "panel_id": panelID, "execution_completed": false,
+            "original_frame": NSStringFromRect(nativeRect(placement.frame)), "maximum_events": 6,
+        ]
+        defer {
+            report["last_stage"] = stage; report["posted_events"] = posted
+            report["within_case_deadline"] = ProcessInfo.processInfo.systemUptime < deadline
+            if let data = try? JSONSerialization.data(withJSONObject: report, options: [.sortedKeys]),
+               data.count <= 64 * 1_024 {
+                try? directEvidence.save(data, name: receiptName, extension: "json")
+                let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+                attachment.name = receiptName; attachment.lifetime = .keepAlways; add(attachment)
+            }
+        }
+        func nativeRect(_ frame: NativeWorkspaceFrame) -> NSRect {
+            NSRect(x: frame.x, y: frame.y, width: frame.width, height: frame.height)
+        }
+        @MainActor func requireOwner() throws {
+            try Task.checkCancellation()
+            guard ProcessInfo.processInfo.systemUptime < deadline, NSApp.isActive,
+                  owned.window.isKeyWindow, NSApp.keyWindow === owned.window,
+                  physicalCachePresentationIsReady(owned, expectedContentSize: NSSize(width: 1_440, height: 900)),
+                  NSApp.windows.filter({ $0.title == owned.window.title }).count == 1,
+                  document.window === owned.window, document.isDescendant(of: owned.hosting),
+                  document.enclosingScrollView === scroll, scroll.documentView === document,
+                  document.panelHosts.mapValues({ ObjectIdentifier($0) }) == identities,
+                  Set(identities.keys) == Set(layout.panels.map(\.id)),
+                  panel.hostingView === hosting, hosting.superview === panel, hosting.window === owned.window,
+                  panel.superview === document, !panel.isHiddenOrHasHiddenAncestor,
+                  owned.preferences.activeLayout(for: layout.viewID)?.id == layout.id else {
+                throw NativeWorkspacePageCaptureFailure("The real queued-input owner/window/panel/layout or deadline changed.")
+            }
+        }
+        @MainActor func wait(_ message: String, _ condition: () throws -> Bool) async throws {
+            let end = min(deadline, ProcessInfo.processInfo.systemUptime + 3)
+            while ProcessInfo.processInfo.systemUptime < end {
+                try requireOwner(); owned.hosting.layoutSubtreeIfNeeded()
+                if try condition() {
+                    try requireOwner()
+                    guard ProcessInfo.processInfo.systemUptime < end else { throw NativeWorkspacePageCaptureFailure(message) }
+                    return
+                }
+                try await Task.sleep(for: .milliseconds(20))
+            }
+            throw NativeWorkspacePageCaptureFailure(message)
+        }
+        @MainActor func stored() throws -> Data {
+            let data = try XCTUnwrap(owned.defaults.data(forKey: NativeWorkspacePreferences.storageKey))
+            guard data.count <= NativeWorkspaceLimits.maximumStoredBytes else {
+                throw NativeWorkspacePageCaptureFailure("The real queued-input storage exceeded its existing byte bound.")
+            }
+            return data
+        }
+        @MainActor func post(_ type: NSEvent.EventType, at point: NSPoint) throws {
+            try requireOwner()
+            let event = try XCTUnwrap(NSEvent.mouseEvent(with: type, location: document.convert(point, to: nil),
+                modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: owned.window.windowNumber,
+                context: nil, eventNumber: 1, clickCount: 1, pressure: type == .leftMouseUp ? 0 : 1))
+            guard posted < 6, event.window === owned.window, event.windowNumber == owned.window.windowNumber else {
+                throw NativeWorkspacePageCaptureFailure("The real queued pointer escaped its exact window/six-event bound.")
+            }
+            NSApp.postEvent(event, atStart: false); posted += 1
+        }
+        try requireOwner()
+        let preparedSize = NSSize(width: layout.canvas.width, height: layout.canvas.height)
+        stage = "prepared-layout.ready"
+        try await wait("The real prepared canvas/start frame did not finish applying.") {
+            document.frame.size == preparedSize && panel.canvasSize == preparedSize
+                && panel.frame == nativeRect(placement.frame)
+        }
+        let moved = NativeWorkspaceFrame(x: placement.frame.x + 20, y: placement.frame.y + 20,
+            width: placement.frame.width, height: placement.frame.height)
+        let dx = min(40, min(Double(descriptor.maximumSize.width) - moved.width, layout.canvas.width - moved.x - moved.width))
+        let dy = min(30, min(Double(descriptor.maximumSize.height) - moved.height, layout.canvas.height - moved.y - moved.height))
+        guard dx.isFinite, dy.isFinite, dx >= 1, dy >= 1 else {
+            throw NativeWorkspacePageCaptureFailure("The real descriptor/canvas must permit a meaningful legal resize.")
+        }
+        let resized = NativeWorkspaceFrame(x: moved.x, y: moved.y, width: moved.width + dx, height: moved.height + dy)
+        try moved.validate(in: layout.canvas); try resized.validate(in: layout.canvas)
+        let bounds = try XCTUnwrap(NativeWorkspaceCatalog.sizeBoundsByView[layout.viewID]?[panelID])
+        try bounds.validate(moved); try bounds.validate(resized)
+        guard panel.frame == nativeRect(placement.frame) else {
+            throw NativeWorkspacePageCaptureFailure("The real panel's starting frame differs from its exact prepared layout.")
+        }
+        for resizing in [false, true] {
+            stage = resizing ? "resize.prepare-hit" : "move.prepare-hit"
+            try requireOwner(); panel.layoutSubtreeIfNeeded()
+            guard panel.subviews.count <= 64 else { throw NativeWorkspacePageCaptureFailure("Real native chrome exceeded64 direct children.") }
+            let identifier = (resizing ? "workspace-resize-" : "workspace-move-") + panelID
+            let targets = panel.subviews.filter { $0.accessibilityIdentifier() == identifier }
+            guard targets.count == 1, let target = targets.first, target.superview === panel,
+                  target.window === owned.window, !target.isHiddenOrHasHiddenAncestor else {
+                throw NativeWorkspacePageCaptureFailure("The unique literal real native gesture handle is absent.")
+            }
+            let from = target.convert(NSPoint(x: target.bounds.midX, y: target.bounds.midY), to: document)
+            let to = NSPoint(x: from.x + CGFloat(resizing ? dx : 20), y: from.y + CGFloat(resizing ? dy : 20))
+            let path = NSRect(x: from.x - 8, y: from.y - 8, width: to.x - from.x + 16, height: to.y - from.y + 16)
+            guard document.bounds.contains(path) else { throw NativeWorkspacePageCaptureFailure("The legal pointer path escaped the real document.") }
+            _ = document.scrollToVisible(path.insetBy(dx: -32, dy: -32).intersection(document.bounds))
+            scroll.reflectScrolledClipView(scroll.contentView)
+            try await wait("The whole real native pointer path did not enter its own viewport.") { document.visibleRect.contains(path) }
+            guard owned.hosting.hitTest(document.convert(from, to: owned.hosting.superview)) === target else {
+                throw NativeWorkspacePageCaptureFailure("The real owned window did not physically hit the literal gesture handle.")
+            }
+            let baseline = owned.preferences.collection, beforeBytes = try stored()
+            guard try JSONDecoder().decode(NativeWorkspaceCollection.self, from: beforeBytes) == baseline else {
+                throw NativeWorkspacePageCaptureFailure("The pre-input real collection/storage differ.")
+            }
+            var expectedDown = baseline
+            let index = try XCTUnwrap(expectedDown.layouts.firstIndex { $0.id == layout.id && $0.viewID == layout.viewID })
+            let slot = try XCTUnwrap(expectedDown.layouts[index].panels.firstIndex { $0.id == panelID })
+            let front = expectedDown.layouts[index].panels.remove(at: slot)
+            expectedDown.layouts[index].panels.append(front)
+            stage = resizing ? "resize.down" : "move.down"
+            try post(.leftMouseDown, at: from)
+            try await wait("The real native queue did not begin the panel gesture.") { panel.isManipulating }
+            let downBytes = try stored()
+            guard owned.preferences.collection == expectedDown,
+                  try JSONDecoder().decode(NativeWorkspaceCollection.self, from: downBytes) == expectedDown else {
+                throw NativeWorkspacePageCaptureFailure("Real mouse-down changed more than exact front order.")
+            }
+            let frame = resizing ? resized : moved
+            stage = resizing ? "resize.drag" : "move.drag"
+            try post(.leftMouseDragged, at: to)
+            try await wait("The real queued drag did not reach exact transient geometry.") { panel.isManipulating && panel.frame == nativeRect(frame) }
+            guard owned.preferences.collection == expectedDown, try stored() == downBytes else {
+                throw NativeWorkspacePageCaptureFailure("A real drag persisted before mouse-up.")
+            }
+            var expectedUp = expectedDown
+            let frontSlot = try XCTUnwrap(expectedUp.layouts[index].panels.firstIndex { $0.id == panelID })
+            expectedUp.layouts[index].panels[frontSlot].frame = frame
+            stage = resizing ? "resize.up" : "move.up"
+            try post(.leftMouseUp, at: to)
+            try await wait("Real mouse-up did not commit exactly one panel frame.") { !panel.isManipulating && owned.preferences.collection == expectedUp }
+            let afterBytes = try stored()
+            let fresh = NativeWorkspacePreferences(knownPanelIDsByView: NativeWorkspaceCatalog.knownPanelIDsByView,
+                panelSizeBoundsByView: NativeWorkspaceCatalog.sizeBoundsByView, defaults: owned.defaults)
+            guard fresh.restorationError == nil, fresh.collection == expectedUp, try stored() == afterBytes else {
+                throw NativeWorkspacePageCaptureFailure("Fresh preferences did not restore the complete real gesture collection unchanged.")
+            }
+            report[resizing ? "resized_frame" : "moved_frame"] = NSStringFromRect(nativeRect(frame))
+        }
+        try requireOwner()
+        guard posted == 6, panel.frame == nativeRect(resized) else { throw NativeWorkspacePageCaptureFailure("Real queued motion omitted input or final geometry.") }
+        stage = "complete"; report["execution_completed"] = true
+    }
+
     /// Physical viewport/cache evidence only; the original semantic parity cases remain separate.
     func testNativeWorkspacesPhysicalCachesThirteenPagesAtNormalAndMinimumSizes() async throws {
         try await prepareHost()

@@ -38,6 +38,8 @@ Controlled exported Tools checks v91 and v92 each pass the same app-hosted metho
 
 Synthetic v94 passes one comparison method: AppKit matches ordinary and strict exported identifiers; plain SwiftUI matches only the exported route. Projects v98 passes native queued move/resize of its repository panel, retaining the unsaved draft and live hosts and restoring preferences without backend writes. Rune v95/v96 remain failed after completed Rename subflows; v96’s exact first-menu end does not prevent the second fatal lookup. V97 restores the pre-experiment Rune source with evidence retained. These scoped tests do not close original naming/ordinary or full UI gates; new implementations remain deferred. [Qualification](docs/QUALIFICATION-STATUS.md).
 
+Native v101 passes queued move/resize on 21 representative real namespaces in one method, verifying saved state, fresh preferences and live hosts. V100’s compile failure remains recorded; only the new test’s conversion changes. API-seeded layouts and prepared scrolling do not qualify menu actions or every panel. Original naming/ordinary/full UI gates remain open; new implementations stay deferred.
+
 The post-naming v6 ordinary Debug build, strict signature and seven-artifact/Info 0.44.0 (60) readback passed against 320 product/build inputs. This qualifies candidate compilation and file identities; candidate launch, installed operation and full UI remain unverified. Remaining new capability implementations stay deferred. [Current gates](docs/QUALIFICATION-STATUS.md).
 
 ## Earlier UI checks before the naming repair

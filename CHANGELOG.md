@@ -56,6 +56,8 @@ Product versions do not by themselves claim shipment.
 
 - Record synthetic comparison v94 PASS and Projects repository-panel queued move/resize v98 PASS, including draft retention, fresh preferences and Feed isolation without backend writes. Rune v95/v96 remain NONPASS despite completed Rename subflows; v97 reverses the unsuccessful exact-end experiment while retaining evidence. These are scoped tests, with no production repair or original UI-gate closure. [Qualification](docs/QUALIFICATION-STATUS.md).
 
+- Verify queued move/resize across 21 representative real namespaces in v101, one method/126 events with saved-state and host guards. Retain v100’s compile failure and local test-only correction; menu, original naming/ordinary and broader UI gates stay open.
+
 #### Earlier UI checks before the naming repair
 
 - Verify the post-Compute ordinary Debug candidate, strict signature and CLI/app product links. Candidate Dashboard startup was observed. The later whole native Canvas selection passed 11 of 13 methods; both draft cases, Projects desktop navigation and Rune naming qualification remain open. The installed 0.18.0 (28) app was not replaced.
