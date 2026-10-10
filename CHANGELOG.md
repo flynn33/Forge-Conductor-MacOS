@@ -12,7 +12,8 @@ Product versions do not by themselves claim shipment.
 
 ### `0.44.1 (61)`
 
-- Prefix saved layout menu entries with `Layout: ` to distinguish them from built-in commands while preserving names, IDs and schema. The reproduced collision regression passes; two fresh Rune failures and all-panel motion/full UI qualification remain open.
+- Prefix saved layout menu entries with `Layout: ` to distinguish them from built-in commands while preserving names, IDs and schema. The reproduced collision regression passes; two fresh Rune failures and full UI qualification remain open.
+- Verify the unchanged all-panel queued move/resize case in foreground Xcode v162: all 126 placements across 21 mounted namespaces, 756 events, one PASS/zero failures/skips, with storage/fresh-restoration and owner guards retained. Foreground v163 still fails both unchanged fresh Rune tests before Save at AXIdentifier −25211. Prior failures, API-prepared fixture limits and full UI/desktop/installed/lifetime gates remain; no production or version/build change.
 
 ### `0.44.0 (60)` custom layouts within each view
 
