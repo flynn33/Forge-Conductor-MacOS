@@ -8,6 +8,8 @@ A separate v20 native pointer check passed actual owned-window hit testing and q
 
 A separate v22 Rune cancellation check passed: actual Rename/editor input, source removal and queued Escape dismissed the exact held sheet, kept the complete saved collection and stored bytes unchanged, and retained overview panels. This covers app-queued Escape; Cancel-button, Save-button and desktop input remain unqualified. Source checkpoint publication/synchronization passed before this test; subsequent result-document and wiki delivery outcomes are retained in external receipts.
 
+The unchanged native Doctor check v23 also passed actual section/Run doctor actions and retained the unavailable `Doctor ISSUES` / `doctor failed` result and heading through default, custom and restored layouts. Healthy/live Doctor reports and complete UI qualification remain open.
+
 The post-naming v6 ordinary Debug build, strict signature and seven-artifact/Info 0.44.0 (60) readback passed against 320 product/build inputs. This qualifies candidate compilation and file identities; candidate launch, installed operation and full UI remain unverified. Remaining new capability implementations stay deferred. [Current gates](docs/QUALIFICATION-STATUS.md).
 
 ## Earlier UI checks before the naming repair

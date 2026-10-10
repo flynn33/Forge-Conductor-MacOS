@@ -23,6 +23,8 @@ Product versions do not by themselves claim shipment.
 
 - Verify a separate v22 Rune cancellation case: actual Rename/editor input, selected-source removal and app-queued Escape dismiss the originating sheet, preserve all saved layouts and stored bytes, and retain overview panels. This adds scoped test evidence; original draft/Save and complete UI gates remain open.
 
+- Verify the unchanged native Doctor v23 case: actual section/Run doctor actions retain the unavailable result and heading across default/custom/restored layouts. Healthy/live Doctor reports and full UI remain unqualified; prior failures retain their recorded inputs.
+
 #### Earlier UI checks before the naming repair
 
 - Verify the post-Compute ordinary Debug candidate, strict signature and CLI/app product links. Candidate Dashboard startup was observed. The later whole native Canvas selection passed 11 of 13 methods; both draft cases, Projects desktop navigation and Rune naming qualification remain open. The installed 0.18.0 (28) app was not replaced.
