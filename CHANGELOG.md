@@ -37,6 +37,10 @@ Product versions do not by themselves claim shipment.
 
 - Record separate Rune native-menu/exported-Save results: v41 Rename and isolated v42 Save As pass exact identity/copy, collection and restored-preference guards; combined v40 and mixed v41 remain NONPASS. The three existing Return/Escape regressions pass in v43. These test-only checks preserve original ordinary-native Save failures and establish no product repair, failure cause, repeated-menu or full UI qualification. [Qualification](docs/QUALIFICATION-STATUS.md).
 
+- Fix Hide during unfinished move/resize: cancel the hidden host’s gesture and check current visibility before the existing layout-identity frame callback. Both unchanged methods pass in v50 after failing in v49; v51 passes 15 related methods including those two. App compilation, ordinary Debug, strict signature and candidate identity readback pass; final source/document checks pass. Exact source/wiki delivery is tracked separately in external receipts; full UI remains open.
+
+- Add bounded Rune cached-path, native menu-state and failure-only standard-control reference diagnostics without relaxing original errors. V44–v46 remain mixed/combined NONPASS; v46 maps the held first-edge ancestor to the exact window Zoom reference. V47 again captures no second menu root. Unreadable-child and menu-failure causes remain unknown. [Qualification](docs/QUALIFICATION-STATUS.md).
+
 #### Earlier UI checks before the naming repair
 
 - Verify the post-Compute ordinary Debug candidate, strict signature and CLI/app product links. Candidate Dashboard startup was observed. The later whole native Canvas selection passed 11 of 13 methods; both draft cases, Projects desktop navigation and Rune naming qualification remain open. The installed 0.18.0 (28) app was not replaced.

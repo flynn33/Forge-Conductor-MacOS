@@ -2570,6 +2570,111 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
         try await requireStaleGestureProtection(applyBeforeMouseUp: false)
     }
 
+    func testSameLayoutHideAfterApplyRejectsPendingMoveAndResizeMouseUp() async throws {
+        try await requireSameLayoutHideGestureProtection(applyBeforeMouseUp: true)
+    }
+
+    func testSameLayoutHideBeforeApplyRejectsPendingMoveAndResizeMouseUp() async throws {
+        try await requireSameLayoutHideGestureProtection(applyBeforeMouseUp: false)
+    }
+
+    private func requireSameLayoutHideGestureProtection(applyBeforeMouseUp: Bool) async throws {
+        continueAfterFailure = true
+        for resizing in [false, true] {
+            let fixture = try await mountScope()
+            let document = try await mountedDocument(fixture)
+            let panel = try XCTUnwrap(document.panelHosts["alpha"])
+            defer { panel.cancelGesture() }
+            let hosting = panel.hostingView
+            let handle = try gestureHandle("workspace-\(resizing ? "resize" : "move")-alpha", in: panel)
+            let original = panel.frame
+            let start = handle.convert(NSPoint(x: handle.bounds.midX, y: handle.bounds.midY), to: document)
+            let end = NSPoint(x: start.x + 50, y: start.y + 30)
+            var report: [String: Any] = [
+                "classification": "Owned native callback reachability reproducer; no desktop or hidden event-delivery claim",
+                "apply_before_mouse_up": applyBeforeMouseUp, "resizing": resizing,
+                "original_frame": NSStringFromRect(original), "stage": "before-down",
+            ]
+            defer {
+                nativeDraftRetainMeasurement(report, name: "workspace-hide-active-gesture-"
+                    + (applyBeforeMouseUp ? "after-apply-" : "before-apply-") + (resizing ? "resize" : "move"))
+            }
+            guard fixture.window.isVisible, fixture.window.isKeyWindow,
+                  fixture.window.contentView === fixture.hosting,
+                  fixture.hosting.window === fixture.window, document.window === fixture.window,
+                  panel.window === fixture.window, handle.window === fixture.window,
+                  !handle.isHiddenOrHasHiddenAncestor else {
+                throw WorkspaceCanvasFixtureFailure("The pending gesture escaped its exact visible owned fixture.")
+            }
+            handle.mouseDown(with: try pointer(.leftMouseDown, at: start, in: document))
+            let afterDown = fixture.preferences.collection
+            let bytesAfterDown = try XCTUnwrap(fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey))
+            handle.mouseDragged(with: try pointer(.leftMouseDragged, at: end, in: document))
+            XCTAssertTrue(panel.isManipulating)
+            XCTAssertNotEqual(panel.frame, original)
+            XCTAssertEqual(fixture.preferences.collection, afterDown)
+            XCTAssertEqual(fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey), bytesAfterDown)
+            report["stage"] = "transient-drag"
+            if applyBeforeMouseUp {
+                try nativeDraftHide(panel)
+                report["hide_route"] = "Actual native NSButton.performClick"
+            } else {
+                try fixture.preferences.setShown(false, for: "alpha", in: "fixture")
+                report["hide_route"] = "Production preferences boundary before native view apply"
+            }
+            let afterHide = fixture.preferences.collection
+            let bytesAfterHide = try XCTUnwrap(fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey))
+            XCTAssertEqual(fixture.preferences.activeLayout(for: "fixture")?.id, fixture.layoutA.id)
+            XCTAssertEqual(fixture.preferences.activeLayout(for: "fixture")?.panels.first { $0.id == "alpha" }?.isVisible, false)
+            XCTAssertEqual(fixture.preferences.activeLayout(for: "fixture")?.panels.first { $0.id == "alpha" }?.frame.nativeRect, original)
+            if applyBeforeMouseUp {
+                try await waitUntil("The same-layout Hide did not reach its existing native panel.") { panel.isHidden }
+                report["manipulating_after_hide_apply"] = panel.isManipulating
+                report["frame_after_hide_apply"] = NSStringFromRect(panel.frame)
+                XCTAssertFalse(panel.isManipulating, "Hiding the active panel must cancel its transient gesture.")
+                XCTAssertEqual(panel.frame, original)
+            } else {
+                // No suspension or root replacement between the production Hide write and late callback.
+                report["manipulating_before_apply"] = panel.isManipulating
+                report["hidden_before_apply"] = panel.isHidden
+                guard panel.isManipulating, !panel.isHidden else {
+                    throw WorkspaceCanvasFixtureFailure("The fixture did not reach the same-layout hide-before-apply window.")
+                }
+            }
+            report["stage"] = "before-late-up"
+            handle.mouseUp(with: try pointer(.leftMouseUp, at: end, in: document))
+            report["collection_unchanged_after_late_up"] = fixture.preferences.collection == afterHide
+            report["bytes_unchanged_after_late_up"] = fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey) == bytesAfterHide
+            report["frame_after_late_up"] = NSStringFromRect(panel.frame)
+            report["manipulating_after_late_up"] = panel.isManipulating
+            XCTAssertEqual(fixture.preferences.collection, afterHide, "A late mouse-up must not persist geometry after Hide.")
+            XCTAssertEqual(fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey), bytesAfterHide)
+            try await waitUntil("The hidden panel did not settle after its late callback.") { panel.isHidden && !panel.isManipulating }
+            XCTAssertTrue(document.panelHosts["alpha"] === panel)
+            XCTAssertTrue(panel.hostingView === hosting)
+            try fixture.preferences.setShown(true, for: "alpha", in: "fixture")
+            let resumed = try XCTUnwrap(fixture.preferences.activeLayout(for: "fixture")?.panels.first { $0.id == "alpha" }?.frame)
+            try await waitUntil("Show did not resume the same native host at its current persisted geometry.") {
+                !panel.isHidden && panel.frame == resumed.nativeRect
+            }
+            XCTAssertTrue(document.panelHosts["alpha"] === panel)
+            XCTAssertTrue(panel.hostingView === hosting)
+            let freshHandle = try gestureHandle("workspace-\(resizing ? "resize" : "move")-alpha", in: panel)
+            let freshStart = freshHandle.convert(NSPoint(x: freshHandle.bounds.midX, y: freshHandle.bounds.midY), to: document)
+            try drag(freshHandle, in: document, from: freshStart,
+                     to: NSPoint(x: freshStart.x + 20, y: freshStart.y + 10))
+            let expectedFresh = resizing
+                ? NativeWorkspaceFrame(x: resumed.x, y: resumed.y, width: resumed.width + 20, height: resumed.height + 10)
+                : NativeWorkspaceFrame(x: resumed.x + 20, y: resumed.y + 10, width: resumed.width, height: resumed.height)
+            XCTAssertEqual(fixture.preferences.activeLayout(for: "fixture")?.panels.first { $0.id == "alpha" }?.frame, expectedFresh)
+            XCTAssertEqual(panel.frame, expectedFresh.nativeRect)
+            XCTAssertFalse(panel.isManipulating)
+            report["same_panel_and_content_host_after_show"] = document.panelHosts["alpha"] === panel && panel.hostingView === hosting
+            report["stage"] = "fresh-completed-gesture"
+            await fixture.close(); scopeFixture = nil
+        }
+    }
+
     func testProductionComputeSurfaceStopsWhenLayoutHidesPanelAndResumesSameSurface() async throws {
         guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
             throw WorkspaceCanvasFixtureFailure("The actual Reduce Motion setting prevents this motion-clock qualification.")

@@ -100,7 +100,10 @@ private struct NativeWorkspaceScope<DefaultContent: View>: View {
             controls
             if let layout = active {
                 NativeWorkspaceCanvasView(layout: layout, descriptors: descriptors, content: panelContent,
-                    commitFrame: { id, frame in perform(for: layout.id) { try preferences.setFrame(frame, for: id, in: viewID) } },
+                    commitFrame: { id, frame in
+                        guard active?.panels.first(where: { $0.id == id })?.isVisible == true else { return }
+                        perform(for: layout.id) { try preferences.setFrame(frame, for: id, in: viewID) }
+                    },
                     hidePanel: { id in perform(for: layout.id) { try preferences.setShown(false, for: id, in: viewID) } },
                     bringToFront: { id in perform(for: layout.id) { try preferences.bringToFront(id, in: viewID) } })
             } else {

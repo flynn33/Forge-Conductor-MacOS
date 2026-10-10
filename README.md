@@ -20,6 +20,8 @@ Separate application-content Manager/Projects checks passed both native draft fl
 
 Separate Rune tests exercised the actual native layout menu, name editor and exact-sheet exported Save action: Rename passed in v41 and standalone Save As passed in v42, including isolated preference restoration. The combined v40 and mixed v41 selections remain NONPASS; v43 retained all three existing Return/Escape regressions. Original ordinary-native Save, repeated-menu, desktop and full UI gates remain open. [Exact outcomes](docs/QUALIFICATION-STATUS.md).
 
+Hide during an unfinished move or resize now cancels the hidden host’s gesture and rejects late frame persistence. The same two native methods failed before repair and passed in v50; all 15 related methods passed in v51, including those two. Saved geometry/bytes and the same hosts survive Hide/show, and fresh gestures still persist. Rune v44–v47 diagnostics remain NONPASS, with causes unresolved. App compilation, ordinary Debug, strict signature and candidate identity readback passed; final source/document checks passed; exact source/wiki delivery is tracked separately in external receipts. Complete UI and desktop/installed gates remain open. [Exact outcomes](docs/QUALIFICATION-STATUS.md).
+
 The post-naming v6 ordinary Debug build, strict signature and seven-artifact/Info 0.44.0 (60) readback passed against 320 product/build inputs. This qualifies candidate compilation and file identities; candidate launch, installed operation and full UI remain unverified. Remaining new capability implementations stay deferred. [Current gates](docs/QUALIFICATION-STATUS.md).
 
 ## Earlier UI checks before the naming repair

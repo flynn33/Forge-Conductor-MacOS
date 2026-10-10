@@ -338,6 +338,8 @@ final class RuneForgeAppTests: XCTestCase {
             let report: [String: Any] = ["classification": "Separate mounted native menu, actual NSTextView editor and exported exact-sheet Save accessibility activation; no Return fallback or desktop/pointer-input proof.",
                 "stage": stage, "normal_naming_witnesses": witnesses,
                 "actual_menu_transition": menu?.evidence ?? [:],
+                "last_required_AX_walk_context": observer.lastRequiredWalkContext,
+                "last_AX_scalar_read": observer.lastRead,
                 "collection": try JSONSerialization.jsonObject(with: bytes),
                 "error": error.map { String(String(describing: $0).prefix(4_096)) as Any } ?? NSNull()]
             let data = try JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys])
@@ -453,6 +455,8 @@ final class RuneForgeAppTests: XCTestCase {
                 "stage": stage, "requested_commands": commands, "fresh_fixture_command_count": commands.count,
                 "normal_naming_witnesses": witnesses,
                 "actual_menu_transition": menu?.evidence ?? [:],
+                "last_required_AX_walk_context": observer.lastRequiredWalkContext,
+                "last_AX_scalar_read": observer.lastRead,
                 "collection": try JSONSerialization.jsonObject(with: bytes),
                 "error": error.map { String(String(describing: $0).prefix(4_096)) as Any } ?? NSNull()]
             let data = try JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys])
@@ -2009,6 +2013,8 @@ private final class RuneWorkspaceNamingAX {
     private(set) var lastNodes: [[String: Any]] = []
     private(set) var lastRead: [String: Any] = [:]
     private(set) var lastMenuTransition: [String: Any] = [:]
+    private var lastWalkContext: [String: Any] = [:]
+    private(set) var lastRequiredWalkContext: [String: Any] = [:]
     init(window: NSWindow, hosting: NSView) { self.window = window; self.hosting = hosting }
 
     private func check(_ deadline: TimeInterval) throws {
@@ -2067,32 +2073,122 @@ private final class RuneWorkspaceNamingAX {
         guard matches.count == 1 else { throw RuneWorkspaceVisibilityFailure("Naming public AX did not export exactly one owned native window: \(matches.count).") }
         return matches[0]
     }
-    private func nodes(_ root: AXUIElement, _ deadline: TimeInterval) throws -> [(AXUIElement, [AXUIElement], String?, String?, String?)] {
-        var pending: [(AXUIElement, [AXUIElement])] = [(root, [])]
+    private func diagnosticNodeMetadata(_ identifier: String?, _ role: String?, _ title: String?) -> [String: Any] {
+        func prefix(_ value: String?) -> Any {
+            value.map { String(decoding: $0.utf8.prefix(256), as: UTF8.self) as Any } ?? NSNull()
+        }
+        return ["identifier_prefix": prefix(identifier), "role_prefix": prefix(role), "title_prefix": prefix(title),
+                "identifier_prefix_capped": identifier.map { ($0.utf8.count > 256) as Any } ?? NSNull(),
+                "role_prefix_capped": role.map { ($0.utf8.count > 256) as Any } ?? NSNull(),
+                "title_prefix_capped": title.map { ($0.utf8.count > 256) as Any } ?? NSNull()]
+    }
+    private func failureOnlyRootStandardReferences(root: AXUIElement, ancestors: [AXUIElement],
+                                                   path: [Int], originalScalarRead: [String: Any]) -> [String: Any] {
+        let started = ProcessInfo.processInfo.systemUptime, diagnosticDeadline = started + 0.3
+        var record: [String: Any] = ["classification": "Failure-only public root reference comparison; no traversal substitution, native-class or error-cause claim",
+            "post_failure_budget_seconds": 0.3, "existing_root_timeout_seconds": 0.1,
+            "original_last_scalar_read": originalScalarRead, "held_ancestor_count": ancestors.count,
+            "copied_first_edge_index": path.first.map { $0 as Any } ?? NSNull(),
+            "query_limit": 3, "query_count": 0, "reference_rows": [:], "budget_expired": false]
+        func finishedRecord() -> [String: Any] {
+            let ended = ProcessInfo.processInfo.systemUptime
+            record["elapsed_seconds"] = ended - started
+            record["budget_expired"] = record["budget_expired"] as? Bool == true || ended >= diagnosticDeadline
+            return record
+        }
+        guard ancestors.count >= 2, !path.isEmpty else {
+            record["unavailable"] = "No already-held first-edge ancestor of the failed node"
+            return finishedRecord()
+        }
+        let firstEdgeAncestor = ancestors[1]
+        record["held_root_CFEqual_ancestor0"] = CFEqual(root, ancestors[0])
+        guard record["held_root_CFEqual_ancestor0"] as? Bool == true else {
+            record["unavailable"] = "Held ancestry does not match the original queried root"
+            return finishedRecord()
+        }
+        var rows: [String: Any] = [:], count = 0
+        for attribute in [kAXZoomButtonAttribute, kAXCloseButtonAttribute, kAXMinimizeButtonAttribute] {
+            guard ProcessInfo.processInfo.systemUptime < diagnosticDeadline else { record["budget_expired"] = true; break }
+            var raw: CFTypeRef?
+            let status = AXUIElementCopyAttributeValue(root, attribute as CFString, &raw)
+            count += 1
+            var row: [String: Any] = ["raw_status": status.rawValue,
+                "returned_type_id": raw.map { Int(CFGetTypeID($0)) as Any } ?? NSNull(),
+                "returned_AXUIElement": raw.map { (CFGetTypeID($0) == AXUIElementGetTypeID()) as Any } ?? NSNull(),
+                "CFEqual_to_held_first_edge_ancestor": NSNull()]
+            if status == .success, let raw, CFGetTypeID(raw) == AXUIElementGetTypeID() {
+                row["CFEqual_to_held_first_edge_ancestor"] = CFEqual(raw, firstEdgeAncestor)
+            }
+            rows[attribute] = row
+        }
+        record["reference_rows"] = rows; record["query_count"] = count
+        record["all_three_copies_attempted"] = count == 3
+        return finishedRecord()
+    }
+    private func nodes(_ root: AXUIElement, _ deadline: TimeInterval,
+                       queryContext: [String: Any] = [:]) throws -> [(AXUIElement, [AXUIElement], String?, String?, String?)] {
+        var pending: [(AXUIElement, [AXUIElement], [Int], [[String: Any]], Int)] = [(root, [], [], [], 0)]
         var result: [(AXUIElement, [AXUIElement], String?, String?, String?)] = []
         lastNodes = []
-        while let (element, ancestors) = pending.popLast() {
+        lastWalkContext = ["query": queryContext, "phase": "walk-start"]
+        while let (element, ancestors, path, cachedAncestors, sheetAncestorCount) = pending.popLast() {
             try check(deadline)
             guard !result.contains(where: { CFEqual($0.0, element) }) else { continue }
             guard result.count < 2_048, ancestors.count <= 48 else { throw RuneWorkspaceVisibilityFailure("Naming AX exceeded its node/depth bounds.") }
-            let identifier = try string(element, kAXIdentifierAttribute, deadline)
-            let role = try string(element, kAXRoleAttribute, deadline)
-            let title = try string(element, kAXTitleAttribute, deadline)
+            lastWalkContext = ["query": queryContext, "phase": "query-scalars",
+                "node_ordinal": result.count + 1, "completed_nodes": result.count, "depth": ancestors.count,
+                "copied_child_index_path": path, "pending_nodes": pending.count,
+                "cached_ancestors_last4": cachedAncestors, "ancestor_prefix_omitted": ancestors.count > 4,
+                "cached_parent": cachedAncestors.last.map { $0 as Any } ?? NSNull(),
+                "successful_cached_AXSheet_ancestor_count": sheetAncestorCount,
+                "successful_cached_AXSheet_ancestor_present": sheetAncestorCount > 0,
+                "metadata_scalar_utf8_input_prefix_limit": 256, "node_limit": 2_048, "depth_limit": 48]
+            let identifier: String?, role: String?, title: String?
+            do {
+                identifier = try string(element, kAXIdentifierAttribute, deadline)
+                role = try string(element, kAXRoleAttribute, deadline)
+                title = try string(element, kAXTitleAttribute, deadline)
+            } catch {
+                let originalScalarRead = lastRead
+                defer { lastRead = originalScalarRead }
+                lastWalkContext["failure_only_standard_window_references"] = failureOnlyRootStandardReferences(
+                    root: root, ancestors: ancestors, path: path, originalScalarRead: originalScalarRead)
+                throw error
+            }
             result.append((element, ancestors, identifier, role, title))
             if lastNodes.count < 64 {
                 lastNodes.append(["identifier": identifier.map { $0 as Any } ?? NSNull(), "role": role.map { $0 as Any } ?? NSNull(),
                                   "title": title.map { $0 as Any } ?? NSNull(), "depth": ancestors.count])
             }
+            lastWalkContext["phase"] = "query-children"
+            var currentMetadata = diagnosticNodeMetadata(identifier, role, title)
+            currentMetadata["cached"] = true
+            lastWalkContext["current_node"] = currentMetadata
+            let nextCachedAncestors = Array((cachedAncestors + [currentMetadata]).suffix(4))
+            let nextSheetAncestorCount = sheetAncestorCount + (role == kAXSheetRole ? 1 : 0)
             let next = try children(element, kAXChildrenAttribute, limit: 2_048 - result.count - pending.count, deadline)
-            pending.append(contentsOf: next.reversed().map { ($0, ancestors + [element]) })
+            pending.append(contentsOf: next.enumerated().reversed().map {
+                ($0.element, ancestors + [element], path + [$0.offset], nextCachedAncestors, nextSheetAncestorCount)
+            })
         }
+        lastWalkContext["phase"] = "walk-complete"
+        lastWalkContext["completed_nodes"] = result.count
         return result
     }
     func required(identifier: String, inSheet: Bool = false) async throws -> AXUIElement {
         let deadline = ProcessInfo.processInfo.systemUptime + 3
+        var attempt = 0
+        defer {
+            lastRequiredWalkContext = lastWalkContext
+            lastRequiredWalkContext["last_scalar_read"] = lastRead
+        }
         repeat {
+            attempt += 1
+            let query: [String: Any] = ["requested_identifier_prefix": String(decoding: identifier.utf8.prefix(512), as: UTF8.self),
+                "requested_identifier_prefix_capped": identifier.utf8.count > 512, "in_sheet": inSheet, "attempt": attempt]
+            lastWalkContext = ["query": query, "phase": "owned-window"]
             let main = try ownedWindow(deadline)
-            let tree = try nodes(main, deadline)
+            let tree = try nodes(main, deadline, queryContext: query)
             let sheets = tree.filter { $0.3 == kAXSheetRole }.map { $0.0 }
             let matches = tree.filter { node in
                 node.2 == identifier && (!inSheet || node.1.contains(where: { ancestor in
@@ -2600,6 +2696,7 @@ private final class RuneWorkspaceNativeNamingMenuCapture: NSObject {
         guard started == 0 else { throw RuneWorkspaceVisibilityFailure("The native menu capture cannot be reused for another opener.") }
         guard ["Rename Layout…", "Save Layout As…"].contains(requestedCommand) else { throw RuneWorkspaceVisibilityFailure("The native capture requested an unsupported literal naming command.") }
         started = ProcessInfo.processInfo.systemUptime; deadline = started + 3
+        recordNativeState("start_attempt")
     }
     var isFinished: Bool { if case .some = result { return true }; return false }
     var evidence: [String: Any] {
@@ -2615,11 +2712,75 @@ private final class RuneWorkspaceNativeNamingMenuCapture: NSObject {
     }
     func noteOpener(action: String, status: Int32) {
         record["actual_opener_action"] = action; record["actual_opener_status"] = status
+        recordNativeState("opener_return")
+    }
+    private func recordNativeState(_ stage: String, includeFailedOwnerClauses: Bool = false) {
+        let observed = ProcessInfo.processInfo.systemUptime, readDeadline = observed + 0.02
+        let window = self.window, hosting = self.hosting
+        var state: [String: Any] = ["classification": includeFailedOwnerClauses
+            ? "Post-failed-guard snapshot; not the original evaluated guard time or failed clause"
+            : "Native scalar context only; no ownership substitution or action result",
+            "snapshot_uptime": observed, "attempt_deadline": deadline, "read_budget_seconds": 0.02,
+            "fixture_window_present": window != nil, "fixture_host_present": hosting != nil,
+            "read_budget_expired": false]
+        func read(_ body: () -> Void) {
+            guard ProcessInfo.processInfo.systemUptime < readDeadline else { state["read_budget_expired"] = true; return }
+            body()
+        }
+        if includeFailedOwnerClauses {
+            var clauses: [String: Any] = ["snapshot_uptime_less_than_deadline": observed < deadline,
+                "window_present": window != nil, "hosting_present": hosting != nil,
+                "window_content_is_host": NSNull(), "host_window_is_fixture": NSNull(),
+                "window_is_visible": NSNull(), "host_has_no_hidden_ancestor": NSNull()]
+            if let window, let hosting {
+                read { clauses["window_content_is_host"] = window.contentView === hosting }
+                read { clauses["host_window_is_fixture"] = hosting.window === window }
+                read { clauses["window_is_visible"] = window.isVisible }
+                read { clauses["host_has_no_hidden_ancestor"] = !hosting.isHiddenOrHasHiddenAncestor }
+            }
+            state["existing_owner_clauses_resampled_after_failed_guard"] = clauses
+        }
+        read { state["run_loop_mode_prefix"] = RunLoop.current.currentMode.map { String($0.rawValue.prefix(128)) as Any } ?? NSNull() }
+        var sheet: NSWindow?
+        if let window {
+            read {
+                state["fixture_window_number"] = window.windowNumber
+                state["fixture_window_is_key"] = window.isKeyWindow
+                state["fixture_window_is_main"] = window.isMainWindow
+            }
+            read { sheet = window.attachedSheet; state["fixture_attached_sheet_present"] = sheet != nil }
+            read {
+                state["fixture_attached_sheet_is_visible"] = sheet.map { $0.isVisible as Any } ?? NSNull()
+                state["fixture_attached_sheet_has_fixture_parent"] = sheet.map { ($0.sheetParent === window) as Any } ?? NSNull()
+            }
+            read {
+                let responder = window.firstResponder
+                state["fixture_first_responder_type_prefix"] = responder.map { String(String(describing: type(of: $0)).prefix(128)) as Any } ?? NSNull()
+                state["fixture_first_responder_view_is_in_fixture"] = (responder as? NSView).map { ($0.window === window) as Any } ?? NSNull()
+            }
+        }
+        read {
+            if let application = NSApp {
+                let key = application.keyWindow, main = application.mainWindow, modal = application.modalWindow
+                state["native_application_is_active"] = application.isActive
+                state["native_key_window_number"] = key.map { $0.windowNumber as Any } ?? NSNull()
+                state["native_main_window_number"] = main.map { $0.windowNumber as Any } ?? NSNull()
+                state["native_modal_window_number"] = modal.map { $0.windowNumber as Any } ?? NSNull()
+                state["native_key_window_is_fixture"] = window.map { (key === $0) as Any } ?? NSNull()
+                state["native_main_window_is_fixture"] = window.map { (main === $0) as Any } ?? NSNull()
+                state["native_modal_window_is_fixture"] = window.map { (modal === $0) as Any } ?? NSNull()
+                state["native_modal_window_is_attached_sheet"] = sheet.map { (modal === $0) as Any } ?? NSNull()
+            }
+        }
+        state["snapshot_elapsed_seconds"] = ProcessInfo.processInfo.systemUptime - observed
+        state["read_budget_expired"] = state["read_budget_expired"] as? Bool == true || ProcessInfo.processInfo.systemUptime >= readDeadline
+        record["native_state_" + stage] = state
     }
     private func requireOwner() throws -> (NSWindow, NSView) {
         guard ProcessInfo.processInfo.systemUptime < deadline,
               let window, let hosting, window.contentView === hosting, hosting.window === window,
               window.isVisible, !hosting.isHiddenOrHasHiddenAncestor else {
+            recordNativeState("post_failed_owner_guard", includeFailedOwnerClauses: true)
             throw RuneWorkspaceVisibilityFailure("The native menu lost its finite exact fixture owner.")
         }
         return (window, hosting)

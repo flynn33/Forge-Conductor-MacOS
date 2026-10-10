@@ -81,6 +81,7 @@ final class NativeWorkspaceDocumentView: NSView {
                 panelHosts[placement.id] = host
                 addSubview(host)
             }
+            if !placement.isVisible { host.cancelGesture() }
             host.canvasSize = frame.size
             host.stackingOrder = index
             host.commitFrame = { value in commitFrame(placement.id, value) }
