@@ -2974,6 +2974,129 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(commits.count, 3)
     }
 
+    func testActualHideReleasesFocusedMoveHandleAndSamePanelResumesKeyboardMovement() async throws {
+        continueAfterFailure = true
+        let deadline = ProcessInfo.processInfo.systemUptime + 20
+        var report: [String: Any] = ["classification": "Owned native Hide/focus regression; automatic AppKit focus behavior is measured, not assumed",
+            "stage": "mount", "case_deadline_seconds": 20, "hidden_arrow_sent": false, "completed": false]
+        defer { nativeDraftRetainMeasurement(report, name: "workspace-hidden-move-handle-focus") }
+        let fixture = try await mountScope()
+        let document = try await mountedDocument(fixture)
+        let panel = try XCTUnwrap(document.panelHosts["alpha"])
+        let contentHost = panel.hostingView
+        try await waitUntil("The actual panel state probe did not mount.") { self.stateReadback(in: contentHost) != nil }
+        let probe = try XCTUnwrap(stateReadback(in: contentHost))
+        let localIdentity = try XCTUnwrap(probe.identity), localText = probe.text
+        let originalFrame = panel.frame, originalCollection = fixture.preferences.collection
+        let bounds = Dictionary(uniqueKeysWithValues: workspaceDescriptors.map {
+            ($0.id, NativeWorkspacePanelSizeBounds(minimumWidth: $0.minimumSize.width, minimumHeight: $0.minimumSize.height,
+                maximumWidth: $0.maximumSize.width, maximumHeight: $0.maximumSize.height))
+        })
+        func requireOwner() throws {
+            report["owner_requirements"] = [
+                "within_deadline": ProcessInfo.processInfo.systemUptime < deadline,
+                "window_visible": fixture.window.isVisible, "window_key": fixture.window.isKeyWindow,
+                "window_content_is_hosting": fixture.window.contentView === fixture.hosting,
+                "hosting_window_is_owned": fixture.hosting.window === fixture.window,
+                "document_window_is_owned": document.window === fixture.window,
+                "panel_window_is_owned": panel.window === fixture.window,
+                "same_panel": document.panelHosts["alpha"] === panel,
+                "same_content_host": panel.hostingView === contentHost,
+                "same_model": probe.model === fixture.model, "same_workbench": probe.workbench === fixture.workbench,
+                "same_guided_mode": probe.guidedMode === fixture.guidedMode,
+                "same_local_identity": probe.identity == localIdentity, "same_local_text": probe.text == localText,
+                "nil_app": fixture.model.app == nil, "nil_manager": fixture.model.manager == nil,
+                "nil_remote_manager": fixture.model.remoteManager == nil,
+            ]
+            guard ProcessInfo.processInfo.systemUptime < deadline, fixture.window.isVisible, fixture.window.isKeyWindow,
+                  fixture.window.contentView === fixture.hosting, fixture.hosting.window === fixture.window,
+                  document.window === fixture.window, panel.window === fixture.window,
+                  document.panelHosts["alpha"] === panel, panel.hostingView === contentHost,
+                  probe.model === fixture.model, probe.workbench === fixture.workbench,
+                  probe.guidedMode === fixture.guidedMode, probe.identity == localIdentity, probe.text == localText,
+                  fixture.model.app == nil, fixture.model.manager == nil, fixture.model.remoteManager == nil else {
+                throw WorkspaceCanvasFixtureFailure("The hidden-focus regression lost its bounded exact fixture/owners.")
+            }
+        }
+        func assertStored(_ expected: NativeWorkspaceCollection) throws {
+            let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
+            let bytes = try XCTUnwrap(fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey))
+            XCTAssertEqual(fixture.preferences.collection, expected)
+            XCTAssertEqual(bytes, try encoder.encode(expected))
+            XCTAssertEqual(try JSONDecoder().decode(NativeWorkspaceCollection.self, from: bytes), expected)
+            let fresh = NativeWorkspacePreferences(knownPanelIDsByView: ["fixture": Set(workspaceDescriptors.map(\.id))],
+                panelSizeBoundsByView: ["fixture": bounds], defaults: fixture.defaults)
+            XCTAssertNil(fresh.restorationError)
+            XCTAssertEqual(fresh.collection, expected)
+            XCTAssertEqual(fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey), bytes)
+        }
+        try requireOwner(); try assertStored(originalCollection)
+        let handles = descendants(panel).filter { $0.accessibilityIdentifier() == "workspace-move-alpha" }
+        let buttons = descendants(panel).compactMap { $0 as? NSButton }
+            .filter { $0.accessibilityIdentifier() == "workspace-hide-alpha" }
+        guard handles.count == 1, buttons.count == 1 else {
+            throw WorkspaceCanvasFixtureFailure("The exact native move/Hide controls were not unique.")
+        }
+        let move = try XCTUnwrap(handles.first), hide = try XCTUnwrap(buttons.first)
+        guard !panel.isHiddenOrHasHiddenAncestor, !move.isHiddenOrHasHiddenAncestor,
+              move.window === fixture.window, hide.window === fixture.window, hide.target === panel,
+              hide.isEnabled, !hide.isHiddenOrHasHiddenAncestor,
+              move.accessibilityPerformPress(), fixture.window.firstResponder === move else {
+            throw WorkspaceCanvasFixtureFailure("The actual visible move handle did not own focus before Hide.")
+        }
+        report["stage"] = "focused-before-actual-hide"; report["first_responder_is_move_before_hide"] = true
+        try requireOwner()
+        hide.performClick(nil)
+        var expectedHidden = originalCollection
+        let layoutIndex = try XCTUnwrap(expectedHidden.layouts.firstIndex { $0.id == fixture.layoutA.id })
+        let panelIndex = try XCTUnwrap(expectedHidden.layouts[layoutIndex].panels.firstIndex { $0.id == "alpha" })
+        expectedHidden.layouts[layoutIndex].panels[panelIndex].isVisible = false
+        try await waitUntil("The actual Hide did not reach the retained native panel.",
+                            timeout: min(3, max(0, deadline - ProcessInfo.processInfo.systemUptime))) {
+            fixture.hosting.layoutSubtreeIfNeeded()
+            return panel.isHiddenOrHasHiddenAncestor && !panel.isManipulating
+        }
+        try requireOwner(); try assertStored(expectedHidden)
+        XCTAssertEqual(panel.frame, originalFrame)
+        let focusedView = fixture.window.firstResponder as? NSView
+        let hiddenOwnsFocus = focusedView.map { $0 === panel || $0.isDescendant(of: panel) } ?? false
+        report["stage"] = "hidden-native-apply"; report["hidden_panel_owns_first_responder"] = hiddenOwnsFocus
+        report["first_responder_is_move_after_hide"] = fixture.window.firstResponder === move
+        report["frame_before_hidden_arrow"] = NSStringFromRect(panel.frame)
+        if hiddenOwnsFocus {
+            try requireOwner()
+            fixture.window.sendEvent(try key(124, flags: [], window: fixture.window))
+            report["hidden_arrow_sent"] = true
+            report["frame_after_hidden_arrow"] = NSStringFromRect(panel.frame)
+            try requireOwner(); try assertStored(expectedHidden)
+            XCTAssertEqual(panel.frame, originalFrame, "An owned-window arrow must not move a hidden panel.")
+        }
+        XCTAssertFalse(hiddenOwnsFocus, "Actual Hide must release keyboard focus from its hidden panel.")
+        report["stage"] = "re-show"
+        try fixture.preferences.setShown(true, for: "alpha", in: "fixture")
+        try await waitUntil("Re-show did not restore the same native panel at its stored frame.",
+                            timeout: min(3, max(0, deadline - ProcessInfo.processInfo.systemUptime))) {
+            fixture.hosting.layoutSubtreeIfNeeded()
+            return !panel.isHiddenOrHasHiddenAncestor && panel.frame == originalFrame
+        }
+        try requireOwner(); try assertStored(originalCollection)
+        XCTAssertTrue(try gestureHandle("workspace-move-alpha", in: panel) === move)
+        guard move.accessibilityPerformPress(), fixture.window.firstResponder === move else {
+            throw WorkspaceCanvasFixtureFailure("The same shown native handle could not regain keyboard focus.")
+        }
+        var expectedMoved = originalCollection
+        expectedMoved.layouts[layoutIndex].panels[panelIndex].frame.x += 10
+        let movedFrame = expectedMoved.layouts[layoutIndex].panels[panelIndex].frame.nativeRect
+        try requireOwner()
+        fixture.window.sendEvent(try key(124, flags: [], window: fixture.window))
+        try await waitUntil("The shown focused handle did not persist its actual owned-window arrow movement.",
+                            timeout: min(3, max(0, deadline - ProcessInfo.processInfo.systemUptime))) {
+            panel.frame == movedFrame && fixture.preferences.collection == expectedMoved
+        }
+        try requireOwner(); try assertStored(expectedMoved)
+        report["stage"] = "shown-keyboard-completed"; report["completed"] = true
+    }
+
     func testKeyboardAlternativesCommitAndEscapeCancelsPointerEdit() throws {
         let document = mountDocument()
         var commits: [NativeWorkspaceFrame] = []
