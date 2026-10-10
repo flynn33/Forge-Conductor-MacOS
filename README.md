@@ -44,6 +44,8 @@ Scoped Rune v103 passes combined Rename and Save As through actual native menus/
 
 Native v106 retains the 21 representative page/Manager routes through a shared queued-geometry verifier. V108 adds actual Rune Source/Violation button navigation and Feed row selection, then queued move/resize on one panel per detail mode. The separate recorded runs cover 24 representative namespaces with saved-state, fresh-preferences and live-host guards. API-seeded layouts and prepared scrolling do not qualify every panel or layout-menu actions; original whole-window/ordinary naming and broader UI gates remain open. New implementations stay deferred.
 
+V110 passes a separate read-only application-content check across 13 pages, two sizes and four layout states (104 native PNG/JSON pairs), omitting only descendants of the freshly validated standard Zoom/FullScreen control. All 104 native caches were visually reviewed; cropping and transient differences remain recorded. V111 preserves the original whole-window failure. Content beyond the captured viewport, scrolling actions and full UI remain unqualified; new implementations stay deferred.
+
 The post-naming v6 ordinary Debug build, strict signature and seven-artifact/Info 0.44.0 (60) readback passed against 320 product/build inputs. This qualifies candidate compilation and file identities; candidate launch, installed operation and full UI remain unverified. Remaining new capability implementations stay deferred. [Current gates](docs/QUALIFICATION-STATUS.md).
 
 ## Earlier UI checks before the naming repair

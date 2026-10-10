@@ -517,7 +517,16 @@ final class NativeWorkspacePageCaptureAppTests: XCTestCase, @unchecked Sendable 
 
     /// Read-only exported semantics of the exact owned window; no foreground or input qualification.
     func testNativeWorkspacesReadOnlyOwnWindowSemanticParityThirteenPagesAtNormalAndMinimumSizes() async throws {
+        try await readOnlyOwnWindowSemanticParity(scope: .wholeWindow)
+    }
+
+    func testNativeWorkspacesReadOnlyValidatedApplicationContentSemanticParityThirteenPagesAtNormalAndMinimumSizes() async throws {
+        try await readOnlyOwnWindowSemanticParity(scope: .applicationContent)
+    }
+
+    private func readOnlyOwnWindowSemanticParity(scope: NativeWorkspacePageCaptureObservationScope) async throws {
         defer { readOnlyObservationPhase = nil }
+        let scopeSuffix = scope == .applicationContent ? "-application-content" : ""
         try await prepareHost()
         do {
             let viewports: [(label: String, size: NSSize)] = [
@@ -525,7 +534,7 @@ final class NativeWorkspacePageCaptureAppTests: XCTestCase, @unchecked Sendable 
                 ("minimum", NSSize(width: 1_100, height: 720)),
             ]
             for viewport in viewports {
-                try directEvidence.configure(testName: name + "-read-only-" + viewport.label)
+                try directEvidence.configure(testName: name + "-read-only-" + viewport.label + scopeSuffix)
                 let owned = try NativeWorkspacePageCaptureFixture(contentSize: viewport.size)
                 fixture = owned
                 try await presentPhysicalCache(owned, expectedContentSize: viewport.size)
@@ -534,18 +543,18 @@ final class NativeWorkspacePageCaptureAppTests: XCTestCase, @unchecked Sendable 
                 for page in NativeWorkspaceCapturePage.allCases {
                     owned.route.page = page
                     readOnlyObservationPhase = viewport.label + ":default"
-                    _ = try await requiredElement("workspace-controls-" + page.viewID, in: owned)
-                    try await settle(page, in: owned)
-                    try await captureReadOnlyOwnWindowPhase(page, in: owned, expectedContentSize: viewport.size,
-                        expectedLayout: nil, allHidden: false, name: "\(page.rawValue)-\(viewport.label)-read-only-default")
+                    _ = try await requiredElement("workspace-controls-" + page.viewID, in: owned, scope: scope)
+                    try await settle(page, in: owned, scope: scope)
+                    try await captureReadOnlyOwnWindowPhase(page, in: owned, expectedContentSize: viewport.size, scope: scope,
+                        expectedLayout: nil, allHidden: false, name: "\(page.rawValue)-\(viewport.label)-read-only-default\(scopeSuffix)")
                     capturedPhases += 1
 
                     let custom = try owned.customize(page.viewID)
                     readOnlyObservationPhase = viewport.label + ":custom"
                     try await requireCanvas(custom, in: owned)
-                    try await settle(page, in: owned)
-                    try await captureReadOnlyOwnWindowPhase(page, in: owned, expectedContentSize: viewport.size,
-                        expectedLayout: custom, allHidden: false, name: "\(page.rawValue)-\(viewport.label)-read-only-custom")
+                    try await settle(page, in: owned, scope: scope)
+                    try await captureReadOnlyOwnWindowPhase(page, in: owned, expectedContentSize: viewport.size, scope: scope,
+                        expectedLayout: custom, allHidden: false, name: "\(page.rawValue)-\(viewport.label)-read-only-custom\(scopeSuffix)")
                     capturedPhases += 1
 
                     var hiddenLayout = custom
@@ -555,8 +564,8 @@ final class NativeWorkspacePageCaptureAppTests: XCTestCase, @unchecked Sendable 
                     }
                     readOnlyObservationPhase = viewport.label + ":all-hidden"
                     try await requireHiddenCanvas(hiddenLayout, in: owned)
-                    try await captureReadOnlyOwnWindowPhase(page, in: owned, expectedContentSize: viewport.size,
-                        expectedLayout: hiddenLayout, allHidden: true, name: "\(page.rawValue)-\(viewport.label)-read-only-all-hidden")
+                    try await captureReadOnlyOwnWindowPhase(page, in: owned, expectedContentSize: viewport.size, scope: scope,
+                        expectedLayout: hiddenLayout, allHidden: true, name: "\(page.rawValue)-\(viewport.label)-read-only-all-hidden\(scopeSuffix)")
                     capturedPhases += 1
 
                     try owned.preferences.reset(page.viewID)
@@ -564,10 +573,10 @@ final class NativeWorkspacePageCaptureAppTests: XCTestCase, @unchecked Sendable 
                     try await waitUntil("The read-only semantic custom document did not dismantle after reset") {
                         !self.nativeViews(owned.hosting).contains { $0 is NativeWorkspaceDocumentView }
                     }
-                    _ = try await requiredElement("workspace-controls-" + page.viewID, in: owned)
-                    try await settle(page, in: owned)
-                    try await captureReadOnlyOwnWindowPhase(page, in: owned, expectedContentSize: viewport.size,
-                        expectedLayout: nil, allHidden: false, name: "\(page.rawValue)-\(viewport.label)-read-only-restored")
+                    _ = try await requiredElement("workspace-controls-" + page.viewID, in: owned, scope: scope)
+                    try await settle(page, in: owned, scope: scope)
+                    try await captureReadOnlyOwnWindowPhase(page, in: owned, expectedContentSize: viewport.size, scope: scope,
+                        expectedLayout: nil, allHidden: false, name: "\(page.rawValue)-\(viewport.label)-read-only-restored\(scopeSuffix)")
                     capturedPhases += 1
                 }
                 let mutations = await owned.client.mutationNames()
@@ -580,8 +589,10 @@ final class NativeWorkspacePageCaptureAppTests: XCTestCase, @unchecked Sendable 
                     throw NativeWorkspacePageCaptureFailure("Read-only own-window parity omitted a route or phase")
                 }
                 let report = try JSONSerialization.data(withJSONObject: [
-                    "classification": "Read-only public AXUIElement parity of 13 direct production-page fixtures in one exact owned window; no active/key, semantic action, sidebar routing, desktop compositor or Metal qualification",
-                    "viewport": viewport.label, "content_size": NSStringFromSize(viewport.size),
+                    "classification": scope == .wholeWindow
+                        ? "Read-only public AXUIElement parity of 13 direct production-page fixtures in one exact owned window; no active/key, semantic action, sidebar routing, desktop compositor or Metal qualification"
+                        : "Read-only validated application-content public AX parity; only exact standard Zoom descendant expansion excluded; original whole-window gate remains separate",
+                    "observation_scope": scope.rawValue, "viewport": viewport.label, "content_size": NSStringFromSize(viewport.size),
                     "captured_phases": capturedPhases, "route_count": 13, "phase_count_per_route": 4,
                     "application_active": NSApp.isActive, "window_key": owned.window.isKeyWindow,
                     "fixture_mutations": mutations.sorted(), "settings_ready": owned.model.hasLoadedInitialSettings,
@@ -589,10 +600,10 @@ final class NativeWorkspacePageCaptureAppTests: XCTestCase, @unchecked Sendable 
                 guard report.count <= 64 * 1_024 else {
                     throw NativeWorkspacePageCaptureFailure("Read-only own-window scope receipt exceeded its byte bound")
                 }
-                try directEvidence.save(report, name: "read-only-own-window-scope", extension: "json")
+                try directEvidence.save(report, name: "read-only-own-window-scope" + scopeSuffix, extension: "json")
                 if !directEvidence.isEnabled {
                     let attachment = XCTAttachment(data: report, uniformTypeIdentifier: "public.json")
-                    attachment.name = "read-only-own-window-scope"; attachment.lifetime = .keepAlways; add(attachment)
+                    attachment.name = "read-only-own-window-scope" + scopeSuffix; attachment.lifetime = .keepAlways; add(attachment)
                 }
                 await owned.close()
                 fixture = nil
@@ -952,23 +963,24 @@ final class NativeWorkspacePageCaptureAppTests: XCTestCase, @unchecked Sendable 
         throw NativeWorkspacePageCaptureFailure("The exact populated Provider contract facts and workflow footer did not appear together in their expected panel scope")
     }
 
-    private func settle(_ page: NativeWorkspaceCapturePage, in owned: NativeWorkspacePageCaptureFixture) async throws {
+    private func settle(_ page: NativeWorkspaceCapturePage, in owned: NativeWorkspacePageCaptureFixture,
+                        scope: NativeWorkspacePageCaptureObservationScope = .wholeWindow) async throws {
         switch page {
         case .projects:
             try await waitUntilAsync("The Projects fixture did not complete snapshot and queue reads") {
                 await owned.client.projectsDidLoad()
             }
-            try await requiredText("Workspace Fixture Project", in: owned)
+            try await requiredText("Workspace Fixture Project", in: owned, scope: scope)
         case .provider:
-            try await requiredText("No LM Studio settings are saved. Open LM Studio Advanced to configure it.", in: owned)
+            try await requiredText("No LM Studio settings are saved. Open LM Studio Advanced to configure it.", in: owned, scope: scope)
         case .runtimes:
-            try await requiredText("settings is intentionally unavailable in the isolated native page capture fixture", in: owned)
+            try await requiredText("settings is intentionally unavailable in the isolated native page capture fixture", in: owned, scope: scope)
         case .continuity:
-            try await requiredText("Continuity packet listing is unavailable from this manager client.", in: owned)
+            try await requiredText("Continuity packet listing is unavailable from this manager client.", in: owned, scope: scope)
         case .runeForge:
-            try await requiredText("Rune Forge is unavailable from this manager client.", in: owned)
+            try await requiredText("Rune Forge is unavailable from this manager client.", in: owned, scope: scope)
         case .evidence:
-            try await requiredText("No Events", in: owned)
+            try await requiredText("No Events", in: owned, scope: scope)
         default: break
         }
     }
@@ -1146,7 +1158,8 @@ final class NativeWorkspacePageCaptureAppTests: XCTestCase, @unchecked Sendable 
     }
 
     private func capture(_ owned: NativeWorkspacePageCaptureFixture,
-                         semantics: [NativeWorkspacePageCaptureSemantic], name: String, diagnosticOnly: Bool = false) throws {
+                         semantics: [NativeWorkspacePageCaptureSemantic], name: String, diagnosticOnly: Bool = false,
+                         scopeProgress: [String: Any]? = nil) throws {
         owned.hosting.layoutSubtreeIfNeeded()
         let size = owned.hosting.bounds.size
         guard size.width > 0, size.height > 0, size.width <= 1_440, size.height <= 900,
@@ -1159,7 +1172,7 @@ final class NativeWorkspacePageCaptureAppTests: XCTestCase, @unchecked Sendable 
         owned.hosting.cacheDisplay(in: owned.hosting.bounds, to: bitmap)
         let png = try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
         guard png.count <= 16 * 1_024 * 1_024 else { throw NativeWorkspacePageCaptureFailure("Native cache exceeded its image byte budget") }
-        let observation: [String: Any] = [
+        var observation: [String: Any] = [
             "classification": diagnosticOnly
                 ? "Direct production-page native-view cache and same-process public formal and informal AppKit accessibility observation; not external AXUIElement evidence, ContentView sidebar routing, ordinary desktop compositor, or Metal drawable readback"
                 : "Direct production-page native-view cache and public AXUIElement observation of the exact own-process window; not ContentView sidebar routing, ordinary desktop compositor, or Metal drawable readback",
@@ -1171,6 +1184,10 @@ final class NativeWorkspacePageCaptureAppTests: XCTestCase, @unchecked Sendable 
             "settings_ready": owned.model.hasLoadedInitialSettings,
             "elements": semantics.map(\.dictionary),
         ]
+        if let scopeProgress {
+            observation["classification"] = "Direct production-page native-view cache and complete validated application-content AX snapshot; original whole-window, sidebar routing, desktop compositor and Metal gates remain separate"
+            observation["application_content_scope"] = scopeProgress
+        }
         let json = try JSONSerialization.data(withJSONObject: observation, options: [.prettyPrinted, .sortedKeys])
         guard json.count <= 512 * 1_024 else { throw NativeWorkspacePageCaptureFailure("Native semantics exceeded its byte budget") }
         try directEvidence.save(png, name: name + "-native-view-cache", extension: "png")
@@ -1185,6 +1202,7 @@ final class NativeWorkspacePageCaptureAppTests: XCTestCase, @unchecked Sendable 
 
     private func captureReadOnlyOwnWindowPhase(_ page: NativeWorkspaceCapturePage,
         in owned: NativeWorkspacePageCaptureFixture, expectedContentSize: NSSize,
+        scope: NativeWorkspacePageCaptureObservationScope = .wholeWindow,
         expectedLayout: NativeWorkspaceLayout?, allHidden: Bool, name: String) async throws {
         func requirePhaseOwner() throws {
             owned.hosting.layoutSubtreeIfNeeded()
@@ -1214,7 +1232,11 @@ final class NativeWorkspacePageCaptureAppTests: XCTestCase, @unchecked Sendable 
             }
         }
         try requirePhaseOwner()
-        let observed = try await observeOwnedSnapshot(in: owned)
+        var scopeProgress: [String: Any]?
+        var requiredIDs: Set<String> = ["workspace-controls-" + page.viewID, page.marker]
+        if page == .runeForge { requiredIDs.insert("rune-detail-heading") }
+        let observed = try await observeOwnedSnapshot(in: owned, scope: scope,
+            requiredIdentifiers: requiredIDs, retainScopeProgress: { scopeProgress = $0 })
         try requirePhaseOwner()
         guard !observed.isEmpty,
               observed.filter({ $0.role == kAXWindowRole && $0.title == owned.window.title }).count == 1,
@@ -1252,7 +1274,7 @@ final class NativeWorkspacePageCaptureAppTests: XCTestCase, @unchecked Sendable 
             }
         }
         try requirePhaseOwner()
-        try capture(owned, semantics: observed, name: name)
+        try capture(owned, semantics: observed, name: name, scopeProgress: scopeProgress)
     }
 
     private func captureForensicBoundary(_ owned: NativeWorkspacePageCaptureFixture, name: String) throws {
@@ -1368,18 +1390,19 @@ final class NativeWorkspacePageCaptureAppTests: XCTestCase, @unchecked Sendable 
         }
     }
 
-    private func requiredElement(_ identifier: String, in owned: NativeWorkspacePageCaptureFixture) async throws -> NativeWorkspacePageCaptureElement {
+    private func requiredElement(_ identifier: String, in owned: NativeWorkspacePageCaptureFixture,
+                                 scope: NativeWorkspacePageCaptureObservationScope = .wholeWindow) async throws -> NativeWorkspacePageCaptureElement {
         let deadline = ProcessInfo.processInfo.systemUptime + 5
         var lastObserved: [NativeWorkspacePageCaptureSemantic] = []
         repeat {
-            let elements = try await semantics(in: owned)
+            let elements = try await semantics(in: owned, scope: scope, requiredIdentifiers: [identifier])
             lastObserved = elements
             let matches = elements.filter { $0.identifier == identifier }
             if matches.count == 1 { return matches[0].element }
             guard matches.count <= 1 else { throw NativeWorkspacePageCaptureFailure("Duplicate native action identifier: \(identifier)") }
             try await Task.sleep(for: .milliseconds(20))
         } while ProcessInfo.processInfo.systemUptime < deadline
-        do { try await retainTraversalFailure(identifier, in: owned, lastObserved: lastObserved) }
+        do { try await retainTraversalFailure(identifier, in: owned, lastObserved: lastObserved, scope: scope) }
         catch {
             let message = "Traversal diagnostic retention failed for \(identifier): \(error)"
             let attachment = XCTAttachment(string: String(message.prefix(4_096)))
@@ -1388,34 +1411,44 @@ final class NativeWorkspacePageCaptureAppTests: XCTestCase, @unchecked Sendable 
         throw NativeWorkspacePageCaptureFailure("Native action did not mount: \(identifier)")
     }
 
-    private func requiredText(_ text: String, in owned: NativeWorkspacePageCaptureFixture) async throws {
+    private func requiredText(_ text: String, in owned: NativeWorkspacePageCaptureFixture,
+                              scope: NativeWorkspacePageCaptureObservationScope = .wholeWindow) async throws {
         let deadline = ProcessInfo.processInfo.systemUptime + 5
         repeat {
-            let elements = try await semantics(in: owned)
+            let elements = try await semantics(in: owned, scope: scope)
             if elements.contains(where: { $0.value == text || $0.label == text || $0.title == text }) { return }
             try await Task.sleep(for: .milliseconds(20))
         } while ProcessInfo.processInfo.systemUptime < deadline
         throw NativeWorkspacePageCaptureFailure("The fixture request completed but the actual page text did not render: \(text)")
     }
 
-    private func semantics(in owned: NativeWorkspacePageCaptureFixture) async throws -> [NativeWorkspacePageCaptureSemantic] {
+    private func semantics(in owned: NativeWorkspacePageCaptureFixture,
+                           scope: NativeWorkspacePageCaptureObservationScope = .wholeWindow,
+                           requiredIdentifiers: Set<String> = []) async throws -> [NativeWorkspacePageCaptureSemantic] {
         owned.hosting.layoutSubtreeIfNeeded()
-        return try await observeOwnedSnapshot(in: owned)
+        return try await observeOwnedSnapshot(in: owned, scope: scope, requiredIdentifiers: requiredIdentifiers)
     }
 
 
-    private func observeOwnedSnapshot(in owned: NativeWorkspacePageCaptureFixture) async throws -> [NativeWorkspacePageCaptureSemantic] {
+    private func observeOwnedSnapshot(in owned: NativeWorkspacePageCaptureFixture,
+                                      scope observationScope: NativeWorkspacePageCaptureObservationScope = .wholeWindow,
+                                      requiredIdentifiers: Set<String> = [],
+                                      retainScopeProgress: (@MainActor ([String: Any]) -> Void)? = nil) async throws -> [NativeWorkspacePageCaptureSemantic] {
         let page = owned.route.page
         let selectedLayout = owned.preferences.activeLayout(for: page.viewID)
         let expectedWindowFrame = owned.window.frame
         let expectedHostBounds = owned.hosting.bounds
         let scope = NativeWorkspacePageCaptureAXScope(window: owned.window, hosting: owned.hosting)
         do {
-            return try scope.observe(frameFailure: { self.retainAXFrameFailure($0, in: owned) })
+            let complete = try scope.observe(scope: observationScope, requiredIdentifiers: requiredIdentifiers,
+                frameFailure: { self.retainAXFrameFailure($0, in: owned) })
+            if observationScope == .applicationContent { retainScopeProgress?(scope.diagnosticProgress) }
+            return complete
         } catch {
             await retainFailedSnapshotReacquisition(error, originalScope: scope, in: owned,
                 page: page, selectedLayout: selectedLayout,
-                expectedWindowFrame: expectedWindowFrame, expectedHostBounds: expectedHostBounds)
+                expectedWindowFrame: expectedWindowFrame, expectedHostBounds: expectedHostBounds,
+                scope: observationScope, requiredIdentifiers: requiredIdentifiers)
             throw error
         }
     }
@@ -1423,13 +1456,16 @@ final class NativeWorkspacePageCaptureAppTests: XCTestCase, @unchecked Sendable 
     private func retainFailedSnapshotReacquisition(_ originalError: Error,
         originalScope: NativeWorkspacePageCaptureAXScope, in owned: NativeWorkspacePageCaptureFixture,
         page: NativeWorkspaceCapturePage, selectedLayout: NativeWorkspaceLayout?,
-        expectedWindowFrame: NSRect, expectedHostBounds: NSRect) async {
+        expectedWindowFrame: NSRect, expectedHostBounds: NSRect,
+        scope observationScope: NativeWorkspacePageCaptureObservationScope = .wholeWindow,
+        requiredIdentifiers: Set<String> = []) async {
         let started = ProcessInfo.processInfo.systemUptime
         let deadline = started + 5
         var report: [String: Any] = [
             "classification": "Diagnostic reacquisition after a failed complete own-window public AX traversal; the original error is always rethrown, even if the fresh diagnostic snapshot succeeds",
             "original_error": String(String(describing: originalError).prefix(4_096)),
             "original_scope_progress": originalScope.diagnosticProgress,
+            "observation_scope": observationScope.rawValue,
             "expected_route": page.rawValue, "expected_view_id": page.viewID,
             "read_only_phase": readOnlyObservationPhase.map { $0 as Any } ?? NSNull(),
             "expected_window_frame": NSStringFromRect(expectedWindowFrame),
@@ -1467,7 +1503,8 @@ final class NativeWorkspacePageCaptureAppTests: XCTestCase, @unchecked Sendable 
             }
             let fresh = NativeWorkspacePageCaptureAXScope(window: owned.window, hosting: owned.hosting)
             do {
-                let complete = try fresh.observe(deadline: deadline)
+                let complete = try fresh.observe(deadline: deadline, scope: observationScope,
+                    requiredIdentifiers: requiredIdentifiers)
                 guard ownerUnchanged(), ProcessInfo.processInfo.systemUptime < deadline else {
                     throw NativeWorkspacePageCaptureFailure("The fresh diagnostic snapshot changed its original route/layout/owner/geometry or exceeded its total deadline")
                 }
@@ -1594,21 +1631,22 @@ final class NativeWorkspacePageCaptureAppTests: XCTestCase, @unchecked Sendable 
     }
 
     private func retainTraversalFailure(_ identifier: String, in owned: NativeWorkspacePageCaptureFixture,
-                                        lastObserved: [NativeWorkspacePageCaptureSemantic]) async throws {
+                                        lastObserved: [NativeWorkspacePageCaptureSemantic],
+                                        scope: NativeWorkspacePageCaptureObservationScope = .wholeWindow) async throws {
         traversalDiagnosticNodes = []; traversalDiagnosticVisitedCount = 0
         defer { traversalDiagnosticNodes = nil; traversalDiagnosticVisitedCount = 0 }
         var measured: [NativeWorkspacePageCaptureSemantic]?
         var measurementError: String?
         var formalMeasured: [NativeWorkspacePageCaptureSemantic]?
         var formalMeasurementError: String?
-        do { measured = try await semantics(in: owned) }
+        do { measured = try await semantics(in: owned, scope: scope, requiredIdentifiers: [identifier]) }
         catch { measurementError = String(String(describing: error).prefix(4_096)) }
         do { formalMeasured = try await formalSemantics(in: owned) }
         catch { formalMeasurementError = String(String(describing: error).prefix(4_096)) }
         let samples = traversalDiagnosticNodes ?? []
         let report: [String: Any] = [
             "classification": "Diagnostic actual native traversal and public API comparison; missing-identifier assertion remains failed",
-            "identifier": identifier, "route": owned.route.page.rawValue,
+            "identifier": identifier, "route": owned.route.page.rawValue, "observation_scope": scope.rawValue,
             "sample_uptime": ProcessInfo.processInfo.systemUptime,
             "window_owns_exact_hosting_view": owned.window.contentView === owned.hosting,
             "node_sample_limit": 64, "visited_node_count": traversalDiagnosticVisitedCount,
@@ -2088,6 +2126,8 @@ private final class NativeWorkspacePageCaptureAXElement {
     func press() throws { try scope.press(reference) }
 }
 
+private enum NativeWorkspacePageCaptureObservationScope: String { case wholeWindow, applicationContent }
+
 /// Exact own-process exported AX tree; native/formal observations remain diagnostic comparisons.
 @MainActor
 private final class NativeWorkspacePageCaptureAXScope {
@@ -2297,7 +2337,50 @@ private final class NativeWorkspacePageCaptureAXScope {
         return Array(identifiers.reversed())
     }
 
+    private func validatedApplicationContentZoom(_ root: AXUIElement, deadline: TimeInterval,
+                                                requiredIdentifiers: Set<String>) throws -> AXUIElement {
+        guard let raw = try attribute(root, kAXZoomButtonAttribute, deadline: deadline),
+              CFGetTypeID(raw) == AXUIElementGetTypeID() else {
+            throw NativeWorkspacePageCaptureFailure("Application-content scope requires the exact owned window's public Zoom reference")
+        }
+        let zoom = raw as! AXUIElement
+        try prepare(zoom, deadline: deadline)
+        _ = try ancestors(zoom, deadline: deadline)
+        let role = try string(zoom, kAXRoleAttribute, deadline: deadline)
+        let subrole = try string(zoom, kAXSubroleAttribute, deadline: deadline)
+        guard role == kAXButtonRole, let subrole,
+              subrole == kAXZoomButtonSubrole || subrole == kAXFullScreenButtonSubrole else {
+            throw NativeWorkspacePageCaptureFailure("Application-content scope requires an owned standard Zoom/Full Screen AXButton")
+        }
+        var fullScreenMatches: Bool?
+        if subrole == kAXFullScreenButtonSubrole {
+            guard let rawFullScreen = try attribute(root, kAXFullScreenButtonAttribute, deadline: deadline),
+                  CFGetTypeID(rawFullScreen) == AXUIElementGetTypeID() else {
+                throw NativeWorkspacePageCaptureFailure("The Full Screen subrole lacks its exact owned window public reference")
+            }
+            let fullScreen = rawFullScreen as! AXUIElement
+            try prepare(fullScreen, deadline: deadline)
+            _ = try ancestors(fullScreen, deadline: deadline)
+            fullScreenMatches = CFEqual(fullScreen, zoom)
+            guard fullScreenMatches == true else {
+                throw NativeWorkspacePageCaptureFailure("The owned Full Screen reference differs from its exact Zoom reference")
+            }
+        }
+        let identifier = try string(zoom, kAXIdentifierAttribute, deadline: deadline)
+        guard identifier.map({ !requiredIdentifiers.contains($0) }) ?? true else {
+            throw NativeWorkspacePageCaptureFailure("Application-content scope cannot exclude a requested Forge identifier")
+        }
+        diagnosticProgress["standard_zoom_reference_validated"] = true
+        diagnosticProgress["standard_zoom_role"] = role
+        diagnosticProgress["standard_zoom_subrole"] = subrole
+        diagnosticProgress["standard_zoom_identifier"] = identifier.map { String($0.prefix(128)) as Any } ?? NSNull()
+        diagnosticProgress["full_screen_reference_matches_zoom"] = fullScreenMatches.map { $0 as Any } ?? NSNull()
+        return zoom
+    }
+
     func observe(deadline requestedDeadline: TimeInterval? = nil,
+                 scope: NativeWorkspacePageCaptureObservationScope = .wholeWindow,
+                 requiredIdentifiers: Set<String> = [],
                  frameFailure: (([String: Any]) -> Void)? = nil) throws -> [NativeWorkspacePageCaptureSemantic] {
         let deadline = min(ProcessInfo.processInfo.systemUptime + 5, requestedDeadline ?? .infinity)
         diagnosticProgress = ["visited_node_count": 0, "completed_semantic_count": 0]
@@ -2314,6 +2397,14 @@ private final class NativeWorkspacePageCaptureAXScope {
             throw NativeWorkspacePageCaptureFailure("Public AX did not export the exact owned window; absence of panel elements is unqualified")
         }
         exportedWindow = match
+        let excludedZoom: AXUIElement?
+        if scope == .applicationContent {
+            diagnosticProgress["observation_scope"] = scope.rawValue
+            diagnosticProgress["standard_zoom_reference_validated"] = false
+            diagnosticProgress["standard_zoom_descendant_expansion_omitted"] = false
+            excludedZoom = try validatedApplicationContentZoom(match, deadline: deadline,
+                requiredIdentifiers: requiredIdentifiers)
+        } else { excludedZoom = nil }
         var pending: [(AXUIElement, [String], Int)] = [(match, [], 0)]
         var seen: [AXUIElement] = [], result: [NativeWorkspacePageCaptureSemantic] = []
         while let (reference, pathAncestors, depth) = pending.popLast() {
@@ -2341,6 +2432,13 @@ private final class NativeWorkspacePageCaptureAXScope {
                     role: observed.role ?? "", title: String(title.prefix(512)), label: String(label.prefix(512)),
                     value: String(value.prefix(512)), ancestors: lineage, frame: observed.frame,
                     exposed: nil, enabled: observed.enabled))
+            }
+            if let excludedZoom, CFEqual(reference, excludedZoom) {
+                guard !requiredIdentifiers.contains(identifier) else {
+                    throw NativeWorkspacePageCaptureFailure("The validated standard Zoom changed into a requested Forge target")
+                }
+                diagnosticProgress["standard_zoom_descendant_expansion_omitted"] = true
+                continue
             }
             let nextAncestors = identifier.isEmpty ? pathAncestors : pathAncestors + [identifier]
             let children = try elements(reference, kAXChildrenAttribute,

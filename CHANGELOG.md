@@ -61,6 +61,7 @@ Product versions do not by themselves claim shipment.
 - Verify scoped combined Rune Rename/Save As in v103 through exact attached-sheet Save AXPress and fresh saved-state restoration. V104 retains both unchanged owned-editor/Return regressions. Original whole-window/ordinary combined and broader UI gates remain open; no production repair.
 
 - Verify shared queued geometry for 21 real page/Manager namespaces in v106 and actual Source/Violation/Feed selection plus three Rune detail-panel gestures in v108. Across separate inputs this covers 24 representative namespaces, with exact saved-state/restoration and host guards; every panel, original naming/ordinary and broader UI gates remain open. No production repair.
+- Add a separate validated application-content semantic check: v110 passes all 104 page/size/layout pairs, with all 104 native caches visually reviewed; the unchanged whole-window v111 gate fails during AXRole discovery. Cropping, transient differences, content beyond the captured viewport and scrolling actions remain limits. Test-only; no production, version or full UI closure.
 
 #### Earlier UI checks before the naming repair
 
