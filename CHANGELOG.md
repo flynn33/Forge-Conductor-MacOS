@@ -25,6 +25,10 @@ Product versions do not by themselves claim shipment.
 
 - Verify the unchanged native Doctor v23 case: actual section/Run doctor actions retain the unavailable result and heading across default/custom/restored layouts. Healthy/live Doctor reports and full UI remain unqualified; prior failures retain their recorded inputs.
 
+- Record v25/v26 complete-draft diagnostics: both native methods remain NONPASS in each selection. Test-only boundary retention rethrows the original accessibility error and shows a different raw terminal associated-error domain naming Gestures `InvalidTransition`; causal ordering remains unknown. Original actions/assertions and all broader qualification gates remain unchanged.
+
+- Record the separate v27 post-failure diagnostic: after one requested 20 ms wait and one fresh child copy from the held parent, both held/fresh child accessibility reads still return −25211. Both complete-draft methods remain NONPASS; original assertions and fatal errors are preserved, with no cause or production repair established.
+
 #### Earlier UI checks before the naming repair
 
 - Verify the post-Compute ordinary Debug candidate, strict signature and CLI/app product links. Candidate Dashboard startup was observed. The later whole native Canvas selection passed 11 of 13 methods; both draft cases, Projects desktop navigation and Rune naming qualification remain open. The installed 0.18.0 (28) app was not replaced.

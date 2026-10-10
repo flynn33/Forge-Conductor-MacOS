@@ -39,180 +39,210 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
     }
 
     func testProductionManagerNativeDraftSurvivesWorkspaceAndSectionTransitions() async throws {
-        continueAfterFailure = true
-        nativeDraftStage("manager.fixture.create")
-        defer { nativeDraftStage("manager.test.return-from-" + nativeDraftCurrentStage) }
-        let fixture = try NativeWorkspaceDraftFixture(page: .manager)
-        draftFixture = fixture
-        nativeDraftStage("bootstrap.await-success")
-        try await exposeNativeDraftFixture(fixture)
-        nativeDraftStage("bootstrap.published-success")
-        let app = try XCTUnwrap(fixture.model.app)
-        let originalConfiguration = try Data(contentsOf: app.paths.configJSON)
-        let originalHost = fixture.model.setHost
-        let draft = "native-workspace-manager-draft.invalid"
-        nativeDraftStage("default.field.lookup")
-        let field = try await nativeDraftField(in: fixture.hosting, identifier: "Dashboard host",
-                                               placeholder: "Dashboard host")
-        try editNativeDraftField(field, value: draft, in: fixture.window)
-        try await waitUntil("The real Manager field did not update its staged AppModel value.") {
-            try fixture.model.setHost == draft && field.stringValue == draft
-        }
-        nativeDraftStage("edit.binding-confirmed.default-to-custom.begin")
-        let layout = nativeDraftLayout(viewID: "manager.settings")
-        try fixture.preferences.save(layout)
-        nativeDraftStage("default-to-custom.preference-saved")
-        let document = try await nativeDraftDocument(fixture, panelID: "manager-dashboard-settings")
-        let panel = try XCTUnwrap(document.panelHosts["manager-dashboard-settings"])
-        let hosting = panel.hostingView
-        nativeDraftStage("custom.field.lookup")
-        let customField = try await nativeDraftField(in: hosting, identifier: "Dashboard host",
+        do {
+            continueAfterFailure = true
+            nativeDraftStage("manager.fixture.create")
+            defer { nativeDraftStage("manager.test.return-from-" + nativeDraftCurrentStage) }
+            let fixture = try NativeWorkspaceDraftFixture(page: .manager)
+            draftFixture = fixture
+            nativeDraftStage("bootstrap.await-success")
+            try await exposeNativeDraftFixture(fixture)
+            nativeDraftStage("bootstrap.published-success")
+            let app = try XCTUnwrap(fixture.model.app)
+            let originalConfiguration = try Data(contentsOf: app.paths.configJSON)
+            let originalHost = fixture.model.setHost
+            let draft = "native-workspace-manager-draft.invalid"
+            nativeDraftStage("default.field.lookup")
+            let field = try await nativeDraftField(in: fixture.hosting, identifier: "Dashboard host",
+                                                   placeholder: "Dashboard host")
+            try editNativeDraftField(field, value: draft, in: fixture.window)
+            try await waitUntil("The real Manager field did not update its staged AppModel value.") {
+                try fixture.model.setHost == draft && field.stringValue == draft
+            }
+            nativeDraftStage("edit.binding-confirmed.default-to-custom.begin")
+            let layout = nativeDraftLayout(viewID: "manager.settings")
+            try fixture.preferences.save(layout)
+            nativeDraftStage("default-to-custom.preference-saved")
+            let document = try await nativeDraftDocument(fixture, panelID: "manager-dashboard-settings")
+            let panel = try XCTUnwrap(document.panelHosts["manager-dashboard-settings"])
+            let hosting = panel.hostingView
+            nativeDraftStage("custom.field.lookup")
+            let customField = try await nativeDraftField(in: hosting, identifier: "Dashboard host",
+                                                         placeholder: "Dashboard host")
+            XCTAssertEqual((try customField.stringValue), draft)
+            nativeDraftStage("custom.hide.begin")
+            try nativeDraftHide(panel)
+            nativeDraftStage("custom.hide.native-action-returned")
+            try await waitUntil("The actual native Hide action did not hide Manager settings.") { panel.isHidden }
+            XCTAssertFalse(try XCTUnwrap(fixture.preferences.activeLayout(for: "manager.settings")?
+                .panels.first { $0.id == "manager-dashboard-settings" }).isVisible)
+            try fixture.preferences.setShown(true, for: "manager-dashboard-settings", in: "manager.settings")
+            try await waitUntil("Manager settings did not resume from the retained native host.") { !panel.isHidden }
+            XCTAssertTrue(panel.hostingView === hosting)
+            XCTAssertEqual((try customField.stringValue), draft)
+            nativeDraftStage("named-layout.save.begin")
+            let named = try fixture.preferences.saveAs(try XCTUnwrap(fixture.preferences.activeLayout(for: "manager.settings")),
+                                                       named: "Manager Native Draft")
+            try await waitUntil("The named Manager layout did not become active.") {
+                fixture.preferences.activeLayout(for: "manager.settings")?.id == named
+            }
+            let namedFrame = NativeWorkspaceFrame(x: 380, y: 60, width: 860, height: 440)
+            try fixture.preferences.setFrame(namedFrame, for: "manager-dashboard-settings", in: "manager.settings")
+            try await waitUntil("The named Manager geometry did not reach the actual panel.") { panel.frame == namedFrame.nativeRect }
+            try fixture.preferences.activate(layout.id, for: "manager.settings")
+            try await waitUntil("The original Manager layout did not reach the actual panel.") {
+                panel.frame == layout.panels.first { $0.id == "manager-dashboard-settings" }?.frame.nativeRect
+            }
+            try fixture.preferences.activate(named, for: "manager.settings")
+            try await waitUntil("Named layout changes replaced the Manager binding.") {
+                try panel.frame == namedFrame.nativeRect && panel.hostingView === hosting
+                    && customField.stringValue == draft && fixture.model.setHost == draft
+            }
+            nativeDraftStage("manager.restore-default.begin")
+            try fixture.preferences.reset("manager.settings")
+            try await waitUntil("Default restoration did not dismantle Manager's custom canvas.") {
+                self.nativeDraftViews(fixture.hosting).allSatisfy { !($0 is NativeWorkspaceDocumentView) }
+            }
+            let defaultField = try await nativeDraftField(in: fixture.hosting, identifier: "Dashboard host",
+                                                          placeholder: "Dashboard host")
+            XCTAssertEqual((try defaultField.stringValue), draft)
+            nativeDraftStage("manager.section-transitions.begin")
+            for (section, title) in [("shell", "Project Shell"), ("folders", "Authorized Folders"),
+                                      ("workbench", "Workbench"), ("settings", "Settings")] {
+                nativeDraftStage("manager.section." + section + ".press")
+                try await nativeDraftPress("manager-section-" + section, in: fixture)
+                try await nativeDraftRequireManagerTitle(title, in: fixture)
+            }
+            let resumed = try await nativeDraftField(in: fixture.hosting, identifier: "Dashboard host",
                                                      placeholder: "Dashboard host")
-        XCTAssertEqual((try customField.stringValue), draft)
-        nativeDraftStage("custom.hide.begin")
-        try nativeDraftHide(panel)
-        nativeDraftStage("custom.hide.native-action-returned")
-        try await waitUntil("The actual native Hide action did not hide Manager settings.") { panel.isHidden }
-        XCTAssertFalse(try XCTUnwrap(fixture.preferences.activeLayout(for: "manager.settings")?
-            .panels.first { $0.id == "manager-dashboard-settings" }).isVisible)
-        try fixture.preferences.setShown(true, for: "manager-dashboard-settings", in: "manager.settings")
-        try await waitUntil("Manager settings did not resume from the retained native host.") { !panel.isHidden }
-        XCTAssertTrue(panel.hostingView === hosting)
-        XCTAssertEqual((try customField.stringValue), draft)
-        nativeDraftStage("named-layout.save.begin")
-        let named = try fixture.preferences.saveAs(try XCTUnwrap(fixture.preferences.activeLayout(for: "manager.settings")),
-                                                   named: "Manager Native Draft")
-        try await waitUntil("The named Manager layout did not become active.") {
-            fixture.preferences.activeLayout(for: "manager.settings")?.id == named
+            XCTAssertEqual((try resumed.stringValue), draft)
+            XCTAssertEqual(fixture.model.setHost, draft)
+            XCTAssertNil(fixture.model.manager)
+            XCTAssertNil(fixture.model.remoteManager)
+            nativeDraftStage("manager.save-refusal.begin")
+            try await nativeDraftPress("settings-save", in: fixture)
+            XCTAssertEqual(fixture.model.managerMessage, "Manager is unavailable")
+            XCTAssertEqual(try Data(contentsOf: app.paths.configJSON), originalConfiguration,
+                           "The isolated native presentation must not turn a staged edit into a backend save.")
+            nativeDraftStage("manager.reload.begin")
+            try await nativeDraftPress("settings-reload", in: fixture)
+            try await waitUntil("Explicit native Reload did not restore the actual bootstrap configuration.") {
+                try !fixture.model.isUpdatingSettings && fixture.model.setHost == originalHost
+                    && resumed.stringValue == originalHost
+            }
+            XCTAssertEqual(fixture.recorder.creations, 1)
+            XCTAssertTrue(fixture.model.app === app)
+        } catch {
+            let actual = error as NSError
+            nativeDraftRetainMeasurement([
+                "classification": "Diagnostic only: actual error caught at the test method boundary; the identical error is rethrown and all original assertions remain in order",
+                "test_method": "testProductionManagerNativeDraftSurvivesWorkspaceAndSectionTransitions",
+                "stage": nativeDraftCurrentStage,
+                "error_type": String(String(reflecting: type(of: error)).prefix(1_024)),
+                "error_description": String(String(describing: error).prefix(4_096)),
+                "NSError_domain": String(actual.domain.prefix(1_024)),
+                "NSError_code": actual.code,
+                "task_cancelled": Task.isCancelled,
+            ], name: "native-draft-test-method-boundary-error")
+            throw error
         }
-        let namedFrame = NativeWorkspaceFrame(x: 380, y: 60, width: 860, height: 440)
-        try fixture.preferences.setFrame(namedFrame, for: "manager-dashboard-settings", in: "manager.settings")
-        try await waitUntil("The named Manager geometry did not reach the actual panel.") { panel.frame == namedFrame.nativeRect }
-        try fixture.preferences.activate(layout.id, for: "manager.settings")
-        try await waitUntil("The original Manager layout did not reach the actual panel.") {
-            panel.frame == layout.panels.first { $0.id == "manager-dashboard-settings" }?.frame.nativeRect
-        }
-        try fixture.preferences.activate(named, for: "manager.settings")
-        try await waitUntil("Named layout changes replaced the Manager binding.") {
-            try panel.frame == namedFrame.nativeRect && panel.hostingView === hosting
-                && customField.stringValue == draft && fixture.model.setHost == draft
-        }
-        nativeDraftStage("manager.restore-default.begin")
-        try fixture.preferences.reset("manager.settings")
-        try await waitUntil("Default restoration did not dismantle Manager's custom canvas.") {
-            self.nativeDraftViews(fixture.hosting).allSatisfy { !($0 is NativeWorkspaceDocumentView) }
-        }
-        let defaultField = try await nativeDraftField(in: fixture.hosting, identifier: "Dashboard host",
-                                                      placeholder: "Dashboard host")
-        XCTAssertEqual((try defaultField.stringValue), draft)
-        nativeDraftStage("manager.section-transitions.begin")
-        for (section, title) in [("shell", "Project Shell"), ("folders", "Authorized Folders"),
-                                  ("workbench", "Workbench"), ("settings", "Settings")] {
-            nativeDraftStage("manager.section." + section + ".press")
-            try await nativeDraftPress("manager-section-" + section, in: fixture)
-            try await nativeDraftRequireManagerTitle(title, in: fixture)
-        }
-        let resumed = try await nativeDraftField(in: fixture.hosting, identifier: "Dashboard host",
-                                                 placeholder: "Dashboard host")
-        XCTAssertEqual((try resumed.stringValue), draft)
-        XCTAssertEqual(fixture.model.setHost, draft)
-        XCTAssertNil(fixture.model.manager)
-        XCTAssertNil(fixture.model.remoteManager)
-        nativeDraftStage("manager.save-refusal.begin")
-        try await nativeDraftPress("settings-save", in: fixture)
-        XCTAssertEqual(fixture.model.managerMessage, "Manager is unavailable")
-        XCTAssertEqual(try Data(contentsOf: app.paths.configJSON), originalConfiguration,
-                       "The isolated native presentation must not turn a staged edit into a backend save.")
-        nativeDraftStage("manager.reload.begin")
-        try await nativeDraftPress("settings-reload", in: fixture)
-        try await waitUntil("Explicit native Reload did not restore the actual bootstrap configuration.") {
-            try !fixture.model.isUpdatingSettings && fixture.model.setHost == originalHost
-                && resumed.stringValue == originalHost
-        }
-        XCTAssertEqual(fixture.recorder.creations, 1)
-        XCTAssertTrue(fixture.model.app === app)
     }
 
     func testProductionProjectsNativeRepositoryDraftSurvivesWorkspaceWithSinglePageOwner() async throws {
-        continueAfterFailure = true
-        nativeDraftStage("projects.fixture.create")
-        defer { nativeDraftStage("projects.test.return-from-" + nativeDraftCurrentStage) }
-        let fixture = try NativeWorkspaceDraftFixture(page: .projects)
-        draftFixture = fixture
-        nativeDraftStage("bootstrap.await-success")
-        try await exposeNativeDraftFixture(fixture)
-        nativeDraftStage("bootstrap.published-success")
-        let draft = "https://github.com/fixture/native-workspace-unsaved"
-        nativeDraftStage("projects.default-viewport.capture.begin")
-        try nativeDraftRecordViewport(fixture, name: "projects-before-default-field")
-        nativeDraftStage("projects.default-viewport.capture.returned")
-        nativeDraftStage("default.field.lookup")
-        let field = try await nativeDraftField(in: fixture.hosting,
-            identifier: "project-github-repository-location", placeholder: "https://github.com/owner/repository",
-            expectedLabel: "GitHub repository location")
-        try editNativeDraftField(field, value: draft, in: fixture.window)
-        try await waitUntil("The real Projects repository field did not retain the native edit.") { (try field.stringValue) == draft }
-        try await nativeDraftRequireProjectIdentity(fixture)
-        nativeDraftStage("edit.binding-confirmed.default-to-custom.begin")
-        let layout = nativeDraftLayout(viewID: "projects")
-        try fixture.preferences.save(layout)
-        nativeDraftStage("default-to-custom.preference-saved")
-        let document = try await nativeDraftDocument(fixture, panelID: "projects-repository")
-        let panel = try XCTUnwrap(document.panelHosts["projects-repository"])
-        let hosting = panel.hostingView
-        nativeDraftStage("custom.field.lookup")
-        let customField = try await nativeDraftField(in: hosting,
-            identifier: "project-github-repository-location", placeholder: "https://github.com/owner/repository",
-            expectedLabel: "GitHub repository location")
-        XCTAssertEqual((try customField.stringValue), draft)
-        nativeDraftStage("custom.hide.begin")
-        try nativeDraftHide(panel)
-        nativeDraftStage("custom.hide.native-action-returned")
-        try await waitUntil("The actual native Hide action did not hide the repository panel.") { panel.isHidden }
-        try fixture.preferences.setShown(true, for: "projects-repository", in: "projects")
-        try await waitUntil("The retained repository host did not resume.") { !panel.isHidden }
-        XCTAssertTrue(panel.hostingView === hosting)
-        XCTAssertEqual((try customField.stringValue), draft)
-        nativeDraftStage("named-layout.save.begin")
-        let named = try fixture.preferences.saveAs(try XCTUnwrap(fixture.preferences.activeLayout(for: "projects")),
-                                                   named: "Projects Native Draft")
-        let namedFrame = NativeWorkspaceFrame(x: 360, y: 260, width: 940, height: 320)
-        try fixture.preferences.setFrame(namedFrame, for: "projects-repository", in: "projects")
-        try await waitUntil("The named repository geometry did not reach the actual panel.") { panel.frame == namedFrame.nativeRect }
-        try fixture.preferences.activate(layout.id, for: "projects")
-        try await waitUntil("The original repository geometry did not reach the actual panel.") {
-            panel.frame == layout.panels.first { $0.id == "projects-repository" }?.frame.nativeRect
+        do {
+            continueAfterFailure = true
+            nativeDraftStage("projects.fixture.create")
+            defer { nativeDraftStage("projects.test.return-from-" + nativeDraftCurrentStage) }
+            let fixture = try NativeWorkspaceDraftFixture(page: .projects)
+            draftFixture = fixture
+            nativeDraftStage("bootstrap.await-success")
+            try await exposeNativeDraftFixture(fixture)
+            nativeDraftStage("bootstrap.published-success")
+            let draft = "https://github.com/fixture/native-workspace-unsaved"
+            nativeDraftStage("projects.default-viewport.capture.begin")
+            try nativeDraftRecordViewport(fixture, name: "projects-before-default-field")
+            nativeDraftStage("projects.default-viewport.capture.returned")
+            nativeDraftStage("default.field.lookup")
+            let field = try await nativeDraftField(in: fixture.hosting,
+                identifier: "project-github-repository-location", placeholder: "https://github.com/owner/repository",
+                expectedLabel: "GitHub repository location")
+            try editNativeDraftField(field, value: draft, in: fixture.window)
+            try await waitUntil("The real Projects repository field did not retain the native edit.") { (try field.stringValue) == draft }
+            try await nativeDraftRequireProjectIdentity(fixture)
+            nativeDraftStage("edit.binding-confirmed.default-to-custom.begin")
+            let layout = nativeDraftLayout(viewID: "projects")
+            try fixture.preferences.save(layout)
+            nativeDraftStage("default-to-custom.preference-saved")
+            let document = try await nativeDraftDocument(fixture, panelID: "projects-repository")
+            let panel = try XCTUnwrap(document.panelHosts["projects-repository"])
+            let hosting = panel.hostingView
+            nativeDraftStage("custom.field.lookup")
+            let customField = try await nativeDraftField(in: hosting,
+                identifier: "project-github-repository-location", placeholder: "https://github.com/owner/repository",
+                expectedLabel: "GitHub repository location")
+            XCTAssertEqual((try customField.stringValue), draft)
+            nativeDraftStage("custom.hide.begin")
+            try nativeDraftHide(panel)
+            nativeDraftStage("custom.hide.native-action-returned")
+            try await waitUntil("The actual native Hide action did not hide the repository panel.") { panel.isHidden }
+            try fixture.preferences.setShown(true, for: "projects-repository", in: "projects")
+            try await waitUntil("The retained repository host did not resume.") { !panel.isHidden }
+            XCTAssertTrue(panel.hostingView === hosting)
+            XCTAssertEqual((try customField.stringValue), draft)
+            nativeDraftStage("named-layout.save.begin")
+            let named = try fixture.preferences.saveAs(try XCTUnwrap(fixture.preferences.activeLayout(for: "projects")),
+                                                       named: "Projects Native Draft")
+            let namedFrame = NativeWorkspaceFrame(x: 360, y: 260, width: 940, height: 320)
+            try fixture.preferences.setFrame(namedFrame, for: "projects-repository", in: "projects")
+            try await waitUntil("The named repository geometry did not reach the actual panel.") { panel.frame == namedFrame.nativeRect }
+            try fixture.preferences.activate(layout.id, for: "projects")
+            try await waitUntil("The original repository geometry did not reach the actual panel.") {
+                panel.frame == layout.panels.first { $0.id == "projects-repository" }?.frame.nativeRect
+            }
+            try fixture.preferences.activate(named, for: "projects")
+            try await waitUntil("Named layouts lost the unsaved repository binding.") {
+                try panel.frame == namedFrame.nativeRect && panel.hostingView === hosting && customField.stringValue == draft
+            }
+            try fixture.preferences.reset("projects")
+            try await waitUntil("Default restoration did not dismantle Projects' custom canvas.") {
+                self.nativeDraftViews(fixture.hosting).allSatisfy { !($0 is NativeWorkspaceDocumentView) }
+            }
+            let restored = try await nativeDraftField(in: fixture.hosting,
+                identifier: "project-github-repository-location", placeholder: "https://github.com/owner/repository",
+                expectedLabel: "GitHub repository location")
+            XCTAssertEqual((try restored.stringValue), draft)
+            try await nativeDraftRequireProjectIdentity(fixture)
+            try fixture.preferences.activate(named, for: "projects")
+            let reactivated = try await nativeDraftField(in: fixture.hosting,
+                identifier: "project-github-repository-location", placeholder: "https://github.com/owner/repository",
+                expectedLabel: "GitHub repository location")
+            XCTAssertEqual((try reactivated.stringValue), draft)
+            try fixture.preferences.reset("projects")
+            let finalDefault = try await nativeDraftField(in: fixture.hosting,
+                identifier: "project-github-repository-location", placeholder: "https://github.com/owner/repository",
+                expectedLabel: "GitHub repository location")
+            XCTAssertEqual((try finalDefault.stringValue), draft)
+            nativeDraftStage("projects.all-transitions-complete.owner-observations")
+            let observations = await fixture.client.observations()
+            XCTAssertEqual(observations.snapshots, 1,
+                           "Layout presentation changes must not recreate/reload the page StateObject.")
+            XCTAssertEqual(observations.repositoryWrites, 0)
+            XCTAssertEqual(observations.otherMutations, 0)
+            XCTAssertEqual(fixture.recorder.creations, 1)
+        } catch {
+            let actual = error as NSError
+            nativeDraftRetainMeasurement([
+                "classification": "Diagnostic only: actual error caught at the test method boundary; the identical error is rethrown and all original assertions remain in order",
+                "test_method": "testProductionProjectsNativeRepositoryDraftSurvivesWorkspaceWithSinglePageOwner",
+                "stage": nativeDraftCurrentStage,
+                "error_type": String(String(reflecting: type(of: error)).prefix(1_024)),
+                "error_description": String(String(describing: error).prefix(4_096)),
+                "NSError_domain": String(actual.domain.prefix(1_024)),
+                "NSError_code": actual.code,
+                "task_cancelled": Task.isCancelled,
+            ], name: "native-draft-test-method-boundary-error")
+            throw error
         }
-        try fixture.preferences.activate(named, for: "projects")
-        try await waitUntil("Named layouts lost the unsaved repository binding.") {
-            try panel.frame == namedFrame.nativeRect && panel.hostingView === hosting && customField.stringValue == draft
-        }
-        try fixture.preferences.reset("projects")
-        try await waitUntil("Default restoration did not dismantle Projects' custom canvas.") {
-            self.nativeDraftViews(fixture.hosting).allSatisfy { !($0 is NativeWorkspaceDocumentView) }
-        }
-        let restored = try await nativeDraftField(in: fixture.hosting,
-            identifier: "project-github-repository-location", placeholder: "https://github.com/owner/repository",
-            expectedLabel: "GitHub repository location")
-        XCTAssertEqual((try restored.stringValue), draft)
-        try await nativeDraftRequireProjectIdentity(fixture)
-        try fixture.preferences.activate(named, for: "projects")
-        let reactivated = try await nativeDraftField(in: fixture.hosting,
-            identifier: "project-github-repository-location", placeholder: "https://github.com/owner/repository",
-            expectedLabel: "GitHub repository location")
-        XCTAssertEqual((try reactivated.stringValue), draft)
-        try fixture.preferences.reset("projects")
-        let finalDefault = try await nativeDraftField(in: fixture.hosting,
-            identifier: "project-github-repository-location", placeholder: "https://github.com/owner/repository",
-            expectedLabel: "GitHub repository location")
-        XCTAssertEqual((try finalDefault.stringValue), draft)
-        nativeDraftStage("projects.all-transitions-complete.owner-observations")
-        let observations = await fixture.client.observations()
-        XCTAssertEqual(observations.snapshots, 1,
-                       "Layout presentation changes must not recreate/reload the page StateObject.")
-        XCTAssertEqual(observations.repositoryWrites, 0)
-        XCTAssertEqual(observations.otherMutations, 0)
-        XCTAssertEqual(fixture.recorder.creations, 1)
     }
 
     private func exposeNativeDraftFixture(_ fixture: NativeWorkspaceDraftFixture) async throws {
@@ -810,8 +840,9 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
                         rawIdentifier = try NativeWorkspaceDraftAXQuery.attribute(element, kAXIdentifierAttribute,
                             deadline: deadline)
                     } catch {
-                        progress["post_failure_discovery_diagnostic"] = NativeWorkspaceDraftAXQuery.discoveryFailureDiagnostic(
-                            root: context.windowElement, parent: discoveryParent, child: element, deadline: deadline)
+                        progress["post_failure_discovery_diagnostic"] = await NativeWorkspaceDraftAXQuery.discoveryFailureDiagnostic(
+                            root: context.windowElement, parent: discoveryParent, child: element,
+                            childOrdinal: childOrdinal, deadline: deadline)
                         throw error
                     }
                     progress["operation"] = "identifier-type-validation"
@@ -2458,13 +2489,134 @@ private enum NativeWorkspaceDraftAXQuery {
         return status == .success ? value : nil
     }
 
+    @MainActor
     static func discoveryFailureDiagnostic(root: AXUIElement, parent: AXUIElement?, child: AXUIElement,
-                                           deadline originalDeadline: TimeInterval) -> [String: Any] {
+                                           childOrdinal: Int?, deadline originalDeadline: TimeInterval) async -> [String: Any] {
         let started = ProcessInfo.processInfo.systemUptime
-        let deadline = originalDeadline > started ? min(originalDeadline, started + 0.25) : started + 0.25
+        let deadline = started + 0.25
+        let immediateDeadline = started + 0.08
+        func metadata(_ element: AXUIElement, attributes: [String], deadline stageDeadline: TimeInterval) -> [String: Any] {
+            let type = CFGetTypeID(element)
+            var result: [String: Any] = ["cf_type_id": type]
+            guard type == AXUIElementGetTypeID(), ProcessInfo.processInfo.systemUptime < stageDeadline else {
+                result["not_queried"] = "invalid-AX-type-or-diagnostic-deadline"; return result
+            }
+            var pid: pid_t = 0
+            let pidStatus = AXUIElementGetPid(element, &pid)
+            result["pid_status"] = pidStatus.rawValue; result["pid"] = pid
+            result["pid_is_own_process"] = pidStatus == .success && pid == ProcessInfo.processInfo.processIdentifier
+            guard pidStatus == .success, pid == ProcessInfo.processInfo.processIdentifier else { return result }
+            var rows: [String: Any] = [:]
+            for attribute in attributes {
+                let remaining = min(deadline, stageDeadline) - ProcessInfo.processInfo.systemUptime
+                guard remaining > 0 else { rows[attribute] = ["not_queried": "diagnostic-deadline"]; continue }
+                let timeout = AXUIElementSetMessagingTimeout(element, Float(min(0.005, remaining / 2)))
+                var row: [String: Any] = ["timeout_status": timeout.rawValue]
+                guard timeout == .success, ProcessInfo.processInfo.systemUptime < min(deadline, stageDeadline) else {
+                    row["not_queried"] = "timeout-or-diagnostic-deadline"; rows[attribute] = row; continue
+                }
+                var value: CFTypeRef?
+                let status = AXUIElementCopyAttributeValue(element, attribute as CFString, &value)
+                row["status"] = status.rawValue
+                if let value {
+                    row["value_cf_type_id"] = CFGetTypeID(value)
+                    if let string = value as? String { row["value"] = String(string.prefix(512)) }
+                }
+                rows[attribute] = row
+            }
+            result["attributes"] = rows
+            return result
+        }
+        let rootMetadata = metadata(root, attributes: [kAXRoleAttribute, kAXIdentifierAttribute], deadline: immediateDeadline)
+        let parentMetadata = parent.map {
+            metadata($0, attributes: [kAXRoleAttribute, kAXIdentifierAttribute, kAXTitleAttribute, kAXDescriptionAttribute],
+                     deadline: immediateDeadline)
+        }
+        let childMetadata = metadata(child, attributes: [kAXRoleAttribute, kAXIdentifierAttribute], deadline: immediateDeadline)
+        var report = discoveryFailureImmediateDiagnostic(root: root, parent: parent, child: child, deadline: immediateDeadline)
+        report["classification"] = "Bounded post-failure measurement only; one held-parent child re-enumeration after one 20ms yield; original identifier error remains fatal"
+        report["immediate_discovery_elapsed_seconds"] = report["elapsed_seconds"]
+        report["immediate_deadline_limit_seconds"] = 0.08
+        report["immediate_owned_root_metadata"] = rootMetadata
+        report["immediate_discovery_parent_metadata"] = parentMetadata.map { $0 as Any } ?? NSNull()
+        report["immediate_failed_child_metadata"] = childMetadata
+        report["original_deadline_remaining_seconds"] = originalDeadline - started
+        report["deadline_limit_seconds"] = 0.25
+        report["diagnostic_deadline_independent_of_failed_lookup"] = true
+        report["fresh_copy_count_limit"] = 1
+        report["recorded_discovery_child_ordinal"] = childOrdinal.map { $0 as Any } ?? NSNull()
+        report["ancestor_scope"] = "Owned exported window and previously discovered AXChildren parent only; no new AXParent query or native-owner inference"
+        report["yield_request_count"] = 1; report["yield_requested_seconds"] = 0.02
+        func finish() -> [String: Any] {
+            report["elapsed_seconds"] = ProcessInfo.processInfo.systemUptime - started
+            report["within_diagnostic_deadline"] = ProcessInfo.processInfo.systemUptime <= deadline
+            return report
+        }
+        let yieldStarted = ProcessInfo.processInfo.systemUptime
+        do { try await Task.sleep(for: .milliseconds(20)); report["yield_completed"] = true }
+        catch {
+            report["yield_completed"] = false
+            report["yield_error_type"] = String(String(reflecting: type(of: error)).prefix(1_024))
+            report["yield_elapsed_seconds"] = ProcessInfo.processInfo.systemUptime - yieldStarted
+            return finish()
+        }
+        report["yield_elapsed_seconds"] = ProcessInfo.processInfo.systemUptime - yieldStarted
+        report["post_yield_same_held_child_metadata"] = metadata(child,
+            attributes: [kAXRoleAttribute, kAXIdentifierAttribute], deadline: deadline)
+        guard let parent, let childOrdinal, 0..<2_048 ~= childOrdinal else {
+            report["fresh_child_not_queried"] = "missing-parent-or-invalid-recorded-ordinal"; return finish()
+        }
+        func prepareParent(_ operation: String) -> Bool {
+            let remaining = deadline - ProcessInfo.processInfo.systemUptime
+            guard remaining > 0 else { report[operation + "_not_queried"] = "diagnostic-deadline"; return false }
+            var pid: pid_t = 0
+            let pidStatus = AXUIElementGetPid(parent, &pid)
+            report[operation + "_pid_status"] = pidStatus.rawValue
+            report[operation + "_pid"] = pid
+            guard pidStatus == .success, pid == ProcessInfo.processInfo.processIdentifier else { return false }
+            let remainingAfterIdentity = deadline - ProcessInfo.processInfo.systemUptime
+            guard remainingAfterIdentity > 0 else {
+                report[operation + "_not_queried"] = "diagnostic-deadline"; return false
+            }
+            let timeout = AXUIElementSetMessagingTimeout(parent, Float(min(0.01, remainingAfterIdentity / 2)))
+            report[operation + "_timeout_status"] = timeout.rawValue
+            return timeout == .success && ProcessInfo.processInfo.systemUptime < deadline
+        }
+        guard prepareParent("post_yield_parent_count") else { return finish() }
+        var count = 0
+        let countStatus = AXUIElementGetAttributeValueCount(parent, kAXChildrenAttribute as CFString, &count)
+        report["post_yield_parent_count_status"] = countStatus.rawValue
+        report["post_yield_parent_child_count"] = count
+        guard ProcessInfo.processInfo.systemUptime < deadline, countStatus == .success,
+              0...2_048 ~= count, childOrdinal < count else {
+            report["fresh_child_not_queried"] = "count-status-bound-or-recorded-ordinal-absent"; return finish()
+        }
+        guard prepareParent("post_yield_parent_copy") else { return finish() }
+        var values: CFArray?
+        let copyStatus = AXUIElementCopyAttributeValues(parent, kAXChildrenAttribute as CFString, childOrdinal, 1, &values)
+        report["post_yield_parent_copy_status"] = copyStatus.rawValue
+        guard ProcessInfo.processInfo.systemUptime < deadline, copyStatus == .success, let values,
+              CFGetTypeID(values) == CFArrayGetTypeID() else { return finish() }
+        let copiedCount = CFArrayGetCount(values)
+        report["post_yield_copied_child_count"] = copiedCount
+        guard copiedCount == 1, let pointer = CFArrayGetValueAtIndex(values, 0) else { return finish() }
+        let raw = Unmanaged<AnyObject>.fromOpaque(pointer).takeUnretainedValue()
+        report["post_yield_copied_child_cf_type_id"] = CFGetTypeID(raw)
+        guard CFGetTypeID(raw) == AXUIElementGetTypeID() else { return finish() }
+        let fresh = raw as! AXUIElement
+        report["post_yield_fresh_child_CFEqual_held_child"] = CFEqual(fresh, child)
+        report["post_yield_fresh_child_metadata"] = metadata(fresh,
+            attributes: [kAXRoleAttribute, kAXIdentifierAttribute], deadline: deadline)
+        return finish()
+    }
+
+    static func discoveryFailureImmediateDiagnostic(root: AXUIElement, parent: AXUIElement?, child: AXUIElement,
+                                                    deadline originalDeadline: TimeInterval) -> [String: Any] {
+        let started = ProcessInfo.processInfo.systemUptime
+        let deadline = min(originalDeadline, started + 0.25)
         var report: [String: Any] = [
             "classification": "One-shot post-failure root/parent measurement; original identifier error remains fatal",
-            "separate_deadline_used": originalDeadline <= started, "deadline_limit_seconds": deadline - started,
+            "separate_deadline_used": false, "deadline_limit_seconds": deadline - started,
             "original_deadline_remaining_seconds": originalDeadline - started, "child_count_limit": 2_048,
             "complete_requested_parent_children_range": false, "non_atomic_count_and_copy": true,
         ]

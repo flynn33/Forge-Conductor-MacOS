@@ -10,6 +10,8 @@ A separate v22 Rune cancellation check passed: actual Rename/editor input, sourc
 
 The unchanged native Doctor check v23 also passed actual section/Run doctor actions and retained the unavailable `Doctor ISSUES` / `doctor failed` result and heading through default, custom and restored layouts. Healthy/live Doctor reports and complete UI qualification remain open.
 
+Two later diagnostic selections, v25/v26, still failed both complete draft methods. A bounded test-only catch retains and rethrows the original accessibility lookup error; its NSError domain differs from the raw terminal associated-error domain naming Gestures `InvalidTransition`. The accessibility cause and internal throw sequence remain unknown. A separate v27 diagnostic also failed both methods: one requested 20 ms wait and one fresh copy from the same parent left the child’s accessibility reads unchanged at −25211. All original actions and assertions remain; complete drafts/UI stay open.
+
 The post-naming v6 ordinary Debug build, strict signature and seven-artifact/Info 0.44.0 (60) readback passed against 320 product/build inputs. This qualifies candidate compilation and file identities; candidate launch, installed operation and full UI remain unverified. Remaining new capability implementations stay deferred. [Current gates](docs/QUALIFICATION-STATUS.md).
 
 ## Earlier UI checks before the naming repair

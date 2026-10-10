@@ -1,5 +1,9 @@
 # Versioning policy
 
+Current target identity is **0.44.0 (60)** for custom layouts within each existing view. The current test-only workspace diagnostics and documentation correction advance no version or build; earlier receipts keep their tested identities. Complete UI and broader qualification gates remain open, and remaining new capabilities stay deferred. A source identity does not claim shipment. [Current gates](QUALIFICATION-STATUS.md).
+
+## Preceding 0.43.0 (59) qualification
+
 Current target identity is **0.43.0 (59)**. Optional AAC-LC M4A extends an existing format enum compatibly and advances the feature component under the policy below; WAV remains the absent-format default. Version/build authorities advance with this increment, separately from the new encoder/test memberships. Matching source/native owning selections passed the same 139 methods on 475 exact inputs; CLI/app compilation and ordinary Debug/strict signature passed. Candidate C1 readback passed with seven artifacts/Info, 475 inputs and 80 preceding guards exact. Six actual App/CLI rate cohorts and separate native consumers passed their 24-file matrices. Scoped Qwen/exact-artifact consumer and initial G3/hygiene passed; first owner source publication/synchronization passed. Scoped AAC result-document/wiki checks and source/wiki delivery are complete. Historical receipts keep their tested identities; a source version does not claim shipment.
 
 ## Preceding 0.42.0 (58) qualification
@@ -368,6 +372,10 @@ Update all four surfaces together. `script/check_repository_hygiene.sh`, the
 focused version test, and CI reject drift between them.
 
 ## Current identity
+
+Current source target is `0.44.0`, build `60`, for custom layouts within each existing view. The current Canvas diagnostics and document correction advance no version/build and establish no production repair or complete UI qualification. Historical receipts retain their tested identities; broader gates remain open and new capabilities stay deferred. [Current gates](QUALIFICATION-STATUS.md).
+
+## Preceding 0.43.0 (59) identity record
 
 Current source target is `0.43.0`, build `59`, for optional supplied PCM16 AAC-LC M4A. Matching owning/build/C1, six App/CLI rate cohorts, 24-file native consumers and scoped Qwen/exact-artifact checks passed. Initial G3/hygiene and first owner source publication/synchronization passed; scoped AAC result-document/wiki checks and source/wiki delivery are complete.
 
