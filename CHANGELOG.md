@@ -50,6 +50,7 @@ Product versions do not by themselves claim shipment.
 - Record the separate Tools shared-controls v77 NONPASS: native Customize identifier lookup fails before button/menu actions after exact default-state readback. Cause remains unknown; no product repair or UI gate closure. [Qualification](docs/QUALIFICATION-STATUS.md).
 
 - Record Tools discovery v79–v81 NONPASS before Customize actions and the separate attached-sheet Rune v82 NONPASS. V82 completes the scoped Rename subflow with actual Save AXPress status 0 and restored saved state, then fails the second whole-window opener before Save As. Later bridge observations and fixture styling establish no product cause or repair; original gates stay open. [Qualification](docs/QUALIFICATION-STATUS.md).
+- Record partial Tools control reachability through the separate exported route: v87 completes Customize Layout and first Panels Hide with exact saved-state/identity readback, then fails before Show. V84/v85 and unchanged pre-admission v86 remain NONPASS; the separate exported route and its menu-role/action correction are test-only. Fresh original ordinary v88 still fails before Customize; remaining control actions and full UI gates stay open. [Qualification](docs/QUALIFICATION-STATUS.md).
 
 #### Earlier UI checks before the naming repair
 

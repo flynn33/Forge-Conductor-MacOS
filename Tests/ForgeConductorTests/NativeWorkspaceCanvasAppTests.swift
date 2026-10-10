@@ -1897,13 +1897,21 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
                                              deadline suppliedDeadline: TimeInterval?,
                                              scope: NativeDraftIdentifierScope = .wholeWindow,
                                              progress: inout [String: Any]) async throws -> NativeWorkspaceDraftAccessibilityNode {
+        try await nativeDraftObserveAXElement(identifier, window: fixture.window, hosting: fixture.hosting,
+            deadline: suppliedDeadline, scope: scope, progress: &progress)
+    }
+
+    private func nativeDraftObserveAXElement(_ identifier: String, window: NSWindow, hosting: NSView,
+                                             deadline suppliedDeadline: TimeInterval?,
+                                             scope: NativeDraftIdentifierScope = .wholeWindow,
+                                             progress: inout [String: Any]) async throws -> NativeWorkspaceDraftAccessibilityNode {
         let deadline = suppliedDeadline ?? ProcessInfo.processInfo.systemUptime + 3
         var attempt = 0
         repeat {
             attempt += 1
             progress = ["operation": "scope-construction", "attempt": attempt]
-            fixture.hosting.layoutSubtreeIfNeeded()
-            if let context = try NativeWorkspaceDraftExportedAXContext(fixture: fixture, deadline: deadline) {
+            hosting.layoutSubtreeIfNeeded()
+            if let context = try NativeWorkspaceDraftExportedAXContext(window: window, hosting: hosting, deadline: deadline) {
                 progress["operation"] = "root-ancestor-validation"
                 try context.requireOwnedAncestor(context.windowElement)
                 var excludedStandardZoom: AXUIElement?, zoomIdentifier: String?, validatedZoomSubrole: String?
@@ -2158,7 +2166,17 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
         return nodes
     }
 
+    private enum ToolsSharedControlIdentifierRoute: Equatable { case ordinary, exportedApplicationContent }
+
     func testProductionToolsNativeSharedControlsRecoverPanelsRestoreSelectAndDelete() async throws {
+        try await nativeToolsSharedControls(.ordinary)
+    }
+
+    func testProductionToolsExportedApplicationContentSharedControlsRecoverPanelsRestoreSelectAndDelete() async throws {
+        try await nativeToolsSharedControls(.exportedApplicationContent)
+    }
+
+    private func nativeToolsSharedControls(_ identifierRoute: ToolsSharedControlIdentifierRoute) async throws {
         continueAfterFailure = true
         let deadline = ProcessInfo.processInfo.systemUptime + 45
         let suite = "forge.workspace.controls.tests.\(UUID().uuidString)"
@@ -2200,7 +2218,10 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
         var stage = "fixture-created", records: [[String: Any]] = [], menus: [[String: Any]] = []
         var latestControlDiscovery: [String: Any] = [:]
         defer {
-            nativeDraftRetainMeasurement(["classification": "Separate real Tools shared native controls route; runtime assertions determine qualification, no all-view/desktop claim",
+            nativeDraftRetainMeasurement(["classification": identifierRoute == .ordinary
+                    ? "Separate real Tools shared native controls route; runtime assertions determine qualification, no all-view/desktop claim"
+                    : "Separate real Tools exported application-content controls route; standard Zoom descendants excluded only after exact validation, original ordinary/whole-window gates unchanged/open; no all-view/desktop claim",
+                "identifier_route": identifierRoute == .ordinary ? "ordinary-native-tree" : "exported-application-content",
                 "stage": stage, "view_id": "tools", "flow_deadline_seconds": 45,
                 "stage_record_limit": 16, "records": records, "menu_record_limit": 8, "menus": menus,
                 "latest_control_discovery": latestControlDiscovery,
@@ -2243,6 +2264,30 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
         }
         func control(_ identifier: String, menu: Bool = false) async throws -> NativeWorkspaceDraftAccessibilityNode {
             let end = min(deadline, ProcessInfo.processInfo.systemUptime + 3)
+            if identifierRoute == .exportedApplicationContent {
+                var progress: [String: Any] = [:]
+                defer {
+                    latestControlDiscovery = progress
+                    latestControlDiscovery["identifier_route"] = "exported-application-content"
+                }
+                try requireOwner()
+                let node = try await nativeDraftObserveAXElement(identifier, window: owned, hosting: hosting,
+                    deadline: end, scope: .applicationContent, progress: &progress)
+                try requireOwner()
+                progress["matched_target_snapshot"] = [
+                    "classification": "Cached exported target snapshot only; no new native getters or role acceptance",
+                    "identifier_utf8_prefix": node.identifier.map { String(decoding: $0.utf8.prefix(256), as: UTF8.self) as Any } ?? NSNull(),
+                    "role_utf8_prefix": node.role.map { String(decoding: $0.rawValue.utf8.prefix(128), as: UTF8.self) as Any } ?? NSNull(),
+                    "enabled": node.enabled.map { $0 as Any } ?? NSNull(),
+                    "exported_element_available": node.exportedAX != nil,
+                    "exported_owner_context_available": node.exportedContext != nil,
+                ]
+                guard node.exportedAX != nil, node.exportedContext != nil, node.identifier == identifier,
+                      node.enabled == true, node.role?.rawValue == (menu ? kAXMenuButtonRole : kAXButtonRole) else {
+                    throw WorkspaceCanvasFixtureFailure("Shared control is not an enabled exact exported button/menu opener.")
+                }
+                return node
+            }
             var attempt = 0
             var latestOriginalNodes: [NativeWorkspaceDraftWeakBridgeReceipt] = []
             repeat {
@@ -2336,11 +2381,25 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
             RunLoop.main.add(timer, forMode: .default); RunLoop.main.add(timer, forMode: .eventTracking)
             defer { timer.invalidate(); capture.stop(); menus.append(capture.receipt) }
             capture.armed = true
-            try requireAncestor(opener.object, before: capture.deadline)
+            if identifierRoute == .exportedApplicationContent {
+                guard let element = opener.exportedAX, let context = opener.exportedContext else {
+                    throw WorkspaceCanvasFixtureFailure("The exact shared exported opener lost its owner context.")
+                }
+                try context.requireOwnedAncestor(element)
+            } else {
+                try requireAncestor(opener.object, before: capture.deadline)
+            }
             guard opener.identifier == (panels ? "workspace-panels-menu-tools" : "workspace-layout-menu-tools"), opener.enabled == true else {
                 throw WorkspaceCanvasFixtureFailure("The exact shared native opener changed before activation.")
             }
-            try opener.press()
+            if identifierRoute == .exportedApplicationContent {
+                guard let element = opener.exportedAX, let context = opener.exportedContext else {
+                    throw WorkspaceCanvasFixtureFailure("The exact shared exported opener lost its owner context.")
+                }
+                try context.pressToolsMenu(element, requestedIdentifier: panels ? "workspace-panels-menu-tools" : "workspace-layout-menu-tools")
+            } else {
+                try opener.press()
+            }
             while !capture.isFinished {
                 guard ProcessInfo.processInfo.systemUptime < capture.deadline else { throw WorkspaceCanvasFixtureFailure("The exact shared native menu did not complete its finite action.") }
                 try await Task.sleep(for: .milliseconds(10))
@@ -4924,19 +4983,23 @@ private final class NativeWorkspaceDraftExportedAXContext {
     let deadline: TimeInterval
     let windowElement: AXUIElement
 
-    init?(fixture: NativeWorkspaceDraftFixture, deadline: TimeInterval) throws {
-        let ownedTitle = fixture.window.title
-        owner = fixture.window; hosting = fixture.hosting
+    convenience init?(fixture: NativeWorkspaceDraftFixture, deadline: TimeInterval) throws {
+        try self.init(window: fixture.window, hosting: fixture.hosting, deadline: deadline)
+    }
+
+    init?(window: NSWindow, hosting: NSView, deadline: TimeInterval) throws {
+        let ownedTitle = window.title
+        owner = window; self.hosting = hosting
         title = ownedTitle; self.deadline = deadline
         guard !ownedTitle.isEmpty, ownedTitle.utf8.count <= 256,
-              fixture.window.contentView === fixture.hosting, fixture.hosting.window === fixture.window,
-              NSApp.windows.filter({ $0.title == fixture.window.title }).count == 1 else {
+              window.contentView === hosting, hosting.window === window,
+              NSApp.windows.filter({ $0.title == window.title }).count == 1 else {
             throw WorkspaceCanvasFixtureFailure("The semantic fixture does not own one exact uniquely titled NSWindow/NSHostingView.")
         }
         let application = AXUIElementCreateApplication(ProcessInfo.processInfo.processIdentifier)
         let windows = try NativeWorkspaceDraftAXQuery.children(application, kAXWindowsAttribute, limit: 32, deadline: deadline)
         let matches = try windows.filter {
-            try NativeWorkspaceDraftAXQuery.attribute($0, kAXTitleAttribute, deadline: deadline) as? String == fixture.window.title
+            try NativeWorkspaceDraftAXQuery.attribute($0, kAXTitleAttribute, deadline: deadline) as? String == window.title
         }
         guard matches.count <= 1 else {
             throw WorkspaceCanvasFixtureFailure("The current process exported duplicate AX windows with the exact owned fixture title.")
@@ -5015,6 +5078,24 @@ private final class NativeWorkspaceDraftExportedAXContext {
             "exported_ax_bridge": true, "identifier": current.identifier ?? "", "role": current.role?.rawValue ?? "",
             "enabled": current.enabled.map { $0 as Any } ?? NSNull(),
             "advertised_exported_actions": try NativeWorkspaceDraftAXQuery.actions(element, deadline: deadline)]
+    }
+
+    func pressToolsMenu(_ element: AXUIElement, requestedIdentifier: String) throws {
+        guard requestedIdentifier == "workspace-panels-menu-tools" || requestedIdentifier == "workspace-layout-menu-tools" else {
+            throw WorkspaceCanvasFixtureFailure("The exported Tools menu request is not one of its two exact shared opener identifiers.")
+        }
+        try requireOwnedAncestor(element)
+        let current = try snapshot(element)
+        guard current.identifier == requestedIdentifier, current.enabled == true,
+              current.role?.rawValue == kAXMenuButtonRole,
+              try NativeWorkspaceDraftAXQuery.actions(element, deadline: deadline).contains(kAXPressAction) else {
+            throw WorkspaceCanvasFixtureFailure("The exact exported Tools menu is not an enabled AXMenuButton advertising AXPress.")
+        }
+        try NativeWorkspaceDraftAXQuery.prepare(element, deadline: deadline)
+        let status = AXUIElementPerformAction(element, kAXPressAction as CFString)
+        guard status == .success, ProcessInfo.processInfo.systemUptime < deadline else {
+            throw WorkspaceCanvasFixtureFailure("The exact exported Tools menu AXPress failed or exceeded its deadline: AXError \(status.rawValue).")
+        }
     }
 
     func press(_ element: AXUIElement) throws {
