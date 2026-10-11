@@ -1,6 +1,10 @@
 # Native custom workspaces
 
-Source target: **0.44.4 (64)**. Custom layouts belong to each existing view. They do not combine panels from different views.
+Source target: **0.44.5 (65)**. Custom layouts belong to each existing view. They do not combine panels from different views.
+
+V206’s same four-case native method failed before the repair and now passes on 0.44.4 (64), covering move/resize across owned hosting-root detach/reattach and retained-window close/reopen (0.656876 test/10.120 result s); the unchanged default-restoration/dismantle/weak-release regression also passes (0.214347 test/3.419 result s). Twenty-four phase rows verify cancellation/frame rollback, byte-exact held old mouse-up, full collection/fresh preferences and inactive-layout retention, then fresh gesture commits and four fixture closes; each run preserves 3,293 inputs and five protected hashes, with zero skips/runtime warnings. Input uses direct AppKit callbacks: final 0.44.5 (65) preference/version checks, CLI/app compilation, ordinary Debug build and strict source/candidate signatures pass; publication status is recorded externally, with no ordinary private-controller, real queued late-delivery, desktop/full UI/live-provider/installed/shipment qualification; other implementations stay deferred.
+
+## Preceding 0.44.4 (64) Doctor verification
 
 Run doctor now owns one background operation, rejects duplicate work, suppresses cancelled results and joins the worker at the UI-owner close boundary. Four AppModel cases pass (2.923 test/19.078 command s, normal exit 0); the scoped native check passes with eight exported report nodes, one real off-main worker and all 24 Doctor checks, preserving full report text, with configuration and layout preferences unchanged (12.065 s result interval, zero failures/skips/runtime warnings), with fixture close returned. The separate failed ordinary-metadata display check retains nil SwiftUI attributes rather than proving absent product content; the 19-case area regression (including G3), CLI/app compilation, ordinary Debug build and strict signature pass; source/wiki synchronization outcomes are retained in external receipts, desktop/full UI/installed/shipment stay open and other implementations remain deferred.
 

@@ -1,6 +1,6 @@
 # Forge Conductor — Xcode
 
-Current source version **0.44.4**, build **64** moves the Manager Doctor check off the main actor, preserves synchronous Core/CLI/HTTP reports, and drains the UI worker before its existing shutdown boundary. The canonical `ForgeConductor.xcworkspace`, existing memberships, dependencies and signing remain.
+Current source version **0.44.5**, build **65** cancels native canvas gestures across window detachment and exact owned-window close. The canonical `ForgeConductor.xcworkspace`, existing memberships, dependencies and signing remain; final-identity preference/version checks, CLI/app compilation, ordinary Debug build and strict source/candidate signatures pass; publication status is recorded externally. V206 native receipts retain their tested 0.44.4 (64) identity.
 
 ## Preceding 0.44.2 (62) qualification
 

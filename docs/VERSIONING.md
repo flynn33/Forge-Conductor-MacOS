@@ -1,6 +1,6 @@
 # Versioning policy
 
-Current target identity is **0.44.4 (64)**. This backward-compatible Doctor UI correction advances patch/build authorities together. Layout, repository and Doctor report contracts remain. [Current gates](QUALIFICATION-STATUS.md).
+Current target identity is **0.44.5 (65)**. This backward-compatible canvas lifecycle correction advances patch/build authorities together. Layout, repository and Doctor report contracts remain; final-identity preference/version checks, CLI/app compilation, ordinary Debug build and strict source/candidate signatures pass; publication status is recorded externally. [Current gates](QUALIFICATION-STATUS.md).
 
 ## Preceding 0.44.2 (62) qualification
 
@@ -381,7 +381,9 @@ focused version test, and CI reject drift between them.
 
 ## Current identity
 
-Current source target is `0.44.4`, build `64`, for one owned background Doctor check with cancellation-safe UI publication. The focused Doctor and version checks pass; historical results keep their tested identities and full UI gates remain open. [Current gates](QUALIFICATION-STATUS.md).
+Current source target is `0.44.5`, build `65`, for cancellation of unfinished gestures on canvas window changes and exact owned-window close. V206 native checks ran at 0.44.4 (64); final-identity preference/version checks, CLI/app compilation, ordinary Debug build and strict source/candidate signatures pass; publication status is recorded externally. Historical results retain their tested identities and full UI gates remain open. [Current gates](QUALIFICATION-STATUS.md).
+
+Preceding source target was `0.44.4`, build `64`, for one owned background Doctor check with cancellation-safe UI publication. The focused Doctor and version checks pass; historical results keep their tested identities and full UI gates remain open. [Current gates](QUALIFICATION-STATUS.md).
 
 ## Preceding 0.43.0 (59) identity record
 

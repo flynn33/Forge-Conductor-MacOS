@@ -1,6 +1,8 @@
 # Forge Conductor architecture
 
-Version: `0.44.4`; build: `64`. One application-owned `NativeWorkspacePreferences` stores validated per-view presentation layouts. Existing page state owners supply panel content to bounded AppKit hosts; completed gestures persist geometry, visibility and stacking. Existing default builders remain available. Manager sections and Rune Forge modes use view-local namespaces. Provider observation pauses when its workspace is entirely hidden and reconciles only the provider registry on resume. [Workspace contract](NATIVE-WORKSPACES.md).
+Version: `0.44.5`; build: `65`. One application-owned `NativeWorkspacePreferences` stores validated per-view presentation layouts. Existing page state owners supply panel content to bounded AppKit hosts; completed gestures persist geometry, visibility and stacking. Existing default builders remain available. Manager sections and Rune Forge modes use view-local namespaces. Provider observation pauses when its workspace is entirely hidden and reconciles only the provider registry on resume. [Workspace contract](NATIVE-WORKSPACES.md).
+
+The native canvas document cancels panel gestures when its window identity changes, on the exact owned window’s public willClose notification and before removing panels. Its selector observer is removed on window movement and deinit; cancellation rolls back the transient frame without publishing geometry. V206 qualifies direct owned-fixture callbacks, not ordinary private window-controller or real queued late-delivery behavior.
 
 Manager Doctor work uses one AppModel-owned background operation. Main-actor admission and request identity prevent duplicate work and stale publication; the UI-owner close boundary joins that worker before diagnostics close. Core/CLI/HTTP synchronous report contracts remain available.
 

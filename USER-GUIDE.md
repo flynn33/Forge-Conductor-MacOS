@@ -1,6 +1,8 @@
 # Forge Conductor user guide
 
-Version **0.44.4**, build **64** retains custom layouts within each existing view and displays saved menu entries as `Layout: <name>`. Stored names and layout identities are unchanged.
+Version **0.44.5**, build **65** retains custom layouts within each existing view and displays saved menu entries as `Layout: <name>`. Stored names and layout identities are unchanged.
+
+An unfinished panel move or resize is cancelled when its canvas detaches or its window closes. The panel returns to its last stored frame; a late mouse-up cannot save the cancelled displacement, and a fresh drag can still save new geometry.
 
 In Projects, a new repository save attempt clears the previous success message before validation. If the project selection or repository URL is invalid, the current error appears without the earlier **Saved** notice.
 

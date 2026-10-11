@@ -10,6 +10,10 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### `0.44.5 (65)`
+
+- Cancel unfinished panel moves/resizes when the canvas changes window or its exact owned window closes, rolling back the frame and rejecting a held old mouse-up. V206’s same four-case native regression and unchanged default-restoration/dismantle/weak-release check pass at 0.44.4 (64); final-identity preference/version checks, CLI/app compilation, ordinary Debug build and strict source/candidate signatures pass; publication status is recorded externally. Desktop/full UI/installed/shipment remain open and other implementations stay deferred. [Qualification](docs/QUALIFICATION-STATUS.md).
+
 ### `0.44.4 (64)`
 
 Run doctor uses one background health check, disables duplicate actions while it runs and discards cancelled results. The existing report text and synchronous Core/CLI/HTTP contract remain. Focused verification is recorded in the qualification status.

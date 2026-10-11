@@ -57,6 +57,8 @@ final class NativeWorkspaceDocumentView: NSView {
     var hasHorizontalWheelMonitor: Bool { horizontalWheelMonitor != nil }
 
     override func viewWillMove(toWindow newWindow: NSWindow?) {
+        if window !== newWindow { cancelPanelGestures() }
+        NotificationCenter.default.removeObserver(self, name: NSWindow.willCloseNotification, object: nil)
         stopHorizontalWheelMonitoring()
         super.viewWillMove(toWindow: newWindow)
     }
@@ -64,6 +66,8 @@ final class NativeWorkspaceDocumentView: NSView {
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         guard window != nil, horizontalWheelMonitor == nil else { return }
+        NotificationCenter.default.addObserver(self, selector: #selector(windowWillClose),
+                                               name: NSWindow.willCloseNotification, object: window)
         horizontalWheelMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
             guard Thread.isMainThread else { return event }
             let forwarded = MainActor.assumeIsolated {
@@ -74,7 +78,19 @@ final class NativeWorkspaceDocumentView: NSView {
         }
     }
 
-    isolated deinit { stopHorizontalWheelMonitoring() }
+    isolated deinit {
+        NotificationCenter.default.removeObserver(self, name: NSWindow.willCloseNotification, object: nil)
+        stopHorizontalWheelMonitoring()
+    }
+
+    @objc private func windowWillClose(_ notification: Notification) {
+        guard let closingWindow = notification.object as? NSWindow, closingWindow === window else { return }
+        cancelPanelGestures()
+    }
+
+    private func cancelPanelGestures() {
+        for host in panelHosts.values { host.cancelGesture() }
+    }
 
     func stopHorizontalWheelMonitoring() {
         guard let monitor = horizontalWheelMonitor else { return }
@@ -180,6 +196,7 @@ final class NativeWorkspaceDocumentView: NSView {
 
     func removePanels() {
         for host in panelHosts.values {
+            host.cancelGesture()
             host.commitFrame = nil; host.hidePanel = nil; host.bringToFront = nil
             host.removeFromSuperview()
         }

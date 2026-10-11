@@ -4618,6 +4618,134 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
         await fixture.close(); scopeFixture = nil
     }
 
+    func testPendingMoveAndResizeCancelAcrossOwnedWindowDetachAndClose() async throws {
+        let priorContinuation = continueAfterFailure
+        continueAfterFailure = true
+        defer { continueAfterFailure = priorContinuation }
+        let deadline = ProcessInfo.processInfo.systemUptime + 45
+        for transition in ["detach", "close"] {
+            for resizing in [false, true] {
+                let fixture = try await mountScope()
+                let document = try await mountedDocument(fixture)
+                let panel = try XCTUnwrap(document.panelHosts["alpha"])
+                let hosting = panel.hostingView
+                let identifier = "workspace-\(resizing ? "resize" : "move")-alpha"
+                let handle = try gestureHandle(identifier, in: panel)
+                let original = panel.frame
+                var phases: [[String: Any]] = []
+                var report: [String: Any] = ["classification": "Direct AppKit event calls on an owned NativeWorkspaceView fixture; no private main-controller, desktop or queued late-delivery qualification",
+                    "transition": transition, "resizing": resizing, "shared_deadline_seconds": 45,
+                    "original_frame": NSStringFromRect(original), "completed": false]
+                defer { nativeDraftRetainMeasurement(report, name: "workspace-window-gesture-\(transition)-\(resizing ? "resize" : "move")") }
+                let bounds = Dictionary(uniqueKeysWithValues: workspaceDescriptors.map {
+                    ($0.id, NativeWorkspacePanelSizeBounds(minimumWidth: $0.minimumSize.width, minimumHeight: $0.minimumSize.height,
+                        maximumWidth: $0.maximumSize.width, maximumHeight: $0.maximumSize.height))
+                })
+                func record(_ phase: String) throws {
+                    guard phases.count < 10, ProcessInfo.processInfo.systemUptime < deadline else {
+                        throw WorkspaceCanvasFixtureFailure("The window gesture observation exceeded its phase/deadline bound.")
+                    }
+                    let bytes = fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey) ?? Data()
+                    phases.append(["phase": phase, "window_visible": fixture.window.isVisible, "window_key": fixture.window.isKeyWindow,
+                        "content_is_exact_hosting": fixture.window.contentView === fixture.hosting,
+                        "hosting_has_owned_window": fixture.hosting.window === fixture.window,
+                        "document_has_owned_window": document.window === fixture.window,
+                        "panel_has_owned_window": panel.window === fixture.window,
+                        "manipulating": panel.isManipulating, "frame": NSStringFromRect(panel.frame),
+                        "stored_bytes": bytes.count, "stored_sha256": JSONSupport.sha256Hex(bytes)])
+                    report["stage"] = phase; report["phases"] = phases
+                }
+                func requireOwner() throws {
+                    guard ProcessInfo.processInfo.systemUptime < deadline, fixture.window.isVisible,
+                          !fixture.window.isReleasedWhenClosed, fixture.window.contentView === fixture.hosting,
+                          fixture.hosting.window === fixture.window, document.window === fixture.window,
+                          panel.window === fixture.window, handle.window === fixture.window,
+                          document.panelHosts["alpha"] === panel, panel.hostingView === hosting,
+                          !handle.isHiddenOrHasHiddenAncestor, fixture.model.app == nil,
+                          fixture.model.manager == nil, fixture.model.remoteManager == nil else {
+                        throw WorkspaceCanvasFixtureFailure("The window gesture escaped its exact retained fixture owners.")
+                    }
+                    XCTAssertTrue(try gestureHandle(identifier, in: panel) === handle)
+                }
+                func assertStored(_ expected: NativeWorkspaceCollection, bytes: Data) throws {
+                    let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
+                    XCTAssertEqual(fixture.preferences.collection, expected)
+                    XCTAssertEqual(fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey), bytes)
+                    XCTAssertEqual(bytes, try encoder.encode(expected))
+                    let fresh = NativeWorkspacePreferences(knownPanelIDsByView: ["fixture": Set(workspaceDescriptors.map(\.id))],
+                        panelSizeBoundsByView: ["fixture": bounds], defaults: fixture.defaults)
+                    XCTAssertNil(fresh.restorationError); XCTAssertEqual(fresh.collection, expected)
+                    XCTAssertEqual(fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey), bytes)
+                }
+                do {
+                    try requireOwner(); try record("before-down")
+                    let start = handle.convert(NSPoint(x: handle.bounds.midX, y: handle.bounds.midY), to: document)
+                    let end = NSPoint(x: start.x + 50, y: start.y + 30)
+                    let heldUp = try pointer(.leftMouseUp, at: end, in: document)
+                    handle.mouseDown(with: try pointer(.leftMouseDown, at: start, in: document))
+                    let afterDown = fixture.preferences.collection
+                    let bytes = try XCTUnwrap(fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey))
+                    XCTAssertEqual(fixture.preferences.activeLayout(for: "fixture")?.panels.first { $0.id == "alpha" }?.frame.nativeRect, original)
+                    handle.mouseDragged(with: try pointer(.leftMouseDragged, at: end, in: document))
+                    XCTAssertTrue(panel.isManipulating); XCTAssertNotEqual(panel.frame, original)
+                    try assertStored(afterDown, bytes: bytes); try record("transient-drag")
+                    if transition == "detach" {
+                        fixture.window.contentView = nil
+                        XCTAssertNil(fixture.hosting.window); XCTAssertNil(document.window)
+                        XCTAssertNil(panel.window); XCTAssertNil(handle.window)
+                    } else {
+                        fixture.window.performClose(nil)
+                        try await waitUntil("The exact retained window did not close.", timeout: min(3, max(0, deadline - ProcessInfo.processInfo.systemUptime))) {
+                            !fixture.window.isVisible
+                        }
+                    }
+                    try record("after-transition")
+                    XCTAssertFalse(panel.isManipulating, "\(transition) must cancel the unfinished gesture.")
+                    XCTAssertEqual(panel.frame, original); try assertStored(afterDown, bytes: bytes)
+                    if transition == "detach" { fixture.window.contentView = fixture.hosting }
+                    else { fixture.window.makeKeyAndOrderFront(nil) }
+                    try await waitUntil("The same retained native root did not reopen.", timeout: min(3, max(0, deadline - ProcessInfo.processInfo.systemUptime))) {
+                        fixture.hosting.layoutSubtreeIfNeeded()
+                        return fixture.window.isVisible && fixture.window.contentView === fixture.hosting && document.window === fixture.window
+                    }
+                    try requireOwner(); try record("reattached-or-reopened")
+                    XCTAssertFalse(panel.isManipulating); XCTAssertEqual(panel.frame, original)
+                    handle.mouseUp(with: heldUp)
+                    try record("held-old-mouse-up")
+                    XCTAssertFalse(panel.isManipulating); XCTAssertEqual(panel.frame, original)
+                    try assertStored(afterDown, bytes: bytes)
+                    report["late_mouse_up_created_before_transition"] = true
+                    report["late_mouse_up_bytes_unchanged"] = fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey) == bytes
+                    // Fresh input follows the cancellation and stale-callback assertions.
+                    try requireOwner()
+                    let freshStart = handle.convert(NSPoint(x: handle.bounds.midX, y: handle.bounds.midY), to: document)
+                    try drag(handle, in: document, from: freshStart, to: NSPoint(x: freshStart.x + 20, y: freshStart.y + 10))
+                    var expected = afterDown
+                    let layoutIndex = try XCTUnwrap(expected.layouts.firstIndex { $0.id == fixture.layoutA.id })
+                    let panelIndex = try XCTUnwrap(expected.layouts[layoutIndex].panels.firstIndex { $0.id == "alpha" })
+                    let old = expected.layouts[layoutIndex].panels[panelIndex].frame
+                    let committed = resizing ? NativeWorkspaceFrame(x: old.x, y: old.y, width: old.width + 20, height: old.height + 10)
+                        : NativeWorkspaceFrame(x: old.x + 20, y: old.y + 10, width: old.width, height: old.height)
+                    expected.layouts[layoutIndex].panels[panelIndex].frame = committed
+                    let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
+                    try assertStored(expected, bytes: encoder.encode(expected))
+                    XCTAssertEqual(panel.frame, committed.nativeRect); XCTAssertFalse(panel.isManipulating)
+                    try requireOwner(); try record("fresh-gesture-committed")
+                    report["completed"] = true
+                    await fixture.close(); scopeFixture = nil
+                    report["fixture_close_returned"] = true
+                    XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, deadline)
+                } catch {
+                    report["original_error"] = String(decoding: String(describing: error).utf8.prefix(1_024), as: UTF8.self)
+                    panel.cancelGesture()
+                    await fixture.close(); scopeFixture = nil
+                    report["fixture_close_returned"] = true
+                    throw error
+                }
+            }
+        }
+    }
+
     func testNamedLayoutApplyCancelsOldMoveAndResizeMouseUp() async throws {
         try await requireStaleGestureProtection(applyBeforeMouseUp: true)
     }

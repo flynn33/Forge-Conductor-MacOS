@@ -1,6 +1,8 @@
 # Forge Conductor for macOS
 
-Current source target **0.44.4 (64)** moves Run doctor health checks into one owned background operation. Movable, resizable, show/hide panels and named layouts remain within each existing view. [Workspace guide](docs/NATIVE-WORKSPACES.md).
+Current source target **0.44.5 (65)** cancels unfinished panel moves/resizes across canvas detachment and owned-window close. Movable, resizable, show/hide panels and named layouts remain within each existing view. [Workspace guide](docs/NATIVE-WORKSPACES.md).
+
+V206 cancels unfinished panel moves/resizes when the owned canvas detaches or its retained window closes. The same four-case native regression now passes, preserving stored frames and bytes through a held old mouse-up and allowing fresh gestures; default restoration/dismantle and weak-owner release also pass. These direct AppKit callback checks ran at 0.44.4 (64); final 0.44.5 (65) preference/version checks, CLI/app compilation, ordinary Debug build and strict source/candidate signatures pass; publication status is recorded externally, ordinary private-controller/queued-late-event/desktop/full UI/installed/shipment proof stays open, and other implementations remain deferred.
 
 Four AppModel Doctor tests and one scoped native Run doctor check pass on 0.44.4 (64): report work runs off the main thread, and the complete 24-check Doctor ISSUES report, configuration and layout preferences are unchanged. The earlier main-thread baseline and separate ordinary-metadata display failure remain recorded; exported application-content readback identifies the existing report. The 19-case area regression (including G3), CLI/app compilation, ordinary Debug build and strict signature pass. Source/wiki synchronization outcomes are retained in external receipts; ordinary desktop/full UI, installed/shipment gates stay open and other implementations remain deferred.
 
@@ -1077,8 +1079,8 @@ continuity. The user does not start project work through a Forge Managed Run.
 
 | | |
 |---|---|
-| **Version** | **0.44.4** |
-| **Build** | **64** |
+| **Version** | **0.44.5** |
+| **Build** | **65** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |
