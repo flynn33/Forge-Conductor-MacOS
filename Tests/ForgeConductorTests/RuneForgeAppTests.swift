@@ -132,6 +132,205 @@ final class RuneForgeAppTests: XCTestCase {
         }
     }
 
+    func testMountedRuneParentCloseWhileRenameDraftPreservesStateAndOwnedReturn() async throws {
+        guard NSApp != nil, Bundle.main.bundleURL.pathExtension == "app", !NSScreen.screens.isEmpty else {
+            throw RuneWorkspaceVisibilityFailure("Run the naming Close observation in ForgeConductorAppTests with a native display.")
+        }
+        let priorContinuation = continueAfterFailure
+        continueAfterFailure = true
+        defer { continueAfterFailure = priorContinuation }
+        let deadline = ProcessInfo.processInfo.systemUptime + 45
+        let source = DevelopmentPolicySource(displayName: "Naming Close policy",
+            selectedPath: "/tmp/rune-naming-close-policy.md", interpretationState: .cataloging)
+        let runeModel = RuneForgeViewModel(client: RuneWorkspaceNamingClient(snapshot: policySnapshot(events: [], sources: [source])))
+        let fixture = try RuneWorkspaceVisibilityFixture(model: runeModel, urls: [])
+        let descriptors = NativeWorkspaceCatalog.runePanels(for: "source")
+        let original = NativeWorkspaceLayout(id: UUID(), viewID: "rune-forge.source", name: "Close-" + UUID().uuidString,
+            canvas: .init(width: max(1_280, descriptors.map { $0.defaultFrame.x + $0.defaultFrame.width + 20 }.max() ?? 0),
+                          height: max(900, descriptors.map { $0.defaultFrame.y + $0.defaultFrame.height + 20 }.max() ?? 0)),
+            panels: descriptors.map { .init(id: $0.id, frame: $0.defaultFrame, isVisible: true) })
+        let observer = RuneWorkspaceNamingAX(window: fixture.window, hosting: fixture.hosting)
+        let draft = "Held-" + UUID().uuidString
+        var stage = "mount", rows: [[String: Any]] = [], menus: [[String: Any]] = []
+        var before: NativeWorkspaceCollection?, beforeBytes: Data?
+        var heldSheet: NSWindow?, heldContent: NSView?, heldField: NSTextField?
+        var witness: [String: Any] = ["parent_performClose_attempts": 0, "actual_Return_attempted": false,
+            "actual_Return_returned": false, "fixture_close_returned": false]
+        func check(reserving seconds: TimeInterval = 0) throws {
+            try Task.checkCancellation()
+            guard ProcessInfo.processInfo.systemUptime + seconds < deadline else {
+                throw RuneWorkspaceVisibilityFailure("Naming Close exceeded its shared 45-second admission/return deadline.")
+            }
+        }
+        func requireUnchanged() throws {
+            try check()
+            guard let before, let beforeBytes, fixture.preferences.collection == before,
+                  fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey) == beforeBytes else {
+                throw RuneWorkspaceVisibilityFailure("Naming Close wrote saved layouts before an owned Return.")
+            }
+        }
+        func record(_ phase: String) throws {
+            try check()
+            guard rows.count < 8 else { throw RuneWorkspaceVisibilityFailure("Naming Close exceeded eight phase rows.") }
+            let bytes = fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey)
+            guard bytes.map({ $0.count <= 64 * 1_024 }) ?? true else {
+                throw RuneWorkspaceVisibilityFailure("Naming Close preferences exceeded the 64 KiB fixture bound.")
+            }
+            rows.append(["phase": phase, "parent_visible": fixture.window.isVisible,
+                "parent_key": fixture.window.isKeyWindow, "parent_is_actual_key": NSApp.keyWindow === fixture.window,
+                "content_is_exact_host": fixture.window.contentView === fixture.hosting,
+                "host_has_owned_window": fixture.hosting.window === fixture.window,
+                "attached_sheet_present": fixture.window.attachedSheet != nil,
+                "held_sheet_is_attached": heldSheet.map { fixture.window.attachedSheet === $0 } ?? false,
+                "held_sheet_has_exact_parent": heldSheet.map { $0.sheetParent === fixture.window } ?? false,
+                "held_sheet_visible": heldSheet?.isVisible ?? false,
+                "held_sheet_is_actual_key": heldSheet.map { NSApp.keyWindow === $0 } ?? false,
+                "held_content_has_sheet": heldContent.map { $0.window === heldSheet } ?? false,
+                "held_field_has_sheet": heldField.map { $0.window === heldSheet } ?? false,
+                "held_field_value": heldField.map { String($0.stringValue.prefix(96)) as Any } ?? NSNull(),
+                "collection_unchanged_from_before": before.map { fixture.preferences.collection == $0 } ?? false,
+                "stored_bytes": bytes.map { $0.count as Any } ?? NSNull(),
+                "stored_sha256": bytes.map { JSONSupport.sha256Hex($0) as Any } ?? NSNull(),
+                "stored_bytes_unchanged_from_before": beforeBytes.map { bytes == $0 } ?? false])
+            stage = phase
+        }
+        func retain(_ error: Error? = nil) throws {
+            let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
+            let current = try encoder.encode(fixture.preferences.collection)
+            guard current.count <= 64 * 1_024, rows.count <= 8, menus.count <= 2 else {
+                throw RuneWorkspaceVisibilityFailure("Naming Close evidence exceeded its collection/phase/menu bounds.")
+            }
+            let payload: [String: Any] = ["classification": "Actual production Rename/editor with one public parent performClose, observed Close/refusal, retained-window reopening if closed and exact owned-sheet Return. No V199 Zoom-descendant traversal, forced sheet teardown before cleanup, private main-controller or desktop proof.",
+                "shared_deadline_seconds": 45, "synchronous_native_calls_preemptible": false,
+                "cleanup_hard_deadline_established": false, "stage": stage, "origin_layout_id": original.id.uuidString,
+                "rows": rows, "native_menu_attempts": menus, "actual_submit_and_close": witness,
+                "baseline_collection": try beforeBytes.map { try JSONSerialization.jsonObject(with: $0) } ?? NSNull(),
+                "current_collection": try JSONSerialization.jsonObject(with: current),
+                "error": error.map { String(String(describing: $0).prefix(1_024)) as Any } ?? NSNull()]
+            let data = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys])
+            guard data.count <= 512 * 1_024 else { throw RuneWorkspaceVisibilityFailure("Naming Close report exceeded 512 KiB.") }
+            let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+            attachment.name = "rune-parent-close-naming-" + stage; attachment.lifetime = .keepAlways; add(attachment)
+        }
+        func openRename() async throws -> (NSWindow, NSView, NSTextField) {
+            try check(reserving: 3)
+            guard fixture.window.attachedSheet == nil, menus.count < 2 else {
+                throw RuneWorkspaceVisibilityFailure("A fresh Rename requires no attached sheet and a bounded menu attempt.")
+            }
+            let opener = try await observer.required(identifier: "workspace-layout-menu-" + original.viewID, scope: .applicationContent)
+            try check(reserving: 3)
+            let capture = RuneWorkspaceNativeNamingMenuCapture(window: fixture.window, hosting: fixture.hosting, expectedName: original.name)
+            defer { menus.append(capture.evidence) }
+            try await observer.openOwnedMenuAndPressNativeNamingCommand(opener, capture: capture, scope: .applicationContent)
+            try check(reserving: 3)
+            try await runeWorkspaceWait("Production Rename did not attach its actual naming sheet.") { fixture.window.attachedSheet != nil }
+            let sheet = try XCTUnwrap(fixture.window.attachedSheet), content = try XCTUnwrap(sheet.contentView)
+            try check(reserving: 6)
+            let (field, _) = try await runeRequiredOwnedNamingField(fixture, sheet: sheet, content: content, expectedValue: original.name)
+            try check()
+            return (sheet, content, field)
+        }
+        do {
+            try check(); try fixture.preferences.save(original)
+            before = fixture.preferences.collection
+            beforeBytes = try XCTUnwrap(fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey))
+            NSApp.activate(ignoringOtherApps: true); fixture.window.makeKeyAndOrderFront(nil); fixture.hosting.layoutSubtreeIfNeeded()
+            try check(reserving: 3)
+            try await runeWorkspaceWait("The real Rune source owners did not settle for naming Close.") {
+                !fixture.model.isBootstrapping && !runeModel.isLoading && runeModel.sources.count == 1
+                    && fixture.document?.panelHosts.count == fixture.layout.panels.count
+            }
+            runeModel.pauseObservation()
+            try check(reserving: 3)
+            let row = try await observer.required(identifier: "rune-policy-source-row-" + source.id.description, scope: .applicationContent)
+            try check(reserving: 3); try observer.pressOwned(row, role: kAXButtonRole, scope: .applicationContent)
+            try check(reserving: 3)
+            try await runeWorkspaceWait("The actual source row did not mount its naming workspace.") {
+                Set(fixture.document?.panelHosts.keys.map { $0 } ?? []) == Set(original.panels.map(\.id))
+            }
+            runeModel.pauseObservation(); try requireUnchanged(); try record("before-Rename")
+            let (sheet, content, field) = try await openRename()
+            heldSheet = sheet; heldContent = content; heldField = field
+            try check(reserving: 3)
+            try runeReplaceOwnedNamingText(fixture, sheet: sheet, content: content, field: field, name: draft)
+            try requireUnchanged(); try record("unsaved-draft-before-Close")
+            try runeRequireNamingSheetOwner(fixture, sheet: sheet, content: content)
+            try check(reserving: 3)
+            witness["parent_performClose_attempts"] = 1
+            fixture.window.performClose(nil)
+            witness["parent_performClose_returned"] = true
+            await Task.yield(); try check(); try requireUnchanged()
+            let closed = !fixture.window.isVisible
+            witness["parent_closed_observed"] = closed
+            witness["Close_disposition"] = closed ? "parent-not-visible-after-return-and-yield" : "parent-still-visible-after-return-and-yield; refusal observation without cause"
+            try record("after-parent-Close-attempt")
+            if closed {
+                fixture.window.makeKeyAndOrderFront(nil); fixture.hosting.layoutSubtreeIfNeeded()
+                try check(reserving: 3)
+                try await runeWorkspaceWait("The retained parent did not reopen with its exact hosting root.") {
+                    fixture.window.isVisible && fixture.window.contentView === fixture.hosting && fixture.hosting.window === fixture.window
+                }
+            }
+            try requireUnchanged(); try record("reopened-or-still-visible")
+            let retainedOwner = fixture.window.isVisible && fixture.window.contentView === fixture.hosting
+                && fixture.hosting.window === fixture.window && !fixture.hosting.isHiddenOrHasHiddenAncestor
+                && fixture.window.attachedSheet === sheet && sheet.sheetParent === fixture.window
+                && sheet.isVisible && sheet.contentView === content && content.window === sheet
+            let submitSheet: NSWindow, submitContent: NSView, submitField: NSTextField, submittedName: String
+            if retainedOwner {
+                witness["submission_branch"] = "same-held-attached-sheet"
+                try check(reserving: 6)
+                let (currentField, _) = try await runeRequiredOwnedNamingField(fixture, sheet: sheet, content: content, expectedValue: draft)
+                witness["submitted_field_is_held_field"] = currentField === field
+                submitSheet = sheet; submitContent = content; submitField = currentField; submittedName = draft
+            } else {
+                witness["submission_branch"] = "fresh-Rename-after-observed-sheet-loss"
+                guard fixture.window.attachedSheet == nil, sheet.sheetParent == nil else {
+                    throw RuneWorkspaceVisibilityFailure("Naming Close left an unexpected attached-sheet owner; no forced teardown is allowed before cleanup.")
+                }
+                let fresh = try await openRename()
+                submitSheet = fresh.0; submitContent = fresh.1; submitField = fresh.2
+                submittedName = "Fresh-" + UUID().uuidString
+                try check(reserving: 3)
+                try runeReplaceOwnedNamingText(fixture, sheet: submitSheet, content: submitContent, field: submitField, name: submittedName)
+            }
+            submitSheet.makeKeyAndOrderFront(nil)
+            try check(reserving: 3)
+            try await runeWorkspaceWait("The exact submitted naming sheet did not become the actual key owner.") {
+                submitSheet.isKeyWindow && NSApp.keyWindow === submitSheet
+            }
+            try requireUnchanged(); try record("before-owned-Return")
+            try check(reserving: 6)
+            try await runeSubmitOwnedNamingReturn(fixture, sheet: submitSheet, content: submitContent,
+                field: submitField, expectedName: submittedName, witness: &witness)
+            try check()
+            var expected = try XCTUnwrap(before)
+            let index = try XCTUnwrap(expected.layouts.firstIndex { $0.id == original.id })
+            expected.layouts[index].name = submittedName
+            let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
+            let expectedBytes = try encoder.encode(expected)
+            let restored = NativeWorkspacePreferences(knownPanelIDsByView: NativeWorkspaceCatalog.knownPanelIDsByView,
+                panelSizeBoundsByView: NativeWorkspaceCatalog.sizeBoundsByView, defaults: fixture.defaults)
+            guard fixture.preferences.collection == expected, restored.restorationError == nil, restored.collection == expected,
+                  fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey) == expectedBytes,
+                  submitSheet.sheetParent == nil, fixture.window.attachedSheet == nil else {
+                throw RuneWorkspaceVisibilityFailure("Owned Return did not preserve exact origin-only Rename, full collection/bytes and fresh restoration.")
+            }
+            witness["exact_origin_only_Rename"] = true; witness["fresh_preferences_match"] = true
+            try record("owned-Return-dismissed-and-persisted")
+            await runeNamingClose(fixture, runeModel: runeModel)
+            witness["fixture_close_returned"] = true
+            try check(); try record("cleanup-returned"); try retain()
+        } catch {
+            try? retain(error)
+            if witness["fixture_close_returned"] as? Bool != true {
+                await runeNamingClose(fixture, runeModel: runeModel); witness["fixture_close_returned"] = true
+            }
+            try? retain(error)
+            throw error
+        }
+    }
+
     func testMountedRuneZoomSubtreeBeforeDuringAfterProductionRenameCancellation() async throws {
         guard NSApp != nil, Bundle.main.bundleURL.pathExtension == "app", !NSScreen.screens.isEmpty else {
             throw RuneWorkspaceVisibilityFailure("Run the Rune Zoom lifecycle measurement in ForgeConductorAppTests with a native display.")
