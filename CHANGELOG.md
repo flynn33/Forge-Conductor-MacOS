@@ -12,6 +12,8 @@ Product versions do not by themselves claim shipment.
 
 ### `0.44.6 (66)`
 
+- Verify the isolated ordinary app's Projects backend with ten HTTP checks covering GitHub Save/readback, invalid/unauthenticated/stale rejection and Clear, preserving project identity. Dashboard capture and logged Projects selection succeed; desktop readback fails before visual Projects/layout verification. This adds qualification evidence without a production change; ordinary Quit, full UI and shipment remain open. [Qualification](docs/QUALIFICATION-STATUS.md).
+
 - Pause view-owned workspace observation while a retained window is closed and preserve observation after immediate reopening. Four final native checks and twenty source preservation tests pass, including default/fallback restoration and accepted-work/draft contracts. Current native window visibility combines with existing panel visibility; layout storage and existing state owners remain. Focused qualification is recorded separately from desktop/full UI and shipment. [Qualification](docs/QUALIFICATION-STATUS.md).
 
 ### `0.44.5 (65)`
