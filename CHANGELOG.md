@@ -10,6 +10,10 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### `0.44.6 (66)`
+
+- Pause view-owned workspace observation while a retained window is closed and preserve observation after immediate reopening. Four final native checks and twenty source preservation tests pass, including default/fallback restoration and accepted-work/draft contracts. Current native window visibility combines with existing panel visibility; layout storage and existing state owners remain. Focused qualification is recorded separately from desktop/full UI and shipment. [Qualification](docs/QUALIFICATION-STATUS.md).
+
 ### `0.44.5 (65)`
 
 - Verify an unsaved Rune layout Rename after one public parent Close attempt (V207). The native window remains visible with its original sheet/draft, and owned-editor Return preserves all saved state except the originating name. One native and one view-scoped storage test pass; one native QoS warning is retained without a cause claim. This adds a regression test without changing production/version. Accepted Close/reopening, desktop/full UI and deferred implementations remain open. [Qualification](docs/QUALIFICATION-STATUS.md).

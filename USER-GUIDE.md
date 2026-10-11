@@ -1,6 +1,6 @@
 # Forge Conductor user guide
 
-Version **0.44.5**, build **65** retains custom layouts within each existing view and displays saved menu entries as `Layout: <name>`. Stored names and layout identities are unchanged.
+Version **0.44.6**, build **66** retains custom layouts within each existing view and displays saved menu entries as `Layout: <name>`. Stored names and layout identities are unchanged. Closing a workspace window pauses its view-owned observation; reopening resumes it.
 
 An unfinished panel move or resize is cancelled when its canvas detaches or its window closes. The panel returns to its last stored frame; a late mouse-up cannot save the cancelled displacement, and a fresh drag can still save new geometry.
 

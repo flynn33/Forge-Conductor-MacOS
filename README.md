@@ -1,6 +1,8 @@
 # Forge Conductor for macOS
 
-Current source target **0.44.5 (65)** cancels unfinished panel moves/resizes across canvas detachment and owned-window close. Movable, resizable, show/hide panels and named layouts remain within each existing view. [Workspace guide](docs/NATIVE-WORKSPACES.md).
+Current source target **0.44.6 (66)** pauses view-owned observation while a retained workspace window is closed and keeps it active after reopening, including immediate reopening. Movable, resizable, show/hide panels and named layouts remain within each existing view. [Workspace guide](docs/NATIVE-WORKSPACES.md).
+
+V208 pauses view-owned observation while an owned retained workspace window is closed and uses current visibility after reopening. The original six-second Rune reproducer failed before repair; rapid-reopen and plain-host checks also exposed issues corrected before closeout. Four separate final native methods pass at 0.44.6 (66), covering sustained Close/reopen, immediate reopen, saved/default/no-preferences callbacks and owner release, plus accepted-command preservation when all Rune panels are hidden. Twenty source preservation tests pass, including Provider draft/accepted-operation cases. Saved layouts, storage and existing state owners remain. Desktop/full UI, installed/shipment and broader capabilities remain open; other implementations stay deferred. [Evidence](docs/QUALIFICATION-STATUS.md).
 
 V207 verifies an unsaved Rune layout Rename through one native parent Close attempt and owned-editor Return. The parent remains visible with the same sheet and draft; Return changes only the original name, preserving all geometry, selections and fresh preference restoration. One native and one view-scoped storage test pass. No production change follows; accepted Close/reopening and broader desktop verification remain untested. [Evidence](docs/QUALIFICATION-STATUS.md).
 
@@ -1081,8 +1083,8 @@ continuity. The user does not start project work through a Forge Managed Run.
 
 | | |
 |---|---|
-| **Version** | **0.44.5** |
-| **Build** | **65** |
+| **Version** | **0.44.6** |
+| **Build** | **66** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |

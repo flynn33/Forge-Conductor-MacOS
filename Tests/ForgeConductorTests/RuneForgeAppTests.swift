@@ -132,6 +132,443 @@ final class RuneForgeAppTests: XCTestCase {
         }
     }
 
+    func testMountedWorkspaceWindowActivityBranchesCloseReopen() async throws {
+        guard NSApp != nil, Bundle.main.bundleURL.pathExtension == "app", !NSScreen.screens.isEmpty else {
+            throw RuneWorkspaceVisibilityFailure("Run native workspace activity branches in ForgeConductorAppTests with a native display.")
+        }
+        let priorContinuation = continueAfterFailure
+        continueAfterFailure = true
+        defer { continueAfterFailure = priorContinuation }
+        let started = ProcessInfo.processInfo.systemUptime, deadline = started + 45
+        var rows: [[String: Any]] = []
+        weak var releasedHost: NSHostingView<AnyView>?
+        weak var releasedModel: AppModel?
+        func check(reserving seconds: TimeInterval = 0) throws {
+            try Task.checkCancellation()
+            guard ProcessInfo.processInfo.systemUptime + seconds < deadline else {
+                throw RuneWorkspaceVisibilityFailure("Native activity branches exceeded their shared 45-second admission/return deadline.")
+            }
+        }
+        func runVariant(_ variant: String) async throws {
+            let suite = "forge.workspace.window.branches.\(UUID().uuidString)"
+            let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+            defer { defaults.removePersistentDomain(forName: suite) }
+            let home = FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent("Projects/Codex Working Folders/Forge-Conductor-MacOS/native-window-branches-\(UUID().uuidString)")
+            let descriptors = NativeWorkspaceCatalog.runePanels(for: "overview")
+            let preferences = NativeWorkspacePreferences(knownPanelIDsByView: NativeWorkspaceCatalog.knownPanelIDsByView,
+                panelSizeBoundsByView: NativeWorkspaceCatalog.sizeBoundsByView, defaults: defaults)
+            if variant == "saved" {
+                try preferences.save(.init(id: UUID(), viewID: "rune-forge.overview", name: "Activity branches",
+                    canvas: .init(width: 1_280, height: 1_460),
+                    panels: descriptors.map { .init(id: $0.id, frame: $0.defaultFrame, isVisible: true) }))
+            }
+            let before = preferences.collection, beforeBytes = defaults.data(forKey: NativeWorkspacePreferences.storageKey)
+            let bootstrap = AppBootstrapOperation(factory: { throw CancellationError() }, pluginStatus: { _ in nil })
+            let model = AppModel(bootstrapOperation: bootstrap, bootstrapIntegration: .isolatedPresentation,
+                diagnosticPaths: AppPaths(home: home))
+            model.autoRefresh = false
+            var callbacks: [Bool] = [], callbackOverflow = false, cleanupReturned = false
+            let view = NativeWorkspaceView(viewID: "rune-forge.overview", descriptors: descriptors,
+                defaultContent: { Text("Default activity composition") },
+                panelContent: { id, _ in AnyView(Text(id)) }, activityChanged: { active in
+                    guard callbacks.count < 16 else { callbackOverflow = true; return }
+                    callbacks.append(active)
+                })
+                .environment(\.nativeWorkspacePreferences, variant == "no-preferences" ? nil : preferences)
+                .environmentObject(model).environmentObject(WorkbenchPreferences(defaults: defaults))
+                .environmentObject(GuidedModeCoordinator(defaults: defaults)).graphiteWorkbench()
+            let hosting = NSHostingView(rootView: AnyView(view))
+            let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 1_280, height: 900),
+                styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false; window.title = "Workspace activity \(variant) \(UUID().uuidString)"
+            window.contentView = hosting; releasedHost = hosting; releasedModel = model
+            var kvoVisibility: [Bool] = [], kvoOverflow = false
+            let visibilityObservation = window.observe(\.isVisible, options: [.initial, .new]) { observed, change in
+                MainActor.assumeIsolated {
+                    guard kvoVisibility.count < 16 else { kvoOverflow = true; return }
+                    kvoVisibility.append(change.newValue ?? observed.isVisible)
+                }
+            }
+            func record(_ phase: String) throws {
+                guard rows.count < 12, !callbackOverflow, callbacks.count <= 16,
+                      preferences.collection == before, defaults.data(forKey: NativeWorkspacePreferences.storageKey) == beforeBytes,
+                      window.contentView === hosting, hosting.window === window else {
+                    throw RuneWorkspaceVisibilityFailure("Native activity branch changed retained owners/storage or exceeded its scalar bounds.")
+                }
+                rows.append(["variant": variant, "phase": phase, "elapsed_seconds": ProcessInfo.processInfo.systemUptime - started,
+                    "window_visible": window.isVisible, "window_miniaturized": window.isMiniaturized,
+                    "hosting_hidden_or_hidden_ancestor": hosting.isHiddenOrHasHiddenAncestor,
+                    "kvo_visibility": kvoVisibility, "kvo_overflow": kvoOverflow,
+                    "same_host": window.contentView === hosting,
+                    "host_has_exact_window": hosting.window === window, "callbacks": callbacks,
+                    "collection_unchanged": preferences.collection == before,
+                    "stored_bytes_unchanged": defaults.data(forKey: NativeWorkspacePreferences.storageKey) == beforeBytes,
+                    "stored_sha256": beforeBytes.map { JSONSupport.sha256Hex($0) as Any } ?? NSNull()])
+            }
+            func cleanup() async {
+                visibilityObservation.invalidate()
+                hosting.rootView = AnyView(EmptyView())
+                window.orderOut(nil); window.contentView = nil; window.close()
+                await model.stopBootstrap(); model.telemetryBinding.detach()
+                try? FileManager.default.removeItem(at: home)
+                cleanupReturned = true
+            }
+            do {
+                try check(reserving: 3); window.orderFront(nil); hosting.layoutSubtreeIfNeeded()
+                try await runeWorkspaceWait("Native activity branch did not become active: " + variant) {
+                    window.isVisible && !model.isBootstrapping && callbacks.last == true
+                }
+                try record("visible-active")
+                let activeCount = callbacks.count
+                try check(reserving: 3); window.performClose(nil)
+                guard !window.isVisible, window.attachedSheet == nil else {
+                    throw RuneWorkspaceVisibilityFailure("Native activity branch Close did not produce a nonvisible sheet-free window.")
+                }
+                await Task.yield()
+                try await runeWorkspaceWait("Native activity branch did not pause after actual Close: " + variant) {
+                    callbacks.count > activeCount && callbacks.last == false
+                }
+                try record("closed-paused")
+                let pausedCount = callbacks.count
+                try check(reserving: 3); window.orderFront(nil)
+                try await runeWorkspaceWait("Native activity branch did not resume on the same reopened host: " + variant) {
+                    window.isVisible && callbacks.count > pausedCount && callbacks.last == true
+                }
+                try record("reopened-active")
+                let fresh = NativeWorkspacePreferences(knownPanelIDsByView: NativeWorkspaceCatalog.knownPanelIDsByView,
+                    panelSizeBoundsByView: NativeWorkspaceCatalog.sizeBoundsByView, defaults: defaults)
+                guard fresh.collection == before, fresh.restorationError == nil else {
+                    throw RuneWorkspaceVisibilityFailure("Native activity branch failed full fresh-preference restoration.")
+                }
+                await cleanup(); try check()
+            } catch {
+                try? record("failure-before-cleanup")
+                if !cleanupReturned { await cleanup() }
+                throw error
+            }
+        }
+        func retain(_ error: Error? = nil) throws {
+            let payload: [String: Any] = ["classification": "Public retained-window Close/yield/reopen callbacks on saved/default-with-preferences/no-preferences NativeWorkspaceView compositions; weak host/model readback only after explicit dismantle and scoped teardown. No backend, private reader visibility, main-controller or desktop proof.",
+                "shared_deadline_seconds": 45, "synchronous_native_calls_preemptible": false,
+                "cleanup_hard_deadline_established": false, "callback_limit_each": 16, "rows": rows,
+                "error": error.map { String(String(describing: $0).prefix(1_024)) as Any } ?? NSNull()]
+            let data = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys])
+            guard rows.count <= 12, data.count <= 128 * 1_024 else { throw RuneWorkspaceVisibilityFailure("Native activity branch report exceeded its bound.") }
+            let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+            attachment.name = "workspace-window-activity-branches"; attachment.lifetime = .keepAlways; add(attachment)
+        }
+        do {
+            for variant in ["saved", "default-with-preferences", "no-preferences"] {
+                try check(reserving: 12); try await runVariant(variant)
+                try check(reserving: 3)
+                try await runeWorkspaceWait("Native activity branch retained a hosting or model owner after teardown: " + variant) {
+                    releasedHost == nil && releasedModel == nil
+                }
+                guard rows.count < 12 else { throw RuneWorkspaceVisibilityFailure("Native activity release rows exceeded their bound.") }
+                rows.append(["variant": variant, "phase": "scoped-teardown-released", "hosting_released": releasedHost == nil,
+                    "model_released": releasedModel == nil, "elapsed_seconds": ProcessInfo.processInfo.systemUptime - started])
+            }
+            try retain(); try check()
+        } catch { try? retain(error); throw error }
+    }
+
+    func testMountedRuneImmediateCloseReopenKeepsObservationActive() async throws {
+        guard NSApp != nil, Bundle.main.bundleURL.pathExtension == "app", !NSScreen.screens.isEmpty else {
+            throw RuneWorkspaceVisibilityFailure("Run rapid retained-window observation in ForgeConductorAppTests with a native display.")
+        }
+        let priorContinuation = continueAfterFailure
+        continueAfterFailure = true
+        defer { continueAfterFailure = priorContinuation }
+        let started = ProcessInfo.processInfo.systemUptime, deadline = started + 45
+        let observationWait: Duration = .seconds(6)
+        guard observationWait > RuneForgeViewModel.pollingInterval else {
+            throw RuneWorkspaceVisibilityFailure("Rapid reopen observation must exceed the actual Rune polling interval.")
+        }
+        let source = DevelopmentPolicySource(displayName: "Rapid reopen policy",
+            selectedPath: "/tmp/rune-rapid-reopen-policy.md", interpretationState: .cataloging)
+        let client = RuneRetainedWindowObservationClient(snapshot: policySnapshot(events: [], sources: [source]))
+        let runeModel = RuneForgeViewModel(client: client)
+        let fixture = try RuneWorkspaceVisibilityFixture(model: runeModel, urls: [])
+        let before = fixture.preferences.collection
+        let beforeBytes = fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey) ?? Data()
+        var stage = "mount", rows: [[String: Any]] = []
+        var document: NativeWorkspaceDocumentView?, controlsHost: NSView?
+        var closeAttempts = 0, closedNonvisibleObserved = false, reopenReturned = false, cleanupReturned = false
+        var waitElapsed: TimeInterval?
+        func check(reserving seconds: TimeInterval = 0) throws {
+            try Task.checkCancellation()
+            guard ProcessInfo.processInfo.systemUptime + seconds < deadline else {
+                throw RuneWorkspaceVisibilityFailure("Rapid reopen exceeded its shared 45-second admission/return deadline.")
+            }
+        }
+        func record(_ phase: String) throws {
+            guard rows.count < 8 else { throw RuneWorkspaceVisibilityFailure("Rapid reopen exceeded eight phase rows.") }
+            let bytes = fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey)
+            guard bytes.map({ $0.count <= 64 * 1_024 }) ?? true else {
+                throw RuneWorkspaceVisibilityFailure("Rapid reopen preference bytes exceeded 64 KiB.")
+            }
+            rows.append(["phase": phase, "elapsed_seconds": ProcessInfo.processInfo.systemUptime - started,
+                "parent_visible": fixture.window.isVisible, "attached_sheet_present": fixture.window.attachedSheet != nil,
+                "content_is_exact_host": fixture.window.contentView === fixture.hosting,
+                "host_has_exact_window": fixture.hosting.window === fixture.window,
+                "controls_host_has_exact_window": controlsHost?.window === fixture.window,
+                "read_counts": client.readCounts, "mutation_requests": client.mutationRequests,
+                "counter_overflow": client.counterOverflow, "model_loading": runeModel.isLoading,
+                "collection_unchanged": fixture.preferences.collection == before,
+                "stored_bytes_unchanged": bytes == beforeBytes, "stored_bytes": bytes.map { $0.count as Any } ?? NSNull(),
+                "stored_sha256": bytes.map { JSONSupport.sha256Hex($0) as Any } ?? NSNull()])
+            stage = phase
+        }
+        func preserve() throws {
+            try check()
+            guard fixture.window.contentView === fixture.hosting, fixture.hosting.window === fixture.window,
+                  let document, fixture.document === document,
+                  document.panelHosts["rune-controls"]?.hostingView === controlsHost,
+                  fixture.preferences.collection == before,
+                  fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey) == beforeBytes,
+                  client.mutationRequests == 0, !client.counterOverflow else {
+                throw RuneWorkspaceVisibilityFailure("Rapid reopen changed retained owners, preferences or the mutation boundary.")
+            }
+        }
+        func retain(_ error: Error? = nil) throws {
+            let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
+            let current = try encoder.encode(fixture.preferences.collection)
+            guard beforeBytes.count <= 64 * 1_024, current.count <= 64 * 1_024, rows.count <= 8 else {
+                throw RuneWorkspaceVisibilityFailure("Rapid reopen evidence exceeded its collection/phase bound.")
+            }
+            let payload: [String: Any] = ["classification": "Owned retained Rune window/root/model; public performClose then immediate orderFront in the same main-actor turn. No private controller, ordinary candidate, desktop, forced layout between Close/reopen or accepted-command simulation.",
+                "shared_deadline_seconds": 45, "synchronous_native_calls_preemptible": false,
+                "cleanup_hard_deadline_established": false, "stage": stage, "rows": rows,
+                "counter_limit_each": 16, "requested_observation_wait_seconds": 6,
+                "actual_observation_wait_seconds": waitElapsed.map { $0 as Any } ?? NSNull(),
+                "polling_interval_seconds": 5, "close_to_reopen_suspensions": 0,
+                "parent_performClose_attempts": closeAttempts, "closed_nonvisible_observed_synchronously": closedNonvisibleObserved,
+                "immediate_reopen_returned": reopenReturned, "fixture_close_returned": cleanupReturned,
+                "editable_draft_prepared": false, "baseline_collection": try JSONSerialization.jsonObject(with: beforeBytes),
+                "current_collection": try JSONSerialization.jsonObject(with: current),
+                "error": error.map { String(String(describing: $0).prefix(1_024)) as Any } ?? NSNull()]
+            let data = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys])
+            guard data.count <= 128 * 1_024 else { throw RuneWorkspaceVisibilityFailure("Rapid reopen report exceeded 128 KiB.") }
+            let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+            attachment.name = "rune-immediate-reopen-" + stage; attachment.lifetime = .keepAlways; add(attachment)
+        }
+        do {
+            try check(reserving: 10)
+            guard !beforeBytes.isEmpty, beforeBytes.count <= 64 * 1_024 else {
+                throw RuneWorkspaceVisibilityFailure("Rapid reopen initial preferences are absent or oversized.")
+            }
+            fixture.window.orderFront(nil); fixture.hosting.layoutSubtreeIfNeeded()
+            try check(reserving: 3)
+            try await runeWorkspaceWait("Rapid reopen did not start one complete observation in its owned canvas.") {
+                fixture.window.isVisible && !fixture.model.isBootstrapping && !runeModel.isLoading
+                    && client.readCounts == ["snapshot": 1, "violations": 1, "projects": 1]
+                    && runeModel.sources.count == 1 && fixture.document?.panelHosts.count == fixture.layout.panels.count
+            }
+            document = try XCTUnwrap(fixture.document)
+            controlsHost = try XCTUnwrap(document?.panelHosts["rune-controls"]?.hostingView)
+            let countsBefore = client.readCounts, sourcesBefore = runeModel.sources, projectsBefore = runeModel.projectLogIDs
+            try preserve(); try record("before-rapid-Close")
+            guard fixture.window.attachedSheet == nil, runeModel.errorMessage == nil else {
+                throw RuneWorkspaceVisibilityFailure("Rapid reopen requires a ready sheet-free window.")
+            }
+            try check(reserving: 7); closeAttempts = 1
+            fixture.window.performClose(nil)
+            closedNonvisibleObserved = !fixture.window.isVisible
+            try record("after-synchronous-public-Close")
+            guard closedNonvisibleObserved else {
+                throw RuneWorkspaceVisibilityFailure("Rapid reopen public Close did not make the parent nonvisible synchronously.")
+            }
+            fixture.window.orderFront(nil); reopenReturned = true
+            try record("immediate-same-turn-reopen")
+            let waitBegan = ProcessInfo.processInfo.systemUptime
+            try await Task.sleep(for: observationWait)
+            waitElapsed = ProcessInfo.processInfo.systemUptime - waitBegan
+            try check(); try record("reopened-past-polling-interval")
+            try preserve()
+            let counts = client.readCounts
+            let deltas = counts.map { key, value in value - (countsBefore[key] ?? 0) }
+            let fresh = NativeWorkspacePreferences(knownPanelIDsByView: NativeWorkspaceCatalog.knownPanelIDsByView,
+                panelSizeBoundsByView: NativeWorkspaceCatalog.sizeBoundsByView, defaults: fixture.defaults)
+            guard (waitElapsed ?? 0) > 5, fixture.window.isVisible, fixture.window.attachedSheet == nil,
+                  Set(counts.values).count == 1, deltas.allSatisfy({ (1...2).contains($0) }),
+                  !runeModel.isLoading, runeModel.errorMessage == nil,
+                  runeModel.sources == sourcesBefore, Set(runeModel.sources.map(\.id)).count == runeModel.sources.count,
+                  runeModel.projectLogIDs == projectsBefore, fresh.collection == before, fresh.restorationError == nil else {
+                throw RuneWorkspaceVisibilityFailure("Immediate Close/reopen left observation paused, duplicated or changed retained presentation state.")
+            }
+            await runeNamingClose(fixture, runeModel: runeModel); cleanupReturned = true
+            try record("cleanup-returned"); try retain(); try check()
+        } catch {
+            try? retain(error)
+            if !cleanupReturned { await runeNamingClose(fixture, runeModel: runeModel); cleanupReturned = true }
+            try? record("failure-cleanup-returned"); try? retain(error)
+            throw error
+        }
+    }
+
+    func testMountedRuneRetainedWindowClosePausesObservationAndReopenResumes() async throws {
+        guard NSApp != nil, Bundle.main.bundleURL.pathExtension == "app", !NSScreen.screens.isEmpty else {
+            throw RuneWorkspaceVisibilityFailure("Run the retained-window observation in ForgeConductorAppTests with a native display.")
+        }
+        let priorContinuation = continueAfterFailure
+        continueAfterFailure = true
+        defer { continueAfterFailure = priorContinuation }
+        let started = ProcessInfo.processInfo.systemUptime, deadline = started + 45
+        let hiddenWait: Duration = .seconds(6), quietWait: Duration = .milliseconds(250)
+        guard hiddenWait > RuneForgeViewModel.pollingInterval else {
+            throw RuneWorkspaceVisibilityFailure("The hidden observation must exceed the actual Rune polling interval.")
+        }
+        let source = DevelopmentPolicySource(displayName: "Retained window policy",
+            selectedPath: "/tmp/rune-retained-window-policy.md", interpretationState: .cataloging)
+        let client = RuneRetainedWindowObservationClient(snapshot: policySnapshot(events: [], sources: [source]))
+        let runeModel = RuneForgeViewModel(client: client)
+        let fixture = try RuneWorkspaceVisibilityFixture(model: runeModel, urls: [])
+        let before = fixture.preferences.collection
+        let beforeBytes = fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey) ?? Data()
+        var document: NativeWorkspaceDocumentView?, controlsHost: NSView?
+        var stage = "initial-owned-root", rows: [[String: Any]] = []
+        var waits: [String: Any] = [:], closeAttempts = 0, cleanupReturned = false
+        func check(reserving seconds: TimeInterval = 0) throws {
+            try Task.checkCancellation()
+            guard ProcessInfo.processInfo.systemUptime + seconds < deadline else {
+                throw RuneWorkspaceVisibilityFailure("Retained-window observation exceeded its shared 45-second admission/return deadline.")
+            }
+        }
+        func wait(_ label: String, seconds: TimeInterval = 3,
+                  until predicate: @escaping @MainActor () -> Bool) async throws {
+            try check(reserving: seconds)
+            let began = ProcessInfo.processInfo.systemUptime, limit = began + seconds
+            defer { waits[label] = ["requested_max_seconds": seconds,
+                                    "actual_seconds": ProcessInfo.processInfo.systemUptime - began] }
+            while !predicate() {
+                try check()
+                guard ProcessInfo.processInfo.systemUptime < limit else {
+                    throw RuneWorkspaceVisibilityFailure("Retained-window condition timed out: " + label)
+                }
+                try await Task.sleep(for: .milliseconds(10))
+            }
+            try check()
+        }
+        func record(_ phase: String) throws {
+            guard rows.count < 8 else { throw RuneWorkspaceVisibilityFailure("Retained-window observation exceeded eight phase rows.") }
+            let bytes = fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey)
+            guard bytes.map({ $0.count <= 64 * 1_024 }) ?? true else {
+                throw RuneWorkspaceVisibilityFailure("Retained-window preferences exceeded 64 KiB.")
+            }
+            rows.append(["phase": phase, "elapsed_seconds": ProcessInfo.processInfo.systemUptime - started,
+                "parent_visible": fixture.window.isVisible, "attached_sheet_present": fixture.window.attachedSheet != nil,
+                "content_is_exact_host": fixture.window.contentView === fixture.hosting,
+                "host_has_exact_window": fixture.hosting.window === fixture.window,
+                "document_is_same_retained_owner": document.map { fixture.document === $0 } ?? false,
+                "controls_host_is_same": controlsHost.map { fixture.document?.panelHosts["rune-controls"]?.hostingView === $0 } ?? false,
+                "read_counts": client.readCounts, "mutation_requests": client.mutationRequests,
+                "counter_overflow": client.counterOverflow, "model_loading": runeModel.isLoading,
+                "model_source_ids": runeModel.sources.map(\.id), "model_project_ids": runeModel.projectLogIDs,
+                "collection_unchanged": fixture.preferences.collection == before,
+                "stored_bytes_unchanged": bytes == beforeBytes, "stored_bytes": bytes.map { $0.count as Any } ?? NSNull(),
+                "stored_sha256": bytes.map { JSONSupport.sha256Hex($0) as Any } ?? NSNull()])
+            stage = phase
+        }
+        func preserve() throws {
+            try check()
+            guard fixture.window.contentView === fixture.hosting, fixture.hosting.window === fixture.window,
+                  let document, fixture.document === document,
+                  document.panelHosts["rune-controls"]?.hostingView === controlsHost,
+                  fixture.preferences.collection == before,
+                  fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey) == beforeBytes,
+                  client.mutationRequests == 0, !client.counterOverflow else {
+                throw RuneWorkspaceVisibilityFailure("Retained-window observation changed its root, panel owner, preferences or mutation boundary.")
+            }
+        }
+        func retain(_ error: Error? = nil) throws {
+            let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
+            let current = try encoder.encode(fixture.preferences.collection)
+            guard beforeBytes.count <= 64 * 1_024, current.count <= 64 * 1_024, rows.count <= 8 else {
+                throw RuneWorkspaceVisibilityFailure("Retained-window evidence exceeded its collection/phase bound.")
+            }
+            let payload: [String: Any] = ["classification": "Actual retained owned Rune NSWindow/root/model using public performClose and reopening. No private main-controller, ordinary candidate, desktop, sheet or accepted-command simulation.",
+                "shared_deadline_seconds": 45, "synchronous_native_calls_preemptible": false,
+                "cleanup_hard_deadline_established": false, "stage": stage, "rows": rows, "waits": waits,
+                "counter_limit_each": 16, "polling_interval_seconds": 5, "requested_hidden_wait_seconds": 6,
+                "requested_reopen_quiet_wait_seconds": 0.25, "parent_performClose_attempts": closeAttempts,
+                "fixture_close_returned": cleanupReturned, "editable_draft_prepared": false,
+                "baseline_collection": try JSONSerialization.jsonObject(with: beforeBytes),
+                "current_collection": try JSONSerialization.jsonObject(with: current),
+                "error": error.map { String(String(describing: $0).prefix(1_024)) as Any } ?? NSNull()]
+            let data = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys])
+            guard data.count <= 128 * 1_024 else { throw RuneWorkspaceVisibilityFailure("Retained-window report exceeded 128 KiB.") }
+            let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+            attachment.name = "rune-retained-window-" + stage; attachment.lifetime = .keepAlways; add(attachment)
+        }
+        do {
+            try check(reserving: 12)
+            guard !beforeBytes.isEmpty, beforeBytes.count <= 64 * 1_024 else {
+                throw RuneWorkspaceVisibilityFailure("Retained-window initial preference bytes are absent or oversized.")
+            }
+            try record("initial-owned-root")
+            fixture.window.orderFront(nil); fixture.hosting.layoutSubtreeIfNeeded()
+            try await wait("initial-completed-observation") {
+                fixture.window.isVisible && !fixture.model.isBootstrapping && !runeModel.isLoading
+                    && client.readCounts == ["snapshot": 1, "violations": 1, "projects": 1]
+                    && runeModel.sources.count == 1 && fixture.document?.panelHosts.count == fixture.layout.panels.count
+            }
+            document = try XCTUnwrap(fixture.document)
+            controlsHost = try XCTUnwrap(document?.panelHosts["rune-controls"]?.hostingView)
+            let sourcesBefore = runeModel.sources, projectsBefore = runeModel.projectLogIDs
+            let countsBefore = client.readCounts
+            try preserve(); try record("visible-observation-ready")
+            guard fixture.window.attachedSheet == nil, runeModel.errorMessage == nil else {
+                throw RuneWorkspaceVisibilityFailure("Retained-window Close requires a ready sheet-free Rune view.")
+            }
+            try check(reserving: 10); closeAttempts = 1
+            fixture.window.performClose(nil)
+            await Task.yield(); try record("after-public-parent-Close")
+            guard !fixture.window.isVisible, fixture.window.attachedSheet == nil else {
+                throw RuneWorkspaceVisibilityFailure("Public parent Close did not produce the required nonvisible sheet-free window.")
+            }
+            try preserve()
+            let hiddenBegan = ProcessInfo.processInfo.systemUptime
+            try await Task.sleep(for: hiddenWait)
+            let hiddenElapsed = ProcessInfo.processInfo.systemUptime - hiddenBegan
+            waits["hidden-hold"] = ["requested_seconds": 6, "actual_seconds": hiddenElapsed]
+            try check(); try record("hidden-past-polling-interval")
+            try preserve()
+            guard hiddenElapsed > 5, !fixture.window.isVisible, client.readCounts == countsBefore,
+                  runeModel.sources == sourcesBefore, runeModel.projectLogIDs == projectsBefore,
+                  !runeModel.isLoading, runeModel.errorMessage == nil else {
+                throw RuneWorkspaceVisibilityFailure("The retained nonvisible Rune window continued observation or changed presentation state.")
+            }
+            fixture.window.orderFront(nil); fixture.hosting.layoutSubtreeIfNeeded()
+            let expectedReopenedCounts = countsBefore.mapValues { $0 + 1 }
+            try await wait("reopen-completed-observation") {
+                fixture.window.isVisible && !runeModel.isLoading
+                    && client.readCounts == expectedReopenedCounts
+            }
+            try preserve(); try record("same-root-reopened-observation-resumed")
+            let reopenedCounts = client.readCounts, quietBegan = ProcessInfo.processInfo.systemUptime
+            try check(reserving: 0.25); try await Task.sleep(for: quietWait)
+            waits["reopen-quiet-hold"] = ["requested_seconds": 0.25,
+                                          "actual_seconds": ProcessInfo.processInfo.systemUptime - quietBegan]
+            try preserve(); try record("reopened-without-duplicate-observation")
+            let fresh = NativeWorkspacePreferences(knownPanelIDsByView: NativeWorkspaceCatalog.knownPanelIDsByView,
+                panelSizeBoundsByView: NativeWorkspaceCatalog.sizeBoundsByView, defaults: fixture.defaults)
+            guard client.readCounts == reopenedCounts, runeModel.sources == sourcesBefore,
+                  Set(runeModel.sources.map(\.id)).count == runeModel.sources.count,
+                  runeModel.projectLogIDs == projectsBefore, runeModel.errorMessage == nil,
+                  fresh.collection == before, fresh.restorationError == nil else {
+                throw RuneWorkspaceVisibilityFailure("Reopened Rune duplicated observation or failed full preference restoration.")
+            }
+            await runeNamingClose(fixture, runeModel: runeModel); cleanupReturned = true
+            try record("cleanup-returned"); try retain(); try check()
+        } catch {
+            try? retain(error)
+            if !cleanupReturned { await runeNamingClose(fixture, runeModel: runeModel); cleanupReturned = true }
+            try? record("failure-cleanup-returned"); try? retain(error)
+            throw error
+        }
+    }
+
     func testMountedRuneParentCloseWhileRenameDraftPreservesStateAndOwnedReturn() async throws {
         guard NSApp != nil, Bundle.main.bundleURL.pathExtension == "app", !NSScreen.screens.isEmpty else {
             throw RuneWorkspaceVisibilityFailure("Run the naming Close observation in ForgeConductorAppTests with a native display.")
@@ -3047,6 +3484,51 @@ private final class RuneWorkspaceVisibilityFixture {
     }
 }
 
+
+@MainActor
+private final class RuneRetainedWindowObservationClient: RuneForgeManagerClientProtocol {
+    private let snapshot: StjornarvaldManagerSnapshot
+    private(set) var readCounts = ["snapshot": 0, "violations": 0, "projects": 0]
+    private(set) var mutationRequests = 0
+    private(set) var counterOverflow = false
+    init(snapshot: StjornarvaldManagerSnapshot) { self.snapshot = snapshot }
+    private func count(_ key: String) throws {
+        guard let value = readCounts[key], value < 16 else {
+            counterOverflow = true
+            throw RuneWorkspaceVisibilityFailure("Retained-window read counter exceeded 16 requests.")
+        }
+        readCounts[key] = value + 1
+        try Task.checkCancellation()
+    }
+    func runeForgeSnapshot() async throws -> StjornarvaldManagerSnapshot {
+        try count("snapshot"); return snapshot
+    }
+    func runeForgeViolations(cursor: Int64, limit: Int, state: PolicyViolationProjectionState?) async throws -> StjornarvaldViolationPage {
+        try count("violations")
+        guard cursor == 0, limit == RuneForgeViewModel.maximumViolations, state == nil else {
+            throw RuneWorkspaceVisibilityFailure("Retained-window violation read changed its bounded first-page contract.")
+        }
+        return .init(violations: [], nextCursor: nil, controlsExecution: false)
+    }
+    func runeForgeProjectIDs() async throws -> [String] {
+        try count("projects"); return ["retained-window-project"]
+    }
+    private func rejectMutation() throws -> Never {
+        guard mutationRequests < 16 else {
+            counterOverflow = true
+            throw RuneWorkspaceVisibilityFailure("Retained-window mutation counter exceeded 16 requests.")
+        }
+        mutationRequests += 1
+        throw RuneWorkspaceVisibilityFailure("Retained-window observation unexpectedly requested a mutation.")
+    }
+    func addRuneForgeSource(path: String, requestID: UUID) async throws -> DevelopmentPolicySource { try rejectMutation() }
+    func refreshRuneForgeSource(sourceID: PolicySourceID, requestID: UUID) async throws -> DevelopmentPolicySource { try rejectMutation() }
+    func removeRuneForgeSource(sourceID: PolicySourceID, requestID: UUID) async throws -> DevelopmentPolicySource { try rejectMutation() }
+    func reorderRuneForgeSources(sourceIDs: [PolicySourceID]) async throws -> [DevelopmentPolicySource] { try rejectMutation() }
+    func scheduleRuneForgeScan(requestID: UUID, reason: String) async throws -> StjornarvaldScanReceipt { try rejectMutation() }
+    func requestRuneForgeExport(format: StjornarvaldExportFormat, destination: String,
+                               filters: StjornarvaldExportFilters, requestID: UUID) async throws -> StjornarvaldExportReceipt { try rejectMutation() }
+}
 
 @MainActor
 private final class RuneWorkspaceRouteClient: RuneForgeManagerClientProtocol {

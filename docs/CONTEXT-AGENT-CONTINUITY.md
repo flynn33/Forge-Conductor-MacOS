@@ -1,8 +1,8 @@
-# Context and agent continuity (v0.44.5)
+# Context and agent continuity (v0.44.6)
 
 <a id="context-and-agent-continuity-v0430"></a>
 
-Current source documentation targets 0.44.5 (65). Per-view layouts store only local presentation state. Page-owned project selection, instruction queues and continuity actions remain outside rearranged panel roots. Workspace checks add no successor-session or handoff qualification. Remaining new capability implementations are deferred while the owner prioritizes UI completion. [Workspace contract](NATIVE-WORKSPACES.md).
+Current source documentation targets 0.44.6 (66). Per-view layouts store local presentation state; page-owned project selection, instruction queues and continuity actions remain outside panel roots. Window activity pauses Rune observation through its existing pause boundary, preserving accepted commands. Workspace checks add no successor-session or handoff qualification. Remaining new capabilities stay deferred. [Workspace contract](NATIVE-WORKSPACES.md).
 
 ## Preceding 0.43.0 (59) qualification
 

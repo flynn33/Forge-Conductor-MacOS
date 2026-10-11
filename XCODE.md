@@ -1,6 +1,6 @@
 # Forge Conductor — Xcode
 
-Current source version **0.44.5**, build **65** cancels native canvas gestures across window detachment and exact owned-window close. The canonical `ForgeConductor.xcworkspace`, existing memberships, dependencies and signing remain; final-identity preference/version checks, CLI/app compilation, ordinary Debug build and strict source/candidate signatures pass; publication status is recorded externally. V206 native receipts retain their tested 0.44.4 (64) identity.
+Current source version **0.44.6**, build **66** gates workspace observation on its current native window visibility. The canonical `ForgeConductor.xcworkspace`, existing memberships, dependencies and signing remain. CLI/app compilation, ordinary Debug compilation and strict source/candidate signatures pass at this identity. Current qualification and publication results are recorded separately. [Current evidence](docs/QUALIFICATION-STATUS.md).
 
 ## Preceding 0.44.2 (62) qualification
 

@@ -1,5 +1,13 @@
 # Functional development build acceptance
 
+## Current 0.44.6 (66) focused UI repair
+
+V208 pauses view-owned observation while an owned retained workspace window is closed and uses current visibility after reopening. The original six-second Rune reproducer failed before repair; rapid-reopen and plain-host checks also exposed issues corrected before closeout. Four separate final native methods pass at 0.44.6 (66), covering sustained Close/reopen, immediate reopen, saved/default/no-preferences callbacks and owner release, plus accepted-command preservation when all Rune panels are hidden. Twenty source preservation tests pass, including Provider draft/accepted-operation cases. Saved layouts, storage and existing state owners remain. Desktop/full UI, installed/shipment and broader capabilities remain open; other implementations stay deferred. Native GUI completion and exact per-method xcresult PASS are verified; CLI/build/signing/publication identities are recorded separately in the external V208 receipt. This closes the scoped observation repair, while the full-view acceptance gate remains open.
+
+CLI/app compilation, the canonical ordinary Debug build and strict source/candidate signatures pass, normal exit 0/unforced. The exact copied 0.44.6 (66) candidate contains 34 regular files and three symlinks; it was not launched, installed, notarized or shipped. Current native and build inputs differ only by the restored known GUI scheme and subsequent documentation; production/test bytes remain identical. Publication/readback revisions are retained externally.
+
+## Historical 0.17.0 acceptance
+
 **UI implementation and QA complete.** Source
 **0.17.0 (27)**,28548a73… passed 116 distinct production tests in 140 successful
 executions, zero failures/skips. The separate native view matrix passed 21 unique

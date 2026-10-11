@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 private struct NativeWorkspacePreferencesKey: EnvironmentKey {
@@ -29,6 +30,7 @@ struct NativeWorkspaceView<DefaultContent: View>: View {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.graphiteAccessibilityCapabilities) private var capabilities
+    @State private var windowIsActive = false
     let viewID: String
     let descriptors: [NativeWorkspacePanelDescriptor]
     @ViewBuilder let defaultContent: () -> DefaultContent
@@ -36,12 +38,23 @@ struct NativeWorkspaceView<DefaultContent: View>: View {
     var activityChanged: ((Bool) -> Void)? = nil
 
     var body: some View {
-        if let preferences {
-            NativeWorkspaceScope(preferences: preferences, viewID: viewID,
-                                 descriptors: descriptors, defaultContent: defaultContent,
-                                 panelContent: hostedPanel, activityChanged: activityChanged)
-        } else {
-            defaultContent().onAppear { activityChanged?(true) }
+        Group {
+            if let preferences {
+                NativeWorkspaceScope(preferences: preferences, viewID: viewID,
+                                     descriptors: descriptors, defaultContent: defaultContent,
+                                     panelContent: hostedPanel, activityChanged: activityChanged,
+                                     windowIsActive: windowIsActive)
+            } else {
+                defaultContent().onChange(of: windowIsActive, initial: true) { _, active in
+                    activityChanged?(active)
+                }
+            }
+        }
+        .background {
+            if activityChanged != nil {
+                NativeWorkspaceWindowActivityReader(isActive: $windowIsActive)
+                    .frame(width: 0, height: 0)
+            }
         }
     }
 
@@ -80,6 +93,7 @@ private struct NativeWorkspaceScope<DefaultContent: View>: View {
     @ViewBuilder let defaultContent: () -> DefaultContent
     let panelContent: (String, Bool) -> AnyView
     let activityChanged: ((Bool) -> Void)?
+    let windowIsActive: Bool
     @State private var errorMessage: String?
     @State private var proposedName = ""
     @State private var namingAction: NamingAction?
@@ -110,7 +124,7 @@ private struct NativeWorkspaceScope<DefaultContent: View>: View {
                 defaultContent()
             }
         }
-        .onChange(of: active?.panels.contains(where: \.isVisible) ?? true, initial: true) { _, visible in
+        .onChange(of: windowIsActive && (active?.panels.contains(where: \.isVisible) ?? true), initial: true) { _, visible in
             activityChanged?(visible)
         }
         .sheet(item: $namingAction) { action in
@@ -244,5 +258,107 @@ private struct NativeWorkspaceScope<DefaultContent: View>: View {
         case .tooManyLayouts: errorMessage = "Up to 32 layouts can be saved. Delete a saved layout to add another."
         default: errorMessage = "The layout settings are invalid. Restore the default layout and try again."
         }
+    }
+}
+
+private struct NativeWorkspaceWindowActivityReader: NSViewRepresentable {
+    @Binding var isActive: Bool
+
+    func makeNSView(context: Context) -> NativeWorkspaceWindowActivityView {
+        let view = NativeWorkspaceWindowActivityView()
+        view.activityChanged = { isActive = $0 }
+        return view
+    }
+
+    func updateNSView(_ view: NativeWorkspaceWindowActivityView, context: Context) {
+        view.activityChanged = { isActive = $0 }
+        view.scheduleDelivery()
+    }
+
+    static func dismantleNSView(_ view: NativeWorkspaceWindowActivityView, coordinator: ()) {
+        view.detach()
+    }
+}
+
+@MainActor
+private final class NativeWorkspaceWindowActivityView: NSView {
+    var activityChanged: ((Bool) -> Void)?
+    private weak var observedWindow: NSWindow?
+    private var lastDeliveredActive: Bool?
+    private var pendingDelivery: DispatchWorkItem?
+    private var deliveryGeneration: UInt64 = 0
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        setAccessibilityElement(false)
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        NotificationCenter.default.removeObserver(self)
+        observedWindow = window
+        if let window {
+            for name in [NSWindow.willCloseNotification, NSWindow.didChangeOcclusionStateNotification,
+                         NSWindow.didMiniaturizeNotification, NSWindow.didDeminiaturizeNotification,
+                         NSWindow.didExposeNotification, NSWindow.didUpdateNotification] {
+                NotificationCenter.default.addObserver(self, selector: #selector(windowActivityChanged),
+                                                       name: name, object: window)
+            }
+        }
+        scheduleDelivery()
+    }
+
+    override func viewDidHide() { super.viewDidHide(); scheduleDelivery() }
+    override func viewDidUnhide() { super.viewDidUnhide(); scheduleDelivery() }
+
+    @objc private func windowActivityChanged(_ notification: Notification) {
+        guard let observedWindow, notification.object as? NSWindow === observedWindow else { return }
+        if notification.name == NSWindow.didUpdateNotification,
+           lastDeliveredActive == currentActivity { return }
+        scheduleDelivery()
+    }
+
+    private var currentActivity: Bool {
+        let attachedWindow = window
+        return attachedWindow != nil && attachedWindow === observedWindow
+            && attachedWindow?.isVisible == true && attachedWindow?.isMiniaturized == false
+            && !isHiddenOrHasHiddenAncestor
+    }
+
+    func scheduleDelivery() {
+        guard pendingDelivery == nil, activityChanged != nil else { return }
+        deliveryGeneration &+= 1
+        let generation = deliveryGeneration
+        // One replaceable native-state delivery keeps Binding writes out of SwiftUI updates.
+        let work = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, self.deliveryGeneration == generation, self.activityChanged != nil else { return }
+                self.pendingDelivery = nil
+                let active = self.currentActivity
+                guard self.lastDeliveredActive != active else { return }
+                self.lastDeliveredActive = active
+                self.activityChanged?(active)
+            }
+        }
+        pendingDelivery = work
+        DispatchQueue.main.async(execute: work)
+    }
+
+    func detach() {
+        NotificationCenter.default.removeObserver(self)
+        pendingDelivery?.cancel()
+        pendingDelivery = nil
+        deliveryGeneration &+= 1
+        observedWindow = nil
+        activityChanged = nil
+    }
+
+    isolated deinit {
+        NotificationCenter.default.removeObserver(self)
+        pendingDelivery?.cancel()
     }
 }
