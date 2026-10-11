@@ -1137,6 +1137,7 @@ public final class AppModel: ObservableObject {
     @Published public private(set) var lastError: String?
     @Published public private(set) var isLoading = false
     @Published public private(set) var isBootstrapping = false
+    @Published public private(set) var isRunningDoctor = false
     @Published public private(set) var hasLoadedInitialSettings = false
     @Published public private(set) var version: String = ForgeApp.version
     @Published public private(set) var homePath: String = ""
@@ -1203,6 +1204,10 @@ public final class AppModel: ObservableObject {
     private let startupDiagnosticPaths: AppPaths
     private var startupDiagnostics: DiagnosticLog?
     private let revealDiagnosticExport: ([URL]) -> Void
+    private let doctorWork: @Sendable (ForgeApp) throws -> DoctorReport
+    private let doctorOperation = AppBackgroundOperation()
+    private var doctorRequest: UUID?
+    private var doctorClosing = false
     private let settingsOperation = AppBackgroundOperation()
     private let pluginStatusOperation = AppBackgroundOperation()
     private var pluginStatusRefreshPending = false
@@ -1278,6 +1283,7 @@ public final class AppModel: ObservableObject {
         bootstrapOperation: AppBootstrapOperation,
         bootstrapIntegration: AppBootstrapIntegrationMode = .live,
         diagnosticPaths: AppPaths = AppPaths(),
+        doctorWork: @escaping @Sendable (ForgeApp) throws -> DoctorReport = { try $0.doctorModel() },
         revealDiagnosticExport: @escaping ([URL]) -> Void = {
             NSWorkspace.shared.activateFileViewerSelecting($0)
         }
@@ -1285,6 +1291,7 @@ public final class AppModel: ObservableObject {
         self.bootstrapOperation = bootstrapOperation
         self.bootstrapIntegration = bootstrapIntegration
         self.startupDiagnosticPaths = diagnosticPaths
+        self.doctorWork = doctorWork
         self.revealDiagnosticExport = revealDiagnosticExport
         secureFilesystemService.setLifecycleStateObserver { [weak self] observation in
             self?.applySecureFilesystemLifecycleObservation(observation)
@@ -1329,6 +1336,8 @@ public final class AppModel: ObservableObject {
     }
 
     public func cancelBackgroundOperations() {
+        doctorClosing = true
+        cancelDoctor()
         bootstrapOperation.cancel()
         settingsOperation.cancel()
         pluginStatusRefreshPending = false
@@ -1338,9 +1347,11 @@ public final class AppModel: ObservableObject {
         if let diagnostics = startupDiagnostics {
             let bootstrap = bootstrapOperation
             let export = diagnosticsExportOperation
+            let doctor = doctorOperation
             startupDiagnostics = nil
             diagnosticsShutdownOperation.start {
                 await bootstrap.stop()
+                await doctor.stop()
                 await export.stop()
                 return diagnostics.shutdown(timeout: 2)
             } completion: { _ in }
@@ -1577,6 +1588,9 @@ public final class AppModel: ObservableObject {
     }
 
     func stopBootstrap() async {
+        doctorClosing = true
+        cancelDoctor()
+        await doctorOperation.stop()
         await bootstrapOperation.stop()
         if let startupDiagnostics {
             _ = await Task.detached { startupDiagnostics.shutdown(timeout: 2) }.value
@@ -2745,8 +2759,41 @@ public final class AppModel: ObservableObject {
         ], category: .ui)
     }
 
-    public func runDoctor() -> DoctorReport? { try? app?.doctorModel() }
+    public func runDoctor() -> DoctorReport? {
+        guard let app else { return nil }
+        return try? doctorWork(app)
+    }
     public func runDoctorDictionary() -> [String: Any]? { try? app?.doctor() }
+
+    @discardableResult
+    func startDoctor(completion: @escaping @MainActor (DoctorReport?) -> Void) -> Bool {
+        guard !doctorClosing, !doctorOperation.isRunning else { return false }
+        guard let app else {
+            completion(nil)
+            return true
+        }
+        let request = UUID()
+        let work = doctorWork
+        doctorRequest = request
+        isRunningDoctor = true
+        return doctorOperation.start {
+            try Task.checkCancellation()
+            let report = try work(app)
+            try Task.checkCancellation()
+            return report
+        } completion: { [weak self, weak app] result in
+            guard let self else { return }
+            self.isRunningDoctor = false
+            guard self.doctorRequest == request, let app, self.app === app else { return }
+            self.doctorRequest = nil
+            completion(try? result.get())
+        }
+    }
+
+    func cancelDoctor() {
+        doctorRequest = nil
+        doctorOperation.cancel()
+    }
 
     public func prunePresence() {
         _ = try? app?.store.presencePrune(maxAgeSec: 60)

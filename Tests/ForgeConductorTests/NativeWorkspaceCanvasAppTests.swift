@@ -1727,6 +1727,143 @@ final class NativeWorkspaceCanvasAppTests: XCTestCase, @unchecked Sendable {
         }
     }
 
+    func testInitializedManagerDoctorOwnedButtonRunsOffMainAndDisplaysRealReport() async throws {
+        let priorContinuation = continueAfterFailure
+        continueAfterFailure = true
+        defer { continueAfterFailure = priorContinuation }
+        let deadline = ProcessInfo.processInfo.systemUptime + 45
+        let probe = NativeWorkspaceDoctorThreadProbe()
+        var receipt: [String: Any] = [
+            "classification": "Actual initialized isolated Manager Doctor button, real report and execution thread; no visible freeze-duration or desktop qualification",
+            "shared_deadline_seconds": 45, "worker_deliberately_parked": false,
+            "execution_completed": false, "owned_fixture_close_returned": false,
+        ]
+        defer { nativeDraftRetainMeasurement(receipt, name: "initialized-manager-doctor-thread-and-report") }
+        let fixture = try NativeWorkspaceDraftFixture(page: .doctor, doctorWork: { try probe.run($0) })
+        draftFixture = fixture
+        do {
+            try await exposeNativeDraftFixture(fixture)
+            try nativeOwnedRequireOwner(fixture, deadline: deadline, requireKey: true)
+            let app = try XCTUnwrap(fixture.model.app)
+            let configuration = try await Task.detached { try Data(contentsOf: app.paths.configJSON) }.value
+            let collection = fixture.preferences.collection
+            let layoutBytes = fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey)
+            XCTAssertNil(fixture.model.manager)
+            XCTAssertNil(fixture.model.remoteManager)
+            XCTAssertEqual(probe.snapshot.starts, 0)
+            nativeDraftStage("initialized-doctor.actual-owned-button")
+            try await nativeExportOwnedPress("settings-run-doctor", in: fixture, deadline: deadline)
+            try await nativeOwnedWait("The actual Doctor button did not complete its real initialized report.", deadline: deadline) {
+                probe.snapshot.completions == 1
+            }
+            let observed = probe.snapshot
+            receipt["work_starts"] = observed.starts
+            receipt["work_completions"] = observed.completions
+            receipt["work_entered_on_main_thread"] = observed.enteredOnMain
+            receipt["work_used_exact_initialized_app"] = observed.application === app
+            receipt["first_work_error"] = observed.firstError.map { $0 as Any } ?? NSNull()
+            let report = try XCTUnwrap(observed.report)
+            let healthy = report.ok && report.checks.allSatisfy(\.ok)
+            let heading = "Doctor " + (healthy ? "OK" : "ISSUES")
+            let lines = report.checks.map { "\($0.ok ? "OK" : "FAIL")  \($0.name): \($0.detail)" }
+            let expectedText = ([
+                "state=\(healthy ? "healthy" : "attention")  version=\(report.version)  build=\(report.buildVersion)",
+                "home=\(report.home)",
+                "binary=\(report.binaryInstalled ? "yes" : "no")  \(report.binaryPath)",
+                "telemetry=\(report.telemetry.runtime)", "",
+            ] + lines).joined(separator: "\n")
+            guard expectedText.utf8.count <= 32 * 1_024, report.checks.count <= 64 else {
+                throw WorkspaceCanvasFixtureFailure("The initialized Doctor report exceeded its finite observation bound.")
+            }
+            receipt["expected_heading"] = heading
+            receipt["real_report_text"] = expectedText
+            receipt["real_report_check_count"] = report.checks.count
+            receipt["report_home_matches_owned_home"] = report.home == fixture.home.path
+            XCTAssertEqual(observed.starts, 1)
+            XCTAssertEqual(observed.completions, 1)
+            XCTAssertTrue(observed.application === app)
+            XCTAssertFalse(observed.enteredOnMain, "The actual initialized Doctor button must perform its real report work off the main thread.")
+            XCTAssertEqual(report.home, fixture.home.path)
+            XCTAssertEqual(report.version, ForgeApp.version)
+            XCTAssertTrue(report.checks.contains { $0.name == "project_control_plane" && $0.ok })
+            XCTAssertTrue(report.checks.contains { $0.name == "sqlite_query" && $0.ok })
+            let reportDeadline = min(deadline, ProcessInfo.processInfo.systemUptime + 3)
+            let action = try await nativeDraftAXElement("settings-run-doctor", in: fixture,
+                deadline: reportDeadline, scope: .applicationContent)
+            guard let button = action.exportedAX, let context = action.exportedContext,
+                  action.identifier == "settings-run-doctor", action.role == .button else {
+                throw WorkspaceCanvasFixtureFailure("The initialized report lacks its exact exported Doctor button.")
+            }
+            var cursor = button, ancestors: [AXUIElement] = []
+            var reportRoot: NativeWorkspaceDraftAccessibilityNode?
+            for _ in 0..<48 {
+                try context.requireOwner()
+                guard !ancestors.contains(where: { CFEqual($0, cursor) }) else {
+                    throw WorkspaceCanvasFixtureFailure("The initialized Doctor report ancestry contains a cycle.")
+                }
+                ancestors.append(cursor)
+                guard let raw = try NativeWorkspaceDraftAXQuery.attribute(cursor, kAXParentAttribute, deadline: reportDeadline),
+                      CFGetTypeID(raw as CFTypeRef) == AXUIElementGetTypeID() else {
+                    throw WorkspaceCanvasFixtureFailure("The initialized Doctor button lacks a bounded exported body parent.")
+                }
+                let parent = raw as! AXUIElement
+                if CFEqual(parent, context.windowElement) { break }
+                try context.requireOwnedAncestor(parent)
+                let candidate = try NativeWorkspaceDraftAccessibilityNode(exported: parent, context: context)
+                if candidate.role == .scrollArea { reportRoot = candidate; break }
+                cursor = parent
+            }
+            guard let reportRoot, let body = reportRoot.exportedAX else {
+                throw WorkspaceCanvasFixtureFailure("The actual Doctor button has no owned exported scroll-area body before its window.")
+            }
+            _ = try nativeExportFrame(body, context: context, fixture: fixture, deadline: reportDeadline)
+            var nodeCount = 0
+            try await nativeOwnedWait("The initialized Doctor result did not display its actual heading and complete report.", deadline: reportDeadline) {
+                let nodes = try self.nativeDraftExportedAXTree(reportRoot, deadline: reportDeadline, limit: 512)
+                nodeCount = nodes.count
+                let buttons = nodes.filter { $0.identifier == "settings-run-doctor" }
+                guard buttons.count == 1, let exactButton = buttons.first?.exportedAX, CFEqual(exactButton, button) else {
+                    throw WorkspaceCanvasFixtureFailure("The observed report body lost its unique exact Doctor button.")
+                }
+                let strings = nodes.flatMap { node in [node.title, node.label, node.value as? String].compactMap { $0 } }
+                receipt["last_heading_exact_match"] = strings.contains(heading)
+                receipt["last_full_report_exact_String_match"] = strings.contains(expectedText)
+                receipt["last_report_native_node_count"] = nodeCount
+                return strings.contains(heading) && strings.contains(expectedText)
+            }
+            try context.requireOwnedAncestor(body)
+            receipt["report_observation_scope"] = "Primary scoped exported AX; nearest exact Doctor-button scroll-area ancestor inside its owned application-content window; no window chrome subtree"
+            receipt["report_root_role"] = reportRoot.role?.rawValue ?? ""
+            receipt["report_button_parent_depth"] = ancestors.count
+            receipt["report_body_contains_exact_button"] = true
+            receipt["report_native_node_count"] = nodeCount
+            receipt["heading_and_complete_report_displayed"] = true
+            XCTAssertEqual(fixture.preferences.collection, collection)
+            XCTAssertEqual(fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey), layoutBytes)
+            let afterConfiguration = try await Task.detached { try Data(contentsOf: app.paths.configJSON) }.value
+            XCTAssertEqual(afterConfiguration, configuration)
+            XCTAssertEqual(fixture.recorder.creations, 1)
+            let observations = await fixture.client.observations()
+            XCTAssertEqual(observations.repositoryWrites, 0)
+            XCTAssertEqual(observations.otherMutations, 0)
+            try nativeOwnedRequireOwner(fixture, deadline: deadline, requireKey: true)
+            receipt["configuration_and_layout_unchanged"] = afterConfiguration == configuration
+                && fixture.preferences.collection == collection
+                && fixture.defaults.data(forKey: NativeWorkspacePreferences.storageKey) == layoutBytes
+            receipt["execution_completed"] = true
+            await fixture.close()
+            draftFixture = nil
+            receipt["owned_fixture_close_returned"] = true
+            XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, deadline)
+        } catch {
+            receipt["original_error"] = String(String(describing: error).prefix(1_024))
+            await fixture.close()
+            draftFixture = nil
+            receipt["owned_fixture_close_returned"] = true
+            throw error
+        }
+    }
+
     private func nativeRepositoryBackendRecord(_ checkpoint: NativeWorkspaceProjectRepositoryBackend.Checkpoint,
                                               phase: String, backend: NativeWorkspaceProjectRepositoryBackend) async throws {
         let payload = try await backend.evidence(checkpoint, phase: phase)
@@ -6876,7 +7013,7 @@ private final class NativeWorkspaceDraftExportedAXContext {
 
 @MainActor
 private final class NativeWorkspaceDraftFixture {
-    enum Page: Equatable { case manager, projects, shell }
+    enum Page: Equatable { case manager, projects, shell, doctor }
     let home: URL
     let suite: String
     let defaults: UserDefaults
@@ -6894,8 +7031,9 @@ private final class NativeWorkspaceDraftFixture {
     private var ownsGuidedSetupEnvironment = false
 
     init(page: Page, repositoryUpdatesEnabled: Bool = false,
-         backend: NativeWorkspaceProjectRepositoryBackend.Presentation? = nil) throws {
-        guard (backend == nil && page != .shell) || (backend != nil && page != .manager) else {
+         backend: NativeWorkspaceProjectRepositoryBackend.Presentation? = nil,
+         doctorWork: @escaping @Sendable (ForgeApp) throws -> DoctorReport = { try $0.doctorModel() }) throws {
+        guard (backend == nil && page != .shell) || (backend != nil && page != .manager && page != .doctor) else {
             throw WorkspaceCanvasFixtureFailure("The real backend is required for Shell and supported for Projects only.")
         }
         let suiteName = backend?.suite ?? "forge.workspace.positive-draft.tests.\(UUID().uuidString)"
@@ -6929,7 +7067,7 @@ private final class NativeWorkspaceDraftFixture {
             return app
         }, pluginStatus: { _ in nil })
         let modelOwner = AppModel(bootstrapOperation: bootstrap, bootstrapIntegration: .isolatedPresentation,
-                                  diagnosticPaths: AppPaths(home: homeURL))
+                                  diagnosticPaths: AppPaths(home: homeURL), doctorWork: doctorWork)
         modelOwner.autoRefresh = false
         let projectsClient: any OperatorManagerClientProtocol
         if let backend { projectsClient = backend.client }
@@ -6937,6 +7075,7 @@ private final class NativeWorkspaceDraftFixture {
         let content: AnyView
         switch page {
         case .manager: content = AnyView(ManagerSettingsView(initialSection: .settings))
+        case .doctor: content = AnyView(ManagerSettingsView(initialSection: .doctor))
         case .projects: content = AnyView(ProjectsOperatorView(client: projectsClient))
         case .shell:
             modelOwner.operatorManagerClient.replace(with: projectsClient)
@@ -7242,6 +7381,42 @@ private actor NativeWorkspaceProjectRepositoryBackend {
             throw WorkspaceCanvasFixtureFailure("Owned loopback ephemeral-port reservation failed.")
         }
         return Int(UInt16(bigEndian: address.sin_port))
+    }
+}
+
+private final class NativeWorkspaceDoctorThreadProbe: @unchecked Sendable {
+    struct Snapshot {
+        let starts: Int
+        let completions: Int
+        let enteredOnMain: Bool
+        let application: ForgeApp?
+        let report: DoctorReport?
+        let firstError: String?
+    }
+    private let lock = NSLock()
+    private var starts = 0
+    private var completions = 0
+    private var enteredOnMain = false
+    private weak var application: ForgeApp?
+    private var report: DoctorReport?
+    private var firstError: String?
+
+    func run(_ app: ForgeApp) throws -> DoctorReport {
+        lock.lock(); starts += 1; enteredOnMain = enteredOnMain || Thread.isMainThread; application = app; lock.unlock()
+        do {
+            let result = try app.doctorModel()
+            lock.lock(); report = result; completions += 1; lock.unlock()
+            return result
+        } catch {
+            lock.lock(); if firstError == nil { firstError = String(String(describing: error).prefix(1_024)) }; completions += 1; lock.unlock()
+            throw error
+        }
+    }
+
+    var snapshot: Snapshot {
+        lock.lock(); defer { lock.unlock() }
+        return Snapshot(starts: starts, completions: completions, enteredOnMain: enteredOnMain,
+                        application: application, report: report, firstError: firstError)
     }
 }
 

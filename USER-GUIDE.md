@@ -1,6 +1,6 @@
 # Forge Conductor user guide
 
-Version **0.44.3**, build **63** retains custom layouts within each existing view and displays saved menu entries as `Layout: <name>`. Stored names and layout identities are unchanged.
+Version **0.44.4**, build **64** retains custom layouts within each existing view and displays saved menu entries as `Layout: <name>`. Stored names and layout identities are unchanged.
 
 In Projects, a new repository save attempt clears the previous success message before validation. If the project selection or repository URL is invalid, the current error appears without the earlier **Saved** notice.
 
@@ -556,6 +556,7 @@ Opening either entry or switching sections preserves staged configuration.
 Folder selection, host/port/refresh/watchdog/session settings and shell settings
 remain staged until **Save settings**; **Reload from disk** explicitly replaces
 the draft. Each section scrolls when content exceeds the available height.
+Run doctor performs its health check in the background. Its actions are disabled while the check runs, and Doctor shows the result when it finishes.
 
 **Provider** has a provider list and detail workspace. Clicking a row only
 inspects that provider. Its explicit activation toggle changes the active

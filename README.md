@@ -1,6 +1,8 @@
 # Forge Conductor for macOS
 
-Current source target **0.44.3 (63)** clears stale repository success feedback when a new Save or Clear is rejected. Movable, resizable, show/hide panels and named layouts remain within each existing view. [Workspace guide](docs/NATIVE-WORKSPACES.md).
+Current source target **0.44.4 (64)** moves Run doctor health checks into one owned background operation. Movable, resizable, show/hide panels and named layouts remain within each existing view. [Workspace guide](docs/NATIVE-WORKSPACES.md).
+
+Four AppModel Doctor tests and one scoped native Run doctor check pass on 0.44.4 (64): report work runs off the main thread, and the complete 24-check Doctor ISSUES report, configuration and layout preferences are unchanged. The earlier main-thread baseline and separate ordinary-metadata display failure remain recorded; exported application-content readback identifies the existing report. The 19-case area regression (including G3), CLI/app compilation, ordinary Debug build and strict signature pass. Source/wiki synchronization outcomes are retained in external receipts; ordinary desktop/full UI, installed/shipment gates stay open and other implementations remain deferred.
 
 V198 reproduces and corrects the feedback bug in unit and native resized-panel tests. All 22 Projects view-model tests and the existing native Projects draft check pass. CLI/app compilation, ordinary Debug build and strict signature checks pass; desktop/full UI and gesture qualification remain open, and other implementations remain deferred. [Current evidence](docs/QUALIFICATION-STATUS.md).
 
@@ -1075,8 +1077,8 @@ continuity. The user does not start project work through a Forge Managed Run.
 
 | | |
 |---|---|
-| **Version** | **0.44.3** |
-| **Build** | **63** |
+| **Version** | **0.44.4** |
+| **Build** | **64** |
 | **Platform** | macOS 26 or later |
 | **Toolchain** | Swift 6.2 and Xcode 26.6 or later |
 | **License** | [Apache License 2.0](LICENSE) |

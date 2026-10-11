@@ -10,6 +10,12 @@ Product versions do not by themselves claim shipment.
 
 ## [Unreleased]
 
+### `0.44.4 (64)`
+
+Run doctor uses one background health check, disables duplicate actions while it runs and discards cancelled results. The existing report text and synchronous Core/CLI/HTTP contract remain. Focused verification is recorded in the qualification status.
+
+Four Doctor ownership/lifecycle cases and the real native button/report check pass. The preserved Doctor layout regression, 19-case area cohort/G3, CLI/app builds, ordinary Debug build and strict signature also pass. Earlier failures remain recorded; desktop/full UI and installed/shipment gates stay open, and other implementations remain deferred. [Qualification](docs/QUALIFICATION-STATUS.md).
+
 ### `0.44.3 (63)`
 
 - Clear previous repository success feedback before validating a new Save or Clear. Invalid input or a changed project now shows only the current error, preserving the saved link and refusing an extra write. The same failing unit/native regression now passes; all 22 Projects view-model tests and the existing native draft case pass. Other implementations remain deferred. [Qualification](docs/QUALIFICATION-STATUS.md).

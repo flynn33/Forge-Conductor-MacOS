@@ -1,6 +1,6 @@
 # Forge Conductor — Xcode
 
-Current source version **0.44.3**, build **63** corrects Projects repository-save feedback: a new save attempt clears the previous success notice before project-context and URL validation. The canonical `ForgeConductor.xcworkspace`, existing memberships, dependencies and signing remain. Keep ordinary candidate and test output directories separate. CLI/app compilation, the separate ordinary Debug build and strict signature/0.44.3 (63) identity readback pass. The project changes only twelve marketing and sixteen build settings; source/test memberships remain. Current results and remaining gates are recorded in [qualification status](docs/QUALIFICATION-STATUS.md).
+Current source version **0.44.4**, build **64** moves the Manager Doctor check off the main actor, preserves synchronous Core/CLI/HTTP reports, and drains the UI worker before its existing shutdown boundary. The canonical `ForgeConductor.xcworkspace`, existing memberships, dependencies and signing remain.
 
 ## Preceding 0.44.2 (62) qualification
 

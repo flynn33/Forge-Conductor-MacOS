@@ -193,6 +193,46 @@ final class GuidedSetupProgressAppTests: XCTestCase {
     }
 }
 
+private final class DoctorWorkerProbe: @unchecked Sendable {
+    private let lock = NSLock()
+    private var starts = 0
+    private var ends = 0
+    private var mainEntry = false
+    private var gateExpired = false
+    private var report: DoctorReport?
+    private let failsFirst: Bool
+    let release = DispatchSemaphore(value: 0)
+
+    init(failsFirst: Bool = false) { self.failsFirst = failsFirst }
+    var startCount: Int { lock.withLock { starts } }
+    var endCount: Int { lock.withLock { ends } }
+    var ranOnMain: Bool { lock.withLock { mainEntry } }
+    var timedOut: Bool { lock.withLock { gateExpired } }
+    var lastReport: DoctorReport? { lock.withLock { report } }
+
+    func run(_ app: ForgeApp) throws -> DoctorReport {
+        let onMain = Thread.isMainThread
+        let attempt = lock.withLock {
+            starts += 1
+            mainEntry = mainEntry || onMain
+            return starts
+        }
+        defer { lock.withLock { ends += 1 } }
+        // A broken implementation must fail promptly instead of parking main.
+        guard !onMain, attempt <= 2 else { throw BootstrapFixtureError.expectedFailure }
+        guard release.wait(timeout: .now() + 10) == .success else {
+            lock.withLock { gateExpired = true }
+            throw BootstrapFixtureError.gateDeadline
+        }
+        if failsFirst && attempt == 1 { throw BootstrapFixtureError.expectedFailure }
+        // Deliberately return a real report even after cancellation: the owner
+        // must suppress the revoked completion rather than relying on this gate.
+        let actual = try app.doctorModel()
+        lock.withLock { report = actual }
+        return actual
+    }
+}
+
 @MainActor
 final class AppBootstrapAppTests: XCTestCase {
     private func home() -> URL {
@@ -509,6 +549,155 @@ final class AppBootstrapAppTests: XCTestCase {
         await model.stopBootstrap()
         XCTAssertFalse(model.hasLoadedInitialSettings)
     }
+    func testDelayedDoctorKeepsMainActorResponsiveAndRejectsDuplicateWork() async throws {
+        let probe = DoctorWorkerProbe()
+        try await withInitializedDoctorModel(probe: probe) { model, app in
+            var received: DoctorReport?
+            var completions = 0
+            XCTAssertTrue(model.startDoctor { report in
+                XCTAssertTrue(Thread.isMainThread)
+                completions += 1
+                received = report
+            })
+            XCTAssertTrue(model.isRunningDoctor)
+            XCTAssertFalse(model.startDoctor { _ in XCTFail("Duplicate Doctor completed") })
+            try await self.waitUntil { probe.startCount == 1 }
+            var heartbeat = false
+            let turn = Task { @MainActor in heartbeat = true }
+            await turn.value
+            XCTAssertTrue(heartbeat)
+            XCTAssertFalse(probe.ranOnMain)
+            XCTAssertNil(received)
+            XCTAssertEqual(completions, 0)
+            probe.release.signal()
+            try await self.waitUntil { completions == 1 && !model.isRunningDoctor }
+            let report = try XCTUnwrap(received)
+            XCTAssertEqual(report, probe.lastReport)
+            XCTAssertEqual(report.home, app.paths.home.path)
+            XCTAssertEqual(report.version, ForgeApp.version)
+            XCTAssertEqual(probe.startCount, 1)
+        }
+    }
+
+    func testDoctorThrownFailureClearsRunningStateAndPermitsRetry() async throws {
+        let probe = DoctorWorkerProbe(failsFirst: true)
+        try await withInitializedDoctorModel(probe: probe) { model, app in
+            var failed = false
+            XCTAssertTrue(model.startDoctor { report in
+                XCTAssertTrue(Thread.isMainThread)
+                XCTAssertNil(report)
+                failed = true
+            })
+            try await self.waitUntil { probe.startCount == 1 }
+            probe.release.signal()
+            try await self.waitUntil { failed && !model.isRunningDoctor }
+            var retried: DoctorReport?
+            XCTAssertTrue(model.startDoctor { report in
+                XCTAssertTrue(Thread.isMainThread)
+                retried = report
+            })
+            try await self.waitUntil { probe.startCount == 2 }
+            probe.release.signal()
+            try await self.waitUntil { retried != nil && !model.isRunningDoctor }
+            XCTAssertEqual(try XCTUnwrap(retried).home, app.paths.home.path)
+            XCTAssertEqual(retried, probe.lastReport)
+            XCTAssertEqual(probe.endCount, 2)
+        }
+    }
+
+    func testDoctorCancellationSuppressesStaleCompletionAndPermitsRetryAfterDrain() async throws {
+        let probe = DoctorWorkerProbe()
+        try await withInitializedDoctorModel(probe: probe) { model, app in
+            var staleCompletions = 0
+            XCTAssertTrue(model.startDoctor { _ in staleCompletions += 1 })
+            try await self.waitUntil { probe.startCount == 1 }
+            model.cancelDoctor()
+            XCTAssertTrue(model.isRunningDoctor, "Cancelled work must remain owned until drained")
+            XCTAssertFalse(model.startDoctor { _ in XCTFail("Retry overlapped cancelled work") })
+            probe.release.signal()
+            try await self.waitUntil { probe.endCount == 1 && !model.isRunningDoctor }
+            XCTAssertEqual(staleCompletions, 0)
+            XCTAssertNotNil(probe.lastReport, "The revoked worker really produced a report")
+            var retry: DoctorReport?
+            XCTAssertTrue(model.startDoctor { retry = $0 })
+            try await self.waitUntil { probe.startCount == 2 }
+            probe.release.signal()
+            try await self.waitUntil { retry != nil && !model.isRunningDoctor }
+            XCTAssertEqual(try XCTUnwrap(retry).home, app.paths.home.path)
+            XCTAssertEqual(staleCompletions, 0)
+        }
+    }
+
+    func testDoctorCloseSealsAdmissionAndJoinsWorkerBeforeCoreFixtureShutdown() async throws {
+        for cancelBackgroundFirst in [false, true] {
+            let probe = DoctorWorkerProbe()
+            try await withInitializedDoctorModel(probe: probe) { model, _ in
+                var completions = 0
+                XCTAssertTrue(model.startDoctor { _ in completions += 1 })
+                try await self.waitUntil { probe.startCount == 1 }
+                if cancelBackgroundFirst { model.cancelBackgroundOperations() }
+                var stopEntered = false
+                var stopReturned = false
+                let close = Task { @MainActor in
+                    stopEntered = true
+                    await model.stopBootstrap()
+                    stopReturned = true
+                }
+                try await self.waitUntil { stopEntered }
+                XCTAssertFalse(model.startDoctor { _ in XCTFail("Close admitted Doctor work") })
+                XCTAssertFalse(stopReturned, "Close returned while the worker was parked")
+                XCTAssertEqual(probe.endCount, 0)
+                probe.release.signal()
+                await close.value
+                XCTAssertTrue(stopReturned)
+                XCTAssertFalse(model.isRunningDoctor)
+                XCTAssertEqual(probe.endCount, 1)
+                XCTAssertEqual(completions, 0)
+                XCTAssertFalse(model.startDoctor { _ in XCTFail("Closed model admitted retry") })
+                // withInitializedDoctorModel invokes Core shutdown only after
+                // this observed join and its own final drain assertion.
+            }
+        }
+    }
+
+    private func withInitializedDoctorModel(
+        probe: DoctorWorkerProbe,
+        body: @MainActor (AppModel, ForgeApp) async throws -> Void
+    ) async throws {
+        let directory = home()
+        let model = AppModel(
+            bootstrapOperation: AppBootstrapOperation(home: directory, pluginStatus: { _ in nil }),
+            bootstrapIntegration: .isolatedPresentation,
+            diagnosticPaths: AppPaths(home: directory),
+            doctorWork: { try probe.run($0) }
+        )
+        model.autoRefresh = false
+        var originalFailure: Error?
+        do {
+            try await waitUntil { !model.isBootstrapping }
+            let app = try XCTUnwrap(model.app)
+            try await waitUntil { model.hasLoadedInitialSettings && !model.isUpdatingSettings }
+            XCTAssertTrue(model.hasLoadedInitialSettings)
+            try await body(model, app)
+        } catch { originalFailure = error }
+        // At most two proposed calls can park; release both on a failed path.
+        probe.release.signal()
+        probe.release.signal()
+        model.cancelBackgroundOperations()
+        await model.stopBootstrap()
+        XCTAssertFalse(model.isRunningDoctor)
+        XCTAssertEqual(probe.endCount, probe.startCount, "Doctor must drain before Core shutdown")
+        XCTAssertFalse(probe.ranOnMain)
+        XCTAssertFalse(probe.timedOut)
+        if let app = model.app {
+            let closed = await Task.detached { app.shutdown() }.value
+            // No new Core-shutdown success/deadline assertion: preserve an
+            // unresolved isolated home instead of deleting beneath its owner.
+            if closed.completed { try? FileManager.default.removeItem(at: directory) }
+        } else { try? FileManager.default.removeItem(at: directory) }
+        if let originalFailure { throw originalFailure }
+    }
+
 }
 
 final class RigOperationalSnapshotAppTests: XCTestCase {

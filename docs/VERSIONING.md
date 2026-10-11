@@ -1,6 +1,6 @@
 # Versioning policy
 
-Current target identity is **0.44.3 (63)**. This backward-compatible Projects repository feedback correction advances patch/build authorities together. Layout and repository storage contracts remain. [Current gates](QUALIFICATION-STATUS.md).
+Current target identity is **0.44.4 (64)**. This backward-compatible Doctor UI correction advances patch/build authorities together. Layout, repository and Doctor report contracts remain. [Current gates](QUALIFICATION-STATUS.md).
 
 ## Preceding 0.44.2 (62) qualification
 
@@ -381,7 +381,7 @@ focused version test, and CI reject drift between them.
 
 ## Current identity
 
-Current source target is `0.44.3`, build `63`, for clearing prior success feedback when a repository Save or Clear begins, including rejected input. Historical wheel and layout evidence retains its tested identity. Focused repository feedback and owning unit regressions pass; full UI gates remain open and new capabilities stay deferred. [Current gates](QUALIFICATION-STATUS.md).
+Current source target is `0.44.4`, build `64`, for one owned background Doctor check with cancellation-safe UI publication. The focused Doctor and version checks pass; historical results keep their tested identities and full UI gates remain open. [Current gates](QUALIFICATION-STATUS.md).
 
 ## Preceding 0.43.0 (59) identity record
 

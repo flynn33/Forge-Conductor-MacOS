@@ -273,7 +273,14 @@ struct ManagerSettingsView: View {
     private var doctorControls: some View {
         VStack(alignment: .leading, spacing: 14) {
             Button("Run doctor") { runDoctor() }
+                .accessibilityIdentifier("settings-run-doctor")
                 .buttonStyle(GraphiteButtonStyle(kind: .primary))
+                .disabled(model.isRunningDoctor)
+            if model.isRunningDoctor {
+                Text("Checking health…")
+                    .font(.callout)
+                    .foregroundStyle(GraphitePalette.textSecondary)
+            }
             if doctorJSON.isEmpty {
                 Text("Run doctor to inspect the current native service, runtime and LM Studio integration health.")
                     .font(.callout)
@@ -786,6 +793,8 @@ struct ManagerSettingsView: View {
                 runDoctor()
                 selectedSection = .doctor
             }
+            .accessibilityIdentifier("settings-run-doctor")
+            .disabled(model.isRunningDoctor)
         }
     }
 
@@ -829,30 +838,30 @@ struct ManagerSettingsView: View {
     }
 
     private func runDoctor() {
-
-        if let d = model.runDoctor() {
-            let healthy = d.ok && d.checks.allSatisfy(\.ok)
-            doctorOK = healthy
-            doctorNeedsPluginRepair = d.checks.contains {
-                $0.name.hasPrefix("lm_studio_") && !$0.ok
+        model.startDoctor { report in
+            if let d = report {
+                let healthy = d.ok && d.checks.allSatisfy(\.ok)
+                doctorOK = healthy
+                doctorNeedsPluginRepair = d.checks.contains {
+                    $0.name.hasPrefix("lm_studio_") && !$0.ok
+                }
+                let lines = d.checks.map { c in
+                    "\(c.ok ? "OK" : "FAIL")  \(c.name): \(c.detail)"
+                }
+                doctorJSON =
+                    ([
+                        "state=\(healthy ? "healthy" : "attention")  version=\(d.version)  build=\(d.buildVersion)",
+                        "home=\(d.home)",
+                        "binary=\(d.binaryInstalled ? "yes" : "no")  \(d.binaryPath)",
+                        "telemetry=\(d.telemetry.runtime)",
+                        "",
+                    ] + lines).joined(separator: "\n")
+            } else {
+                doctorJSON = "doctor failed"
+                doctorOK = false
+                doctorNeedsPluginRepair = false
             }
-            let lines = d.checks.map { c in
-                "\(c.ok ? "OK" : "FAIL")  \(c.name): \(c.detail)"
-            }
-            doctorJSON =
-                ([
-                    "state=\(healthy ? "healthy" : "attention")  version=\(d.version)  build=\(d.buildVersion)",
-                    "home=\(d.home)",
-                    "binary=\(d.binaryInstalled ? "yes" : "no")  \(d.binaryPath)",
-                    "telemetry=\(d.telemetry.runtime)",
-                    "",
-                ] + lines).joined(separator: "\n")
-        } else {
-            doctorJSON = "doctor failed"
-            doctorOK = false
-            doctorNeedsPluginRepair = false
         }
-
     }
     @ViewBuilder
     private func runtimeRow(_ label: String, id: String, path: String?) -> some View {
